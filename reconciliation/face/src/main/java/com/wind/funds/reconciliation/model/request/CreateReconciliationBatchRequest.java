@@ -4,6 +4,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -31,12 +32,15 @@ public class CreateReconciliationBatchRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "本批次运行结果适用的准入对象类型")
-    @NotNull
+    @Schema(description = "本次对账作业范围的稳定业务引用")
+    @NotBlank
+    @Size(max = 128)
+    private String reconciliationScopeRef;
+
+    @Schema(description = "本批次运行结果适用的准入对象类型；纯对账时为空")
     private ReconciliationGateObjectType gateObjectType;
 
-    @Schema(description = "本批次运行结果适用的准入对象流水号")
-    @NotBlank
+    @Schema(description = "本批次运行结果适用的准入对象流水号；纯对账时为空")
     private String gateObjectSn;
 
     @Schema(description = "匹配或对账规则版本")

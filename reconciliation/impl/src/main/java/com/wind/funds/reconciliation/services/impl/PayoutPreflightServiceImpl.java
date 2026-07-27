@@ -13,11 +13,13 @@ import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
-import com.wind.funds.reconciliation.service.PayoutOrderService;
+import com.wind.funds.reconciliation.service.PayoutPreflightService;
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.core.context.TenantContextHolder;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -32,16 +34,17 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 出款单服务实现。
+ * 出款证据预检服务实现。
  *
- * <p>职责：在清结算出款提交前执行准入门禁，返回可解释的放行或阻断结果。</p>
+ * <p>职责：在清结算出款提交前检查调用方提供的证据，返回可解释的预检通过或阻断结果。</p>
  *
- * <p>边界：本实现不创建出款单、不调用通道、不写交易或账本事实。</p>
+ * <p>边界：本实现不读取结算、账户或通道权威事实，结果不是出款提交授权；
+ * 不创建出款单、不调用通道、不写交易或账本事实。</p>
  */
 @NullMarked
 @Service
 @AllArgsConstructor
-public class PayoutOrderServiceImpl implements PayoutOrderService {
+public class PayoutPreflightServiceImpl implements PayoutPreflightService {
 
     private static final long PREFLIGHT_RESULT_EXPIRE_MINUTES = 5L;
 
@@ -58,14 +61,14 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         AssertUtils.notNull(operator, "出款前准入检查操作人不能为空");
         List<PayoutPreflightBlockingReasonDTO> blockingReasons = new ArrayList<>();
         addBlockingReasonIfMissing(blockingReasons, request.getPayoutAccountRef(),
-                PayoutPreflightBlockingReasonCode.PAYOUT_ACCOUNT_INVALID,
-                "payoutAccountRef", "出款账户缺失或无效", SYSTEM_CONFIRMATION_OWNER);
+                PayoutPreflightBlockingReasonCode.PAYOUT_ACCOUNT_REF_MISSING,
+                "payoutAccountRef", "出款账户引用缺失", SYSTEM_CONFIRMATION_OWNER);
         addBlockingReasonIfMissing(blockingReasons, request.getPayeeEndpointRef(),
-                PayoutPreflightBlockingReasonCode.PAYEE_ENDPOINT_INVALID,
-                "payeeEndpointRef", "收款端点缺失或无效", OPERATIONS_CONFIRMATION_OWNER);
+                PayoutPreflightBlockingReasonCode.PAYEE_ENDPOINT_REF_MISSING,
+                "payeeEndpointRef", "收款端点引用缺失", OPERATIONS_CONFIRMATION_OWNER);
         addBlockingReasonIfMissing(blockingReasons, request.getChannelRef(),
-                PayoutPreflightBlockingReasonCode.CHANNEL_UNAVAILABLE,
-                "channelRef", "出款通道缺失或不可用", SYSTEM_CONFIRMATION_OWNER);
+                PayoutPreflightBlockingReasonCode.CHANNEL_REF_MISSING,
+                "channelRef", "出款通道引用缺失", SYSTEM_CONFIRMATION_OWNER);
         addExternalRuleBlockingReasonIfUnverified(blockingReasons, request.getExternalRuleVerificationEvidence());
         addBlockingReasonIfMissing(blockingReasons, request.getApprovalRef(),
                 PayoutPreflightBlockingReasonCode.APPROVAL_REQUIRED,
@@ -79,9 +82,9 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 .setPassed(passed)
                 .setBlockingLevel(passed ? PayoutPreflightBlockingLevel.PASSED : PayoutPreflightBlockingLevel.BLOCKED)
                 .setBlockingReasons(List.copyOf(blockingReasons))
-                .setManualReviewRequired(!passed)
+                .setManualReviewRequired(requiresManualReview(blockingReasons))
                 .setFactStatus(resolveFactStatus(passed))
-                .setDisplayStatus(resolveDisplayStatus(passed))
+                .setDisplayStatus(resolveDisplayStatus(passed, blockingReasons))
                 .setOperationStatus(resolveOperationStatus(passed))
                 .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
                 .setReconciliationRunResultSn(reconciliationGateDecision.getReconciliationRunResultSn())
@@ -95,11 +98,9 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
     private void validateRequest(CheckPayoutPreflightRequest request) {
         AssertUtils.notNull(request, "出款前准入检查请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "出款前准入检查租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "出款前准入检查 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getSettlementSn(), "出款前准入检查结算单号不能为空");
-        AssertUtils.notNull(request.getCurrency(), "出款前准入检查币种不能为空");
-        AssertUtils.notNull(request.getAmount(), "出款前准入检查金额不能为空");
-        AssertUtils.isTrue(request.getAmount() > 0, "出款前准入检查金额必须大于 0");
-        AssertUtils.hasText(request.getIdempotencyKey(), "出款前准入检查幂等键不能为空");
         AssertUtils.hasText(request.getReconciliationRunResultSn(), "出款前对账运行结果流水号不能为空");
     }
 
@@ -146,11 +147,17 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
 
     private ReconciliationGateDecisionDTO checkReconciliationGate(CheckPayoutPreflightRequest request,
                                                                  WindOperator operator) {
-        return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
+        return reconciliationGateApplicationService.inspectGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
-                .setGateObjectType(ReconciliationGateObjectType.PAYOUT)
+                .setGateObjectType(payoutGateObjectType(request))
                 .setGateObjectSn(payoutGateObjectSn(request))
                 .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
+    }
+
+    private ReconciliationGateObjectType payoutGateObjectType(CheckPayoutPreflightRequest request) {
+        return StringUtils.hasText(request.getPayoutSn())
+                ? ReconciliationGateObjectType.PAYOUT
+                : ReconciliationGateObjectType.SETTLEMENT;
     }
 
     private String payoutGateObjectSn(CheckPayoutPreflightRequest request) {
@@ -166,14 +173,37 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         if (reconciliationGateDecision.getDecisionStatus() != ReconciliationGateDecisionStatus.BLOCKED) {
             return;
         }
-        blockingReasons.add(new PayoutPreflightBlockingReasonDTO()
+        List<ReconciliationGateBlockingDifferenceDTO> differences = reconciliationGateDecision.getBlockingDifferences();
+        if (differences == null || differences.isEmpty()) {
+            blockingReasons.add(reconciliationBlockingReason(
+                    reconciliationGateDecision.getExplanation(), firstEvidenceRef(reconciliationGateDecision),
+                    null, null));
+            return;
+        }
+        differences.forEach(difference -> blockingReasons.add(reconciliationBlockingReason(
+                difference.getBlockingReason(), difference.getEvidenceRef(), difference.getDifferenceSn(),
+                difference.getResponsiblePartyRef())));
+    }
+
+    private PayoutPreflightBlockingReasonDTO reconciliationBlockingReason(String message,
+                                                                          @Nullable String evidenceRef,
+                                                                          @Nullable String differenceSn,
+                                                                          @Nullable String responsiblePartyRef) {
+        return new PayoutPreflightBlockingReasonDTO()
                 .setCode(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED)
-                .setMessage("对账差错未闭环，出款准入阻断：" + reconciliationGateDecision.getExplanation())
+                .setMessage("对账差错未闭环，出款准入阻断：" + message)
                 .setGuardName("reconciliationGate")
                 .setSeverity(PayoutPreflightBlockingLevel.BLOCKED)
                 .setRecoverable(true)
-                .setEvidenceRef(firstEvidenceRef(reconciliationGateDecision))
-                .setConfirmationOwner(OPERATIONS_CONFIRMATION_OWNER));
+                .setEvidenceRef(evidenceRef)
+                .setRelatedDifferenceSn(differenceSn)
+                .setConfirmationOwner(OPERATIONS_CONFIRMATION_OWNER)
+                .setResponsiblePartyRef(responsiblePartyRef);
+    }
+
+    private boolean requiresManualReview(List<PayoutPreflightBlockingReasonDTO> blockingReasons) {
+        return blockingReasons.stream()
+                .anyMatch(reason -> OPERATIONS_CONFIRMATION_OWNER.equals(reason.getConfirmationOwner()));
     }
 
     private @Nullable String firstEvidenceRef(ReconciliationGateDecisionDTO reconciliationGateDecision) {
@@ -210,13 +240,20 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 : PayoutPreflightFactStatus.PREFLIGHT_BLOCKED;
     }
 
-    private PayoutPreflightDisplayStatus resolveDisplayStatus(boolean passed) {
-        return passed ? PayoutPreflightDisplayStatus.READY_TO_SUBMIT
+    private PayoutPreflightDisplayStatus resolveDisplayStatus(
+            boolean passed,
+            List<PayoutPreflightBlockingReasonDTO> blockingReasons) {
+        if (passed) {
+            return PayoutPreflightDisplayStatus.PREFLIGHT_PASSED;
+        }
+        boolean reconciliationBlocked = blockingReasons.stream()
+                .anyMatch(reason -> reason.getCode() == PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
+        return reconciliationBlocked ? PayoutPreflightDisplayStatus.RECONCILIATION_REQUIRED
                 : PayoutPreflightDisplayStatus.WAITING_EVIDENCE;
     }
 
     private PayoutPreflightOperationStatus resolveOperationStatus(boolean passed) {
-        return passed ? PayoutPreflightOperationStatus.SUBMITTABLE
+        return passed ? PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED
                 : PayoutPreflightOperationStatus.BLOCKED;
     }
 

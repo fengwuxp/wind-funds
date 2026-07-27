@@ -14,9 +14,14 @@ import lombok.Getter;
 public enum PayoutPreflightDisplayStatus implements DescriptiveEnum {
 
     /**
-     * 可提交。
+     * 当前证据预检通过。
      */
-    READY_TO_SUBMIT("可提交"),
+    PREFLIGHT_PASSED("预检通过"),
+
+    /**
+     * 需要完成对账差错处理。
+     */
+    RECONCILIATION_REQUIRED("需要对账处理"),
 
     /**
      * 等待证据。

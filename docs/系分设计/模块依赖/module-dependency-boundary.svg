@@ -48,7 +48,7 @@
   <rect x="145" y="585" width="230" height="64" class="box teal"/><text x="260" y="611" text-anchor="middle" class="label">wallet-impl</text><text x="260" y="633" text-anchor="middle" class="sub">依赖 wallet-face / ledger-face / core</text>
   <rect x="430" y="585" width="260" height="64" class="box blue"/><text x="560" y="611" text-anchor="middle" class="label">transaction-impl</text><text x="560" y="633" text-anchor="middle" class="sub">依赖 transaction-face / wallet-face / core</text>
   <rect x="745" y="585" width="230" height="64" class="box green"/><text x="860" y="611" text-anchor="middle" class="label">ledger-impl</text><text x="860" y="633" text-anchor="middle" class="sub">依赖 ledger-face / core</text>
-  <rect x="1030" y="585" width="260" height="64" class="box orange"/><text x="1160" y="611" text-anchor="middle" class="label">reconciliation-impl</text><text x="1160" y="633" text-anchor="middle" class="sub">依赖 face / core；补事实走白名单命令</text>
+  <rect x="1030" y="585" width="260" height="64" class="box orange"/><text x="1160" y="611" text-anchor="middle" class="label">reconciliation-impl</text><text x="1160" y="633" text-anchor="middle" class="sub">依赖 face / core；资金变更走受控命令</text>
 
   <rect x="80" y="730" width="1340" height="100" class="group gray"/>
   <text x="105" y="764" class="section">测试层</text>
@@ -72,6 +72,6 @@
   <text x="120" y="865" class="section">禁止方向</text>
   <rect x="240" y="845" width="980" height="72" class="box red"/>
   <text x="730" y="864" text-anchor="middle" class="sub">face 不依赖 impl；生产模块不依赖 tests；core 不依赖 DAL/Web/MQ；跨域只通过 face/port，impl 不直接依赖其他 impl</text>
-  <text x="730" y="884" text-anchor="middle" class="sub">wallet 不直接写交易或账本；route 不写事实；ledger 不持有业务生命周期；对账清算补事实必须走白名单命令</text>
+  <text x="730" y="884" text-anchor="middle" class="sub">wallet 不直接写交易或账本；route 不写事实；ledger 不持有业务生命周期；对账清算资金变更必须走明确业务命令</text>
   <text x="730" y="904" text-anchor="middle" class="sub">对账清算不得直接改历史分录、余额投影或交易事实；治理、归档、重放和指标不得反写资金事实</text>
 </svg>

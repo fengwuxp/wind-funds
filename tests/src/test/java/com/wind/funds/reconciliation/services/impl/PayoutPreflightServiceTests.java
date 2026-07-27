@@ -28,7 +28,7 @@ import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceA
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
-import com.wind.funds.reconciliation.service.PayoutOrderService;
+import com.wind.funds.reconciliation.service.PayoutPreflightService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +46,7 @@ import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.reconciliation.ReconciliationTestFixture.withMatchBatchAsCurrentHead;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -63,20 +64,14 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     private static final String PAYOUT_SN = "payout_preflight_001";
 
-    private static final String IDEMPOTENCY_KEY = "idem_payout_preflight_001";
-
-    private static final String DIFFERENCE_SN = "recon_payout_gate_diff_001";
-
     private static final String RECONCILIATION_BATCH_SN = "recon_payout_gate_batch_001";
-
-    private static final String SOURCE_RECORD_SN = "processor_payout_gate_line_001";
 
     private static final String ADJUSTMENT_SN = "balance_adjust_payout_gate_001";
 
     private static final String RERUN_BATCH_SN = "recon_payout_gate_batch_001_rerun_001";
 
     @Autowired
-    private PayoutOrderService payoutOrderService;
+    private PayoutPreflightService payoutPreflightService;
 
     @Autowired
     private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
@@ -91,14 +86,27 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     private String preCreateRunResultSn;
 
+    private String reconciliationMatchResultSn;
+
     @BeforeEach
     void prepareReconciliationEvidence() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
         com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
-        payoutRunResultSn = recordBalancedRunResult(PAYOUT_SN, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN,
-                "report:payout-recon-run-001");
-        preCreateRunResultSn = recordBalancedRunResult(SETTLEMENT_SN, "recon_payout_precreate_batch_001", null,
-                "report:payout-precreate-recon-run-001");
+        reconciliationMatchResultSn = recordDifferenceMatchResultSn();
+        payoutRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.PAYOUT, PAYOUT_SN,
+                RERUN_BATCH_SN, RECONCILIATION_BATCH_SN, "report:payout-recon-run-001");
+        preCreateRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT, SETTLEMENT_SN,
+                "recon_payout_precreate_batch_001", null, "report:payout-precreate-recon-run-001");
+    }
+
+    @Test
+    void testCheckPayoutPreflightShouldRejectTenantDifferentFromCurrentContext() {
+        CheckPayoutPreflightRequest request = new CheckPayoutPreflightRequest()
+                .setTenantId(TENANT_ID + 1);
+
+        assertThatThrownBy(() -> payoutPreflightService.checkPayoutPreflight(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("tenantId 与当前租户不一致");
     }
 
     /**
@@ -109,7 +117,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldRejectNullRequest() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> payoutOrderService.checkPayoutPreflight(null, WindOperatorFactory.system()))
+        assertThatThrownBy(() -> payoutPreflightService.checkPayoutPreflight(null, WindOperatorFactory.system()))
                 .hasMessageContaining("出款前准入检查请求不能为空");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -117,7 +125,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：提交出款前缺少账户、收款端点、通道、外部规则核验证据和审批证据。
-     * 输入：结算单、出款单、金额和幂等键已给出，但所有出款准入证据缺失。
+     * 输入：结算单、出款单已给出，但所有出款准入证据缺失。
      * 输出：准入结果为阻断，并列出可解释的 blockingReasons。
      * 红线：出款前准入只做放行决策，不生成 ledger transaction、posting plan 或 entry。
      */
@@ -125,7 +133,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldBlockWhenRequiredGateEvidenceMissingWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 minimumPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
@@ -135,12 +143,13 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
         assertThat(result.getExternalRuleVerificationStatus())
                 .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
+        assertThat(result.isManualReviewRequired()).isTrue();
         assertThat(result.getBlockingReasons())
                 .extracting(PayoutPreflightBlockingReasonDTO::getCode)
                 .containsExactly(
-                        PayoutPreflightBlockingReasonCode.PAYOUT_ACCOUNT_INVALID,
-                        PayoutPreflightBlockingReasonCode.PAYEE_ENDPOINT_INVALID,
-                        PayoutPreflightBlockingReasonCode.CHANNEL_UNAVAILABLE,
+                        PayoutPreflightBlockingReasonCode.PAYOUT_ACCOUNT_REF_MISSING,
+                        PayoutPreflightBlockingReasonCode.PAYEE_ENDPOINT_REF_MISSING,
+                        PayoutPreflightBlockingReasonCode.CHANNEL_REF_MISSING,
                         PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED,
                         PayoutPreflightBlockingReasonCode.APPROVAL_REQUIRED);
         assertThat(result.getCheckedAt()).isNotNull();
@@ -149,9 +158,24 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testCheckPayoutPreflightShouldNotRequireManualReviewForSystemConfigurationOnly() {
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
+                readyPayoutPreflightRequest()
+                        .setPayoutAccountRef(null)
+                        .setChannelRef(null),
+                WindOperatorFactory.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.isManualReviewRequired()).isFalse();
+        assertThat(result.getBlockingReasons())
+                .extracting(PayoutPreflightBlockingReasonDTO::getConfirmationOwner)
+                .containsOnly("SYSTEM");
+    }
+
     /**
      * 场景：提交出款前的账户、收款端点、通道、外部规则核验证据和审批证据齐备。
-     * 输入：结算单、出款单、金额、幂等键和全部准入证据。
+     * 输入：结算单、出款单和全部准入证据。
      * 输出：准入结果为通过，保留核验证据引用用于后续审计链路。
      * 红线：准入通过仍不代表已经出款或入账，不得生成账务事实。
      */
@@ -159,15 +183,16 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldPassWhenRequiredGateEvidenceReadyWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
         assertThat(result.getBlockingReasons()).isEmpty();
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
-        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.READY_TO_SUBMIT);
-        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.PREFLIGHT_PASSED);
+        assertThat(result.getOperationStatus())
+                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(payoutRunResultSn);
         assertThat(result.getReconciliationResultDigest()).hasSize(64);
@@ -180,7 +205,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：创建出款单前先按结算单做准入检查，尚未生成 payoutSn。
-     * 输入：结算单、金额、幂等键和全部准入证据齐备，出款单号为空。
+     * 输入：结算单和全部准入证据齐备，出款单号为空。
      * 输出：准入结果通过，并返回服务端解释状态。
      * 红线：创建前检查不得强制要求已有出款单，也不得写入账务事实。
      */
@@ -188,7 +213,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldAllowPreCreateCheckWithoutPayoutSn() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest()
                         .setPayoutSn(null)
                         .setReconciliationRunResultSn(preCreateRunResultSn),
@@ -196,8 +221,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
-        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.READY_TO_SUBMIT);
-        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.PREFLIGHT_PASSED);
+        assertThat(result.getOperationStatus())
+                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -211,7 +237,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldBlockWhenExternalRuleEvidenceIncompleteWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest()
                         .setExternalRuleVerificationEvidence(new ExternalRuleVerificationEvidenceDTO()
                                 .setEvidenceRef("rule-evidence-incomplete")
@@ -236,15 +262,15 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     @Test
     void testCheckPayoutPreflightShouldBlockWhenPayoutReconciliationGateBlocked() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperatorFactory.system());
+        createHistoricalDifference();
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_BLOCKED);
-        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.WAITING_EVIDENCE);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.RECONCILIATION_REQUIRED);
         assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
         assertThat(result.getBlockingReasons())
                 .extracting(PayoutPreflightBlockingReasonDTO::getCode)
@@ -252,39 +278,64 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
         assertThat(blockingReason.getGuardName()).isEqualTo("reconciliationGate");
         assertThat(blockingReason.getMessage()).contains("对账差错");
-        assertThat(blockingReason.getEvidenceRef()).isEqualTo("report:payout-recon-run-001");
+        assertThat(blockingReason.getEvidenceRef()).isEqualTo("processor-payout-file-digest-001");
+        assertThat(blockingReason.getRelatedDifferenceSn()).isEqualTo(requiredDifferenceSn());
+        assertThat(blockingReason.getConfirmationOwner()).isEqualTo("OPERATIONS");
+        assertThat(blockingReason.getResponsiblePartyRef()).isEqualTo("processor:issuer-ledger");
         assertThat(result.getEvidenceRefs())
                 .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
                         "processor-payout-file-digest-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testCheckPayoutPreflightShouldNotInventResponsiblePartyWhenGateHasNoDifference() {
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
+                readyPayoutPreflightRequest().setReconciliationRunResultSn("missing-run-result"),
+                WindOperatorFactory.system());
+
+        PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
+        assertThat(blockingReason.getCode())
+                .isEqualTo(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
+        assertThat(blockingReason.getConfirmationOwner()).isEqualTo("OPERATIONS");
+        assertThat(blockingReason.getResponsiblePartyRef()).isNull();
+    }
+
     /**
-     * 场景：命中 PAYOUT 范围的差错已完成白名单处理并重新对账通过。
+     * 场景：命中 PAYOUT 对象的差错已完成上层受控处理并重新对账通过。
      * 输入：出款准入基础证据齐备，差错已回链处理动作和重跑对平证据。
-     * 输出：出款准入可以继续提交，但保留差错、处理动作和重跑证据引用。
-     * 红线：条件放行仍不代表已创建出款单或已经出款成功。
+     * 输出：出款证据预检通过，并保留差错、处理动作和重跑证据引用。
+     * 红线：历史差错闭环不等于条件放行，预检通过仍不是出款提交授权。
      */
     @Test
-    void testCheckPayoutPreflightShouldPassWhenPayoutReconciliationGateConditionallyPassed() {
+    void testCheckPayoutPreflightShouldPassEvidenceCheckWhenPayoutDifferenceResolved() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperatorFactory.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(payoutAdjustmentRequest(), WindOperatorFactory.system());
+        prepareAdjustedDifferenceWithBalancedRerun();
         reconciliationDifferenceApplicationService.recordRerunResult(payoutRerunRequest(), WindOperatorFactory.system());
 
-        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+        PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
         assertThat(result.getBlockingReasons()).isEmpty();
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
-        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
+        assertThat(result.getOperationStatus())
+                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
-                        "processor-payout-file-digest-001",
-                        "adjustment-evidence-payout-001", payoutRunResultSn);
+                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    private void prepareAdjustedDifferenceWithBalancedRerun() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
+        reconciliationMatchResultSn = recordDifferenceMatchResultSn();
+        createHistoricalDifference();
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                payoutAdjustmentRequest(), WindOperatorFactory.system());
+        payoutRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.PAYOUT, PAYOUT_SN,
+                RERUN_BATCH_SN, RECONCILIATION_BATCH_SN, "report:payout-recon-run-001");
     }
 
     private CheckPayoutPreflightRequest minimumPayoutPreflightRequest() {
@@ -292,10 +343,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setTenantId(TENANT_ID)
                 .setSettlementSn(SETTLEMENT_SN)
                 .setPayoutSn(PAYOUT_SN)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setAmount(10_00L)
-                .setReconciliationRunResultSn(payoutRunResultSn)
-                .setIdempotencyKey(IDEMPOTENCY_KEY);
+                .setReconciliationRunResultSn(payoutRunResultSn);
     }
 
     private CheckPayoutPreflightRequest readyPayoutPreflightRequest() {
@@ -323,26 +371,21 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     private CreateReconciliationDifferenceRequest payoutDifferenceRequest() {
         return new CreateReconciliationDifferenceRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
-                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
-                .setSourceRecordSn(SOURCE_RECORD_SN)
-                .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
-                .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
-                .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setDifferenceAmount(50L)
+                .setReconciliationMatchResultSn(reconciliationMatchResultSn)
                 .setResponsiblePartyRef("processor:issuer-ledger")
-                .setBlockingScope("PAYOUT")
-                .setRuleVersion("recon-rule-v1")
-                .setEvidenceRef("processor-payout-file-digest-001")
                 .setDescription("外部 processor 出款文件金额与内部待出款金额不一致");
+    }
+
+    private void createHistoricalDifference() {
+        withMatchBatchAsCurrentHead(jdbcTemplate, TENANT_ID, reconciliationMatchResultSn,
+                () -> reconciliationDifferenceApplicationService.createDifference(
+                        payoutDifferenceRequest(), WindOperatorFactory.system()));
     }
 
     private LinkReconciliationDifferenceAdjustmentRequest payoutAdjustmentRequest() {
         return new LinkReconciliationDifferenceAdjustmentRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
+                .setDifferenceSn(requiredDifferenceSn())
                 .setActionType(ReconciliationDifferenceActionType.ADJUST)
                 .setAdjustmentSn(ADJUSTMENT_SN)
                 .setIdempotencyKey("idem-recon-payout-adjust-001")
@@ -356,18 +399,52 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     private RecordReconciliationDifferenceRerunRequest payoutRerunRequest() {
         return new RecordReconciliationDifferenceRerunRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
+                .setDifferenceSn(requiredDifferenceSn())
                 .setReconciliationRunResultSn(payoutRunResultSn);
     }
 
-    private String recordBalancedRunResult(String gateObjectSn,
+    private String recordDifferenceMatchResultSn() {
+        String referenceSourceRef = "internal-difference:" + PAYOUT_SN;
+        String comparisonSourceRef = "external-difference:" + PAYOUT_SN;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, ReconciliationGateObjectType.PAYOUT,
+                PAYOUT_SN, "recon-rule-v1", "processor-payout-file-digest-001",
+                referenceSourceRef, comparisonSourceRef);
+        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
+                .setMatchResults(List.of(new ReconciliationMatchResultItem()
+                        .setReferenceSourceRef(referenceSourceRef)
+                        .setComparisonSourceRef(comparisonSourceRef)
+                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
+                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
+                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDifferenceAmount(50L)
+                        .setEvidenceRef("processor-payout-file-digest-001"))), WindOperatorFactory.system());
+        return jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_reconciliation_match_result
+                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND difference_type IS NOT NULL
+                """, String.class, TENANT_ID, RECONCILIATION_BATCH_SN);
+    }
+
+    private String requiredDifferenceSn() {
+        return jdbcTemplate.queryForObject("""
+                SELECT difference_sn FROM t_reconciliation_difference
+                WHERE tenant_id = ? AND reconciliation_match_result_sn = ?
+                """, String.class, TENANT_ID, reconciliationMatchResultSn);
+    }
+
+    private String recordBalancedRunResult(ReconciliationGateObjectType gateObjectType,
+                                           String gateObjectSn,
                                            String reconciliationBatchSn,
                                            String previousBatchSn,
                                            String evidenceRef) {
         String referenceSourceRef = "internal:" + gateObjectSn;
         String comparisonSourceRef = "external:" + gateObjectSn;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, reconciliationBatchSn, ReconciliationGateObjectType.PAYOUT,
+                jdbcTemplate, TENANT_ID, reconciliationBatchSn, gateObjectType,
                 gateObjectSn, "recon-rule-v1", evidenceRef, referenceSourceRef, comparisonSourceRef,
                 previousBatchSn);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
@@ -383,7 +460,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     @Configuration
     @Import({
-            PayoutOrderServiceImpl.class,
+            PayoutPreflightServiceImpl.class,
             ReconciliationDifferenceApplicationServiceImpl.class,
             ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class

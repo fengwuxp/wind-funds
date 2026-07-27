@@ -46,6 +46,12 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
     @NotNull
     private String fundsTransactionSn;
 
+    /**
+     * 识别候选时冻结的来源资金交易版本；最终清分命令必须重新核对。
+     */
+    @NotNull
+    private Integer sourceTransactionVersion;
+
     @NotNull
     private String fundsTransactionDetailSn;
 

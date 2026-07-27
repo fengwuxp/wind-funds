@@ -19,18 +19,28 @@ import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -44,10 +54,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         ReconciliationDifferenceApplicationServiceTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServiceTest {
-
-    private static final String DIFFERENCE_SN = "recon_diff_mvp_001";
 
     private static final String RECONCILIATION_BATCH_SN = "recon_batch_mvp_001";
 
@@ -68,10 +77,27 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private String reconciliationMatchResultSn;
+
     @BeforeEach
     void cleanReconciliationDifference() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
         com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
+        reconciliationMatchResultSn = recordInitialDifferenceRunResult();
+    }
+
+    @Test
+    void testCreateDifferenceShouldRejectTenantDifferentFromCurrentContext() {
+        CreateReconciliationDifferenceRequest request = new CreateReconciliationDifferenceRequest()
+                .setTenantId(TENANT_ID + 1);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("tenantId 与当前租户不一致");
+        assertThat(countDifferenceRows()).isZero();
     }
 
     /**
@@ -89,24 +115,76 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         ReconciliationDifferenceDTO replay = reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest(), WindOperatorFactory.system());
 
-        assertThat(result.getDifferenceSn()).isEqualTo(DIFFERENCE_SN);
+        assertThat(result.getDifferenceSn()).startsWith("RDF");
         assertThat(result.getReconciliationBatchSn()).isEqualTo(RECONCILIATION_BATCH_SN);
-        assertThat(result.getSourceRecordSn()).isEqualTo(SOURCE_RECORD_SN);
+        assertThat(result.getReconciliationMatchResultSn()).isEqualTo(reconciliationMatchResultSn);
         assertThat(result.getDifferenceType()).isEqualTo(ReconciliationDifferenceType.AMOUNT_MISMATCH);
         assertThat(result.getSourceQuality()).isEqualTo(ReconciliationSourceQuality.UNVERIFIED);
         assertThat(result.getMatchStrength()).isEqualTo(ReconciliationMatchStrength.CANDIDATE_MATCH);
         assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.BLOCKED);
-        assertThat(result.getBlockingScope()).isEqualTo("CLEARING,PAYOUT");
         assertThat(result.getRerunCount()).isZero();
         assertThat(result.getCreatedBy()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertThat(replay.getId()).isEqualTo(result.getId());
-        assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
+        assertThat(countDifferenceRows()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testCreateDifferenceShouldRejectLateMaterializationAfterLineageAdvances() throws Exception {
+        CountDownLatch lineageLocked = new CountDownLatch(1);
+        CountDownLatch allowLineageCommit = new CountDownLatch(1);
+        CountDownLatch createStarted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> lineageAdvance = executor.submit(() -> {
+                TenantContextHolder.setTenantId(TENANT_ID);
+                try {
+                    new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                        jdbcTemplate.update("""
+                                UPDATE t_reconciliation_batch_lineage
+                                SET current_batch_sn = 'recon_batch_mvp_001_rerun_committed'
+                                WHERE tenant_id = ?
+                                  AND gate_object_type = 'CLEARING'
+                                  AND gate_object_sn = 'reconciliation-difference-001'
+                                """, TENANT_ID);
+                        lineageLocked.countDown();
+                        await(allowLineageCommit);
+                    });
+                } finally {
+                    TenantContextHolder.clear();
+                }
+            });
+            assertThat(lineageLocked.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<DifferenceCreateAttempt> lateCreate = executor.submit(() -> {
+                TenantContextHolder.setTenantId(TENANT_ID);
+                createStarted.countDown();
+                try {
+                    ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
+                            minimumCreateRequest(), WindOperatorFactory.system());
+                    return new DifferenceCreateAttempt(true, result.getDifferenceSn(), null);
+                } catch (RuntimeException exception) {
+                    return new DifferenceCreateAttempt(false, null, exception.getMessage());
+                } finally {
+                    TenantContextHolder.clear();
+                }
+            });
+            assertThat(createStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            allowLineageCommit.countDown();
+
+            lineageAdvance.get(10, TimeUnit.SECONDS);
+            DifferenceCreateAttempt result = lateCreate.get(10, TimeUnit.SECONDS);
+            assertThat(result.succeeded()).isFalse();
+            assertThat(result.message()).contains("不是当前批次血缘头");
+            assertThat(countDifferenceRows()).isZero();
+        } finally {
+            allowLineageCommit.countDown();
+            executor.shutdownNow();
+        }
     }
 
     /**
      * 场景：清算或结算消费方登记一个对象级阻断差错。
-     * 输入：blockingScope、blockingObjectType 和 blockingObjectSn。
+     * 输入：blockingObjectType 和 blockingObjectSn。
      * 输出：差错结果回传阻断对象字段，重复提交保持幂等。
      * 红线：对象级字段只是差错命中键，不生成清算、结算、route、posting 或账本事实。
      */
@@ -114,46 +192,83 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     void testCreateDifferenceShouldKeepObjectScopeInResultAndIdempotentReplay() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        CreateReconciliationDifferenceRequest request = minimumCreateRequest()
-                .setBlockingScope("SETTLEMENT")
-                .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
-                .setBlockingObjectSn("settlement-order-001");
+        CreateReconciliationDifferenceRequest request = minimumCreateRequest();
         ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
                 request, WindOperatorFactory.system());
         ReconciliationDifferenceDTO replay = reconciliationDifferenceApplicationService.createDifference(
                 request, WindOperatorFactory.system());
 
-        assertThat(result.getBlockingScope()).isEqualTo("SETTLEMENT");
-        assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
-        assertThat(result.getBlockingObjectSn()).isEqualTo("settlement-order-001");
+        assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
+        assertThat(result.getBlockingObjectSn()).isEqualTo("reconciliation-difference-001");
         assertThat(replay.getId()).isEqualTo(result.getId());
-        assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
+        assertThat(countDifferenceRows()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：对账差错只传阻断对象类型或只传阻断对象流水。
-     * 输入：不完整的对象级阻断字段。
-     * 输出：拒绝创建差错。
-     * 红线：对象级阻断不能形成半截命中键，也不能生成 route、posting 或账本事实。
+     * 场景：调用方使用未持久化的逐笔匹配结果登记 Gate 阻断差错。
+     * 输入：reconciliationMatchResultSn 指向不存在的 ReconciliationMatchResult。
+     * 输出：快速失败，不写入差错事实。
+     * 红线：差错不得成为调用方可自报批次、金额、规则或证据的第二真相源。
      */
     @Test
-    void testCreateDifferenceShouldRejectIncompleteObjectScope() {
+    void testCreateDifferenceShouldRejectUnpersistedMatchResult() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest()
-                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING),
+                minimumCreateRequest().setReconciliationMatchResultSn("RMR_missing_001"),
                 WindOperatorFactory.system()))
-                .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
-        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest()
-                        .setBlockingObjectSn("clearing-candidate-001"),
-                WindOperatorFactory.system()))
-                .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
+                .hasMessageContaining("对账匹配结果不存在");
 
-        assertThat(countDifferenceRows(DIFFERENCE_SN)).isZero();
+        assertThat(countDifferenceRows()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：逐笔匹配结论是状态不一致，不存在可表达的金额差。
+     * 结果：差错保留明确类型，但不伪造币种或零金额。
+     */
+    @Test
+    void testCreateDifferenceShouldKeepNonAmountDifferenceFieldsEmpty() {
+        String batchSn = "recon_batch_status_mismatch_001";
+        recordRunResult(false, batchSn, null);
+        String matchResultSn = jdbcTemplate.queryForObject("""
+                SELECT sn
+                FROM t_reconciliation_match_result
+                WHERE tenant_id = ?
+                  AND reconciliation_batch_sn = ?
+                """, String.class, TENANT_ID, batchSn);
+
+        ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest().setReconciliationMatchResultSn(matchResultSn),
+                WindOperatorFactory.system());
+
+        assertThat(result.getDifferenceType()).isEqualTo(ReconciliationDifferenceType.STATUS_MISMATCH);
+        assertThat(result.getCurrency()).isNull();
+        assertThat(result.getDifferenceAmount()).isNull();
+    }
+
+    /**
+     * 场景：匹配结论使用合法的长证据引用并物化 Gate 差错。
+     * 结果：差错完整保留证据引用，不因匹配表与差错表字段宽度不一致而失败。
+     */
+    @Test
+    void testCreateDifferenceShouldPreserveLongMatchEvidenceRef() {
+        String batchSn = "recon_batch_long_evidence_001";
+        String evidenceRef = "report:" + "e".repeat(193);
+        recordRunResult(false, batchSn, null, evidenceRef);
+        String matchResultSn = jdbcTemplate.queryForObject("""
+                SELECT sn
+                FROM t_reconciliation_match_result
+                WHERE tenant_id = ?
+                  AND reconciliation_batch_sn = ?
+                """, String.class, TENANT_ID, batchSn);
+
+        ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest().setReconciliationMatchResultSn(matchResultSn),
+                WindOperatorFactory.system());
+
+        assertThat(result.getEvidenceRef()).isEqualTo(evidenceRef);
     }
 
     /**
@@ -184,6 +299,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(linked.getOriginalFactRef()).isEqualTo("external-balance-anomaly:issuer-ledger-001");
         assertThat(linked.getAdjustmentTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
         assertThat(linkedReplay.getId()).isEqualTo(linked.getId());
+        assertThat(countDifferenceActionRows()).isOne();
         assertThat(closed.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
         assertThat(closed.getLastRerunSn()).isEqualTo(runResultSn);
         assertThat(closed.getRerunCount()).isOne();
@@ -191,26 +307,229 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
-    /**
-     * 场景：运营只回链调账单号、审批和证据，但没有声明白名单处理动作和原始事实引用。
-     * 输入：差错流水号、调账单号、资金交易流水、审批、凭证和原因。
-     * 输出：拒绝回链处理结果。
-     * 红线：差错处理不能退化为任意单号备注；必须能说明白名单动作和被处理的原始事实。
-     */
     @Test
-    void testAdjustmentLinkShouldRejectMissingWhitelistActionContext() {
+    void testCreateDifferenceShouldRejectValuesWiderThanPersistenceContract() {
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest().setReconciliationMatchResultSn(
+                        "x".repeat(CreateReconciliationDifferenceRequest.MAX_MATCH_RESULT_SN_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("匹配结果流水号长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest().setResponsiblePartyRef(
+                        "x".repeat(CreateReconciliationDifferenceRequest.MAX_RESPONSIBLE_PARTY_REF_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("责任方引用长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest().setDescription(
+                        "x".repeat(CreateReconciliationDifferenceRequest.MAX_DESCRIPTION_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("说明长度不能超过");
+
+        assertThat(countDifferenceRows()).isZero();
+    }
+
+    @Test
+    void testAdjustmentLinkShouldRejectValuesWiderThanPersistenceContract() {
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
-                adjustmentRequestWithoutWhitelistActionContext(), WindOperatorFactory.system()))
+                minimumAdjustmentRequest().setDifferenceSn(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_DIFFERENCE_SN_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("差错流水号长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setAdjustmentSn(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_ADJUSTMENT_SN_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("处理动作号长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setIdempotencyKey(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_IDEMPOTENCY_KEY_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("幂等键长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setOriginalFactRef(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_ORIGINAL_FACT_REF_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("原始事实引用长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setAdjustmentTransactionSn(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_TRANSACTION_SN_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易流水号长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setApprovalRef(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_APPROVAL_REF_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("审批引用长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setEvidenceRef(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_EVIDENCE_REF_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("证据引用长度不能超过");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setReason(
+                        "x".repeat(LinkReconciliationDifferenceAdjustmentRequest.MAX_REASON_LENGTH + 1)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("处理原因长度不能超过");
+
+        assertThat(countDifferenceActionRows()).isZero();
+        assertThat(differenceStatus(requiredDifferenceSn())).isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+    }
+
+    @Test
+    void testRequestPersistenceWidthsShouldBeDeclaredForBeanValidation() throws NoSuchFieldException {
+        assertSizeConstraint(CreateReconciliationDifferenceRequest.class, "reconciliationMatchResultSn",
+                CreateReconciliationDifferenceRequest.MAX_MATCH_RESULT_SN_LENGTH);
+        assertSizeConstraint(CreateReconciliationDifferenceRequest.class, "responsiblePartyRef",
+                CreateReconciliationDifferenceRequest.MAX_RESPONSIBLE_PARTY_REF_LENGTH);
+        assertSizeConstraint(CreateReconciliationDifferenceRequest.class, "description",
+                CreateReconciliationDifferenceRequest.MAX_DESCRIPTION_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "differenceSn",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_DIFFERENCE_SN_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "adjustmentSn",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_ADJUSTMENT_SN_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "idempotencyKey",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_IDEMPOTENCY_KEY_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "originalFactRef",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_ORIGINAL_FACT_REF_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "adjustmentTransactionSn",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_TRANSACTION_SN_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "approvalRef",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_APPROVAL_REF_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "evidenceRef",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_EVIDENCE_REF_LENGTH);
+        assertSizeConstraint(LinkReconciliationDifferenceAdjustmentRequest.class, "reason",
+                LinkReconciliationDifferenceAdjustmentRequest.MAX_REASON_LENGTH);
+    }
+
+    /**
+     * 场景：第一次处理后重新对账仍未对平，业务确认需要执行第二个处理动作。
+     * 结果：第二个动作追加为新事实，差错主表只投影最新动作并重新进入 ADJUSTING。
+     * 红线：不得覆盖或丢失第一次处理动作，也不得在上一次动作尚未重跑时并行追加。
+     */
+    @Test
+    void testAdjustmentLinkShouldAppendNextActionAfterUnbalancedRerun() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String unbalancedRunResultSn = recordRunResult(false, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        ReconciliationDifferenceDTO rerun = reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(unbalancedRunResultSn), WindOperatorFactory.system());
+
+        ReconciliationDifferenceDTO linked = reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest()
+                        .setActionType(ReconciliationDifferenceActionType.RECOVER)
+                        .setAdjustmentSn("recovery_recon_002")
+                        .setIdempotencyKey("idem-recon-recovery-002")
+                        .setAdjustmentTransactionSn(null)
+                        .setApprovalRef("approval-recon-recovery-002")
+                        .setEvidenceRef("recovery-evidence-002")
+                        .setReason("首次调账后仍不平，已由上层发起追偿"),
+                WindOperatorFactory.system());
+
+        assertThat(rerun.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RECONCILING);
+        assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.RECOVER);
+        assertThat(linked.getAdjustmentSn()).isEqualTo("recovery_recon_002");
+        assertThat(countDifferenceActionRows()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：重跑仍未对平，但本轮差异来自另一组来源记录。
+     * 结果：拒绝把新差异回链到旧差错，避免不同业务事实共用一条处置生命周期。
+     */
+    @Test
+    void testRerunShouldRejectDifferentDifferenceIdentity() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(false, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN,
+                "report:different#line-1", "internal:different", "external:different");
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("差错身份");
+
+        assertThat(differenceStatus(difference.getDifferenceSn()))
+                .isEqualTo(ReconciliationDifferenceStatus.ADJUSTING.name());
+    }
+
+    /**
+     * 场景：调用方先生成了后继重跑结果，之后才尝试回链本轮处理动作。
+     * 结果：拒绝回链，差错仍保持阻断且不新增处理动作。
+     * 红线：处理动作必须发生在对应重跑批次创建之前，不能用动作之前生成的旧结果关闭差错。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectWhenRerunBatchAlreadyExists() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("处理动作必须在重跑批次创建前回链");
+
+        assertThat(differenceStatus(difference.getDifferenceSn()))
+                .isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+        assertThat(countDifferenceActionRows()).isZero();
+    }
+
+    /**
+     * 场景：调用方复用既有动作幂等键，却更换了处理动作单号。
+     * 结果：拒绝把同一业务动作登记为两个事实。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectIdempotencyKeyReusedByAnotherAction() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setAdjustmentSn("balance_adjust_recon_changed"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("处理动作幂等键已被其他动作使用");
+        assertThat(countDifferenceActionRows()).isOne();
+    }
+
+    /**
+     * 场景：运营只回链调账单号、审批和证据，但没有声明处理动作分类和原始事实引用。
+     * 输入：差错流水号、调账单号、资金交易流水、审批、凭证和原因。
+     * 输出：拒绝回链处理结果。
+     * 红线：差错处理不能退化为任意单号备注；必须能说明处理结果分类和被处理的原始事实。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectMissingActionResultContext() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                adjustmentRequestWithoutActionResultContext(), WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理动作类型不能为空");
     }
 
     /**
-     * 场景：同一差错流水号被重复提交，但来源金额被改写。
-     * 输入：第一次登记 50 USD，第二次用相同 differenceSn 登记 51 USD。
+     * 场景：差错处理回链请求完整，但调用方未提供操作人。
+     * 结果：以稳定业务异常快速失败，不能暴露空指针或改变差错状态。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectMissingOperator() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), null))
+                .hasMessageContaining("对账差错处理回链操作人不能为空");
+
+        assertThat(differenceStatus(difference.getDifferenceSn()))
+                .isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+    }
+
+    /**
+     * 场景：同一逐笔匹配结果被重复提交，但责任归属或说明被改写。
+     * 输入：第一次登记 processor 责任，第二次改为 merchant 或修改说明。
      * 输出：拒绝第二次提交，差错单仍只有一条。
-     * 红线：差错流水号的幂等不能退化为只按主键去重，必须拒绝事实字段漂移。
+     * 红线：逐笔匹配结果业务唯一键不能静默覆盖上层确认的责任归属。
      */
     @Test
     void testCreateDifferenceShouldRejectIdempotentConflict() {
@@ -218,16 +537,14 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest().setDifferenceAmount(51L), WindOperatorFactory.system()))
-                .hasMessageContaining("对账差错幂等请求差异金额不一致");
+                minimumCreateRequest().setResponsiblePartyRef("merchant:unexpected"), WindOperatorFactory.system()))
+                .hasMessageContaining("对账差错幂等请求责任方不一致");
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest()
-                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
-                        .setBlockingObjectSn("clearing-candidate-001"),
+                minimumCreateRequest().setDescription("changed-description"),
                 WindOperatorFactory.system()))
-                .hasMessageContaining("对账差错幂等请求阻断对象类型不一致");
+                .hasMessageContaining("对账差错幂等请求说明不一致");
 
-        assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
+        assertThat(countDifferenceRows()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -239,14 +556,35 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testRerunShouldRejectClosingDifferenceWithoutAdjustmentLink() {
-        reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest().setDifferenceSn("recon_diff_mvp_002"), WindOperatorFactory.system());
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
         String runResultSn = recordRunResult(true, "recon_batch_mvp_001_rerun_002", RECONCILIATION_BATCH_SN);
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest(runResultSn).setDifferenceSn("recon_diff_mvp_002"),
+                minimumRerunRequest(runResultSn).setDifferenceSn(difference.getDifferenceSn()),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("差错关闭必须先关联处理动作或调账结果");
+    }
+
+    /**
+     * 场景：重跑结果已经持久化，但调用方未提供记录操作人。
+     * 结果：以稳定业务异常快速失败，差错保持处理中且不消费该重跑结果。
+     */
+    @Test
+    void testRerunShouldRejectMissingOperator() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, "recon_batch_mvp_001_rerun_missing_operator",
+                RECONCILIATION_BATCH_SN);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), null))
+                .hasMessageContaining("对账差错重跑操作人不能为空");
+
+        assertThat(differenceStatus(difference.getDifferenceSn()))
+                .isEqualTo(ReconciliationDifferenceStatus.ADJUSTING.name());
     }
 
     /**
@@ -358,11 +696,19 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testRerunShouldRejectRunResultForOtherBlockingObject() {
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest()
-                .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
-                .setBlockingObjectSn("clearing-candidate-expected"), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
         String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_batch
+                SET gate_object_sn = 'clearing-candidate-other'
+                WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID, RERUN_BATCH_SN);
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_run_result
+                SET gate_object_sn = 'clearing-candidate-other'
+                WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID, runResultSn);
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
@@ -376,7 +722,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      * 红线：动作类型、幂等键和原事实引用属于审计事实，不允许二次回链静默改写。
      */
     @Test
-    void testAdjustmentLinkShouldRejectWhitelistContextConflict() {
+    void testAdjustmentLinkShouldRejectActionResultContextConflict() {
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
 
@@ -418,26 +764,15 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     private CreateReconciliationDifferenceRequest minimumCreateRequest() {
         return new CreateReconciliationDifferenceRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
-                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
-                .setSourceRecordSn(SOURCE_RECORD_SN)
-                .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
-                .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
-                .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setDifferenceAmount(50L)
+                .setReconciliationMatchResultSn(reconciliationMatchResultSn)
                 .setResponsiblePartyRef("processor:issuer-ledger")
-                .setBlockingScope("CLEARING,PAYOUT")
-                .setRuleVersion("recon-rule-v1")
-                .setEvidenceRef("processor-file-digest-001")
                 .setDescription("外部 processor 文件金额与内部账本金额不一致");
     }
 
     private LinkReconciliationDifferenceAdjustmentRequest minimumAdjustmentRequest() {
         return new LinkReconciliationDifferenceAdjustmentRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
+                .setDifferenceSn(requiredDifferenceSn())
                 .setActionType(ReconciliationDifferenceActionType.ADJUST)
                 .setAdjustmentSn(ADJUSTMENT_SN)
                 .setIdempotencyKey("idem-recon-adjust-001")
@@ -448,10 +783,10 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .setReason("已由余额控制调账纠偏，等待重新对账");
     }
 
-    private LinkReconciliationDifferenceAdjustmentRequest adjustmentRequestWithoutWhitelistActionContext() {
+    private LinkReconciliationDifferenceAdjustmentRequest adjustmentRequestWithoutActionResultContext() {
         return new LinkReconciliationDifferenceAdjustmentRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
+                .setDifferenceSn(requiredDifferenceSn())
                 .setAdjustmentSn(ADJUSTMENT_SN)
                 .setAdjustmentTransactionSn(FUNDS_TRANSACTION_SN)
                 .setApprovalRef("approval-recon-adjust-001")
@@ -462,28 +797,70 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     private RecordReconciliationDifferenceRerunRequest minimumRerunRequest(String reconciliationRunResultSn) {
         return new RecordReconciliationDifferenceRerunRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn(DIFFERENCE_SN)
+                .setDifferenceSn(requiredDifferenceSn())
                 .setReconciliationRunResultSn(reconciliationRunResultSn);
     }
 
+    private String recordInitialDifferenceRunResult() {
+        String comparisonSourceRef = "external:" + RECONCILIATION_BATCH_SN;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                "reconciliation-difference-001", "recon-rule-v1", "processor-file-digest-001",
+                SOURCE_RECORD_SN, comparisonSourceRef);
+        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
+                .setMatchResults(List.of(new ReconciliationMatchResultItem()
+                        .setReferenceSourceRef(SOURCE_RECORD_SN)
+                        .setComparisonSourceRef(comparisonSourceRef)
+                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
+                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
+                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDifferenceAmount(50L)
+                        .setEvidenceRef("processor-file-digest-001"))), WindOperatorFactory.system());
+        return jdbcTemplate.queryForObject("""
+                SELECT sn
+                FROM t_reconciliation_match_result
+                WHERE tenant_id = ?
+                  AND reconciliation_batch_sn = ?
+                  AND difference_type IS NOT NULL
+                """, String.class, TENANT_ID, RECONCILIATION_BATCH_SN);
+    }
+
     private String recordRunResult(boolean balanced, String batchSn, String previousBatchSn) {
-        String referenceSourceRef = "internal:" + batchSn;
-        String comparisonSourceRef = "external:" + batchSn;
+        return recordRunResult(balanced, batchSn, previousBatchSn, "report:" + batchSn + "#line-1");
+    }
+
+    private String recordRunResult(boolean balanced,
+                                   String batchSn,
+                                   String previousBatchSn,
+                                   String evidenceRef) {
+        return recordRunResult(balanced, batchSn, previousBatchSn, evidenceRef,
+                SOURCE_RECORD_SN, "external:" + RECONCILIATION_BATCH_SN);
+    }
+
+    private String recordRunResult(boolean balanced,
+                                   String batchSn,
+                                   String previousBatchSn,
+                                   String evidenceRef,
+                                   String referenceSourceRef,
+                                   String comparisonSourceRef) {
         ReconciliationMatchResultItem matchResult = new ReconciliationMatchResultItem()
                 .setReferenceSourceRef(referenceSourceRef)
                 .setComparisonSourceRef(comparisonSourceRef)
                 .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                 .setMatchStrength(balanced ? ReconciliationMatchStrength.EXACT_MATCH
                         : ReconciliationMatchStrength.UNMATCHED)
-                .setEvidenceRef("report:" + batchSn + "#line-1");
+                .setEvidenceRef(evidenceRef);
         if (!balanced) {
             matchResult.setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
-                    .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                    .setDifferenceAmount(0L);
+                    .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR);
         }
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
                 jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
-                "reconciliation-difference-001", "recon-rule-v1", "report:" + batchSn,
+                "reconciliation-difference-001", "recon-rule-v1", evidenceRef,
                 referenceSourceRef, comparisonSourceRef, previousBatchSn);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
@@ -491,13 +868,59 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .setMatchResults(List.of(matchResult)), WindOperatorFactory.system()).getSn();
     }
 
-    private Integer countDifferenceRows(String differenceSn) {
+    private Integer countDifferenceRows() {
         return jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM t_reconciliation_difference
                 WHERE tenant_id = ?
+                  AND reconciliation_match_result_sn = ?
+                """, Integer.class, TENANT_ID, reconciliationMatchResultSn);
+    }
+
+    private Integer countDifferenceActionRows() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM t_reconciliation_difference_action
+                WHERE tenant_id = ?
                   AND difference_sn = ?
-                """, Integer.class, TENANT_ID, differenceSn);
+                """, Integer.class, TENANT_ID, requiredDifferenceSn());
+    }
+
+    private String differenceStatus(String differenceSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT status
+                FROM t_reconciliation_difference
+                WHERE tenant_id = ?
+                  AND difference_sn = ?
+                """, String.class, TENANT_ID, differenceSn);
+    }
+
+    private String requiredDifferenceSn() {
+        return jdbcTemplate.queryForObject("""
+                SELECT difference_sn
+                FROM t_reconciliation_difference
+                WHERE tenant_id = ?
+                  AND reconciliation_match_result_sn = ?
+                """, String.class, TENANT_ID, reconciliationMatchResultSn);
+    }
+
+    private static void assertSizeConstraint(Class<?> requestType,
+                                             String fieldName,
+                                             int expectedMax) throws NoSuchFieldException {
+        Size constraint = requestType.getDeclaredField(fieldName).getAnnotation(Size.class);
+        assertThat(constraint).isNotNull();
+        assertThat(constraint.max()).isEqualTo(expectedMax);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("等待并发对账测试条件超时");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("等待并发对账测试条件被中断", exception);
+        }
     }
 
     @Configuration
@@ -506,5 +929,8 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
             ReconciliationRunResultApplicationServiceImpl.class
     })
     static class Config {
+    }
+
+    private record DifferenceCreateAttempt(boolean succeeded, String differenceSn, String message) {
     }
 }

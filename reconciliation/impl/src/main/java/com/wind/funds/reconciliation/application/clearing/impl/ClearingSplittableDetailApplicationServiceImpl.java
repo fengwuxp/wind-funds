@@ -6,6 +6,10 @@ import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.reconciliation.application.clearing.ClearingSplittableDetailApplicationService;
@@ -20,12 +24,16 @@ import com.wind.funds.reconciliation.model.dto.ClearingSplittableDetailDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
@@ -77,6 +85,11 @@ public class ClearingSplittableDetailApplicationServiceImpl
         ReconciliationGateDecisionDTO reconciliationDecision = checkReconciliationGate(request, operator);
         ClearingSplittableDetail candidate = toCandidate(request, operator, transaction, detail, entry,
                 ledgerTransaction, reconciliationDecision);
+        if (candidate.getExclusionReason() == ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED) {
+            log.info("可清分明细被对账 Gate 临时阻断，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}",
+                    request.getTenantId(), request.getFundsTransactionSn(), request.getLedgerEntrySn());
+            return ClearingSplittableDetailConverter.INSTANCE.toDTO(candidate);
+        }
 
         ClearingSplittableDetail existing = clearingSplittableDetailMapper.selectByLedgerEntrySn(
                 request.getTenantId(), request.getLedgerEntrySn());
@@ -131,9 +144,12 @@ public class ClearingSplittableDetailApplicationServiceImpl
         ClearingSplittableExclusionReason exclusionReason = resolveExclusionReason(request, transaction, detail,
                 entry, ledgerTransaction, reconciliationDecision);
         ClearingSplittableDetail result = new ClearingSplittableDetail();
-        result.setSn(TemporalSequenceFactory.hourNext(SPLITTABLE_DETAIL_SEQUENCE_TYPE));
+        if (exclusionReason != ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED) {
+            result.setSn(TemporalSequenceFactory.hourNext(SPLITTABLE_DETAIL_SEQUENCE_TYPE));
+        }
         result.setTenantId(request.getTenantId());
         result.setFundsTransactionSn(transaction.getSn());
+        result.setSourceTransactionVersion(transaction.getVersion());
         result.setFundsTransactionDetailSn(detail.getSn());
         result.setLedgerTransactionSn(entry.getLedgerTransactionSn());
         result.setPostingPlanSn(entry.getPostingPlanSn());
@@ -186,6 +202,9 @@ public class ClearingSplittableDetailApplicationServiceImpl
         if (entry.getLedgerSubjectCode() != LedgerSubjectCode.CLEARING) {
             return ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING;
         }
+        if (!isClearingInflowFact(transaction, detail, entry, ledgerTransaction)) {
+            return ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING_INFLOW;
+        }
         if (defaultAmount(transaction.getRefundedAmount()) > 0) {
             return ClearingSplittableExclusionReason.REFUND_EXISTS;
         }
@@ -222,6 +241,9 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 && Objects.equals(transaction.getSn(), detail.getTransactionSn())
                 && Objects.equals(transaction.getSn(), entry.getFundsTransactionSn())
                 && Objects.equals(transaction.getSn(), ledgerTransaction.getFundsTransactionSn())
+                && transaction.getTransactionType() == detail.getTransactionType()
+                && transaction.getTransactionType() == ledgerTransaction.getTransactionType()
+                && detail.getEventType() == ledgerTransaction.getEventType()
                 && Objects.equals(detail.getLedgerTransactionSn(), entry.getLedgerTransactionSn())
                 && Objects.equals(entry.getLedgerTransactionSn(), ledgerTransaction.getSn())
                 && Objects.equals(detail.getSubjectType(), entry.getSubjectType())
@@ -234,6 +256,27 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 && Objects.equals(detail.getBusinessSn(), entry.getBusinessSn());
     }
 
+    private boolean isClearingInflowFact(FundsTransactionDTO transaction,
+                                         FundsTransactionDetailDTO detail,
+                                         LedgerEntryDTO entry,
+                                         LedgerTransactionDTO ledgerTransaction) {
+        FundsTransactionEventType eventType = detail.getEventType();
+        boolean supportedEvent = eventType == FundsTransactionEventType.PAY
+                || eventType == FundsTransactionEventType.COMPLETE;
+        boolean supportedFundsEffect = eventType == FundsTransactionEventType.PAY
+                ? detail.getFundsEffectType() == FundsEffectType.DIRECT
+                : detail.getFundsEffectType() == FundsEffectType.CONSUME;
+        return transaction.getTransactionType() == DefaultFundsTransactionType.PAY
+                && detail.getTransactionType() == DefaultFundsTransactionType.PAY
+                && ledgerTransaction.getTransactionType() == DefaultFundsTransactionType.PAY
+                && supportedEvent
+                && supportedFundsEffect
+                && entry.getLedgerSubjectCategory() == LedgerSubjectCategory.CLEARING
+                && entry.getEntryType() == EntrySide.CREDIT
+                && entry.getPostingRole() == LedgerPostingRole.DETAIL
+                && entry.getBalanceEffectType() == LedgerBalanceEffectType.INCREASE;
+    }
+
     private String sourceDigest(IdentifyClearingSplittableDetailRequest request,
                                 FundsTransactionDTO transaction,
                                 FundsTransactionDetailDTO detail,
@@ -244,13 +287,27 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("tenantId", request.getTenantId());
         facts.put("fundsTransactionSn", transaction.getSn());
         facts.put("fundsTransactionStatus", transaction.getStatus());
+        facts.put("fundsTransactionType", transaction.getTransactionType());
+        facts.put("sourceTransactionVersion", transaction.getVersion());
         facts.put("fundsTransactionDetailSn", detail.getSn());
         facts.put("fundsTransactionDetailStatus", detail.getStatus());
+        facts.put("fundsTransactionDetailType", detail.getTransactionType());
+        facts.put("fundsTransactionDetailEventType", detail.getEventType());
+        facts.put("fundsTransactionDetailEffectType", detail.getFundsEffectType());
         facts.put("ledgerTransactionSn", ledgerTransaction.getSn());
+        facts.put("ledgerTransactionType", ledgerTransaction.getTransactionType());
+        facts.put("ledgerTransactionEventType", ledgerTransaction.getEventType());
         facts.put("ledgerTransactionDigest", ledgerTransaction.getSha256());
         facts.put("postingPlanSn", entry.getPostingPlanSn());
         facts.put("ledgerEntrySn", entry.getSn());
         facts.put("ledgerEntryDigest", entry.getSha256());
+        facts.put("ledgerSubjectCode", entry.getLedgerSubjectCode());
+        facts.put("ledgerSubjectCategory", entry.getLedgerSubjectCategory());
+        facts.put("entryType", entry.getEntryType());
+        facts.put("postingRole", entry.getPostingRole());
+        facts.put("balanceEffectType", entry.getBalanceEffectType());
+        facts.put("phaseCode", entry.getPhaseCode());
+        facts.put("intent", entry.getIntent());
         facts.put("routeSnapshot", transaction.getRouteSnapshot());
         facts.put("subjectType", entry.getSubjectType());
         facts.put("subjectId", entry.getSubjectId());
@@ -277,6 +334,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
     private void validateRequest(IdentifyClearingSplittableDetailRequest request, WindOperator operator) {
         AssertUtils.notNull(request, "可清分明细识别请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "可清分明细租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "可清分明细 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getFundsTransactionSn(), "来源资金交易流水号不能为空");
         AssertUtils.hasText(request.getFundsTransactionDetailSn(), "来源资金交易明细流水号不能为空");
         AssertUtils.hasText(request.getLedgerEntrySn(), "来源账本分录流水号不能为空");

@@ -38,10 +38,13 @@ public class ReconciliationRunResultDTO implements Serializable {
     @Schema(description = "对账批次流水号")
     private String reconciliationBatchSn;
 
-    @Schema(description = "准入对象类型")
+    @Schema(description = "本次对账作业范围的稳定业务引用")
+    private String reconciliationScopeRef;
+
+    @Schema(description = "准入对象类型；纯对账时为空")
     private ReconciliationGateObjectType gateObjectType;
 
-    @Schema(description = "准入对象流水号")
+    @Schema(description = "准入对象流水号；纯对账时为空")
     private String gateObjectSn;
 
     @Schema(description = "对账运行结果状态")

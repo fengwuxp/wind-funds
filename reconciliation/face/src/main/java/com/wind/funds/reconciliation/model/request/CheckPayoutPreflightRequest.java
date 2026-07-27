@@ -1,12 +1,10 @@
 package com.wind.funds.reconciliation.model.request;
 
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
-import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -19,7 +17,7 @@ import java.io.Serializable;
 /**
  * 出款前准入检查请求。
  *
- * <p>职责：承载结算单、可选出款单、金额、出款账户、收款端点、通道、幂等和准入证据引用。</p>
+ * <p>职责：承载结算单、可选出款单、出款账户、收款端点、通道和准入证据引用。</p>
  *
  * <p>边界：请求只用于出款提交前的准入判断，不包含通道真实回执、账务分录或出款生命周期事实。</p>
  */
@@ -44,15 +42,6 @@ public class CheckPayoutPreflightRequest implements Serializable {
     @Schema(description = "出款单号，创建前检查可为空")
     private String payoutSn;
 
-    @Schema(description = "币种")
-    @NotNull
-    private CurrencyIsoCode currency;
-
-    @Schema(description = "出款金额，最小货币单位")
-    @NotNull
-    @Positive
-    private Long amount;
-
     @Schema(description = "出款账户引用")
     private String payoutAccountRef;
 
@@ -61,10 +50,6 @@ public class CheckPayoutPreflightRequest implements Serializable {
 
     @Schema(description = "通道引用")
     private String channelRef;
-
-    @Schema(description = "幂等键")
-    @NotBlank
-    private String idempotencyKey;
 
     @Schema(description = "出款前必须消费的对账运行结果流水号")
     @NotBlank

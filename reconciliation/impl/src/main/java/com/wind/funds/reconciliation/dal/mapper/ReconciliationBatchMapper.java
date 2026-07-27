@@ -82,4 +82,19 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
     int complete(@Param("tenantId") Long tenantId,
                  @Param("sn") String sn,
                  @Param("runResultSn") String runResultSn);
+
+    @Update("""
+            UPDATE t_reconciliation_batch
+            SET status = 'ABORTED', aborted_by = #{abortedBy},
+                aborted_time = #{abortedTime}, abort_reason = #{abortReason}
+            WHERE tenant_id = #{tenantId}
+              AND sn = #{sn}
+              AND status = #{currentStatus}
+            """)
+    int abort(@Param("tenantId") Long tenantId,
+              @Param("sn") String sn,
+              @Param("currentStatus") String currentStatus,
+              @Param("abortedBy") String abortedBy,
+              @Param("abortedTime") java.time.LocalDateTime abortedTime,
+              @Param("abortReason") String abortReason);
 }

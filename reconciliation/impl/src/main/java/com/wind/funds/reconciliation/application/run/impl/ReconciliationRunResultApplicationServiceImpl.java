@@ -1,13 +1,18 @@
 package com.wind.funds.reconciliation.application.run.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.query.WindPagination;
+import com.wind.common.query.supports.AbstractPageQuery;
+import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationBatch;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationMatchResult;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationRunResult;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationSourceItem;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationSourceSnapshot;
+import com.wind.funds.reconciliation.dal.entities.table.ReconciliationMatchResultNameRefs;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationMatchResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
@@ -20,12 +25,16 @@ import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.mapstruct.ReconciliationRunResultConverter;
+import com.wind.funds.reconciliation.mapstruct.ReconciliationMatchResultConverter;
+import com.wind.funds.reconciliation.model.dto.ReconciliationMatchResultDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
 import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
+import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
@@ -40,6 +49,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 /**
  * 对账运行结果应用服务实现。
@@ -49,6 +59,8 @@ import java.util.TreeMap;
 @AllArgsConstructor
 public class ReconciliationRunResultApplicationServiceImpl
         implements ReconciliationRunResultApplicationService {
+
+    private static final Pattern SHA_256_PATTERN = Pattern.compile("[0-9a-f]{64}");
 
     private static final WindSequenceType RUN_RESULT_SEQUENCE_TYPE =
             WindSequenceType.immutable("RECONCILIATION_RUN_RESULT", "RRR", 6);
@@ -105,9 +117,52 @@ public class ReconciliationRunResultApplicationServiceImpl
         ReconciliationRunResult saved = reconciliationRunResultMapper.selectBySn(
                 request.getTenantId(), candidate.getSn());
         AssertUtils.notNull(saved, "记录对账运行结果后未找到持久化事实");
-        log.info("对账运行结果记录完成，tenantId = {}, reconciliationBatchSn = {}, gateObjectType = {}, gateObjectSn = {}, status = {}",
-                batch.getTenantId(), batch.getSn(), batch.getGateObjectType(), batch.getGateObjectSn(), candidate.getStatus());
+        log.info("对账运行结果记录完成，tenantId = {}, reconciliationBatchSn = {}, "
+                        + "reconciliationScopeRef = {}, gateObjectType = {}, gateObjectSn = {}, status = {}",
+                batch.getTenantId(), batch.getSn(), batch.getReconciliationScopeRef(),
+                batch.getGateObjectType(), batch.getGateObjectSn(), candidate.getStatus());
         return ReconciliationRunResultConverter.INSTANCE.toDTO(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReconciliationRunResultDTO getRunResult(Long tenantId, String runResultSn) {
+        validateQueryIdentity(tenantId, runResultSn);
+        ReconciliationRunResult result = reconciliationRunResultMapper.selectBySn(tenantId, runResultSn);
+        AssertUtils.notNull(result, "对账运行结果不存在，runResultSn = {}", runResultSn);
+        return ReconciliationRunResultConverter.INSTANCE.toDTO(result);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WindPagination<ReconciliationMatchResultDTO> queryMatchResults(
+            Long tenantId,
+            String runResultSn,
+            AbstractPageQuery<? extends QueryOrderField> options) {
+        validateQueryIdentity(tenantId, runResultSn);
+        AssertUtils.notNull(options, "对账逐笔匹配结果查询选项不能为空");
+        AssertUtils.isTrue(!options.shouldOrderBy(), "对账逐笔匹配结果不支持自定义排序");
+        AssertUtils.notNull(reconciliationRunResultMapper.selectBySn(tenantId, runResultSn),
+                "对账运行结果不存在，runResultSn = {}", runResultSn);
+        ReconciliationMatchResultNameRefs matchResult =
+                ReconciliationMatchResultNameRefs.reconciliationMatchResult;
+        QueryWrapper queryWrapper = QueryWrapper.create().select()
+                .from(matchResult)
+                .where(matchResult.tenantId.eq(tenantId))
+                .and(matchResult.reconciliationRunResultSn.eq(runResultSn))
+                .orderBy(matchResult.id.asc());
+        return MybatisQueryHelper.<ReconciliationMatchResult, ReconciliationMatchResultDTO>query(queryWrapper)
+                .counter(reconciliationMatchResultMapper::selectCountByQuery)
+                .resultQueryFunc(reconciliationMatchResultMapper::selectListByQuery)
+                .converter(ReconciliationMatchResultConverter.INSTANCE::toDTO)
+                .query(options);
+    }
+
+    private void validateQueryIdentity(Long tenantId, String runResultSn) {
+        AssertUtils.notNull(tenantId, "对账运行结果查询租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), tenantId,
+                "对账运行结果查询 tenantId 与当前租户不一致");
+        AssertUtils.hasText(runResultSn, "对账运行结果流水号不能为空");
     }
 
     private SourceSet loadSourceSet(ReconciliationBatch batch) {
@@ -130,15 +185,11 @@ public class ReconciliationRunResultApplicationServiceImpl
                 batch.getTenantId(), snapshot.getSn());
         AssertUtils.isTrue(items.size() == snapshot.getRecordCount(),
                 "对账来源快照成员数不一致，sourceSnapshotSn = {}", snapshot.getSn());
-        for (ReconciliationSourceItem item : items) {
-            String itemDigest = ReconciliationDigestSupport.sourceItemDigest(
-                    snapshot.getSourceRole(), snapshot.getSourceType(), item.getSourceItemRef());
-            AssertUtils.isTrue(Objects.equals(itemDigest, item.getItemDigest()),
-                    "对账来源成员摘要不一致，sourceItemRef = {}", item.getSourceItemRef());
-        }
+        AssertUtils.isTrue(items.stream().allMatch(item -> isSha256(item.getContentDigest())),
+                "对账来源成员内容摘要无效，sourceSnapshotSn = {}", snapshot.getSn());
         String sourceDigest = ReconciliationDigestSupport.sourceDigest(
                 snapshot.getSourceRole(), snapshot.getSourceType(),
-                items.stream().map(ReconciliationSourceItem::getItemDigest).toList());
+                sourceContentDigests(items));
         AssertUtils.isTrue(Objects.equals(sourceDigest, snapshot.getSourceDigest()),
                 "对账来源快照摘要不一致，sourceSnapshotSn = {}", snapshot.getSn());
         return new SourceSnapshotFacts(snapshot, items);
@@ -165,6 +216,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         result.setSn(runResultSn);
         result.setTenantId(request.getTenantId());
         result.setReconciliationBatchSn(batch.getSn());
+        result.setReconciliationScopeRef(batch.getReconciliationScopeRef());
         result.setGateObjectType(batch.getGateObjectType());
         result.setGateObjectSn(batch.getGateObjectSn());
         result.setStatus(status);
@@ -281,6 +333,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         facts.put("tenantId", batch.getTenantId());
         facts.put("reconciliationBatchSn", batch.getSn());
         facts.put("batchDigest", batch.getBatchDigest());
+        facts.put("reconciliationScopeRef", batch.getReconciliationScopeRef());
         facts.put("gateObjectType", batch.getGateObjectType());
         facts.put("gateObjectSn", batch.getGateObjectSn());
         facts.put("status", status);
@@ -307,8 +360,14 @@ public class ReconciliationRunResultApplicationServiceImpl
     private void validateRequest(RecordReconciliationRunResultRequest request, WindOperator operator) {
         AssertUtils.notNull(request, "对账运行结果请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "对账运行结果租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "对账运行结果 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getReconciliationBatchSn(), "对账运行结果批次流水号不能为空");
         AssertUtils.notNull(request.getMatchResults(), "对账运行结果逐笔匹配结果列表不能为空");
+        AssertUtils.isTrue(request.getMatchResults().size()
+                        <= RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT,
+                "对账运行结果逐笔匹配结果数量不能超过 {}",
+                RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT);
         request.getMatchResults().forEach(this::validateMatchResult);
         AssertUtils.notNull(operator, "对账运行结果操作人不能为空");
     }
@@ -318,6 +377,12 @@ public class ReconciliationRunResultApplicationServiceImpl
         AssertUtils.notNull(item.getSourceQuality(), "对账匹配结果来源质量不能为空");
         AssertUtils.notNull(item.getMatchStrength(), "对账匹配结果匹配强度不能为空");
         AssertUtils.hasText(item.getEvidenceRef(), "对账匹配结果证据引用不能为空");
+        AssertUtils.isTrue(item.getEvidenceRef().trim().length()
+                        <= ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH,
+                "对账匹配结果证据引用长度不能超过 {}",
+                ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH);
+        assertOptionalSourceRefLength(item.getReferenceSourceRef(), "基准侧");
+        assertOptionalSourceRefLength(item.getComparisonSourceRef(), "核对侧");
         boolean hasReferenceSource = StringUtils.hasText(item.getReferenceSourceRef());
         boolean hasComparisonSource = StringUtils.hasText(item.getComparisonSourceRef());
         AssertUtils.isTrue(hasReferenceSource || hasComparisonSource, "对账匹配结果至少需要一侧来源引用");
@@ -346,6 +411,15 @@ public class ReconciliationRunResultApplicationServiceImpl
         }
     }
 
+    private void assertOptionalSourceRefLength(String sourceRef, String sourceRole) {
+        if (!StringUtils.hasText(sourceRef)) {
+            return;
+        }
+        AssertUtils.isTrue(sourceRef.trim().length() <= ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH,
+                "对账匹配结果{}来源引用长度不能超过 {}",
+                sourceRole, ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH);
+    }
+
     private void validateDifferenceSourceRefs(ReconciliationDifferenceType differenceType,
                                               boolean hasReferenceSource,
                                               boolean hasComparisonSource) {
@@ -370,6 +444,25 @@ public class ReconciliationRunResultApplicationServiceImpl
                 .count();
         AssertUtils.isTrue(distinctIdentityCount == matchResults.size(),
                 "对账运行结果不能重复使用同一基准侧和核对侧来源对");
+        assertOneToOneSourceUsage(matchResults, ReconciliationMatchResult::getReferenceSourceRef,
+                "同一基准侧来源引用只能参与一个匹配结果");
+        assertOneToOneSourceUsage(matchResults, ReconciliationMatchResult::getComparisonSourceRef,
+                "同一核对侧来源引用只能参与一个匹配结果");
+    }
+
+    private void assertOneToOneSourceUsage(List<ReconciliationMatchResult> matchResults,
+                                           java.util.function.Function<ReconciliationMatchResult, String> extractor,
+                                           String message) {
+        long sourceCount = matchResults.stream()
+                .map(extractor)
+                .filter(StringUtils::hasText)
+                .count();
+        long distinctSourceCount = matchResults.stream()
+                .map(extractor)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .count();
+        AssertUtils.isTrue(sourceCount == distinctSourceCount, message);
     }
 
     private boolean isMatched(ReconciliationMatchResult result) {
@@ -380,6 +473,16 @@ public class ReconciliationRunResultApplicationServiceImpl
     private boolean isAutomaticMatch(ReconciliationMatchStrength matchStrength) {
         return matchStrength == ReconciliationMatchStrength.EXACT_MATCH
                 || matchStrength == ReconciliationMatchStrength.RULE_MATCH;
+    }
+
+    private TreeMap<String, String> sourceContentDigests(List<ReconciliationSourceItem> items) {
+        TreeMap<String, String> result = new TreeMap<>();
+        items.forEach(item -> result.put(item.getSourceItemRef(), item.getContentDigest()));
+        return result;
+    }
+
+    private boolean isSha256(String digest) {
+        return digest != null && SHA_256_PATTERN.matcher(digest).matches();
     }
 
     private List<String> parseEvidenceRefs(String value) {

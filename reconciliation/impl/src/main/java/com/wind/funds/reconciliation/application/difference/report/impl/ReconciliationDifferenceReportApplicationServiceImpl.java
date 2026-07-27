@@ -5,14 +5,18 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.difference.report.ReconciliationDifferenceReportApplicationService;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationDifference;
+import com.wind.funds.reconciliation.dal.entities.ReconciliationDifferenceAction;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceActionMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportCompleteness;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceReportDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceActionDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.GetReconciliationDifferenceReportRequest;
+import com.wind.integration.core.context.TenantContextHolder;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -38,10 +42,12 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
 
     private final ReconciliationDifferenceMapper reconciliationDifferenceMapper;
 
+    private final ReconciliationDifferenceActionMapper reconciliationDifferenceActionMapper;
+
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(readOnly = true, rollbackFor = Exception.class)
     public ReconciliationDifferenceReportDTO getReport(GetReconciliationDifferenceReportRequest request,
                                                        WindOperator operator) {
         validateRequest(request, operator);
@@ -50,12 +56,16 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         AssertUtils.notNull(difference, "对账差异报告对应差错不存在，differenceSn = {}", request.getDifferenceSn());
 
         ReconciliationGateDecisionDTO gateDecision = resolveGateDecision(request, difference, operator);
-        return toReportDTO(request, difference, gateDecision, operator);
+        List<ReconciliationDifferenceAction> actionHistory = reconciliationDifferenceActionMapper.selectByDifferenceSn(
+                request.getTenantId(), request.getDifferenceSn());
+        return toReportDTO(request, difference, actionHistory, gateDecision, operator);
     }
 
     private void validateRequest(GetReconciliationDifferenceReportRequest request, WindOperator operator) {
         AssertUtils.notNull(request, "对账差异报告查询请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "对账差异报告查询租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "对账差异报告查询 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getDifferenceSn(), "对账差异报告查询差错流水号不能为空");
         AssertUtils.notNull(operator, "对账差异报告查询操作人不能为空");
     }
@@ -67,12 +77,9 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         if (!includeGateDecision(request)) {
             return null;
         }
-        if (difference.getBlockingObjectType() == null || !StringUtils.hasText(difference.getBlockingObjectSn())) {
-            return null;
-        }
         AssertUtils.hasText(request.getReconciliationRunResultSn(),
                 "查询对账差异报告 gate 决策时，对账运行结果流水号不能为空");
-        return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
+        return reconciliationGateApplicationService.inspectGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
                 .setGateObjectType(difference.getBlockingObjectType())
                 .setGateObjectSn(difference.getBlockingObjectSn())
@@ -81,13 +88,14 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
 
     private ReconciliationDifferenceReportDTO toReportDTO(GetReconciliationDifferenceReportRequest request,
                                                           ReconciliationDifference difference,
+                                                          List<ReconciliationDifferenceAction> actionHistory,
                                                           @Nullable ReconciliationGateDecisionDTO gateDecision,
                                                           WindOperator operator) {
         ReconciliationDifferenceReportDTO result = new ReconciliationDifferenceReportDTO()
                 .setTenantId(difference.getTenantId())
                 .setDifferenceSn(difference.getDifferenceSn())
                 .setReconciliationBatchSn(difference.getReconciliationBatchSn())
-                .setSourceRecordSn(difference.getSourceRecordSn())
+                .setReconciliationMatchResultSn(difference.getReconciliationMatchResultSn())
                 .setSourceQuality(difference.getSourceQuality())
                 .setMatchStrength(difference.getMatchStrength())
                 .setDifferenceType(difference.getDifferenceType())
@@ -96,7 +104,6 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
                 .setCurrency(difference.getCurrency())
                 .setDifferenceAmount(difference.getDifferenceAmount())
                 .setResponsiblePartyRef(difference.getResponsiblePartyRef())
-                .setBlockingScope(difference.getBlockingScope())
                 .setBlockingObjectType(difference.getBlockingObjectType())
                 .setBlockingObjectSn(difference.getBlockingObjectSn())
                 .setRuleVersion(difference.getRuleVersion())
@@ -109,6 +116,7 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
                 .setAdjustmentApprovalRef(difference.getAdjustmentApprovalRef())
                 .setAdjustmentEvidenceRef(difference.getAdjustmentEvidenceRef())
                 .setAdjustmentReason(difference.getAdjustmentReason())
+                .setActionHistory(actionHistory.stream().map(this::toActionDTO).toList())
                 .setLastRerunSn(difference.getLastRerunSn())
                 .setLastRerunBatchSn(difference.getLastRerunBatchSn())
                 .setLastRerunRuleVersion(difference.getLastRerunRuleVersion())
@@ -118,7 +126,7 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
                 .setRerunCount(difference.getRerunCount())
                 .setGateDecisionStatus(resolveGateDecisionStatus(gateDecision))
                 .setGateExplanation(resolveGateExplanation(gateDecision))
-                .setCompleteness(resolveCompleteness(request, difference, gateDecision))
+                .setCompleteness(resolveCompleteness(difference))
                 .setSecurityWarnings(List.of(SECURITY_WARNING))
                 .setExplanation(resolveExplanation(difference, gateDecision))
                 .setCheckedAt(LocalDateTime.now())
@@ -129,6 +137,22 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
             result.setEvidenceRefs(List.of());
         }
         return result;
+    }
+
+    private ReconciliationDifferenceActionDTO toActionDTO(ReconciliationDifferenceAction source) {
+        return new ReconciliationDifferenceActionDTO()
+                .setSn(source.getSn())
+                .setDifferenceSn(source.getDifferenceSn())
+                .setActionType(source.getActionType())
+                .setAdjustmentSn(source.getAdjustmentSn())
+                .setIdempotencyKey(source.getIdempotencyKey())
+                .setOriginalFactRef(source.getOriginalFactRef())
+                .setAdjustmentTransactionSn(source.getAdjustmentTransactionSn())
+                .setApprovalRef(source.getApprovalRef())
+                .setEvidenceRef(source.getEvidenceRef())
+                .setReason(source.getReason())
+                .setCreatedBy(source.getCreatedBy())
+                .setCreatedTime(source.getGmtCreate());
     }
 
     @Nullable
@@ -147,23 +171,14 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         return gateDecision.getExplanation();
     }
 
-    private ReconciliationDifferenceReportCompleteness resolveCompleteness(GetReconciliationDifferenceReportRequest request,
-                                                                           ReconciliationDifference difference,
-                                                                           @Nullable ReconciliationGateDecisionDTO gateDecision) {
+    private ReconciliationDifferenceReportCompleteness resolveCompleteness(ReconciliationDifference difference) {
         if (hasIncompleteActionEvidence(difference)) {
             return ReconciliationDifferenceReportCompleteness.INCOMPLETE_ACTION_EVIDENCE;
         }
         if (needsRerunResult(difference) && !StringUtils.hasText(difference.getLastRerunSn())) {
             return ReconciliationDifferenceReportCompleteness.MISSING_RERUN_RESULT;
         }
-        if (includeGateDecision(request) && missingGateDecision(gateDecision)) {
-            return ReconciliationDifferenceReportCompleteness.MISSING_GATE_DECISION;
-        }
         return ReconciliationDifferenceReportCompleteness.COMPLETE;
-    }
-
-    private boolean missingGateDecision(@Nullable ReconciliationGateDecisionDTO gateDecision) {
-        return gateDecision == null;
     }
 
     private boolean hasIncompleteActionEvidence(ReconciliationDifference difference) {
@@ -204,12 +219,8 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         if (gateDecision != null && gateDecision.getDecisionStatus() == ReconciliationGateDecisionStatus.BLOCKED) {
             return "对账差错仍命中阻断对象，当前准入必须阻断";
         }
-        if (gateDecision != null
-                && gateDecision.getDecisionStatus() == ReconciliationGateDecisionStatus.CONDITIONALLY_PASSED) {
-            return "对账差错已处理并重新对账对平，当前准入可条件放行";
-        }
         if (difference.getStatus() == ReconciliationDifferenceStatus.RESOLVED) {
-            return "对账差错已重新对账通过并关闭";
+            return "对账差错已处理并经当前批次重新对账通过，当前准入按普通通过处理";
         }
         return "对账差错处于 " + difference.getStatus().getDesc() + " 状态，需要人工继续处理或复核";
     }

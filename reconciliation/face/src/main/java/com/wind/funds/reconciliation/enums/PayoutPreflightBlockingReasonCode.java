@@ -16,39 +16,19 @@ import lombok.Getter;
 public enum PayoutPreflightBlockingReasonCode implements DescriptiveEnum {
 
     /**
-     * 结算单尚未锁定。
+     * 出款账户引用缺失。
      */
-    SETTLEMENT_NOT_LOCKED("结算单尚未锁定"),
+    PAYOUT_ACCOUNT_REF_MISSING("出款账户引用缺失"),
 
     /**
-     * 出款账户无效。
+     * 收款端点引用缺失。
      */
-    PAYOUT_ACCOUNT_INVALID("出款账户无效"),
+    PAYEE_ENDPOINT_REF_MISSING("收款端点引用缺失"),
 
     /**
-     * 收款端点无效。
+     * 通道引用缺失。
      */
-    PAYEE_ENDPOINT_INVALID("收款端点无效"),
-
-    /**
-     * 通道不可用。
-     */
-    CHANNEL_UNAVAILABLE("通道不可用"),
-
-    /**
-     * 通道限额超限。
-     */
-    CHANNEL_LIMIT_EXCEEDED("通道限额超限"),
-
-    /**
-     * 通道 cut-off 已关闭。
-     */
-    CUTOFF_CLOSED("通道 cut-off 已关闭"),
-
-    /**
-     * 名单筛查阻断。
-     */
-    WATCHLIST_BLOCKED("名单筛查阻断"),
+    CHANNEL_REF_MISSING("通道引用缺失"),
 
     /**
      * 外部规则未核验。
@@ -56,24 +36,9 @@ public enum PayoutPreflightBlockingReasonCode implements DescriptiveEnum {
     EXTERNAL_RULE_UNVERIFIED("外部规则未核验"),
 
     /**
-     * 负余额阻断。
-     */
-    NEGATIVE_BALANCE_BLOCKED("负余额阻断"),
-
-    /**
-     * 备付或预留余额不足。
-     */
-    RESERVE_INSUFFICIENT("备付或预留余额不足"),
-
-    /**
      * 对账状态阻断。
      */
     RECONCILIATION_BLOCKED("对账状态阻断"),
-
-    /**
-     * 幂等冲突。
-     */
-    IDEMPOTENCY_CONFLICT("幂等冲突"),
 
     /**
      * 需要审批。

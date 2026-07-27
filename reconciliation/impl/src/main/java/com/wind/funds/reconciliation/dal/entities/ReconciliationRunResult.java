@@ -43,9 +43,10 @@ public class ReconciliationRunResult implements Serializable, TenantIsolationObj
     private String reconciliationBatchSn;
 
     @NotNull
+    private String reconciliationScopeRef;
+
     private ReconciliationGateObjectType gateObjectType;
 
-    @NotNull
     private String gateObjectSn;
 
     @NotNull

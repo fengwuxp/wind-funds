@@ -45,6 +45,12 @@ public class PayoutPreflightBlockingReasonDTO implements Serializable {
     @Schema(description = "关联证据引用")
     private String evidenceRef;
 
-    @Schema(description = "确认责任方")
+    @Schema(description = "关联对账差错流水号；非对账阻断时为空")
+    private String relatedDifferenceSn;
+
+    @Schema(description = "平台内部确认处理角色")
     private String confirmationOwner;
+
+    @Schema(description = "差错责任方引用；非对账阻断时为空")
+    private String responsiblePartyRef;
 }

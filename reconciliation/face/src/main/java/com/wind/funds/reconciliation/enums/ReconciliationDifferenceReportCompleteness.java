@@ -28,12 +28,7 @@ public enum ReconciliationDifferenceReportCompleteness implements DescriptiveEnu
     /**
      * 差错处于重跑相关状态，但缺少重跑结果。
      */
-    MISSING_RERUN_RESULT("缺少重跑结果"),
-
-    /**
-     * 请求包含准入 gate 摘要，但当前差错缺少可查询的 gate 对象或决策结果。
-     */
-    MISSING_GATE_DECISION("缺少准入决策");
+    MISSING_RERUN_RESULT("缺少重跑结果");
 
     private final String desc;
 }

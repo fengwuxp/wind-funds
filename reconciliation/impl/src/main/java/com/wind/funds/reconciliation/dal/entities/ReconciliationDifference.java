@@ -69,10 +69,10 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private String reconciliationBatchSn;
 
     /**
-     * 对账来源记录流水号。
+     * 对账逐笔匹配结果流水号。
      */
     @NotNull
-    private String sourceRecordSn;
+    private String reconciliationMatchResultSn;
 
     /**
      * 对账来源质量。
@@ -105,15 +105,13 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private ReconciliationDifferenceStatus status;
 
     /**
-     * 差异币种。
+     * 金额差异的币种；非金额差异为空。
      */
-    @NotNull
     private CurrencyIsoCode currency;
 
     /**
-     * 差异金额，最小货币单位。
+     * 金额差异，最小货币单位；非金额差异为空。
      */
-    @NotNull
     private Long differenceAmount;
 
     /**
@@ -123,19 +121,15 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private String responsiblePartyRef;
 
     /**
-     * 阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT。
+     * 阻断对象类型，例如清算候选、结算单或出款单。
      */
     @NotNull
-    private String blockingScope;
-
-    /**
-     * 阻断对象类型，例如清算候选、结算单或出款单；为空表示历史类型级阻断。
-     */
     private ReconciliationGateObjectType blockingObjectType;
 
     /**
-     * 阻断对象流水号；为空表示历史类型级阻断。
+     * 阻断对象流水号。
      */
+    @NotNull
     private String blockingObjectSn;
 
     /**

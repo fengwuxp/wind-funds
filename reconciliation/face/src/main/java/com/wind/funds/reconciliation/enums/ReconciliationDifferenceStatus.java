@@ -14,11 +14,6 @@ import lombok.Getter;
 public enum ReconciliationDifferenceStatus implements DescriptiveEnum {
 
     /**
-     * 已发现差错。
-     */
-    DISCOVERED("已发现"),
-
-    /**
      * 已阻断相关清分、清算、结算、出款或报表对象。
      */
     BLOCKED("已阻断"),

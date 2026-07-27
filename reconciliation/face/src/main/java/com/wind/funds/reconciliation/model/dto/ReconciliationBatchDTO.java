@@ -32,10 +32,13 @@ public class ReconciliationBatchDTO implements Serializable {
     @Schema(description = "租户 ID")
     private Long tenantId;
 
-    @Schema(description = "准入对象类型")
+    @Schema(description = "本次对账作业范围的稳定业务引用")
+    private String reconciliationScopeRef;
+
+    @Schema(description = "准入对象类型；纯对账时为空")
     private ReconciliationGateObjectType gateObjectType;
 
-    @Schema(description = "准入对象流水号")
+    @Schema(description = "准入对象流水号；纯对账时为空")
     private String gateObjectSn;
 
     @Schema(description = "匹配或对账规则版本")
@@ -58,6 +61,15 @@ public class ReconciliationBatchDTO implements Serializable {
 
     @Schema(description = "完成态运行结果流水号")
     private String runResultSn;
+
+    @Schema(description = "终止操作人")
+    private String abortedBy;
+
+    @Schema(description = "终止时间")
+    private LocalDateTime abortedTime;
+
+    @Schema(description = "终止原因")
+    private String abortReason;
 
     @Schema(description = "对账范围与重跑关系 SHA-256")
     private String batchDigest;

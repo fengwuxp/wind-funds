@@ -4,7 +4,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 
-import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 /**
@@ -15,23 +15,13 @@ public final class ReconciliationDigestSupport {
     private ReconciliationDigestSupport() {
     }
 
-    public static String sourceItemDigest(ReconciliationSourceRole sourceRole,
-                                          ReconciliationSourceType sourceType,
-                                          String sourceItemRef) {
-        TreeMap<String, Object> facts = new TreeMap<>();
-        facts.put("sourceRole", sourceRole);
-        facts.put("sourceType", sourceType);
-        facts.put("sourceItemRef", sourceItemRef);
-        return FundsStableHashSupport.sha256Json(facts);
-    }
-
     public static String sourceDigest(ReconciliationSourceRole sourceRole,
                                       ReconciliationSourceType sourceType,
-                                      List<String> itemDigests) {
+                                      Map<String, String> sourceContentDigests) {
         TreeMap<String, Object> facts = new TreeMap<>();
         facts.put("sourceRole", sourceRole);
         facts.put("sourceType", sourceType);
-        facts.put("itemDigests", itemDigests.stream().sorted().toList());
+        facts.put("sourceContentDigests", new TreeMap<>(sourceContentDigests));
         return FundsStableHashSupport.sha256Json(facts);
     }
 }

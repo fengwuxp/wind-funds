@@ -42,9 +42,10 @@ public class ReconciliationBatch implements Serializable, TenantIsolationObject<
     private Long tenantId;
 
     @NotNull
+    private String reconciliationScopeRef;
+
     private ReconciliationGateObjectType gateObjectType;
 
-    @NotNull
     private String gateObjectSn;
 
     @NotNull
@@ -65,6 +66,12 @@ public class ReconciliationBatch implements Serializable, TenantIsolationObject<
     private ReconciliationBatchStatus status;
 
     private String runResultSn;
+
+    private String abortedBy;
+
+    private LocalDateTime abortedTime;
+
+    private String abortReason;
 
     @NotNull
     private String batchDigest;

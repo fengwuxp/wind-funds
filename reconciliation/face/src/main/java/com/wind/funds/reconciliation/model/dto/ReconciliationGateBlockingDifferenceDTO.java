@@ -41,13 +41,10 @@ public class ReconciliationGateBlockingDifferenceDTO implements Serializable {
     @Schema(description = "责任方引用")
     private String responsiblePartyRef;
 
-    @Schema(description = "阻断范围")
-    private String blockingScope;
-
-    @Schema(description = "阻断对象类型；为空表示历史类型级阻断")
+    @Schema(description = "阻断对象类型")
     private ReconciliationGateObjectType blockingObjectType;
 
-    @Schema(description = "阻断对象流水号；为空表示历史类型级阻断")
+    @Schema(description = "阻断对象流水号")
     private String blockingObjectSn;
 
     @Schema(description = "来源证据引用")

@@ -21,11 +21,6 @@ public enum ReconciliationGateDecisionStatus implements DescriptiveEnum {
     PASSED("通过"),
 
     /**
-     * 相关差错已处理并重新对账对平，可基于证据条件放行。
-     */
-    CONDITIONALLY_PASSED("条件通过"),
-
-    /**
      * 存在未闭环或未对平差错，必须阻断。
      */
     BLOCKED("阻断");

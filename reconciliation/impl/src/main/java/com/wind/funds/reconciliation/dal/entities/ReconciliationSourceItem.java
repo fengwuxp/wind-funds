@@ -44,7 +44,7 @@ public class ReconciliationSourceItem implements Serializable, TenantIsolationOb
     private String sourceItemRef;
 
     @NotNull
-    private String itemDigest;
+    private String contentDigest;
 
     @NotNull
     private String createdBy;

@@ -21,6 +21,8 @@ public enum ClearingSplittableExclusionReason implements DescriptiveEnum {
 
     LEDGER_ENTRY_NOT_CLEARING("来源分录未命中 CLEARING 账目"),
 
+    LEDGER_ENTRY_NOT_CLEARING_INFLOW("来源事实不是 CLEARING 正向待清分入账"),
+
     REFUND_EXISTS("清分前已发生退款"),
 
     RECONCILIATION_BLOCKED("清分前对账门禁阻断");

@@ -16,6 +16,25 @@ import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.reconciliation.ReconciliationTestFixture;
+import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
+import com.wind.funds.reconciliation.application.batch.impl.ReconciliationBatchApplicationServiceImpl;
+import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
+import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
+import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
+import com.wind.funds.reconciliation.model.dto.ReconciliationBatchDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
+import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
+import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
+import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
@@ -38,6 +57,7 @@ import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionCon
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
@@ -78,8 +98,10 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.TreeMap;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -115,8 +137,16 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
 
     private static final String EXTERNAL_SOURCE_ACCOUNT_SN = "external_funds_event_source";
 
+    private static final String RECONCILIATION_RULE_VERSION = "global-inbound-recon-v1";
+
     @Autowired
     private ExternalFundsEventApplicationService externalFundsEventApplicationService;
+
+    @Autowired
+    private ReconciliationBatchApplicationService reconciliationBatchApplicationService;
+
+    @Autowired
+    private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
 
     @Autowired
     private FundingAccountService fundingAccountService;
@@ -163,6 +193,74 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(postingPlanCount()).isEqualTo(2);
         assertThat(ledgerEntryCount()).isEqualTo(4);
         assertExternalEventRouteSnapshot();
+    }
+
+    /**
+     * 场景：可信银行入金事实已完成资金入账，上层对账任务确认银行流水与内部交易完全一致。
+     * 结果：资金底座冻结外部流水、账本交易和 BALANCED 结论。
+     * 红线：纯对账不伪造结算对象，不重复入账，也不修改已有资金或账本事实。
+     */
+    @Test
+    void testConfirmedCreditShouldSupportBalancedReconciliation() {
+        createCreditConsumeScenario();
+        String transactionSn = externalFundsEventApplicationService.consume(
+                consumeRequest(), WindOperatorFactory.system());
+        String ledgerTransactionSn = ledgerTransactionSn();
+        LedgerFactSnapshot postedFacts = ledgerFactSnapshot(jdbcTemplate);
+
+        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn,
+                new ReconciliationMatchResultItem()
+                        .setReferenceSourceRef(externalSourceRef())
+                        .setComparisonSourceRef(internalSourceRef(ledgerTransactionSn))
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
+                        .setEvidenceRef("matcher:global-inbound-001#line-1"));
+
+        assertThat(runResult.getStatus()).isEqualTo(ReconciliationRunResultStatus.BALANCED);
+        assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
+        assertThat(runResult.getGateObjectType()).isNull();
+        assertThat(runResult.getGateObjectSn()).isNull();
+        assertThat(fundsTransactionSn()).isEqualTo(transactionSn);
+        assertThat(fundsTransactionCount()).isOne();
+        assertThat(ledgerEntryCount()).isEqualTo(4);
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+        assertLedgerFactsUnchanged(jdbcTemplate, postedFacts);
+    }
+
+    /**
+     * 场景：可信银行入金事实已完成资金入账，但上层对账任务发现银行流水与内部交易金额不一致。
+     * 结果：资金底座冻结 DIFFERENCE_FOUND 结论，供上层差错流程处理。
+     * 红线：差异只形成对账证据，不回写或撤销原资金、余额和账本事实。
+     */
+    @Test
+    void testConfirmedCreditShouldRecordDifferenceWithoutChangingPostedFunds() {
+        createCreditConsumeScenario();
+        String transactionSn = externalFundsEventApplicationService.consume(
+                consumeRequest(), WindOperatorFactory.system());
+        String ledgerTransactionSn = ledgerTransactionSn();
+        LedgerFactSnapshot postedFacts = ledgerFactSnapshot(jdbcTemplate);
+
+        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn,
+                new ReconciliationMatchResultItem()
+                        .setReferenceSourceRef(externalSourceRef())
+                        .setComparisonSourceRef(internalSourceRef(ledgerTransactionSn))
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
+                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
+                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDifferenceAmount(10L)
+                        .setEvidenceRef("matcher:global-inbound-001#line-1"));
+
+        assertThat(runResult.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
+        assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
+        assertThat(runResult.getGateObjectType()).isNull();
+        assertThat(runResult.getGateObjectSn()).isNull();
+        assertThat(fundsTransactionSn()).isEqualTo(transactionSn);
+        assertThat(fundsTransactionCount()).isOne();
+        assertThat(ledgerEntryCount()).isEqualTo(4);
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+        assertLedgerFactsUnchanged(jdbcTemplate, postedFacts);
     }
 
     /**
@@ -318,6 +416,8 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     private void cleanupExternalFundsEventTestData() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         jdbcTemplate.update("""
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
@@ -423,6 +523,105 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setDescription("external funds event contract");
     }
 
+    private ReconciliationRunResultDTO recordReconciliationResult(
+            String ledgerTransactionSn,
+            ReconciliationMatchResultItem matchResult) {
+        ReconciliationBatchDTO batch = reconciliationBatchApplicationService.createBatch(
+                new CreateReconciliationBatchRequest()
+                        .setTenantId(TENANT_ID)
+                        .setReconciliationScopeRef(externalSourceRef())
+                        .setRuleVersion(RECONCILIATION_RULE_VERSION)
+                        .setWindowStart(LocalDateTime.of(2026, 7, 24, 0, 0))
+                        .setWindowEnd(LocalDateTime.of(2026, 7, 25, 0, 0))
+                        .setTimezoneId("Asia/Shanghai"),
+                WindOperatorFactory.system());
+        reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
+                batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.EXTERNAL_STATEMENT,
+                externalSourceRef(), "bank-statement:global-inbound-001"), WindOperatorFactory.system());
+        reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
+                batch.getSn(), ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.LEDGER,
+                internalSourceRef(ledgerTransactionSn), "ledger-transaction:" + ledgerTransactionSn),
+                WindOperatorFactory.system());
+        return reconciliationRunResultApplicationService.recordRunResult(
+                new RecordReconciliationRunResultRequest()
+                        .setTenantId(TENANT_ID)
+                        .setReconciliationBatchSn(batch.getSn())
+                        .setMatchResults(List.of(matchResult)),
+                WindOperatorFactory.system());
+    }
+
+    private RecordReconciliationSourceSnapshotRequest sourceSnapshotRequest(
+            String batchSn,
+            ReconciliationSourceRole sourceRole,
+            ReconciliationSourceType sourceType,
+            String sourceItemRef,
+            String evidenceRef) {
+        return new RecordReconciliationSourceSnapshotRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batchSn)
+                .setSourceRole(sourceRole)
+                .setSourceType(sourceType)
+                .setSourceItems(List.of(new ReconciliationSourceItemInput()
+                        .setSourceItemRef(sourceItemRef)
+                        .setContentDigest(sourceContentDigest(sourceType, sourceItemRef))))
+                .setEvidenceRefs(List.of(evidenceRef));
+    }
+
+    private String sourceContentDigest(ReconciliationSourceType sourceType, String sourceItemRef) {
+        if (sourceType == ReconciliationSourceType.LEDGER) {
+            return ledgerSourceContentDigest(sourceItemRef);
+        }
+        TreeMap<String, Object> facts = new TreeMap<>();
+        facts.put("sourceType", sourceType.name());
+        facts.put("sourceItemRef", sourceItemRef);
+        facts.put("businessScene", BUSINESS_SCENE);
+        facts.put("externalSourceCode", EXTERNAL_SOURCE_CODE);
+        facts.put("externalFundsFactSn", EXTERNAL_FUNDS_FACT_SN);
+        facts.put("amount", 90L);
+        facts.put("currency", CurrencyIsoCode.USD);
+        return FundsStableHashSupport.sha256Json(facts);
+    }
+
+    private String ledgerSourceContentDigest(String sourceItemRef) {
+        String ledgerTransactionSn = sourceItemRef.substring("ledger-transaction:".length());
+        TreeMap<String, Object> facts = jdbcTemplate.queryForObject("""
+                        SELECT sn, funds_transaction_sn, instruction_type, event_type, transaction_type,
+                               business_scene, business_sn, amount, currency, original_amount,
+                               original_currency, debit_amount, credit_amount, sha256
+                        FROM t_ledger_transaction
+                        WHERE tenant_id = ? AND sn = ?
+                        """,
+                (resultSet, rowNum) -> {
+                    TreeMap<String, Object> result = new TreeMap<>();
+                    result.put("sourceType", ReconciliationSourceType.LEDGER.name());
+                    result.put("sourceItemRef", sourceItemRef);
+                    result.put("sn", resultSet.getString("sn"));
+                    result.put("fundsTransactionSn", resultSet.getString("funds_transaction_sn"));
+                    result.put("instructionType", resultSet.getString("instruction_type"));
+                    result.put("eventType", resultSet.getString("event_type"));
+                    result.put("transactionType", resultSet.getString("transaction_type"));
+                    result.put("businessScene", resultSet.getString("business_scene"));
+                    result.put("businessSn", resultSet.getString("business_sn"));
+                    result.put("amount", resultSet.getLong("amount"));
+                    result.put("currency", resultSet.getString("currency"));
+                    result.put("originalAmount", resultSet.getLong("original_amount"));
+                    result.put("originalCurrency", resultSet.getString("original_currency"));
+                    result.put("debitAmount", resultSet.getLong("debit_amount"));
+                    result.put("creditAmount", resultSet.getLong("credit_amount"));
+                    result.put("sha256", resultSet.getString("sha256"));
+                    return result;
+                }, TENANT_ID, ledgerTransactionSn);
+        return FundsStableHashSupport.sha256Json(facts);
+    }
+
+    private String externalSourceRef() {
+        return "external-funds-fact:" + EXTERNAL_SOURCE_CODE + ":" + EXTERNAL_FUNDS_FACT_SN;
+    }
+
+    private String internalSourceRef(String ledgerTransactionSn) {
+        return "ledger-transaction:" + ledgerTransactionSn;
+    }
+
     private FundsAccountId targetAccountId() {
         return FundsAccountId.immutable(TARGET_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
     }
@@ -445,6 +644,20 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     private String fundsTransactionStatus() {
         return jdbcTemplate.queryForObject("""
                 SELECT status FROM t_funds_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                """, String.class, BUSINESS_SCENE, BUSINESS_SN);
+    }
+
+    private String fundsTransactionSn() {
+        return jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_funds_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                """, String.class, BUSINESS_SCENE, BUSINESS_SN);
+    }
+
+    private String ledgerTransactionSn() {
+        return jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_ledger_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, String.class, BUSINESS_SCENE, BUSINESS_SN);
     }
@@ -588,7 +801,9 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class,
-            ExternalFundsEventApplicationServiceImpl.class
+            ExternalFundsEventApplicationServiceImpl.class,
+            ReconciliationBatchApplicationServiceImpl.class,
+            ReconciliationRunResultApplicationServiceImpl.class
     })
     static class Config {
     }

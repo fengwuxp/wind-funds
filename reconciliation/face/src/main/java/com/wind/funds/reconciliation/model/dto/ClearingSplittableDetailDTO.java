@@ -41,6 +41,9 @@ public class ClearingSplittableDetailDTO implements Serializable {
     @Schema(description = "来源资金交易流水号")
     private String fundsTransactionSn;
 
+    @Schema(description = "识别候选时冻结的来源资金交易乐观锁版本；最终清分前必须重新核对")
+    private Integer sourceTransactionVersion;
+
     @Schema(description = "来源资金交易明细流水号")
     private String fundsTransactionDetailSn;
 

@@ -1,5 +1,8 @@
 package com.wind.funds.reconciliation.application.run.impl;
 
+import com.wind.common.query.WindPagination;
+import com.wind.common.query.supports.DefaultOrderField;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
 import com.wind.funds.reconciliation.application.batch.impl.ReconciliationBatchApplicationServiceImpl;
@@ -14,13 +17,17 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.funds.reconciliation.model.dto.ReconciliationBatchDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationMatchResultDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
+import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
 import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,11 +42,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.IntStream;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -72,7 +81,69 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
         jdbcTemplate.update("DELETE FROM t_reconciliation_source_item");
         jdbcTemplate.update("DELETE FROM t_reconciliation_source_snapshot");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_batch_lineage");
         jdbcTemplate.update("DELETE FROM t_reconciliation_batch");
+    }
+
+    @Test
+    void testRecordShouldRejectTenantDifferentFromCurrentContext() {
+        RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID + 1);
+
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("tenantId 与当前租户不一致");
+        assertThat(runResultCount()).isZero();
+    }
+
+    /**
+     * 场景：可信 matcher 一次提交超过单次原子封版容量的逐笔匹配结论。
+     * 结果：在查询和锁定批次前快速失败，不生成运行结果或逐笔匹配事实。
+     */
+    @Test
+    void testRecordShouldRejectOversizedMatchResultsBeforeBatchLookup() {
+        RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn("missing-batch")
+                .setMatchResults(IntStream.rangeClosed(
+                                1, RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT + 1)
+                        .mapToObj(index -> exactMatchResult(String.valueOf(index), "report:run#line-" + index))
+                        .toList());
+
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("逐笔匹配结果数量不能超过")
+                .hasMessageContaining(String.valueOf(
+                        RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT));
+
+        assertThat(runResultCount()).isZero();
+        assertThat(matchResultCount()).isZero();
+    }
+
+    @Test
+    void testRecordShouldRejectOversizedMatchReferencesBeforeBatchLookup() {
+        ReconciliationMatchResultItem oversizedSourceRef = exactMatchResult("001", "report:run#line-1")
+                .setReferenceSourceRef("x".repeat(ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH + 1));
+        ReconciliationMatchResultItem oversizedEvidence = exactMatchResult("002",
+                "x".repeat(ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH + 1));
+
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                new RecordReconciliationRunResultRequest()
+                        .setTenantId(TENANT_ID)
+                        .setReconciliationBatchSn("missing-batch")
+                        .setMatchResults(List.of(oversizedSourceRef)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("基准侧来源引用长度不能超过");
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                new RecordReconciliationRunResultRequest()
+                        .setTenantId(TENANT_ID)
+                        .setReconciliationBatchSn("missing-batch")
+                        .setMatchResults(List.of(oversizedEvidence)),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("证据引用长度不能超过");
+
+        assertThat(runResultCount()).isZero();
+        assertThat(matchResultCount()).isZero();
     }
 
     /**
@@ -106,6 +177,50 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         assertThat(runResultCount()).isOne();
         assertThat(matchResultCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testQueryShouldReadRunResultAndPageMatchEvidence() {
+        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.recordRunResult(
+                readyRequest(List.of("001", "002")), WindOperatorFactory.system());
+
+        ReconciliationRunResultDTO queried = reconciliationRunResultApplicationService.getRunResult(
+                TENANT_ID, recorded.getSn());
+        WindPagination<ReconciliationMatchResultDTO> firstPage =
+                reconciliationRunResultApplicationService.queryMatchResults(
+                        TENANT_ID, recorded.getSn(), DefaultPageQueryOptions.defaults(1, 1));
+        WindPagination<ReconciliationMatchResultDTO> secondPage =
+                reconciliationRunResultApplicationService.queryMatchResults(
+                        TENANT_ID, recorded.getSn(), DefaultPageQueryOptions.defaults(2, 1));
+
+        assertThat(queried.getResultDigest()).isEqualTo(recorded.getResultDigest());
+        assertThat(firstPage.getTotal()).isEqualTo(2);
+        assertThat(firstPage.getRecords())
+                .extracting(ReconciliationMatchResultDTO::getEvidenceRef)
+                .containsExactly("report:run#line-001");
+        assertThat(secondPage.getRecords())
+                .extracting(ReconciliationMatchResultDTO::getEvidenceRef)
+                .containsExactly("report:run#line-002");
+    }
+
+    @Test
+    void testQueryShouldRejectCrossTenantOrMissingRunResult() {
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.getRunResult(
+                TENANT_ID + 1, "missing-run-result"))
+                .hasMessageContaining("tenantId 与当前租户不一致");
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.queryMatchResults(
+                TENANT_ID, "missing-run-result", DefaultPageQueryOptions.defaults()))
+                .hasMessageContaining("对账运行结果不存在");
+    }
+
+    @Test
+    void testQueryShouldRejectCustomSorting() {
+        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.recordRunResult(
+                readyRequest(List.of("001")), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.queryMatchResults(
+                TENANT_ID, recorded.getSn(), DefaultPageQueryOptions.asc(DefaultOrderField.GMT_CREATE)))
+                .hasMessageContaining("不支持自定义排序");
     }
 
     /**
@@ -143,8 +258,8 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                 FROM t_reconciliation_source_item
                 WHERE source_snapshot_sn = ?
                 """, String.class, snapshotSn);
-        String itemDigest = jdbcTemplate.queryForObject(
-                "SELECT item_digest FROM t_reconciliation_source_item WHERE sn = ?", String.class, itemSn);
+        String contentDigest = jdbcTemplate.queryForObject(
+                "SELECT content_digest FROM t_reconciliation_source_item WHERE sn = ?", String.class, itemSn);
         String sourceDigest = jdbcTemplate.queryForObject(
                 "SELECT source_digest FROM t_reconciliation_source_snapshot WHERE sn = ?", String.class, snapshotSn);
 
@@ -154,12 +269,19 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                 .hasMessageContaining("快照成员数不一致");
         jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET record_count = 1 WHERE sn = ?", snapshotSn);
 
-        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET item_digest = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
+                "x".repeat(64), itemSn);
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("来源成员内容摘要无效");
+
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
                 "0".repeat(64), itemSn);
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("来源成员摘要不一致");
-        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET item_digest = ? WHERE sn = ?", itemDigest, itemSn);
+                .hasMessageContaining("来源快照摘要不一致");
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
+                contentDigest, itemSn);
 
         jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET source_digest = ? WHERE sn = ?",
                 "0".repeat(64), snapshotSn);
@@ -321,18 +443,51 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     }
 
     /**
-     * 场景：批次头写入后，逐笔明细因数据库字段约束写入失败。
-     * 结果：整个事务回滚，批次保持 DATA_READY，不留下批次头或部分逐笔事实。
+     * 场景：两条基准侧事实重复匹配同一条核对侧事实。
+     * 结果：当前一对一匹配模型快速失败，不能通过集合覆盖制造假 BALANCED。
      */
     @Test
-    void testRecordShouldRollbackHeaderAndDetailsWhenDetailInsertFails() {
+    void testRecordShouldRejectReusingOneSideAcrossMatchResults() {
+        ReconciliationBatchDTO batch = createBatch();
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.TRANSACTION,
+                List.of("reference:001", "reference:002"), "report:reference");
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON,
+                ReconciliationSourceType.SETTLEMENT_REPORT,
+                List.of("comparison:001"), "report:comparison");
+        RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batch.getSn())
+                .setMatchResults(List.of(
+                        exactMatchResult("001", "report:run#line-1"),
+                        new ReconciliationMatchResultItem()
+                                .setReferenceSourceRef("reference:002")
+                                .setComparisonSourceRef("comparison:001")
+                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
+                                .setEvidenceRef("report:run#line-2")));
+
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("同一核对侧来源引用只能参与一个匹配结果");
+
+        assertThat(runResultCount()).isZero();
+        assertThat(matchResultCount()).isZero();
+    }
+
+    /**
+     * 场景：逐笔明细证据引用超过数据库字段宽度。
+     * 结果：在锁定批次和写入批次头前快速失败，批次保持 DATA_READY。
+     */
+    @Test
+    void testRecordShouldRejectOversizedEvidenceBeforePersistence() {
         RecordReconciliationRunResultRequest request = readyRequest(List.of("001", "002"))
                 .setMatchResults(List.of(
                         exactMatchResult("001", "report:run#line-1"),
                         exactMatchResult("002", "x".repeat(300))));
 
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperatorFactory.system()));
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("证据引用长度不能超过");
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
@@ -380,6 +535,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     private ReconciliationBatchDTO createBatch() {
         return reconciliationBatchApplicationService.createBatch(new CreateReconciliationBatchRequest()
                 .setTenantId(TENANT_ID)
+                .setReconciliationScopeRef("clearing:clearing-candidate-001")
                 .setGateObjectType(ReconciliationGateObjectType.CLEARING)
                 .setGateObjectSn("clearing-candidate-001")
                 .setRuleVersion("recon-rule-v1")
@@ -398,13 +554,17 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                 .setReconciliationBatchSn(batchSn)
                 .setSourceRole(sourceRole)
                 .setSourceType(sourceType)
-                .setSourceItemRefs(sourceItemRefs)
+                .setSourceItems(sourceItemRefs.stream()
+                        .map(sourceItemRef -> new ReconciliationSourceItemInput()
+                                .setSourceItemRef(sourceItemRef)
+                                .setContentDigest(FundsStableHashSupport.sha256(sourceItemRef)))
+                        .toList())
                 .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system());
     }
 
     private void insertEmptyComparisonSnapshotBypassingBatchService(String batchSn) {
         String sourceDigest = ReconciliationDigestSupport.sourceDigest(
-                ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.SETTLEMENT_REPORT, List.of());
+                ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.SETTLEMENT_REPORT, Map.of());
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_source_snapshot
                     (sn, tenant_id, reconciliation_batch_sn, source_role, source_type,
@@ -426,13 +586,16 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     private Callable<RunResultAttempt> concurrentRecordAttempt(CountDownLatch startGate,
                                                                RecordReconciliationRunResultRequest request) {
         return () -> {
-            startGate.await();
+            TenantContextHolder.setTenantId(TENANT_ID);
             try {
+                startGate.await();
                 ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
                         request, WindOperatorFactory.system());
                 return new RunResultAttempt(true, result.getSn(), null);
             } catch (RuntimeException exception) {
                 return new RunResultAttempt(false, null, exception.getMessage());
+            } finally {
+                TenantContextHolder.clear();
             }
         };
     }

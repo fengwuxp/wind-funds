@@ -17,9 +17,9 @@ import java.util.List;
 /**
  * 清算 / 结算对账准入消费结果。
  *
- * <p>职责：返回清算或结算消费方是否可以继续推进，以及阻断差错、证据引用和解释摘要。</p>
+ * <p>职责：返回清算或结算对象的对账 gate 时点状态，以及阻断差错、证据引用和解释摘要。</p>
  *
- * <p>边界：结果只代表准入判断，不代表清算候选、清算批次、结算单或账务事实已经产生。</p>
+ * <p>边界：结果不是最终放行凭证，不代表清算候选、清算批次、结算单或账务事实已经产生。</p>
  */
 @Data
 @NoArgsConstructor
@@ -32,9 +32,9 @@ public class ClearingSettlementGateResultDTO implements Serializable {
     private static final long serialVersionUID = -5698978715418952457L;
 
     /**
-     * 是否准入通过。
+     * 本次时点检查是否通过。
      */
-    @Schema(description = "是否准入通过")
+    @Schema(description = "本次时点检查是否通过；不能作为最终放行凭证")
     private boolean passed;
 
     /**
@@ -67,6 +67,9 @@ public class ClearingSettlementGateResultDTO implements Serializable {
     @Schema(description = "阻断差错列表")
     private List<ReconciliationGateBlockingDifferenceDTO> blockingDifferences;
 
+    @Schema(description = "已处理且经当前批次重跑对平的历史差错数量")
+    private int resolvedDifferenceCount;
+
     /**
      * 准入证据引用列表。
      */
@@ -78,12 +81,6 @@ public class ClearingSettlementGateResultDTO implements Serializable {
      */
     @Schema(description = "准入解释摘要")
     private String explanation;
-
-    /**
-     * 操作状态，例如 PASSED、CONDITIONALLY_PASSED、BLOCKED。
-     */
-    @Schema(description = "操作状态，例如 PASSED、CONDITIONALLY_PASSED、BLOCKED")
-    private String operationStatus;
 
     /**
      * 检查时间。

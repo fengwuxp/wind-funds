@@ -19,6 +19,7 @@ public interface ClearingSplittableDetailConverter {
     ClearingSplittableDetailConverter INSTANCE = Mappers.getMapper(ClearingSplittableDetailConverter.class);
 
     @Mapping(target = "createdTime", source = "gmtCreate")
+    @Mapping(target = "sourceTransactionVersion", source = "sourceTransactionVersion")
     @Mapping(target = "reconciliationEvidenceRefs",
             expression = "java(parseEvidenceRefs(source.getReconciliationEvidenceRefs()))")
     ClearingSplittableDetailDTO toDTO(ClearingSplittableDetail source);

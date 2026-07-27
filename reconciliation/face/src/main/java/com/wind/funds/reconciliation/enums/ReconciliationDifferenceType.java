@@ -19,6 +19,16 @@ public enum ReconciliationDifferenceType implements DescriptiveEnum {
     AMOUNT_MISMATCH("金额不一致"),
 
     /**
+     * 币种不一致。
+     */
+    CURRENCY_MISMATCH("币种不一致"),
+
+    /**
+     * 收支或借贷方向不一致。
+     */
+    DIRECTION_MISMATCH("方向不一致"),
+
+    /**
      * 状态不一致。
      */
     STATUS_MISMATCH("状态不一致"),

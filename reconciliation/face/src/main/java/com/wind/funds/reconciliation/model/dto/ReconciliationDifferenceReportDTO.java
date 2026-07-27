@@ -48,8 +48,8 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "对账批次流水号")
     private String reconciliationBatchSn;
 
-    @Schema(description = "对账来源记录流水号")
-    private String sourceRecordSn;
+    @Schema(description = "对账逐笔匹配结果流水号")
+    private String reconciliationMatchResultSn;
 
     @Schema(description = "对账来源质量")
     private ReconciliationSourceQuality sourceQuality;
@@ -66,22 +66,19 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "对账差错状态")
     private ReconciliationDifferenceStatus status;
 
-    @Schema(description = "差异币种")
+    @Schema(description = "金额差异的币种；非金额差异为空")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "差异金额，最小货币单位")
+    @Schema(description = "金额差异，最小货币单位；非金额差异为空")
     private Long differenceAmount;
 
     @Schema(description = "责任方引用")
     private String responsiblePartyRef;
 
-    @Schema(description = "阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT")
-    private String blockingScope;
-
-    @Schema(description = "阻断对象类型；为空表示历史类型级阻断")
+    @Schema(description = "阻断对象类型")
     private ReconciliationGateObjectType blockingObjectType;
 
-    @Schema(description = "阻断对象流水号；为空表示历史类型级阻断")
+    @Schema(description = "阻断对象流水号")
     private String blockingObjectSn;
 
     @Schema(description = "匹配或对账规则版本")
@@ -113,6 +110,9 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
 
     @Schema(description = "处理原因")
     private String adjustmentReason;
+
+    @Schema(description = "按发生顺序排列的 append-only 差错处理动作事实")
+    private List<ReconciliationDifferenceActionDTO> actionHistory;
 
     @Schema(description = "最后一次重跑对账运行结果流水号")
     private String lastRerunSn;

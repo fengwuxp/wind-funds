@@ -80,6 +80,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
     private static final String LEDGER_ENTRY_SN = "clearing_ledger_entry_001";
 
+    private static final String DIFFERENCE_BATCH_SN = "clearing_recon_difference_batch_001";
+
     private static final String BUSINESS_SCENE = "MERCHANT_PAY";
 
     private static final String BUSINESS_SN = "merchant_pay_001";
@@ -102,6 +104,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
     private String reconciliationRunResultSn;
 
+    private String reconciliationMatchResultSn;
+
     @BeforeEach
     void prepareSourceFacts() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
@@ -113,6 +117,16 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 "{\"routeCode\":\"DIRECT_PAY_STANDARD\",\"routeVersion\":\"v1\",\"legs\":[{\"legId\":\"merchant-clearing\"}]}",
                 0L, 0L);
         reconciliationRunResultSn = recordBalancedRunResult();
+    }
+
+    @Test
+    void testIdentifyShouldRejectTenantDifferentFromCurrentContext() {
+        IdentifyClearingSplittableDetailRequest request = new IdentifyClearingSplittableDetailRequest()
+                .setTenantId(TENANT_ID + 1);
+
+        assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
+                request, WindOperatorFactory.system()))
+                .hasMessageContaining("tenantId 与当前租户不一致");
     }
 
     /**
@@ -130,6 +144,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
         assertThat(result.getExclusionReason()).isNull();
         assertThat(result.getFundsTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
+        assertThat(result.getSourceTransactionVersion()).isZero();
         assertThat(result.getFundsTransactionDetailSn()).isEqualTo(FUNDS_TRANSACTION_DETAIL_SN);
         assertThat(result.getLedgerTransactionSn()).isEqualTo(LEDGER_TRANSACTION_SN);
         assertThat(result.getPostingPlanSn()).isEqualTo(POSTING_PLAN_SN);
@@ -149,7 +164,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
     /**
      * 场景：来源资金和账本事实完整，但没有可读取的正向对账运行结果。
-     * 结果：稳定排除，不能用“没有登记差错”替代清分前对账。
+     * 结果：返回临时阻断结论但不占用可清分明细唯一键，不能用“没有登记差错”替代清分前对账。
      */
     @Test
     void testIdentifyShouldExcludeWhenReconciliationRunResultIsMissing() {
@@ -161,6 +176,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
         assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getSn()).isNull();
+        assertThat(detailCount()).isZero();
     }
 
     /**
@@ -181,6 +198,27 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(replay.getSourceDigest()).isEqualTo(first.getSourceDigest());
         assertThat(detailCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：可清分候选形成后，来源交易又成功退款并推进乐观锁版本。
+     * 结果：相同来源分录重放时拒绝复用旧候选。
+     * 红线：SPLIT_READY 不是清分执行授权，最终清分必须以冻结版本识别来源变化。
+     */
+    @Test
+    void testIdentifyShouldRejectReplayWhenSourceTransactionVersionAdvances() {
+        clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+        jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET refunded_amount = ?, version = version + 1
+                WHERE sn = ?
+                """, 100L, FUNDS_TRANSACTION_SN);
+
+        assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("来源事实或规则已变化");
+        assertThat(detailCount()).isOne();
     }
 
     /**
@@ -205,13 +243,17 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
     /**
      * 场景：来源事实完整，但该交易明细存在未闭环的清分前重大对账差错。
-     * 结果：记录 EXCLUDED、对账阻断结论和证据引用。
+     * 结果：返回临时 EXCLUDED 和对账阻断证据但不落候选；阻断解除后同一分录可重新识别。
      * 红线：重大差错不得生成可清分结果，也不得修改历史资金事实。
      */
     @Test
     void testIdentifyShouldExcludeWhenPreSplitReconciliationIsBlocked() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
+        reconciliationMatchResultSn = recordDifferenceMatchResultSn();
         reconciliationDifferenceApplicationService.createDifference(blockingDifferenceRequest(),
                 WindOperatorFactory.system());
+        reconciliationRunResultSn = recordBalancedRerunResult();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -222,8 +264,22 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
         assertThat(result.getReconciliationEvidenceRefs()).containsExactly("report:merchant-clearing-recon-run-001",
                 "merchant-clearing-recon-evidence-001");
-        assertThat(detailCount()).isOne();
+        assertThat(result.getSn()).isNull();
+        assertThat(detailCount()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_difference
+                SET status = 'RESOLVED', last_rerun_balanced = TRUE,
+                    last_rerun_batch_sn = 'clearing_recon_batch_balanced_001'
+                WHERE tenant_id = ?
+                """, TENANT_ID);
+        ClearingSplittableDetailDTO retry = clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(retry.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
+        assertThat(retry.getSn()).isNotBlank();
+        assertThat(detailCount()).isOne();
     }
 
     /**
@@ -275,6 +331,61 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason())
                 .isEqualTo(ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING);
+    }
+
+    /**
+     * 输入：来源分录命中 CLEARING，但分录方向为借记、余额效果为减少。
+     *
+     * <p>预期：识别为逆向或扣减事实并排除，不能把正金额字段当成正向待清分本金。</p>
+     */
+    @Test
+    void testIdentifyShouldExcludeClearingDebitDecreaseEntry() {
+        jdbcTemplate.update("""
+                        UPDATE t_ledger_entry
+                        SET entry_side = ?, balance_effect_type = ?, phase_code = ?
+                        WHERE sn = ?
+                        """,
+                EntrySide.DEBIT.name(), LedgerBalanceEffectType.DECREASE.name(),
+                LedgerPhaseCode.REFUND.name(), LEDGER_ENTRY_SN);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService
+                .identifySplittableDetail(minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason())
+                .isEqualTo(ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING_INFLOW);
+    }
+
+    /**
+     * 输入：来源交易、明细和账本交易均为退款事实，但分录仍伪装为 CLEARING 贷记增加。
+     *
+     * <p>预期：按交易事实语义排除，退款或冲正不能进入正向清分候选。</p>
+     */
+    @Test
+    void testIdentifyShouldExcludeRefundTransactionEvenWhenEntryLooksLikeInflow() {
+        jdbcTemplate.update("UPDATE t_funds_transaction SET transaction_type = ? WHERE sn = ?",
+                DefaultFundsTransactionType.REFUND.name(), FUNDS_TRANSACTION_SN);
+        jdbcTemplate.update("""
+                        UPDATE t_funds_transaction_detail
+                        SET transaction_type = ?, event_type = ?, funds_effect_type = ?
+                        WHERE sn = ?
+                        """,
+                DefaultFundsTransactionType.REFUND.name(), FundsTransactionEventType.REFUND.name(),
+                FundsEffectType.RETURN.name(), FUNDS_TRANSACTION_DETAIL_SN);
+        jdbcTemplate.update("""
+                        UPDATE t_ledger_transaction
+                        SET transaction_type = ?, event_type = ?
+                        WHERE sn = ?
+                        """,
+                DefaultFundsTransactionType.REFUND.name(), FundsTransactionEventType.REFUND.name(),
+                LEDGER_TRANSACTION_SN);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService
+                .identifySplittableDetail(minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason())
+                .isEqualTo(ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING_INFLOW);
     }
 
     /**
@@ -357,13 +468,21 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     }
 
     private String recordBalancedRunResult() {
+        return recordBalancedRunResult(null);
+    }
+
+    private String recordBalancedRerunResult() {
+        return recordBalancedRunResult(DIFFERENCE_BATCH_SN);
+    }
+
+    private String recordBalancedRunResult(String previousBatchSn) {
         String batchSn = "clearing_recon_batch_balanced_001";
         String referenceSourceRef = "internal:" + FUNDS_TRANSACTION_DETAIL_SN;
         String comparisonSourceRef = "external:" + FUNDS_TRANSACTION_DETAIL_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
                 jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
                 FUNDS_TRANSACTION_DETAIL_SN, "recon-rule-1", "report:merchant-clearing-recon-run-001",
-                referenceSourceRef, comparisonSourceRef);
+                referenceSourceRef, comparisonSourceRef, previousBatchSn);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
                 .setReconciliationBatchSn(batchSn)
@@ -379,21 +498,35 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     private CreateReconciliationDifferenceRequest blockingDifferenceRequest() {
         return new CreateReconciliationDifferenceRequest()
                 .setTenantId(TENANT_ID)
-                .setDifferenceSn("clearing_recon_difference_001")
-                .setReconciliationBatchSn("clearing_recon_batch_001")
-                .setSourceRecordSn(FUNDS_TRANSACTION_DETAIL_SN)
-                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setDifferenceAmount(AMOUNT)
+                .setReconciliationMatchResultSn(reconciliationMatchResultSn)
                 .setResponsiblePartyRef("merchant:" + MERCHANT_SUBJECT_ID)
-                .setBlockingScope(ReconciliationGateObjectType.CLEARING.name())
-                .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
-                .setBlockingObjectSn(FUNDS_TRANSACTION_DETAIL_SN)
-                .setRuleVersion("recon-rule-1")
-                .setEvidenceRef("merchant-clearing-recon-evidence-001");
+                .setDescription("商户清算候选与外部清算来源金额不一致");
+    }
+
+    private String recordDifferenceMatchResultSn() {
+        String referenceSourceRef = "internal-difference:" + FUNDS_TRANSACTION_DETAIL_SN;
+        String comparisonSourceRef = "external-difference:" + FUNDS_TRANSACTION_DETAIL_SN;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, DIFFERENCE_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                FUNDS_TRANSACTION_DETAIL_SN, "recon-rule-1", "merchant-clearing-recon-evidence-001",
+                referenceSourceRef, comparisonSourceRef);
+        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(DIFFERENCE_BATCH_SN)
+                .setMatchResults(List.of(new ReconciliationMatchResultItem()
+                        .setReferenceSourceRef(referenceSourceRef)
+                        .setComparisonSourceRef(comparisonSourceRef)
+                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
+                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
+                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDifferenceAmount(AMOUNT)
+                        .setEvidenceRef("merchant-clearing-recon-evidence-001"))), WindOperatorFactory.system());
+        return jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_reconciliation_match_result
+                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND difference_type IS NOT NULL
+                """, String.class, TENANT_ID, DIFFERENCE_BATCH_SN);
     }
 
     private void insertSourceFacts(FundsTransactionStatus transactionStatus,

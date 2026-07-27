@@ -16,7 +16,8 @@ public enum ReconciliationBatchStatus implements DescriptiveEnum {
     CREATED("已创建"),
     DATA_COLLECTING("来源收集中"),
     DATA_READY("来源已冻结"),
-    COMPLETED("运行结果已固化");
+    COMPLETED("运行结果已固化"),
+    ABORTED("批次证据已终止");
 
     private final String desc;
 }

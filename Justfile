@@ -61,11 +61,11 @@ verify-codegen:
 
 # Run PMD checks.
 pmd:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn pmd:check
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -DskipTests package pmd:check
 
 # Run PMD checks and force Maven to refresh snapshots.
 pmd-update:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -U pmd:check
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -U -DskipTests package pmd:check
 
 # Run one test class in a Maven module. Defaults to the tests module.
 test-one tests module='tests':
@@ -122,8 +122,16 @@ test-governance tests='FundsProjectionReplayServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Reconciliation, difference lifecycle, gate consumption, and payout preflight tests.
-test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,ReconciliationBatchApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests':
+test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,ReconciliationBatchApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests,ReconciliationMysqlDdlContractTests':
     @just _run-test-classes "{{tests}}" tests
+
+# Run the reconciliation suite against a dedicated disposable MySQL database.
+test-mysql-reconciliation:
+    @[[ "${WIND_FUNDS_TEST_MYSQL_DESTRUCTIVE:-}" == "true" ]] || { echo "Set WIND_FUNDS_TEST_MYSQL_DESTRUCTIVE=true for a disposable database"; exit 1; }
+    @[[ "${WIND_FUNDS_TEST_DATASOURCE_URL:-}" == jdbc:mysql:* ]] || { echo "WIND_FUNDS_TEST_DATASOURCE_URL must use jdbc:mysql:"; exit 1; }
+    @database_url="${WIND_FUNDS_TEST_DATASOURCE_URL%%\?*}"; database_url="${database_url%/}"; database_name="${database_url##*/}"; [[ "$database_name" == "wind_funds_reconciliation_test" ]] || { echo "WIND_FUNDS_TEST_DATASOURCE_URL must target wind_funds_reconciliation_test"; exit 1; }
+    @[[ -n "${WIND_FUNDS_TEST_DATASOURCE_USERNAME:-}" ]] || { echo "WIND_FUNDS_TEST_DATASOURCE_USERNAME is required"; exit 1; }
+    @export WIND_FUNDS_TEST_DATASOURCE_DRIVER=com.mysql.cj.jdbc.Driver; export WIND_FUNDS_TEST_SQL_INIT_MODE=always; just test-reconciliation
 
 # Fast CAD verification for non-business tooling or test-asset changes.
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation

@@ -59,6 +59,9 @@ public class ReconciliationGateDecisionDTO implements Serializable {
     @Schema(description = "阻断差错列表")
     private List<ReconciliationGateBlockingDifferenceDTO> blockingDifferences;
 
+    @Schema(description = "已处理且经当前批次重跑对平的历史差错数量")
+    private int resolvedDifferenceCount;
+
     @Schema(description = "准入证据引用列表")
     private List<String> evidenceRefs;
 

@@ -1,7 +1,6 @@
 package com.wind.funds.reconciliation.model.request;
 
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -59,24 +58,4 @@ public class CheckClearingSettlementGateRequest implements Serializable {
     @NotBlank
     private String reconciliationRunResultSn;
 
-    /**
-     * 准入对象币种，用于调用方审计和后续扩展校验。
-     */
-    @Schema(description = "准入对象币种")
-    @NotNull
-    private CurrencyIsoCode currency;
-
-    /**
-     * 准入对象金额，单位遵循项目金额最小单位约定。
-     */
-    @Schema(description = "准入对象金额，单位遵循项目金额最小单位约定")
-    @NotNull
-    private Long amount;
-
-    /**
-     * 调用方幂等键，用于调用方追踪准入检查请求。
-     */
-    @Schema(description = "调用方幂等键，用于追踪准入检查请求")
-    @NotBlank
-    private String idempotencyKey;
 }
