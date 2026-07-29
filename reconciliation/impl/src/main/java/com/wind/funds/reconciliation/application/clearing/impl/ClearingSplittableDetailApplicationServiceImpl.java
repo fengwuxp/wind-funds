@@ -26,8 +26,10 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -188,8 +190,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
             LedgerEntryDTO entry,
             LedgerTransactionDTO ledgerTransaction,
             ReconciliationGateDecisionDTO reconciliationDecision) {
-        if (transaction.getStatus() != FundsTransactionStatus.OPEN
-                && transaction.getStatus() != FundsTransactionStatus.CLOSED) {
+        if (transaction.getStatus() != FundsTransactionStatus.CLOSED) {
             return ClearingSplittableExclusionReason.TRANSACTION_NOT_ELIGIBLE;
         }
         if (detail.getStatus() != FundsTransactionDetailStatus.SUCCEEDED) {
@@ -257,6 +258,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 && Objects.equals(detail.getAmount(), entry.getAmount().getAmount())
                 && Objects.equals(transaction.getBusinessScene(), detail.getBusinessScene())
                 && Objects.equals(transaction.getBusinessSn(), detail.getBusinessSn())
+                && Objects.equals(detail.getBusinessScene(), ledgerTransaction.getBusinessScene())
+                && Objects.equals(detail.getBusinessSn(), ledgerTransaction.getBusinessSn())
                 && Objects.equals(detail.getBusinessScene(), entry.getBusinessScene())
                 && Objects.equals(detail.getBusinessSn(), entry.getBusinessSn());
     }
@@ -265,17 +268,13 @@ public class ClearingSplittableDetailApplicationServiceImpl
                                          FundsTransactionDetailDTO detail,
                                          LedgerEntryDTO entry,
                                          LedgerTransactionDTO ledgerTransaction) {
-        FundsTransactionEventType eventType = detail.getEventType();
-        boolean supportedEvent = eventType == FundsTransactionEventType.PAY
-                || eventType == FundsTransactionEventType.COMPLETE;
-        boolean supportedFundsEffect = eventType == FundsTransactionEventType.PAY
-                ? detail.getFundsEffectType() == FundsEffectType.DIRECT
-                : detail.getFundsEffectType() == FundsEffectType.CONSUME;
         return transaction.getTransactionType() == DefaultFundsTransactionType.PAY
                 && detail.getTransactionType() == DefaultFundsTransactionType.PAY
                 && ledgerTransaction.getTransactionType() == DefaultFundsTransactionType.PAY
-                && supportedEvent
-                && supportedFundsEffect
+                && transaction.getTransactionMode() == FundsTransactionMode.DIRECT
+                && detail.getEventType() == FundsTransactionEventType.PAY
+                && detail.getFundsEffectType() == FundsEffectType.DIRECT
+                && ledgerTransaction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
                 && entry.getLedgerSubjectCategory() == LedgerSubjectCategory.CLEARING
                 && entry.getEntryType() == EntrySide.CREDIT
                 && entry.getPostingRole() == LedgerPostingRole.DETAIL
@@ -292,18 +291,37 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("tenantId", request.getTenantId());
         facts.put("fundsTransactionSn", transaction.getSn());
         facts.put("fundsTransactionStatus", transaction.getStatus());
+        facts.put("fundsTransactionMode", transaction.getTransactionMode());
         facts.put("fundsTransactionType", transaction.getTransactionType());
+        facts.put("fundsTransactionBusinessScene", transaction.getBusinessScene());
+        facts.put("fundsTransactionBusinessSn", transaction.getBusinessSn());
         facts.put("fundsTransactionDetailSn", detail.getSn());
+        facts.put("fundsTransactionDetailTransactionSn", detail.getTransactionSn());
         facts.put("fundsTransactionDetailStatus", detail.getStatus());
         facts.put("fundsTransactionDetailType", detail.getTransactionType());
         facts.put("fundsTransactionDetailEventType", detail.getEventType());
         facts.put("fundsTransactionDetailEffectType", detail.getFundsEffectType());
+        facts.put("fundsTransactionDetailBusinessScene", detail.getBusinessScene());
+        facts.put("fundsTransactionDetailBusinessSn", detail.getBusinessSn());
+        facts.put("fundsTransactionDetailSubjectType", detail.getSubjectType());
+        facts.put("fundsTransactionDetailSubjectId", detail.getSubjectId());
+        facts.put("fundsTransactionDetailAmount", detail.getAmount());
+        facts.put("fundsTransactionDetailCurrency", detail.getCurrency());
+        facts.put("fundsTransactionDetailLedgerTransactionSn", detail.getLedgerTransactionSn());
         facts.put("ledgerTransactionSn", ledgerTransaction.getSn());
+        facts.put("ledgerTransactionFundsTransactionSn", ledgerTransaction.getFundsTransactionSn());
+        facts.put("ledgerTransactionInstructionType", ledgerTransaction.getInstructionType());
         facts.put("ledgerTransactionType", ledgerTransaction.getTransactionType());
         facts.put("ledgerTransactionEventType", ledgerTransaction.getEventType());
+        facts.put("ledgerTransactionBusinessScene", ledgerTransaction.getBusinessScene());
+        facts.put("ledgerTransactionBusinessSn", ledgerTransaction.getBusinessSn());
         facts.put("ledgerTransactionDigest", ledgerTransaction.getSha256());
         facts.put("postingPlanSn", entry.getPostingPlanSn());
         facts.put("ledgerEntrySn", entry.getSn());
+        facts.put("ledgerEntryFundsTransactionSn", entry.getFundsTransactionSn());
+        facts.put("ledgerEntryLedgerTransactionSn", entry.getLedgerTransactionSn());
+        facts.put("ledgerEntryBusinessScene", entry.getBusinessScene());
+        facts.put("ledgerEntryBusinessSn", entry.getBusinessSn());
         facts.put("ledgerEntryDigest", entry.getSha256());
         facts.put("ledgerSubjectCode", entry.getLedgerSubjectCode());
         facts.put("ledgerSubjectCategory", entry.getLedgerSubjectCategory());

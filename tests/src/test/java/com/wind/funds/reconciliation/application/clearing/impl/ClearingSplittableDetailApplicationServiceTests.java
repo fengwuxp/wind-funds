@@ -86,6 +86,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
     private static final String BUSINESS_SN = "merchant_pay_001";
 
+    private static final String OTHER_BUSINESS_SN = "merchant_pay_002";
+
     private static final String MERCHANT_SUBJECT_ID = "merchant_settlement_001";
 
     private static final long AMOUNT = 9800L;
@@ -220,6 +222,34 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(detailCount()).isOne();
     }
 
+    @Test
+    void testIdentifyShouldRejectReplayWhenSourceBusinessIdentityDrifts() {
+        clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+        jdbcTemplate.update("UPDATE t_funds_transaction_detail SET business_sn = ? WHERE sn = ?",
+                OTHER_BUSINESS_SN, FUNDS_TRANSACTION_DETAIL_SN);
+
+        assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("来源事实或规则已变化");
+        assertThat(detailCount()).isOne();
+    }
+
+    @Test
+    void testIdentifyShouldRejectReplayWhenSourceLifecycleDrifts() {
+        clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+        jdbcTemplate.update("UPDATE t_funds_transaction SET transaction_mode = ? WHERE sn = ?",
+                FundsTransactionMode.AUTHORIZATION.name(), FUNDS_TRANSACTION_SN);
+        jdbcTemplate.update("UPDATE t_ledger_transaction SET instruction_type = ? WHERE sn = ?",
+                FundsInstructionType.AUTHORIZATION_TRANSACTION.name(), LEDGER_TRANSACTION_SN);
+
+        assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("来源事实或规则已变化");
+        assertThat(detailCount()).isOne();
+    }
+
     /**
      * 场景：交易已成功但缺少 route snapshot。
      * 结果：记录 EXCLUDED 和稳定排除原因，不进入后续清分。
@@ -282,20 +312,74 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：授权聚合仍有剩余占用而保持 OPEN，但本次完成明细已成功并命中 CLEARING。
-     * 结果：本次成功明细可以进入清分。
-     * 红线：不能因主聚合尚未关闭而误伤 VCC 部分完成等已成立资金事实。
+     * 直接支付成功后必须关闭，OPEN 表示生命周期事实不完整。
      */
     @Test
-    void testIdentifyShouldAllowOpenAggregateWhenCurrentDetailSucceeded() {
+    void testIdentifyShouldExcludeOpenDirectPay() {
         jdbcTemplate.update("UPDATE t_funds_transaction SET status = ? WHERE sn = ?",
                 FundsTransactionStatus.OPEN.name(), FUNDS_TRANSACTION_SN);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
                 minimumRequest(), WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
-        assertThat(result.getExclusionReason()).isNull();
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason())
+                .isEqualTo(ClearingSplittableExclusionReason.TRANSACTION_NOT_ELIGIBLE);
+    }
+
+    /**
+     * 直接支付不允许用其他业务流水伪装成同一父交易的后继事件。
+     */
+    @Test
+    void testIdentifyShouldExcludeDirectPayWhenDetailBusinessSnDiffersFromParent() {
+        jdbcTemplate.update("UPDATE t_funds_transaction_detail SET business_sn = ? WHERE sn = ?",
+                OTHER_BUSINESS_SN, FUNDS_TRANSACTION_DETAIL_SN);
+        jdbcTemplate.update("UPDATE t_ledger_transaction SET business_sn = ? WHERE sn = ?",
+                OTHER_BUSINESS_SN, LEDGER_TRANSACTION_SN);
+        jdbcTemplate.update("UPDATE t_ledger_entry SET business_sn = ? WHERE sn = ?",
+                OTHER_BUSINESS_SN, LEDGER_ENTRY_SN);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.SOURCE_FACT_MISMATCH);
+    }
+
+    /**
+     * 交易明细、账本交易头和分录必须表达同一业务事件。
+     */
+    @Test
+    void testIdentifyShouldExcludeWhenLedgerTransactionBusinessIdentityDiffers() {
+        jdbcTemplate.update("UPDATE t_ledger_transaction SET business_sn = ? WHERE sn = ?",
+                OTHER_BUSINESS_SN, LEDGER_TRANSACTION_SN);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.SOURCE_FACT_MISMATCH);
+    }
+
+    /**
+     * 授权完成进入 SETTLEMENT，不得伪装成商户待清分 CLEARING 事实。
+     */
+    @Test
+    void testIdentifyShouldExcludeAuthorizationCompletionFromMerchantClearing() {
+        jdbcTemplate.update("UPDATE t_funds_transaction SET transaction_mode = ? WHERE sn = ?",
+                FundsTransactionMode.AUTHORIZATION.name(), FUNDS_TRANSACTION_SN);
+        jdbcTemplate.update("UPDATE t_funds_transaction_detail SET event_type = ?, funds_effect_type = ? WHERE sn = ?",
+                FundsTransactionEventType.COMPLETE.name(), FundsEffectType.CONSUME.name(), FUNDS_TRANSACTION_DETAIL_SN);
+        jdbcTemplate.update("UPDATE t_ledger_transaction SET instruction_type = ?, event_type = ? WHERE sn = ?",
+                FundsInstructionType.AUTHORIZATION_TRANSACTION.name(), FundsTransactionEventType.COMPLETE.name(),
+                LEDGER_TRANSACTION_SN);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason())
+                .isEqualTo(ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING_INFLOW);
     }
 
     /**
