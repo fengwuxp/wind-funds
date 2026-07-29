@@ -144,7 +144,6 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
         assertThat(result.getExclusionReason()).isNull();
         assertThat(result.getFundsTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
-        assertThat(result.getSourceTransactionVersion()).isZero();
         assertThat(result.getFundsTransactionDetailSn()).isEqualTo(FUNDS_TRANSACTION_DETAIL_SN);
         assertThat(result.getLedgerTransactionSn()).isEqualTo(LEDGER_TRANSACTION_SN);
         assertThat(result.getPostingPlanSn()).isEqualTo(POSTING_PLAN_SN);
@@ -152,7 +151,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getSubjectType()).isEqualTo("FUNDING_ACCOUNT");
         assertThat(result.getSubjectId()).isEqualTo(MERCHANT_SUBJECT_ID);
         assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
-        assertThat(result.getPrincipalAmount()).isEqualTo(AMOUNT);
+        assertThat(result.getAmount()).isEqualTo(AMOUNT);
         assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(reconciliationRunResultSn);
         assertThat(result.getReconciliationResultDigest()).hasSize(64);
@@ -450,7 +449,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         clearingSplittableDetailApplicationService.identifySplittableDetail(minimumRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest().setRuleVersion("2"), WindOperatorFactory.system()))
+                minimumRequest().setSplitRuleVersion("2"), WindOperatorFactory.system()))
                 .hasMessageContaining("来源事实或规则已变化");
         assertThat(detailCount()).isOne();
     }
@@ -462,9 +461,10 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 .setFundsTransactionDetailSn(FUNDS_TRANSACTION_DETAIL_SN)
                 .setLedgerEntrySn(LEDGER_ENTRY_SN)
                 .setReconciliationRunResultSn(reconciliationRunResultSn)
-                .setClearingPeriod("2026-07-21")
-                .setRuleCode("MERCHANT_DAILY_SPLIT")
-                .setRuleVersion("1");
+                .setBusinessLine("ACQUIRING")
+                .setSplitPeriod("2026-07-21")
+                .setSplitRuleCode("MERCHANT_DAILY_SPLIT")
+                .setSplitRuleVersion("1");
     }
 
     private String recordBalancedRunResult() {

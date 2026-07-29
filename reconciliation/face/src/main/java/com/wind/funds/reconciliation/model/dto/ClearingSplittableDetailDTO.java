@@ -41,9 +41,6 @@ public class ClearingSplittableDetailDTO implements Serializable {
     @Schema(description = "来源资金交易流水号")
     private String fundsTransactionSn;
 
-    @Schema(description = "识别候选时冻结的来源资金交易乐观锁版本；最终清分前必须重新核对")
-    private Integer sourceTransactionVersion;
-
     @Schema(description = "来源资金交易明细流水号")
     private String fundsTransactionDetailSn;
 
@@ -65,20 +62,23 @@ public class ClearingSplittableDetailDTO implements Serializable {
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "本金金额，最小货币单位")
-    private Long principalAmount;
+    @Schema(description = "来源 CLEARING 入账金额，最小货币单位")
+    private Long amount;
 
     @Schema(description = "清分前已退款金额，最小货币单位")
     private Long refundAmount;
 
+    @Schema(description = "业务线")
+    private String businessLine;
+
     @Schema(description = "清分周期")
-    private String clearingPeriod;
+    private String splitPeriod;
 
     @Schema(description = "清分规则编码")
-    private String ruleCode;
+    private String splitRuleCode;
 
     @Schema(description = "清分规则版本")
-    private String ruleVersion;
+    private String splitRuleVersion;
 
     @Schema(description = "可清分准入状态")
     private ClearingSplittableDetailStatus status;
@@ -97,6 +97,9 @@ public class ClearingSplittableDetailDTO implements Serializable {
 
     @Schema(description = "清分前对账证据引用")
     private List<String> reconciliationEvidenceRefs;
+
+    @Schema(description = "来源 RouteSnapshot SHA-256")
+    private String routeSnapshotDigest;
 
     @Schema(description = "来源事实与规则快照摘要")
     private String sourceDigest;

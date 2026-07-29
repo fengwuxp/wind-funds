@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.OperationActorType;
 import com.wind.integration.operator.WindOperatorFactory;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -43,6 +44,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 
@@ -659,7 +667,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND")
                 .setDescription("refund with missing original transaction"), WindOperatorFactory.system()))
-                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
+                .hasMessageContaining("退款原交易不存在");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
@@ -845,7 +853,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertPostedTransactions(3);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_PAY", 2, 2);
-        assertReferenceRefundFacts("DIRECT_REFUND_REFERENCE_REFUND", refundTransactionSn, payTransactionSn);
+        assertReferenceRefundFacts("DIRECT_REFUND_REFERENCE_REFUND", refundTransactionSn, payTransactionSn, 30L);
 
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
@@ -867,6 +875,65 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND");
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(30L);
+    }
+
+    /**
+     * 场景：同一原支付在并发窗口内收到两笔超过累计可退金额的部分退款。
+     * 输入：原支付 100，收款方另有足额待清算余额，两笔不同业务流水同时退款 60。
+     * 输出：只有一笔退款成功，另一笔按原交易累计可退金额失败且不留下资金或账务事实。
+     * 红线：不能依赖收款方余额不足偶然阻止并发超退，同一 referenceTransactionSn 必须串行裁决。
+     */
+    @Test
+    void testConcurrentReferencedRefundsShouldAllowOnlyOneWinner() throws Exception {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId reservePayer = fundingAccount("refund_reserve_payer");
+        FundsAccountId payee = fundingAccount("refund_race_payee");
+        ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "DIRECT_REFUND_CONCURRENT_TOPUP");
+        topup(reservePayer, 100L, "DIRECT_REFUND_CONCURRENT_RESERVE_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "DIRECT_REFUND_CONCURRENT_PAY");
+        pay(reservePayer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "DIRECT_REFUND_CONCURRENT_RESERVE_PAY");
+        BalanceSnapshot beforeRace = snapshot(balances(payer, reservePayer, payee));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<DirectRefundRaceOutcome> first = executor.submit(() -> raceReferencedRefund(ready, start,
+                    payTransactionSn, "DIRECT_REFUND_CONCURRENT_FIRST"));
+            Future<DirectRefundRaceOutcome> second = executor.submit(() -> raceReferencedRefund(ready, start,
+                    payTransactionSn, "DIRECT_REFUND_CONCURRENT_SECOND"));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).as("direct refund race commands are ready").isTrue();
+            start.countDown();
+
+            List<DirectRefundRaceOutcome> outcomes = List.of(awaitDirectRefundOutcome(first),
+                    awaitDirectRefundOutcome(second));
+            List<DirectRefundRaceOutcome> successes = outcomes.stream()
+                    .filter(DirectRefundRaceOutcome::succeeded)
+                    .toList();
+            List<DirectRefundRaceOutcome> failures = outcomes.stream()
+                    .filter(outcome -> !outcome.succeeded())
+                    .toList();
+            assertThat(successes).as("direct refund race outcomes: %s", outcomes).hasSize(1);
+            assertThat(failures).as("direct refund race outcomes: %s", outcomes).hasSize(1);
+            assertThat(failures.getFirst().failure())
+                    .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+            BalanceSnapshot afterRace = snapshot(balances(payer, reservePayer, payee));
+            assertOnlyBalanceDeltas(beforeRace, afterRace,
+                    delta(payer, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
+                    delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                    delta(payee, LedgerSubjectCode.SETTLEMENT, -60L, CURRENCY));
+            assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(60L);
+            assertReferenceRefundFacts(successes.getFirst().businessSn(), successes.getFirst().transactionSn(),
+                    payTransactionSn, 60L);
+            assertNoFundsOrLedgerFactsForBusinessSn(failures.getFirst().businessSn());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     /**
@@ -1025,7 +1092,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertPostedTransactions(3);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_PAY", 2, 2);
-        assertReferenceRefundFacts("DIRECT_REFUND_REPLAY_BINDING_REFUND", refundTransactionSn, payTransactionSn);
+        assertReferenceRefundFacts("DIRECT_REFUND_REPLAY_BINDING_REFUND", refundTransactionSn, payTransactionSn,
+                30L);
         assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution(
                 "DIRECT_REFUND_REPLAY_BINDING_REFUND");
     }
@@ -3899,7 +3967,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private void assertReferenceRefundFacts(String businessSn,
                                             String refundTransactionSn,
-                                            String payTransactionSn) {
+                                            String payTransactionSn,
+                                            long refundAmount) {
         assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 2);
         assertThat(refundTransactionSn).isNotEqualTo(payTransactionSn);
         assertThat(fundsTransaction(refundTransactionSn))
@@ -3909,11 +3978,11 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
                     assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
                     assertThat(transaction.getReferenceTransactionSn()).isEqualTo(payTransactionSn);
-                    assertThat(transaction.getRefundedAmount()).isEqualTo(30L);
+                    assertThat(transaction.getRefundedAmount()).isEqualTo(refundAmount);
                 });
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount())
                 .as("original direct pay refunded amount")
-                .isEqualTo(30L);
+                .isEqualTo(refundAmount);
         assertThat(routeSnapshot(businessSn).getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
         assertThat(ledgerTransactionByBusinessSn(businessSn).getFundsTransactionSn()).isEqualTo(refundTransactionSn);
     }
@@ -4289,6 +4358,50 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
                     assertThat(routeSnapshot.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
                 });
+    }
+
+    private DirectRefundRaceOutcome raceReferencedRefund(CountDownLatch ready,
+                                                         CountDownLatch start,
+                                                         String referenceTransactionSn,
+                                                         String businessSn) {
+        try {
+            TenantContextHolder.setTenantId(TENANT_ID);
+            ready.countDown();
+            assertThat(start.await(5, TimeUnit.SECONDS)).as("direct refund race start signal received").isTrue();
+            String transactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                    .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                    .setReferenceTransactionSn(referenceTransactionSn)
+                    .setBusinessScene("REFUND")
+                    .setBusinessSn(businessSn)
+                    .setDescription("concurrent referenced refund"), WindOperatorFactory.system());
+            return DirectRefundRaceOutcome.success(businessSn, transactionSn);
+        } catch (Throwable failure) {
+            return DirectRefundRaceOutcome.failure(businessSn, failure);
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
+    private static DirectRefundRaceOutcome awaitDirectRefundOutcome(Future<DirectRefundRaceOutcome> future)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        return future.get(10, TimeUnit.SECONDS);
+    }
+
+    private record DirectRefundRaceOutcome(String businessSn,
+                                           String transactionSn,
+                                           Throwable failure) {
+
+        private static DirectRefundRaceOutcome success(String businessSn, String transactionSn) {
+            return new DirectRefundRaceOutcome(businessSn, transactionSn, null);
+        }
+
+        private static DirectRefundRaceOutcome failure(String businessSn, Throwable failure) {
+            return new DirectRefundRaceOutcome(businessSn, null, failure);
+        }
+
+        private boolean succeeded() {
+            return failure == null;
+        }
     }
 
     private record DirectRouteParticipantKey(String subjectId,

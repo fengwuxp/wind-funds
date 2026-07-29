@@ -5,6 +5,7 @@ import com.wind.funds.transaction.projection.FundsTransactionProjectionPublishCo
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublisher;
 import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.wind.funds.ledger.LedgerPostingAssembler;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.route.RouteResolver;
 import com.wind.funds.route.RouteSnapshotFactory;
@@ -69,7 +70,7 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
      * @return 资金交易流水号
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
         ResolvedRouteSpec resolvedRoute = routeResolver.resolve(instruction);
         RouteSnapshotSpec routeSnapshot = routeSnapshotFactory.createSnapshot(resolvedRoute);

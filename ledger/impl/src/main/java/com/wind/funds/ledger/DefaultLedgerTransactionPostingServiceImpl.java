@@ -52,7 +52,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     private final List<LedgerBalanceProjectionService> ledgerBalanceProjectionServices;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public void post(@NonNull LedgerTransactionSpec transaction) {
         assertTransactionPostable(transaction);
         assertAllPostingPlansHaveEntries(transaction);
@@ -323,18 +323,16 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                             beforeBalance,
                             minimumNormalBalance);
                     long afterBalance = beforeBalance + normalBalanceDelta;
-                    AssertUtils.isTrue(afterBalance >= minimumNormalBalance,
-                            "账本余额不足，ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, "
-                                    + "beforeBalance = {}, balanceDelta = {}, afterBalance = {}, "
-                                    + "minimumNormalBalance = {}",
-                            ledger.getId(),
-                            ledger.getSubjectId(),
-                            ledger.getSubjectType(),
-                            ledger.getLedgerSubjectCode(),
-                            beforeBalance,
-                            normalBalanceDelta,
-                            afterBalance,
-                            minimumNormalBalance);
+                    if (afterBalance < minimumNormalBalance) {
+                        throw new LedgerPostingRejectedException(
+                                transaction.getFundsTransactionSn(),
+                                ("账本余额不足，ledgerId = %s, subjectId = %s, subjectType = %s, ledgerSubjectCode = %s, "
+                                        + "beforeBalance = %s, balanceDelta = %s, afterBalance = %s, "
+                                        + "minimumNormalBalance = %s")
+                                        .formatted(ledger.getId(), ledger.getSubjectId(), ledger.getSubjectType(),
+                                                ledger.getLedgerSubjectCode(), beforeBalance, normalBalanceDelta,
+                                                afterBalance, minimumNormalBalance));
+                    }
                 });
     }
 

@@ -21,6 +21,8 @@ public final class FundsRouteLegIds {
 
     public static final String FEE = "FEE";
 
+    public static final String CLEARING_CONFIRM = "CLEARING_CONFIRM";
+
     public static final String FREEZE = "FREEZE";
 
     public static final String UNFREEZE = "UNFREEZE";

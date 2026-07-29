@@ -8,6 +8,7 @@ import com.wind.common.locks.JdkLockFactory;
 import com.wind.common.locks.LockFactory;
 import com.wind.common.locks.WindLock;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.FundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
@@ -63,6 +64,7 @@ import java.util.function.Function;
 @Slf4j
 @NullMarked
 @Service
+@Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
 public class FundsTransactionCommandServiceImpl implements FundsDirectTransactionService,
         FundsBalanceControlService,
         FundsAuthorizationTransactionService {
@@ -84,7 +86,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     private final FundsTransactionDetailMapper fundsTransactionDetailMapper;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String topup(FundsTransactionTopupRequest request, WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "直接充值入账账户不能为空");
         AssertUtils.notNull(request.getFundsSourceAccountId(), "直接充值资金来源账户不能为空");
@@ -125,7 +126,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String transfer(FundsTransactionTransferRequest request, WindOperator operator) {
         AssertUtils.notNull(request.getPayerAccountId(), "系统内转账付款账户不能为空");
         AssertUtils.notNull(request.getPayeeAccountId(), "系统内转账收款账户不能为空");
@@ -135,19 +135,21 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String pay(FundsTransactionPayRequest request, WindOperator operator) {
         return execute(directTransactionInstructionConverter.convertToPayInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String refund(FundsTransactionRefundRequest request, WindOperator operator) {
+        if (request.getReferenceTransactionSn() != null && !request.getReferenceTransactionSn().isBlank()) {
+            return executeWithLockedReferenceTransaction(request.getReferenceTransactionSn(), "退款原交易",
+                    ignored -> execute(directTransactionInstructionConverter.convertToRefundInstruction(request,
+                            operator)));
+        }
         return execute(directTransactionInstructionConverter.convertToRefundInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String withdraw(FundsTransactionWithdrawRequest request, WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "提现账户不能为空");
         AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
@@ -158,13 +160,11 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String fee(FundsTransactionFeeRequest request, WindOperator operator) {
         return execute(directTransactionInstructionConverter.convertToFeeInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String refundFee(FundsTransactionFeeRefundRequest request, WindOperator operator) {
         AssertUtils.hasText(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
         AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
@@ -174,31 +174,26 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String freeze(FundsBalanceFreezeRequest request, WindOperator operator) {
         return execute(balanceControlInstructionConverter.convertToFreezeInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String unfreeze(FundsBalanceUnfreezeRequest request, WindOperator operator) {
         return execute(balanceControlInstructionConverter.convertToUnfreezeInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String adjust(FundsBalanceAdjustRequest request, WindOperator operator) {
         return execute(balanceControlInstructionConverter.convertToAdjustInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String authorize(FundsAuthorizationTransactionAuthorizeRequest request, WindOperator operator) {
         return execute(authorizationInstructionConverter.convertToAuthorizeInstruction(request, operator));
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator) {
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
                 authorizationTransaction -> {
@@ -208,7 +203,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String complete(FundsAuthorizationTransactionCompleteRequest request, WindOperator operator) {
         if (request.isForceCompletion()) {
             return execute(authorizationInstructionConverter.convertToCompleteInstruction(request, operator));
@@ -221,7 +215,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public String refund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
         if (request.isNoAuthRefund()) {
             return execute(authorizationInstructionConverter.convertToRefundInstruction(request, operator));

@@ -367,7 +367,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessSn("BENEFIT_MISSING_ORIGINAL_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
                 .setRefundReason("missing original benefit contribution"), WindOperatorFactory.system()))
-                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照")
+                .hasMessageContaining("退款原交易不存在")
                 .hasMessageContaining("BENEFIT_TXN_MISSING_ORIGINAL_001");
 
         var after = snapshot(balances(costBearer, receiver));

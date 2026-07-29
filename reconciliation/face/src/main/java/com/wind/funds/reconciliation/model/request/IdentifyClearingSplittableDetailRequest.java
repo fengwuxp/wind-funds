@@ -47,15 +47,19 @@ public class IdentifyClearingSplittableDetailRequest implements Serializable {
     @NotBlank
     private String reconciliationRunResultSn;
 
+    @Schema(description = "上层清分策略已经确认的业务线")
+    @NotBlank
+    private String businessLine;
+
     @Schema(description = "已解析的清分周期")
     @NotBlank
-    private String clearingPeriod;
+    private String splitPeriod;
 
     @Schema(description = "清分规则编码")
     @NotBlank
-    private String ruleCode;
+    private String splitRuleCode;
 
     @Schema(description = "清分规则版本")
     @NotBlank
-    private String ruleVersion;
+    private String splitRuleVersion;
 }

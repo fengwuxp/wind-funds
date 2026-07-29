@@ -46,12 +46,6 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
     @NotNull
     private String fundsTransactionSn;
 
-    /**
-     * 识别候选时冻结的来源资金交易版本；最终清分命令必须重新核对。
-     */
-    @NotNull
-    private Integer sourceTransactionVersion;
-
     @NotNull
     private String fundsTransactionDetailSn;
 
@@ -74,19 +68,22 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
     private CurrencyIsoCode currency;
 
     @NotNull
-    private Long principalAmount;
+    private Long amount;
 
     @NotNull
     private Long refundAmount;
 
     @NotNull
-    private String clearingPeriod;
+    private String businessLine;
 
     @NotNull
-    private String ruleCode;
+    private String splitPeriod;
 
     @NotNull
-    private String ruleVersion;
+    private String splitRuleCode;
+
+    @NotNull
+    private String splitRuleVersion;
 
     @NotNull
     private ClearingSplittableDetailStatus status;
@@ -109,6 +106,8 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
 
     @NotNull
     private String reconciliationEvidenceRefs;
+
+    private String routeSnapshotDigest;
 
     @NotNull
     private String sourceDigest;

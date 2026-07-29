@@ -22,6 +22,7 @@ public enum FundsTransactionEventType implements DescriptiveEnum {
     WITHDRAW("funds.transaction.withdraw", "提现"),
     FEE_CHARGE("funds.transaction.fee.charge", "手续费收取"),
     FEE_REFUND("funds.transaction.fee.refund", "手续费退回"),
+    CLEARING_CONFIRM("funds.clearing.confirm", "清算确认"),
 
     AUTHORIZE("funds.authorization.authorize", "授权"),
     REVERSAL("funds.authorization.reversal", "撤销/冲正"),

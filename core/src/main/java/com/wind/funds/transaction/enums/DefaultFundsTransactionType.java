@@ -67,6 +67,12 @@ public enum DefaultFundsTransactionType implements DescriptiveEnum {
     @Schema(description = "Withdraw")
     WITHDRAW("提现"),
 
+    /**
+     * 已确认清算批次对应的账户内待清算资金转可用。
+     */
+    @Schema(description = "Clearing")
+    CLEARING("清算确认"),
+
     /*=================== 调账相关 ======================*/
 
     /**

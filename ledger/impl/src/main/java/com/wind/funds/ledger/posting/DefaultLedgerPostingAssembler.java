@@ -321,6 +321,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case UNFREEZE -> LedgerPostingIntentType.AUTHORIZATION_REVERSAL;
             case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPostingIntentType.ADJUSTMENT;
             case WITHDRAW -> LedgerPostingIntentType.WITHDRAWAL;
+            case CLEARING_CONFIRM -> LedgerPostingIntentType.SETTLEMENT;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedIntent(resolvedRoute.getTransactionType());
         };
     }
@@ -332,6 +333,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case TRANSFER, PAY -> LedgerPostingIntentType.TRANSFER;
             case FEE -> LedgerPostingIntentType.FEE;
             case REFUND -> LedgerPostingIntentType.REFUND;
+            case CLEARING -> LedgerPostingIntentType.SETTLEMENT;
             case ADJUSTMENT -> LedgerPostingIntentType.ADJUSTMENT;
         };
     }
@@ -344,6 +346,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case HOLD -> resolveHoldPostingScope(phaseCode);
             case AUTHORIZATION, AUTHORIZATION_REVERSAL -> LedgerPostingScope.CONTROL_HOLD;
             case AUTHORIZATION_COMPLETION -> LedgerPostingScope.CONTROL_CONSUME;
+            case SETTLEMENT -> LedgerPostingScope.WITHIN_SUBJECT;
             default -> LedgerPostingScope.BETWEEN_SUBJECTS;
         };
     }

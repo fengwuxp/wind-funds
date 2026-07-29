@@ -21,6 +21,8 @@ public final class FundsRouteCodes {
 
     public static final String FEE_STANDARD = "FEE_STANDARD";
 
+    public static final String CLEARING_CONFIRM_STANDARD = "CLEARING_CONFIRM_STANDARD";
+
     public static final String BALANCE_FREEZE_STANDARD = "BALANCE_FREEZE_STANDARD";
 
     public static final String BALANCE_UNFREEZE_STANDARD = "BALANCE_UNFREEZE_STANDARD";

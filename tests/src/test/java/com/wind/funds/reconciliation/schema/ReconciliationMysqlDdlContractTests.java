@@ -20,6 +20,12 @@ class ReconciliationMysqlDdlContractTests {
 
     private static final List<String> TABLE_NAMES = List.of(
             "t_clearing_splittable_detail",
+            "t_clearing_split_batch",
+            "t_clearing_split_batch_detail",
+            "t_clearing_split_result_snapshot",
+            "t_clearing_candidate",
+            "t_clearing_batch",
+            "t_clearing_batch_detail",
             "t_reconciliation_batch",
             "t_reconciliation_batch_lineage",
             "t_reconciliation_source_snapshot",
@@ -63,6 +69,18 @@ class ReconciliationMysqlDdlContractTests {
         for (String tableName : TABLE_NAMES) {
             assertThat(verificationDdl).contains("'" + tableName + "'");
             String tableDdl = extractCreateTable(forwardDdl, tableName);
+            Matcher tableCounts = Pattern.compile(
+                            "(?:SELECT|UNION ALL SELECT)\\s+'" + Pattern.quote(tableName)
+                                    + "'(?:\\s+AS\\s+table_name)?,\\s*(\\d+)(?:\\s+AS\\s+column_count)?,"
+                                    + "\\s*(\\d+)(?:\\s+AS\\s+index_count)?")
+                    .matcher(verificationDdl);
+            assertThat(tableCounts.find()).as("missing verification counts for %s", tableName).isTrue();
+            assertThat(Integer.parseInt(tableCounts.group(1)))
+                    .as("verification column count for %s", tableName)
+                    .isEqualTo(columnCount(tableDdl));
+            assertThat(Integer.parseInt(tableCounts.group(2)))
+                    .as("verification index count for %s", tableName)
+                    .isEqualTo(indexCount(tableDdl));
             assertThat(verificationDdl).contains("'" + tableName + "' AS table_name, '"
                     + columnSignature(tableDdl) + "' AS column_signature");
             Matcher indexes = Pattern.compile(
@@ -89,7 +107,18 @@ class ReconciliationMysqlDdlContractTests {
 
         assertThat(justfile)
                 .contains("database_name=\"${database_url##*/}\"")
-                .contains("[[ \"$database_name\" == \"wind_funds_reconciliation_test\" ]]");
+                .contains("[[ \"$database_name\" == \"wind_funds_reconciliation_test\" ]]")
+                .contains("WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX")
+                .contains("ReconciliationMysqlMigrationIntegrationTests");
+    }
+
+    @Test
+    void testMysqlReadmeShouldDescribeCurrentMigrationScope() throws IOException {
+        String readme = readDatabaseFile("README.md");
+
+        assertThat(readme)
+                .contains("十五张表", "just test-mysql-reconciliation")
+                .doesNotContain("九张表");
     }
 
     private String readDatabaseFile(String fileName) throws IOException {
@@ -111,6 +140,24 @@ class ReconciliationMysqlDdlContractTests {
         return sql.replace("COLLATE = utf8mb4_bin", "")
                 .replaceAll("\\s+", " ")
                 .trim();
+    }
+
+    private int columnCount(String tableDdl) {
+        Matcher columns = Pattern.compile("(?m)^\\s*`[^`]+`\\s+[A-Z]+").matcher(tableDdl);
+        int count = 0;
+        while (columns.find()) {
+            count++;
+        }
+        return count;
+    }
+
+    private int indexCount(String tableDdl) {
+        Matcher indexes = Pattern.compile("(?m)^\\s*(?:PRIMARY KEY|UNIQUE KEY|KEY)").matcher(tableDdl);
+        int count = 0;
+        while (indexes.find()) {
+            count++;
+        }
+        return count;
     }
 
     private String columnSignature(String tableDdl) {

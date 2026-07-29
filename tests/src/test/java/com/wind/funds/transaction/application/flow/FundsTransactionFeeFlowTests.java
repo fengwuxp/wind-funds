@@ -29,6 +29,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * 手续费组合业务流测试。
  */
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
     /**

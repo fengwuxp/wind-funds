@@ -2,6 +2,7 @@ package com.wind.funds.transaction.services.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
@@ -73,6 +74,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private static final int MAX_ERROR_MESSAGE_LENGTH = 512;
 
+    private static final String LEDGER_POSTING_REJECTED_ERROR_CODE = "LEDGER_POSTING_REJECTED";
+
+    private static final String FUNDS_INSTRUCTION_EXECUTION_FAILED_ERROR_CODE =
+            "FUNDS_INSTRUCTION_EXECUTION_FAILED";
+
     private static final String HASH_FIELD_CURRENCY = "currency";
 
     private static final String HASH_FIELD_ORIGINAL_CURRENCY = "originalCurrency";
@@ -110,7 +116,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         FundsTransaction transaction = findOrCreateTransaction(instruction, routeSnapshot);
         List<FundsTransactionDetail> existingDetails = findExistingTransactionDetails(instruction, routeSnapshot,
                 transaction.getSn());
-        assertFailedDirectTransactionCannotBeReposted(instruction, transaction, existingDetails);
+        assertFailedTransactionCannotBeReposted(instruction, transaction, existingDetails);
         if (!existingDetails.isEmpty() && existingDetails.stream().allMatch(this::isCompletedDetail)) {
             return lifecycleResult(transaction.getSn(), existingDetails);
         }
@@ -120,9 +126,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return lifecycleResult(transaction.getSn(), details);
     }
 
-    private void assertFailedDirectTransactionCannotBeReposted(FundsInstructionSpec instruction,
-                                                               FundsTransaction transaction,
-                                                               List<FundsTransactionDetail> existingDetails) {
+    private void assertFailedTransactionCannotBeReposted(FundsInstructionSpec instruction,
+                                                          FundsTransaction transaction,
+                                                          List<FundsTransactionDetail> existingDetails) {
         if (instruction.getInstructionType() != FundsInstructionType.DIRECT_TRANSACTION
                 || existingDetails.isEmpty()) {
             return;
@@ -175,7 +181,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         }
         for (FundsTransactionDetail detail : details) {
             detail.setStatus(FundsTransactionDetailStatus.FAILED);
-            detail.setErrorCode(cause.getClass().getSimpleName());
+            detail.setErrorCode(resolveFailureCode(cause));
             detail.setErrorMessage(truncate(cause.getMessage()));
             AssertUtils.isTrue(fundsTransactionDetailMapper.update(detail) == 1,
                     "更新资金交易明细失败状态失败，sn = {}", detail.getSn());
@@ -187,6 +193,12 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         }
         AssertUtils.isTrue(fundsTransactionMapper.update(transaction) == 1,
                 "更新资金交易失败状态失败，sn = {}", transaction.getSn());
+    }
+
+    private static String resolveFailureCode(Throwable cause) {
+        return cause instanceof LedgerPostingRejectedException
+                ? LEDGER_POSTING_REJECTED_ERROR_CODE
+                : FUNDS_INSTRUCTION_EXECUTION_FAILED_ERROR_CODE;
     }
 
     private FundsTransaction findOrCreateTransaction(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
@@ -449,7 +461,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             }
             case REVERSAL -> applyReversedSummary(transaction, amount);
             case COMPLETE -> applyCompletedSummary(transaction, primaryDetail, amount);
-            case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE -> applyPostedSummary(transaction, primaryDetail, details);
+            case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE, CLEARING_CONFIRM ->
+                    applyPostedSummary(transaction, primaryDetail, details);
             case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount, resolveFeeAmount(details));
             case FEE_REFUND -> applyFeeRefundedSummary(transaction, amount);
             case FREEZE, UNFREEZE, BALANCE_ADJUST, LIMIT_ADJUST ->
@@ -652,6 +665,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case COMPLETE, WITHDRAW -> FundsEffectType.CONSUME;
             case AUTH_REFUND, REFUND, FEE_REFUND -> FundsEffectType.RETURN;
             case BALANCE_ADJUST, LIMIT_ADJUST -> FundsEffectType.ADJUST;
+            case CLEARING_CONFIRM -> FundsEffectType.RELEASE;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedFundsEffectType(instruction);
         };
     }
@@ -661,6 +675,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case TOPUP, TRANSFER, PAY, FEE -> FundsEffectType.DIRECT;
             case WITHDRAW -> FundsEffectType.CONSUME;
             case REFUND -> FundsEffectType.RETURN;
+            case CLEARING -> FundsEffectType.RELEASE;
             case ADJUSTMENT -> FundsEffectType.ADJUST;
         };
     }

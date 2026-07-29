@@ -44,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
@@ -149,7 +150,6 @@ public class ClearingSplittableDetailApplicationServiceImpl
         }
         result.setTenantId(request.getTenantId());
         result.setFundsTransactionSn(transaction.getSn());
-        result.setSourceTransactionVersion(transaction.getVersion());
         result.setFundsTransactionDetailSn(detail.getSn());
         result.setLedgerTransactionSn(entry.getLedgerTransactionSn());
         result.setPostingPlanSn(entry.getPostingPlanSn());
@@ -157,11 +157,12 @@ public class ClearingSplittableDetailApplicationServiceImpl
         result.setSubjectType(entry.getSubjectType());
         result.setSubjectId(entry.getSubjectId());
         result.setCurrency(entry.getAmount().getCurrency());
-        result.setPrincipalAmount(entry.getAmount().getAmount());
+        result.setAmount(entry.getAmount().getAmount());
         result.setRefundAmount(defaultAmount(transaction.getRefundedAmount()));
-        result.setClearingPeriod(request.getClearingPeriod());
-        result.setRuleCode(request.getRuleCode());
-        result.setRuleVersion(request.getRuleVersion());
+        result.setBusinessLine(request.getBusinessLine());
+        result.setSplitPeriod(request.getSplitPeriod());
+        result.setSplitRuleCode(request.getSplitRuleCode());
+        result.setSplitRuleVersion(request.getSplitRuleVersion());
         result.setStatus(exclusionReason == null
                 ? ClearingSplittableDetailStatus.SPLIT_READY
                 : ClearingSplittableDetailStatus.EXCLUDED);
@@ -170,6 +171,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
         result.setReconciliationRunResultSn(reconciliationDecision.getReconciliationRunResultSn());
         result.setReconciliationResultDigest(reconciliationDecision.getReconciliationResultDigest());
         result.setReconciliationEvidenceRefs(JSON.toJSONString(reconciliationDecision.getEvidenceRefs()));
+        if (StringUtils.hasText(transaction.getRouteSnapshot())) {
+            result.setRouteSnapshotDigest(FundsStableHashSupport.sha256Json(
+                    Map.of("routeSnapshot", transaction.getRouteSnapshot())));
+        }
         result.setSourceDigest(sourceDigest(request, transaction, detail, entry, ledgerTransaction,
                 reconciliationDecision));
         result.setCreatedBy(operator.getOperatorAsText());
@@ -288,7 +293,6 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("fundsTransactionSn", transaction.getSn());
         facts.put("fundsTransactionStatus", transaction.getStatus());
         facts.put("fundsTransactionType", transaction.getTransactionType());
-        facts.put("sourceTransactionVersion", transaction.getVersion());
         facts.put("fundsTransactionDetailSn", detail.getSn());
         facts.put("fundsTransactionDetailStatus", detail.getStatus());
         facts.put("fundsTransactionDetailType", detail.getTransactionType());
@@ -314,9 +318,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("amount", entry.getAmount().getAmount());
         facts.put("currency", entry.getAmount().getCurrency());
         facts.put("refundedAmount", defaultAmount(transaction.getRefundedAmount()));
-        facts.put("clearingPeriod", request.getClearingPeriod());
-        facts.put("ruleCode", request.getRuleCode());
-        facts.put("ruleVersion", request.getRuleVersion());
+        facts.put("businessLine", request.getBusinessLine());
+        facts.put("splitPeriod", request.getSplitPeriod());
+        facts.put("splitRuleCode", request.getSplitRuleCode());
+        facts.put("splitRuleVersion", request.getSplitRuleVersion());
         facts.put("reconciliationDecisionStatus", reconciliationDecision.getDecisionStatus());
         facts.put("reconciliationRunResultSn", reconciliationDecision.getReconciliationRunResultSn());
         facts.put("reconciliationResultDigest", reconciliationDecision.getReconciliationResultDigest());
@@ -340,9 +345,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
         AssertUtils.hasText(request.getFundsTransactionDetailSn(), "来源资金交易明细流水号不能为空");
         AssertUtils.hasText(request.getLedgerEntrySn(), "来源账本分录流水号不能为空");
         AssertUtils.hasText(request.getReconciliationRunResultSn(), "清分前对账运行结果流水号不能为空");
-        AssertUtils.hasText(request.getClearingPeriod(), "清分周期不能为空");
-        AssertUtils.hasText(request.getRuleCode(), "清分规则编码不能为空");
-        AssertUtils.hasText(request.getRuleVersion(), "清分规则版本不能为空");
+        AssertUtils.hasText(request.getBusinessLine(), "业务线不能为空");
+        AssertUtils.hasText(request.getSplitPeriod(), "清分周期不能为空");
+        AssertUtils.hasText(request.getSplitRuleCode(), "清分规则编码不能为空");
+        AssertUtils.hasText(request.getSplitRuleVersion(), "清分规则版本不能为空");
         AssertUtils.notNull(operator, "可清分明细识别操作人不能为空");
     }
 
