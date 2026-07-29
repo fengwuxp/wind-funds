@@ -121,6 +121,25 @@ class ReconciliationMysqlDdlContractTests {
                 .doesNotContain("九张表");
     }
 
+    @Test
+    void testOperationalDiscoveryQueriesShouldHaveMatchingIndexes() throws IOException {
+        String forwardDdl = readDatabaseFile("001_create_reconciliation_tables.sql");
+
+        assertThat(extractCreateTable(forwardDdl, "t_clearing_split_batch"))
+                .contains("KEY `idx_clearing_split_batch_status_age` "
+                        + "(`tenant_id`, `status`, `gmt_modified`)");
+        assertThat(extractCreateTable(forwardDdl, "t_clearing_candidate"))
+                .contains("KEY `idx_clearing_candidate_status_available` "
+                        + "(`tenant_id`, `status`, `clearing_available_time`)")
+                .contains("KEY `idx_clearing_candidate_status_changed` "
+                        + "(`tenant_id`, `status`, `status_changed_time`)")
+                .contains("KEY `idx_clearing_candidate_locked_batch` "
+                        + "(`tenant_id`, `locked_clearing_batch_sn`, `status`)");
+        assertThat(extractCreateTable(forwardDdl, "t_clearing_batch"))
+                .contains("KEY `idx_clearing_batch_status_age` "
+                        + "(`tenant_id`, `status`, `gmt_modified`)");
+    }
+
     private String readDatabaseFile(String fileName) throws IOException {
         Path path = workspaceRoot().resolve("database/mysql/reconciliation").resolve(fileName);
         assertThat(path).exists().isRegularFile();

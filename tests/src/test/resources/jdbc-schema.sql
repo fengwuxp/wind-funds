@@ -759,7 +759,8 @@ CREATE TABLE `t_clearing_split_batch`
     UNIQUE KEY `uk_clearing_split_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_clearing_split_batch_active_digest` (`tenant_id`, `active_batch_digest`),
     KEY `idx_clearing_split_batch_scope`
-        (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `split_period`, `status`)
+        (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `split_period`, `status`),
+    KEY `idx_clearing_split_batch_status_age` (`tenant_id`, `status`, `gmt_modified`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '单账务主体清分批次表';
 
@@ -871,7 +872,9 @@ CREATE TABLE `t_clearing_candidate`
     UNIQUE KEY `uk_clearing_candidate_active_detail` (`tenant_id`, `active_splittable_detail_sn`),
     KEY `idx_clearing_candidate_source` (`tenant_id`, `split_result_sn`, `splittable_detail_sn`),
     KEY `idx_clearing_candidate_subject` (`tenant_id`, `subject_type`, `subject_id`, `currency`, `clearing_period`),
-    KEY `idx_clearing_candidate_status` (`tenant_id`, `status`)
+    KEY `idx_clearing_candidate_status_available` (`tenant_id`, `status`, `clearing_available_time`),
+    KEY `idx_clearing_candidate_status_changed` (`tenant_id`, `status`, `status_changed_time`),
+    KEY `idx_clearing_candidate_locked_batch` (`tenant_id`, `locked_clearing_batch_sn`, `status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '清算候选准入事实表';
 
@@ -915,6 +918,7 @@ CREATE TABLE `t_clearing_batch`
     UNIQUE KEY `uk_clearing_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_clearing_batch_active_digest` (`tenant_id`, `active_amount_digest`),
     KEY `idx_clearing_batch_scope` (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `clearing_period`, `status`),
+    KEY `idx_clearing_batch_status_age` (`tenant_id`, `status`, `gmt_modified`),
     KEY `idx_clearing_batch_funds_transaction` (`tenant_id`, `funds_transaction_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '清算批次表';

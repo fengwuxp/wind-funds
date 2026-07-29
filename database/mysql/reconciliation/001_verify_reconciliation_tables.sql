@@ -6,11 +6,11 @@ SELECT @@version AS mysql_version,
 
 WITH expected_tables AS (
     SELECT 't_clearing_splittable_detail' AS table_name, 28 AS column_count, 6 AS index_count
-    UNION ALL SELECT 't_clearing_split_batch', 26, 4
+    UNION ALL SELECT 't_clearing_split_batch', 26, 5
     UNION ALL SELECT 't_clearing_split_batch_detail', 9, 5
     UNION ALL SELECT 't_clearing_split_result_snapshot', 26, 5
-    UNION ALL SELECT 't_clearing_candidate', 36, 7
-    UNION ALL SELECT 't_clearing_batch', 32, 5
+    UNION ALL SELECT 't_clearing_candidate', 36, 9
+    UNION ALL SELECT 't_clearing_batch', 32, 6
     UNION ALL SELECT 't_clearing_batch_detail', 14, 5
     UNION ALL SELECT 't_reconciliation_batch', 22, 7
     UNION ALL SELECT 't_reconciliation_batch_lineage', 8, 3
@@ -181,6 +181,7 @@ WITH expected_indexes AS (
     UNION ALL SELECT 't_clearing_split_batch' AS table_name, 'uk_clearing_split_batch_sn' AS index_name, 0 AS non_unique, 'tenant_id,sn' AS column_names
     UNION ALL SELECT 't_clearing_split_batch' AS table_name, 'uk_clearing_split_batch_active_digest' AS index_name, 0 AS non_unique, 'tenant_id,active_batch_digest' AS column_names
     UNION ALL SELECT 't_clearing_split_batch' AS table_name, 'idx_clearing_split_batch_scope' AS index_name, 1 AS non_unique, 'tenant_id,subject_type,subject_id,currency,business_line,split_period,status' AS column_names
+    UNION ALL SELECT 't_clearing_split_batch' AS table_name, 'idx_clearing_split_batch_status_age' AS index_name, 1 AS non_unique, 'tenant_id,status,gmt_modified' AS column_names
     UNION ALL SELECT 't_clearing_split_batch_detail' AS table_name, 'PRIMARY' AS index_name, 0 AS non_unique, 'id' AS column_names
     UNION ALL SELECT 't_clearing_split_batch_detail' AS table_name, 'uk_clearing_split_batch_detail_sn' AS index_name, 0 AS non_unique, 'tenant_id,sn' AS column_names
     UNION ALL SELECT 't_clearing_split_batch_detail' AS table_name, 'uk_clearing_split_batch_detail_member' AS index_name, 0 AS non_unique, 'tenant_id,split_batch_sn,splittable_detail_sn' AS column_names
@@ -197,11 +198,14 @@ WITH expected_indexes AS (
     UNION ALL SELECT 't_clearing_candidate' AS table_name, 'uk_clearing_candidate_active_detail' AS index_name, 0 AS non_unique, 'tenant_id,active_splittable_detail_sn' AS column_names
     UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_source' AS index_name, 1 AS non_unique, 'tenant_id,split_result_sn,splittable_detail_sn' AS column_names
     UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_subject' AS index_name, 1 AS non_unique, 'tenant_id,subject_type,subject_id,currency,clearing_period' AS column_names
-    UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_status' AS index_name, 1 AS non_unique, 'tenant_id,status' AS column_names
+    UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_status_available' AS index_name, 1 AS non_unique, 'tenant_id,status,clearing_available_time' AS column_names
+    UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_status_changed' AS index_name, 1 AS non_unique, 'tenant_id,status,status_changed_time' AS column_names
+    UNION ALL SELECT 't_clearing_candidate' AS table_name, 'idx_clearing_candidate_locked_batch' AS index_name, 1 AS non_unique, 'tenant_id,locked_clearing_batch_sn,status' AS column_names
     UNION ALL SELECT 't_clearing_batch' AS table_name, 'PRIMARY' AS index_name, 0 AS non_unique, 'id' AS column_names
     UNION ALL SELECT 't_clearing_batch' AS table_name, 'uk_clearing_batch_sn' AS index_name, 0 AS non_unique, 'tenant_id,sn' AS column_names
     UNION ALL SELECT 't_clearing_batch' AS table_name, 'uk_clearing_batch_active_digest' AS index_name, 0 AS non_unique, 'tenant_id,active_amount_digest' AS column_names
     UNION ALL SELECT 't_clearing_batch' AS table_name, 'idx_clearing_batch_scope' AS index_name, 1 AS non_unique, 'tenant_id,subject_type,subject_id,currency,business_line,clearing_period,status' AS column_names
+    UNION ALL SELECT 't_clearing_batch' AS table_name, 'idx_clearing_batch_status_age' AS index_name, 1 AS non_unique, 'tenant_id,status,gmt_modified' AS column_names
     UNION ALL SELECT 't_clearing_batch' AS table_name, 'idx_clearing_batch_funds_transaction' AS index_name, 1 AS non_unique, 'tenant_id,funds_transaction_sn' AS column_names
     UNION ALL SELECT 't_clearing_batch_detail' AS table_name, 'PRIMARY' AS index_name, 0 AS non_unique, 'id' AS column_names
     UNION ALL SELECT 't_clearing_batch_detail' AS table_name, 'uk_clearing_batch_detail_sn' AS index_name, 0 AS non_unique, 'tenant_id,sn' AS column_names

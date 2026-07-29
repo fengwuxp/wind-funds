@@ -16,7 +16,7 @@
 2. 对账表为空或确认为首次创建；若已有历史表或数据，必须另写带历史数据校验的增量迁移，不能执行本基线覆盖。
 3. 生产同版本 MySQL 下并发验证同一 Gate 根批次竞争、重跑推进当前头、差错动作与后继重跑竞争，以及 Gate 与新差错插入竞争。
 4. 最终清分、清算、结算或出款命令必须在自己的本地事务中调用 `ReconciliationGateApplicationService.checkGate`，并在同一事务内完成业务写入；只读 `inspectGate` 和出款预检不能作为提交授权。
-5. 上线前记录十五张表的行数、索引、慢查询基线与锁等待；上线后监控死锁、Gate 阻断率、批次滞留、差错积压和迁移校验结果。
+5. 上线前记录十五张表的行数、索引、慢查询基线与锁等待；使用峰值等量数据执行 `EXPLAIN`，确认批次状态与账龄扫描命中 `idx_clearing_split_batch_status_age` / `idx_clearing_batch_status_age`，候选到期、状态账龄和所属批次回查分别命中 `idx_clearing_candidate_status_available` / `idx_clearing_candidate_status_changed` / `idx_clearing_candidate_locked_batch`。任何发现查询出现全表扫描或估算扫描行数超出本轮分页容量，都必须停止准出并调整索引或查询。上线后监控死锁、Gate 阻断率、批次滞留、差错积压和迁移校验结果。
 
 ## 仓内验证
 
