@@ -185,6 +185,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
 
     private static final String SPEND_PASS_DECISION_DIGEST = "sha256:auth-admission-spend-pass";
 
+    private static final String CONTROL_SCOPE_ID = "budget_auth_admission";
+
+    private static final String CONTROL_PERIOD_ID = "2026-07";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -398,6 +402,27 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         var beforeExplainFacts = ledgerFactSnapshot(jdbcTemplate);
         assertAuthorizationProjectionSpendRuleExplanation(authorizationSn);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeExplainFacts);
+    }
+
+    /**
+     * 场景：已固化的授权决策被复用到另一个预算周期。
+     * 输入：决策记录绑定当期窗口，授权请求仅替换 periodId。
+     * 输出：交易入口在准入阶段 fail-closed。
+     * 红线：跨周期 decisionRef 不得创建交易、路由、记账计划或账本事实。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectDecisionReusedAcrossPeriodWithoutFundsFacts() {
+        preparePassedAuthorizationData();
+        var before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
+                        .setPeriodId("2026-08"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("控制窗口不一致");
+
+        assertNoFundsOrLedgerFacts(AUTHORIZE_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -948,13 +973,15 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     private AuthorizeByPaymentInstrumentRequest authorizeSpendRejectedRequest() {
         return authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
-                .setControlScopeId("budget_auth_admission");
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(CONTROL_PERIOD_ID);
     }
 
     private AuthorizeByPaymentInstrumentRequest authorizeSpendPassedRequest(String businessSn, String instrumentSn) {
         return authorizeRequest(businessSn, instrumentSn)
                 .setSpendDecisionSn(SPEND_PASS_DECISION_SN)
-                .setControlScopeId("budget_auth_admission");
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(CONTROL_PERIOD_ID);
     }
 
     private void recordAuthorizationDecision(String decisionSn,
@@ -971,6 +998,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(1)
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(CONTROL_PERIOD_ID)
+                .setTargetAccountId(creditAccountId())
                 .setAction(PaymentInstrumentAction.AUTHORIZE)
                 .setAmount(60L)
                 .setCurrency(CurrencyIsoCode.USD)

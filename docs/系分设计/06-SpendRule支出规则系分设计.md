@@ -413,6 +413,11 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | scope_type | varchar(50) | 是 | 决策 scope 类型。 | PAYMENT_INSTRUMENT |
 | scope_id | varchar(64) | 是 | 决策 scope 编号。 | PI-10001 |
 | instrument_sn | varchar(64) | 否 | 支付工具号。 | PI-VCC-10001 |
+| instrument_binding_version | int | 支付工具决策必填 | 决策生成时的支付工具绑定版本。 | 1 |
+| control_scope_id | varchar(64) | 否 | 预算控制范围；与 period_id 同时有值或同时为空。 | COST-CENTER-001 |
+| period_id | varchar(64) | 否 | 预算控制周期；与 control_scope_id 同时有值或同时为空。 | 2026-07 |
+| target_subject_id | varchar(64) | 否 | 可选规则评估目标账户 ID。 | CREDIT-10001 |
+| target_subject_type | varchar(50) | 否 | 可选目标账户类型，仅 FUNDING_ACCOUNT / CREDIT_ACCOUNT。 | CREDIT_ACCOUNT |
 | action | varchar(50) | 是 | 支付工具动作。 | AUTHORIZE |
 | amount | bigint(20) | 是 | 交易金额，最小货币单位。 | 3500 |
 | currency | varchar(10) | 是 | 币种。 | USD |
@@ -438,6 +443,8 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 2. 同 tenantId + decisionSn 但 decisionDigest 不一致时拒绝。
 3. 决策记录不可修改；纠错应追加新决策或审计更正记录。
 4. 决策记录不设置 gmtModified，避免被误认为可更新事实；如未来增加更正记录，需另起设计。
+5. 支付工具决策必须携带正数 `instrumentBindingVersion`；`controlScopeId + periodId` 是原子窗口证据；目标账户若存在，只允许 Funding Account 或 Credit Account。
+6. 绑定版本、控制窗口和目标账户参与同一 decisionSn 的幂等一致性校验。wallet 准入与当前工具快照、请求窗口和资金责任目标逐项比较，旧记录缺少当前请求所需证据或任一字段漂移时 fail-closed。
 
 ### 6.5 控制额度变动流水模型
 
@@ -797,10 +804,11 @@ git diff --check
 1. 规则定义、版本发布、规则挂载、挂载查询、挂载解释、决策记录、决策记录只读查询和决策事实解释已有最小 application service、DTO、Entity、Mapper、H2 schema 和目标服务流测试。
 2. 已证明已发布版本不可变、挂载必须携带冲突策略和有效期、支付工具和支出控制范围只作为控制 scope、规则拒绝不生成资金交易或账本副作用。
 3. 支出控制准入已改为自行解析当前有效 binding，并按 `decisionSn` 回读、验真由可信决策方预先固化的单条决策记录；授权准入只把可验真的决策引用传入 wallet，裸 `PASSED + sha256` 不放行。有效 `SPEND_CONTROL_SCOPE` 未被请求精确解析、或存在当前无法解析的有效 `ACCOUNT_HIERARCHY` 挂载时 fail-closed，不返回 `NO_APPLICABLE_RULE`。
-4. 已成立授权的相同业务请求按固化交易上下文核对并幂等返回，不受当前 binding 暂停影响；金额、币种、支付工具、授权结果或决策证据变化时拒绝。
-5. 控制额度变动流水、预算额度调额、交易成功消耗、策略授权的退款控制补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
-6. `SpendControlMovementType` 已统一承载控制额度变动语义分类，当前服务实现消费枚举分类方法，避免各实现重复硬编码类型集合。
-7. 该基线不等于完整规则引擎、生产迁移、运营后台或外部通道规则生产适用性已完成。
+4. 支付工具决策记录已固化 `instrumentBindingVersion`、完整 `controlScopeId + periodId` 和可选 Funding/Credit Account 目标；wallet 准入与当前快照逐项核对，跨绑定版本、跨 scope、跨周期、跨目标账户或缺失所需历史证据均在交易内核前拒绝。
+5. 已成立授权的相同业务请求按固化交易上下文核对并幂等返回，不受当前 binding 暂停影响；金额、币种、支付工具、授权结果或决策证据变化时拒绝。
+6. 控制额度变动流水、预算额度调额、交易成功消耗、策略授权的退款控制补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
+7. `SpendControlMovementType` 已统一承载控制额度变动语义分类，当前服务实现消费枚举分类方法，避免各实现重复硬编码类型集合。
+8. 该基线不等于完整规则引擎、生产迁移、运营后台或外部通道规则生产适用性已完成。
 
 未完成交付：
 
@@ -878,8 +886,8 @@ Velocity 控制映射边界：
 
 | 能力域 | 当前证据 | 生产准入前还需 | 验证入口 |
 | --- | --- | --- | --- |
-| 规则定义闭环 | 规则定义、不可变版本、挂载、查询解释、决策记录、决策查询和决策解释已有服务层能力。 | 完整权限模型、生产迁移、规则变更审计和运营入口。 | `SpendRuleDefinitionServiceFlowTests`、`SpendRuleDefinitionServiceTests`、compile、PMD、diff。 |
-| 决策消费闭环 | 授权前规则决策可被准入链路消费，拒绝路径无资金事实副作用。 | 完整业务策略准入、外部规则适用性确认和更完整的组合回归。 | 授权准入和支出控制准入回归。 |
+| 规则定义闭环 | 规则定义、不可变版本、挂载、查询解释、决策记录、决策查询和决策解释已有服务层能力；证据边界归档在 `openspec/changes/spend-rule-production-conditional-baseline/spec.md`。 | 完整权限模型、生产迁移、规则变更审计和运营入口。 | `SpendRuleDefinitionServiceFlowTests`、`SpendRuleDefinitionServiceTests`、`SpendRuleBindingServiceTests`、`SpendRuleDecisionRecordServiceTests`、compile、PMD、diff。 |
+| 决策消费闭环 | 授权前规则决策可被准入链路消费；决策固化支付工具绑定版本、完整控制窗口和可选目标账户，wallet 准入与当前快照核对；跨绑定版本、跨 scope、跨周期、跨目标账户或缺证据均 fail-closed，拒绝路径无资金事实副作用。 | 生产宿主仍需用 IAM 和可信适配层保证写入者与上下文来源，并完成生产 DDL / 历史数据策略、业务策略准入、外部规则适用性确认和更完整的组合回归。 | `SpendRuleDecisionRecordServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`PaymentInstrumentTransactionAuthorizationTests`。 |
 | 控制额度变动闭环 | 预算额度调额、预留、消耗、可信释放、策略授权的退款控制补偿和预算控制投影已有服务层证据。 | 事件消费、outbox、历史数据回填、生产告警和 Runbook。 | 控制额度变动、交易消费和枚举契约测试。 |
 | 投影解释闭环 | 交易投影解释已有只读边界和敏感信息保护基础。 | 历史规则版本、挂载、决策记录和控制额度变动流水的完整解释矩阵。 | 交易投影解释目标测试和只读边界测试。 |
 | 生产启用准备 | 系分已定义生产准入口径。 | 生产 DDL、滚动窗口查询索引、迁移、权限、审计、告警、Runbook、灰度和回滚策略。 | 生产变更评审、数据校验、慢查询评审、灰度验收和回滚演练。 |

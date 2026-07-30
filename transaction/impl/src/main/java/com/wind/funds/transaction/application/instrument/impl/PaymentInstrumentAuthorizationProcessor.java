@@ -247,6 +247,7 @@ public class PaymentInstrumentAuthorizationProcessor {
                 .setSpendDecisionResult(request.getSpendDecisionResult())
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
                 .setControlScopeId(request.getControlScopeId())
+                .setPeriodId(request.getPeriodId())
                 .setRejectReason(request.getSpendDecisionRejectReason());
     }
 

@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -60,6 +61,18 @@ public class SpendRuleDecisionRecordDTO implements Serializable {
 
     @Schema(description = "支付工具号")
     private String instrumentSn;
+
+    @Schema(description = "支付工具绑定版本")
+    private Integer instrumentBindingVersion;
+
+    @Schema(description = "预算控制范围标识")
+    private String controlScopeId;
+
+    @Schema(description = "预算控制周期标识")
+    private String periodId;
+
+    @Schema(description = "规则评估目标账户")
+    private FundsAccountId targetAccountId;
 
     @Schema(description = "支付工具动作")
     private PaymentInstrumentAction action;

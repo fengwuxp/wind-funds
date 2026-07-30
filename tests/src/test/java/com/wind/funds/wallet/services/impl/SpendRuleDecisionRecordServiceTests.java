@@ -1,7 +1,9 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
@@ -64,6 +66,10 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     private static final String BUSINESS_SN = "SPEND_RULE_DECISION_RECORD_SERVICE_001";
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_decision_record_service_card";
+
+    private static final String CONTROL_SCOPE_ID = "spend_rule_decision_record_service_scope";
+
+    private static final String PERIOD_ID = "2026-07";
 
     private static final LocalDateTime EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
 
@@ -144,6 +150,102 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         assertThat(countDecisionRecords()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：可信决策方固化支付工具绑定版本、预算窗口和账户级评估上下文。
+     * 输入：同一 decisionSn 先写入完整上下文，再以不同 periodId 重放。
+     * 输出：首次写入可回读完整上下文，漂移重放被拒绝。
+     * 红线：decisionRef 不得脱离原绑定、控制窗口或账户评估上下文复用。
+     */
+    @Test
+    void testRecordDecisionShouldPersistAdmissionContextAndRejectReplayDrift() {
+        prepareRuleVersionAndBinding();
+        FundsAccountId targetAccountId = FundsAccountId.immutable(
+                "decision_context_credit_account", FundsSubjectType.CREDIT_ACCOUNT);
+        RecordSpendRuleDecisionRecordRequest request = rejectedDecisionRequest()
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(PERIOD_ID)
+                .setTargetAccountId(targetAccountId);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleDecisionRecordDTO recorded = spendRuleDecisionRecordService.recordDecision(request);
+
+        assertThat(recorded.getInstrumentBindingVersion()).isEqualTo(1);
+        assertThat(recorded.getControlScopeId()).isEqualTo(CONTROL_SCOPE_ID);
+        assertThat(recorded.getPeriodId()).isEqualTo(PERIOD_ID);
+        assertThat(recorded.getTargetAccountId()).isEqualTo(targetAccountId);
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
+                rejectedDecisionRequest()
+                        .setControlScopeId(CONTROL_SCOPE_ID)
+                        .setPeriodId("2026-08")
+                        .setTargetAccountId(targetAccountId)))
+                .hasMessageContaining("决策流水已存在但内容不一致");
+        assertThat(countDecisionRecords()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：可信决策方只提交预算控制范围，没有周期证据。
+     * 输入：controlScopeId 非空、periodId 为空。
+     * 输出：写入口 fail-closed，不创建决策记录。
+     * 红线：不完整控制窗口不得成为可复用 decisionRef。
+     */
+    @Test
+    void testRecordDecisionShouldRejectPartialControlWindow() {
+        prepareRuleVersionAndBinding();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
+                rejectedDecisionRequest().setControlScopeId(CONTROL_SCOPE_ID)))
+                .hasMessageContaining("控制范围和周期必须同时提供");
+
+        assertThat(countDecisionRecords()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：可信决策方把支付工具误作为规则评估目标账户。
+     * 输入：targetAccountId.type=PAYMENT_INSTRUMENT。
+     * 输出：写入口拒绝，不创建决策记录。
+     * 红线：Spend Rule 上下文不能把 PaymentInstrument 变成账务主体。
+     */
+    @Test
+    void testRecordDecisionShouldRejectNonAccountingTarget() {
+        prepareRuleVersionAndBinding();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
+                rejectedDecisionRequest().setTargetAccountId(FundsAccountId.immutable(
+                        PAYMENT_INSTRUMENT_SN, "PAYMENT_INSTRUMENT"))))
+                .hasMessageContaining("目标账户只允许资金账户或信用账户");
+
+        assertThat(countDecisionRecords()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史或异常数据只保留目标账户类型，没有目标账户 ID。
+     * 输入：先写入无目标账户决策，再模拟不完整的持久化证据。
+     * 输出：读取 fail-closed，不把不完整证据降级为范围级决策。
+     * 红线：目标账户证据缺失不得扩大 PASSED 决策的适用范围。
+     */
+    @Test
+    void testGetDecisionRecordShouldRejectPartialPersistedTargetEvidence() {
+        prepareRuleVersionAndBinding();
+        SpendRuleDecisionRecordDTO recorded =
+                spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
+        jdbcTemplate.update("""
+                UPDATE t_spend_rule_decision_record
+                SET target_subject_type = ?
+                WHERE id = ?
+                """, FundsSubjectType.CREDIT_ACCOUNT.name(), recorded.getId());
+
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.getDecisionRecordById(recorded.getId()))
+                .hasMessageContaining("目标账户证据不完整");
     }
 
     /**
@@ -279,6 +381,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(1)
                 .setAction(PaymentInstrumentAction.AUTHORIZE)
                 .setAmount(10001L)
                 .setCurrency(CurrencyIsoCode.USD)

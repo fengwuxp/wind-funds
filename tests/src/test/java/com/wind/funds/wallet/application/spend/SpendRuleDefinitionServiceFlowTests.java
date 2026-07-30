@@ -610,6 +610,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(1)
                 .setAction(PaymentInstrumentAction.AUTHORIZE)
                 .setAmount(10001L)
                 .setCurrency(CurrencyIsoCode.USD)

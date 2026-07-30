@@ -113,6 +113,10 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String SPEND_DECISION_DIGEST = "sha256:spend-control-admission";
 
+    private static final String CONTROL_SCOPE_ID = "spend_control_admission_scope";
+
+    private static final String PERIOD_ID = "2026-07";
+
     private static final String MULTI_RULE_FINAL_DECISION_SN = "decision_spend_control_multi_rule_final_001";
 
     private static final String MULTI_RULE_FINAL_DECISION_DIGEST = "sha256:multi-rule-final-deny-overrides";
@@ -586,6 +590,95 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：调用方把已固化 PASSED 决策复用到另一个预算控制范围。
+     * 输入：决策记录绑定原 controlScopeId 和 periodId，准入请求只替换 controlScopeId。
+     * 输出：准入 fail-closed。
+     * 红线：decisionRef 不得跨预算范围复用，也不得产生资金或账务事实。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectDecisionReusedAcrossControlScope() {
+        prepareSpendControlAdmissionData();
+        recordDecisionWithAdmissionContext(1, CONTROL_SCOPE_ID, PERIOD_ID, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)
+                        .setControlScopeId("spend_control_admission_other_scope")
+                        .setPeriodId(PERIOD_ID)))
+                .hasMessageContaining("控制窗口不一致");
+
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把已固化 PASSED 决策复用到另一个预算周期。
+     * 输入：决策记录绑定原 controlScopeId 和 periodId，准入请求只替换 periodId。
+     * 输出：准入 fail-closed。
+     * 红线：decisionRef 不得跨周期复用，也不得生成控制流水或资金事实。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectDecisionReusedAcrossPeriod() {
+        prepareSpendControlAdmissionData();
+        recordDecisionWithAdmissionContext(1, CONTROL_SCOPE_ID, PERIOD_ID, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)
+                        .setControlScopeId(CONTROL_SCOPE_ID)
+                        .setPeriodId("2026-08")))
+                .hasMessageContaining("控制窗口不一致");
+
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：旧支付工具绑定版本产生的 PASSED 决策在当前绑定上重放。
+     * 输入：当前绑定版本为 1，决策记录绑定版本为 2。
+     * 输出：准入 fail-closed。
+     * 红线：换绑后不得沿用旧 decisionRef 进入交易内核。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectDecisionFromDifferentInstrumentBindingVersion() {
+        prepareSpendControlAdmissionData();
+        recordDecisionWithAdmissionContext(2, null, null, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)))
+                .hasMessageContaining("支付工具绑定版本不一致");
+
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：账户级预算判断产生的 PASSED 决策被用于另一个资金责任目标。
+     * 输入：决策记录绑定另一 CreditAccount，当前快照解析到原 CreditAccount。
+     * 输出：准入 fail-closed。
+     * 红线：账户级 decisionRef 不得跨 Funding/Credit Account 复用。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectDecisionForDifferentTargetAccount() {
+        prepareSpendControlAdmissionData();
+        recordDecisionWithAdmissionContext(1, null, null,
+                FundsAccountId.immutable("spend_control_other_credit", FundsSubjectType.CREDIT_ACCOUNT));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)))
+                .hasMessageContaining("目标账户不一致");
+
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendControlAdmissionTestData() {
         cleanupSpendControlAdmissionTestData();
@@ -692,7 +785,35 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                                 String rejectReason,
                                 SpendRuleScopeType scopeType,
                                 String scopeId) {
-        spendRuleDecisionRecordService.recordDecision(new RecordSpendRuleDecisionRecordRequest()
+        spendRuleDecisionRecordService.recordDecision(decisionRecordRequest(
+                decisionSn, decisionDigest, decisionResult, rejectReason, scopeType, scopeId));
+    }
+
+    private void recordDecisionWithAdmissionContext(Integer instrumentBindingVersion,
+                                                    String controlScopeId,
+                                                    String periodId,
+                                                    FundsAccountId targetAccountId) {
+        spendRuleDecisionRecordService.recordDecision(decisionRecordRequest(
+                        SPEND_DECISION_SN,
+                        SPEND_DECISION_DIGEST,
+                        SpendControlDecisionResult.PASSED,
+                        null,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(instrumentBindingVersion)
+                .setControlScopeId(controlScopeId)
+                .setPeriodId(periodId)
+                .setTargetAccountId(targetAccountId));
+    }
+
+    private RecordSpendRuleDecisionRecordRequest decisionRecordRequest(
+            String decisionSn,
+            String decisionDigest,
+            SpendControlDecisionResult decisionResult,
+            String rejectReason,
+            SpendRuleScopeType scopeType,
+            String scopeId) {
+        return new RecordSpendRuleDecisionRecordRequest()
                 .setTenantId(TENANT_ID)
                 .setDecisionSn(decisionSn)
                 .setRuleId(SPEND_RULE_ID)
@@ -701,6 +822,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setScopeType(scopeType)
                 .setScopeId(scopeId)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(1)
                 .setAction(PaymentInstrumentAction.AUTHORIZE)
                 .setAmount(60L)
                 .setCurrency(CurrencyIsoCode.USD)
@@ -708,7 +830,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setBusinessSn(BUSINESS_SN)
                 .setDecisionResult(decisionResult)
                 .setRejectReason(rejectReason)
-                .setDecisionDigest(decisionDigest));
+                .setDecisionDigest(decisionDigest);
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {

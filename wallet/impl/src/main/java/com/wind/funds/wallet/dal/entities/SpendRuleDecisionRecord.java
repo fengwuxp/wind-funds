@@ -4,6 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -87,6 +88,31 @@ public class SpendRuleDecisionRecord implements Serializable, TenantIsolationObj
      * 支付工具号。
      */
     private String instrumentSn;
+
+    /**
+     * 支付工具绑定版本。
+     */
+    private Integer instrumentBindingVersion;
+
+    /**
+     * 预算控制范围标识。
+     */
+    private String controlScopeId;
+
+    /**
+     * 预算控制周期标识。
+     */
+    private String periodId;
+
+    /**
+     * 规则评估目标资金主体 ID。
+     */
+    private String targetSubjectId;
+
+    /**
+     * 规则评估目标资金主体类型。
+     */
+    private FundsSubjectType targetSubjectType;
 
     /**
      * 支付工具动作。

@@ -96,7 +96,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         AssertUtils.notNull(decisionRecord,
                 "Spend Rule 决策引用不存在，decisionRef = {}",
                 request.getSpendDecisionSn());
-        assertDecisionMatches(request, binding, decisionRecord);
+        assertDecisionMatches(request, snapshot, binding, decisionRecord);
         return toDecision(request, snapshot, decisionRecord);
     }
 
@@ -194,6 +194,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
     }
 
     private void assertDecisionMatches(ResolveSpendControlAdmissionRequest request,
+                                       PaymentInstrumentPreTransactionSnapshotDTO snapshot,
                                        SpendRuleBindingDTO binding,
                                        SpendRuleDecisionRecordDTO decisionRecord) {
         AssertUtils.isTrue(Objects.equals(decisionRecord.getSpendRuleBindingSn(), binding.getSn())
@@ -211,6 +212,19 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                         && Objects.equals(decisionRecord.getBusinessScene(), request.getBusinessScene())
                         && Objects.equals(decisionRecord.getBusinessSn(), request.getBusinessSn()),
                 "Spend Rule 决策引用与当前交易上下文不一致，decisionRef = {}",
+                request.getSpendDecisionSn());
+        AssertUtils.notNull(snapshot.getPaymentInstrumentCapability(), "支付工具能力快照不能为空");
+        AssertUtils.isTrue(Objects.equals(decisionRecord.getInstrumentBindingVersion(),
+                        snapshot.getPaymentInstrumentCapability().getBindingVersion()),
+                "Spend Rule 决策引用与当前支付工具绑定版本不一致，decisionRef = {}",
+                request.getSpendDecisionSn());
+        AssertUtils.isTrue(Objects.equals(decisionRecord.getControlScopeId(), request.getControlScopeId())
+                        && Objects.equals(decisionRecord.getPeriodId(), request.getPeriodId()),
+                "Spend Rule 决策引用与当前控制窗口不一致，decisionRef = {}",
+                request.getSpendDecisionSn());
+        AssertUtils.isTrue(decisionRecord.getTargetAccountId() == null
+                        || Objects.equals(decisionRecord.getTargetAccountId(), snapshot.getTargetAccountId()),
+                "Spend Rule 决策引用与当前目标账户不一致，decisionRef = {}",
                 request.getSpendDecisionSn());
         AssertUtils.isTrue(decisionRecord.getDecisionResult() == SpendControlDecisionResult.PASSED
                         || decisionRecord.getDecisionResult() == SpendControlDecisionResult.REJECTED,
@@ -314,6 +328,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setBusinessSn(request.getBusinessSn())
                 .setTargetAccountId(snapshot.getTargetAccountId())
                 .setControlScopeId(request.getControlScopeId())
+                .setPeriodId(request.getPeriodId())
                 .setPreTransactionSnapshot(snapshot);
         if (decisionRecord == null) {
             return result;

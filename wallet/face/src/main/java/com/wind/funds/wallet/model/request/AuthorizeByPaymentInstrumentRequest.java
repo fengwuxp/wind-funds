@@ -89,6 +89,9 @@ public class AuthorizeByPaymentInstrumentRequest {
     @Schema(description = "控制范围标识，可为空")
     private String controlScopeId;
 
+    @Schema(description = "控制周期标识；需要预算控制预留时必须由可信上层提供")
+    private String periodId;
+
     @Schema(description = "Spend Rule 决策拒绝原因，可选回显字段，不作为授权准入依据")
     private String spendDecisionRejectReason;
 

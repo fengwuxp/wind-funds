@@ -133,7 +133,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | SpendRuleDefinition | 规则定义，描述规则是什么、归谁管理、用于哪个规则域。 | ruleId、ruleCode、ruleName、ruleType、ruleDomain、ownerType、ownerId、status。 | DRAFT、ACTIVE、SUSPENDED、ARCHIVED。 |
 | SpendRuleVersion | 不可变规则版本，描述规则规格 JSON、裁决动作和摘要。 | ruleId、ruleVersion、ruleSpec、ruleDigest；ruleSpec 可承载 display、matchSpec、counterSpec、limitSpec、decisionSpec、safetySpec。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
 | SpendRuleBinding | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | sn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、auditReferenceSn、status。 | ACTIVE、SUSPENDED、RETIRED；EXPIRED 是按生效窗口解释出的只读状态，不作为挂载存储状态。 |
-| SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、spendRuleBindingSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
+| SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、评估上下文、结果和原因。 | decisionSn、spendRuleBindingSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、instrumentBindingVersion、controlScopeId、periodId、targetAccountId、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
 | SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、可信释放或策略授权的退款控制补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
 | BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
 
@@ -148,6 +148,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类”的分类口径；服务实现不得再各自硬编码一套类型解释。
 8. `controlScopeId` 是支出控制范围的公共契约和落库字段，`ResolveSpendControlAdmissionRequest`、`AuthorizeByPaymentInstrumentRequest`、控制额度变动流水和预算控制投影统一使用该字段。
 9. `periodId` 是 Spend Rule 控制周期标识，例如 `2026-07`，用于当前周期和历史周期查询；它不是账本周期 bucket，不会生成支出控制范围账本。
+10. 支付工具决策必须固化 `instrumentBindingVersion`；`controlScopeId + periodId` 同时提供或同时省略；可选 `targetAccountId` 只允许 Funding Account 或 Credit Account。wallet 准入按当前快照逐项核对，缺失或漂移均 fail-closed，不推断补齐历史证据。
 
 命名口径：
 
@@ -330,11 +331,12 @@ Spend Rule DSL v1.1 先锁定规则版本、规则挂载和决策证据三类契
 | AC-SR-004 | 规则通过后继续交易准入。 | 交易链路继续校验支付工具、账户能力、资金责任和余额/额度。 | 把规则通过当作资金可用或授权成功。 |
 | AC-SR-005 | 历史交易投影解释规则命中。 | 只读取当时版本、挂载和决策流水。 | 按当前规则或当前工具绑定重算历史。 |
 | AC-SR-006 | 预算控制视图查询。 | 按 `controlScopeId + periodId` 展示当前或历史周期的 reserved、consumed、released、remaining 等控制口径。 | 展示为账本 AVAILABLE、FROZEN、AUTHORIZATION 或 SETTLEMENT。 |
+| AC-SR-007 | 已固化规则决策进入授权准入。 | 当前支付工具绑定版本、控制范围、周期和决策中可选目标账户与固化值一致；缺证据或任一漂移均 fail-closed。 | 跨绑定、跨 scope、跨周期或跨目标账户复用 decisionRef，或产生交易、route、posting、LedgerEntry、余额事实。 |
 
 验收标准：
 
 1. 正向测试场景必须覆盖规则定义、不可变版本发布、规则挂载、决策记录、控制额度变动流水和预算控制视图查询。
-2. 边界路径必须覆盖同版本不同摘要、缺冲突策略、挂载未生效或已过期、支付工具 scope 与工具号不一致、同流水不同摘要和额度调减低于已占用金额。
+2. 边界路径必须覆盖同版本不同摘要、缺冲突策略、挂载未生效或已过期、支付工具 scope 与工具号不一致、同流水不同摘要、决策绑定版本 / 控制窗口 / 目标账户漂移和额度调减低于已占用金额。
 3. 异常路径必须证明规则拒绝、证据缺失、摘要冲突和历史决策兼容类型误入控制额度变动入口时，不生成资金交易、route、posting、LedgerEntry、账本交易或余额投影。
 4. 投影解释验收必须证明只能读取历史规则版本、挂载流水、决策流水、控制额度变动流水和 route snapshot，不按当前规则、当前挂载或当前工具绑定重算历史。
 
@@ -398,7 +400,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 8. Highnote 页面中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、deposit amount、deposit count、deposit processing network 和 street address 等规则类型当前不进入 wallet evaluator：信用额度浮动类规则由授信 / 风控专项承接，conditional rule 不进入单条 evaluator，外部确认入金由 `transaction` 外部资金事件入口承接，街道地址原文不得进入资金底座，地址类控制只接收外部 AVS / 邮编校验结果事实。
 9. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验、挂载容量硬约束或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
 
-当前能力：接入口径已同步为“上游可信决策方裁决并固化、wallet 解析 binding 并回读验真、transaction 消费准入快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，且准入 / 授权公共契约、控制流水和投影统一使用 `controlScopeId`；外部 approve / decline 先由可信适配方写入决策记录，wallet 已证明裸结果 / 摘要不放行、外部拒绝无资金事实副作用、外部通过仍不得绕过支付工具、账户能力和资金责任校验；多个适用 binding 当前 fail-closed，尚未新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载管理支持 `ACCOUNT_HIERARCHY`，但当前准入契约没有可信层级标识，不能自行解析该 scope；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。`controlScopeId` 仍来自请求，生产调用方若可省略该字段就可能规避 `SPEND_CONTROL_SCOPE` 挂载，因此必须由可信 facade 强制提供或后续改为 wallet 从内部关系派生；该门禁未关闭前不得声明所有 scope 已实现完全自治解析。
+当前能力：接入口径已同步为“上游可信决策方裁决并固化、wallet 解析 binding 并回读验真、transaction 消费准入快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，且准入 / 授权公共契约、决策记录、控制流水和投影统一使用 `controlScopeId`；外部 approve / decline 先由可信适配方写入决策记录，支付工具决策同时固化绑定版本、完整控制窗口和可选目标账户，wallet 已证明裸结果 / 摘要不放行，跨绑定版本、跨 scope、跨周期和跨目标账户复用均 fail-closed 且无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多个适用 binding 当前 fail-closed，尚未新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载管理支持 `ACCOUNT_HIERARCHY`，但当前准入契约没有可信层级标识，不能自行解析该 scope；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。`controlScopeId` 仍来自请求，但该值必须与已固化决策一致；该仓内防绕过门禁不等于控制范围已自治派生，生产宿主仍须用 IAM 和可信适配层保证字段来源，或另立工程边界改为 wallet 从内部关系派生。
 
 ## 13. 产品到架构和 TDD 交接
 
@@ -417,7 +419,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | 验收种子 | 推荐测试资产 | 通过标准 |
 | --- | --- | --- |
 | AC-SR-001 / AC-SR-002 | SpendRuleDefinitionServiceTests、SpendRuleDefinitionServiceFlowTests | 标准基础服务和服务流测试证明规则定义、版本不可变、挂载 scope、冲突策略和有效期可追踪。 |
-| AC-SR-003 / AC-SR-004 | SpendControlAdmissionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验。 |
+| AC-SR-003 / AC-SR-004 / AC-SR-007 | SpendRuleDecisionRecordServiceTests、SpendControlAdmissionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验；decisionRef 不能跨绑定版本、控制窗口或目标账户复用。 |
 | AC-SR-005 | FundsTransactionProjectionExplainApplicationServiceTests | 投影只读读取历史规则版本、挂载、决策流水和控制引用，不输出敏感原文。 |
 | AC-SR-006 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests | 控制额度变动流水可重建预算控制视图，不反写账本余额。 |
 

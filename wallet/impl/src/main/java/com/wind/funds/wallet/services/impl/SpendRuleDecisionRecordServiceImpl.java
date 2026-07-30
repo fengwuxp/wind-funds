@@ -7,6 +7,8 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.dal.entities.SpendRuleDecisionRecord;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleDecisionRecordNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDecisionRecordMapper;
@@ -168,6 +170,21 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                     "Spend Rule 决策支付工具号与控制范围不一致，decisionSn = {}",
                     request.getDecisionSn());
         }
+        if (StringUtils.hasText(request.getInstrumentSn())) {
+            AssertUtils.notNull(request.getInstrumentBindingVersion(), "支付工具绑定版本不能为空");
+            AssertUtils.isTrue(request.getInstrumentBindingVersion() > 0, "支付工具绑定版本必须大于 0");
+        }
+        if (request.getControlScopeId() != null || request.getPeriodId() != null) {
+            AssertUtils.isTrue(StringUtils.hasText(request.getControlScopeId())
+                            && StringUtils.hasText(request.getPeriodId()),
+                    "控制范围和周期必须同时提供，decisionSn = {}", request.getDecisionSn());
+        }
+        if (request.getTargetAccountId() != null) {
+            AssertUtils.hasText(request.getTargetAccountId().id(), "目标账户 ID 不能为空");
+            AssertUtils.isTrue(FundsSubjectType.isLedgerPostableName(request.getTargetAccountId().type()),
+                    "目标账户只允许资金账户或信用账户，targetAccountId = {}",
+                    request.getTargetAccountId());
+        }
     }
 
     private void assertBindingMatchesIfPresent(RecordSpendRuleDecisionRecordRequest request) {
@@ -206,13 +223,17 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
     }
 
     private void assertSameDecisionRecord(RecordSpendRuleDecisionRecordRequest request,
-                                       SpendRuleDecisionRecordDTO existing) {
+                                          SpendRuleDecisionRecordDTO existing) {
         AssertUtils.isTrue(Objects.equals(existing.getRuleId(), request.getRuleId())
                         && Objects.equals(existing.getRuleVersion(), request.getRuleVersion())
                         && Objects.equals(existing.getSpendRuleBindingSn(), request.getSpendRuleBindingSn())
                         && existing.getScopeType() == request.getScopeType()
                         && Objects.equals(existing.getScopeId(), request.getScopeId())
                         && Objects.equals(existing.getInstrumentSn(), request.getInstrumentSn())
+                        && Objects.equals(existing.getInstrumentBindingVersion(), request.getInstrumentBindingVersion())
+                        && Objects.equals(existing.getControlScopeId(), request.getControlScopeId())
+                        && Objects.equals(existing.getPeriodId(), request.getPeriodId())
+                        && Objects.equals(existing.getTargetAccountId(), request.getTargetAccountId())
                         && existing.getAction() == request.getAction()
                         && Objects.equals(existing.getAmount(), request.getAmount())
                         && existing.getCurrency() == request.getCurrency()
@@ -256,6 +277,17 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         }
         if (StringUtils.hasText(decision.getInstrumentSn())) {
             refs.add("paymentInstrument:" + decision.getInstrumentSn());
+        }
+        if (decision.getInstrumentBindingVersion() != null) {
+            refs.add("paymentInstrumentBinding:" + decision.getInstrumentSn()
+                    + ":" + decision.getInstrumentBindingVersion());
+        }
+        if (StringUtils.hasText(decision.getControlScopeId())) {
+            refs.add("spendControlWindow:" + decision.getControlScopeId() + ":" + decision.getPeriodId());
+        }
+        if (decision.getTargetAccountId() != null) {
+            refs.add("fundsAccount:" + decision.getTargetAccountId().type()
+                    + ":" + decision.getTargetAccountId().id());
         }
         refs.add("spendRuleBusiness:" + decision.getBusinessScene() + ":" + decision.getBusinessSn());
         return List.copyOf(refs);
@@ -315,6 +347,13 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         result.setScopeType(request.getScopeType());
         result.setScopeId(request.getScopeId());
         result.setInstrumentSn(request.getInstrumentSn());
+        result.setInstrumentBindingVersion(request.getInstrumentBindingVersion());
+        result.setControlScopeId(request.getControlScopeId());
+        result.setPeriodId(request.getPeriodId());
+        if (request.getTargetAccountId() != null) {
+            result.setTargetSubjectId(request.getTargetAccountId().id());
+            result.setTargetSubjectType(FundsSubjectType.valueOf(request.getTargetAccountId().type()));
+        }
         result.setAction(request.getAction());
         result.setAmount(request.getAmount());
         result.setCurrency(request.getCurrency());
@@ -338,6 +377,10 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                 .setScopeType(entity.getScopeType())
                 .setScopeId(entity.getScopeId())
                 .setInstrumentSn(entity.getInstrumentSn())
+                .setInstrumentBindingVersion(entity.getInstrumentBindingVersion())
+                .setControlScopeId(entity.getControlScopeId())
+                .setPeriodId(entity.getPeriodId())
+                .setTargetAccountId(toTargetAccountId(entity))
                 .setAction(entity.getAction())
                 .setAmount(entity.getAmount())
                 .setCurrency(entity.getCurrency())
@@ -346,5 +389,16 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                 .setDecisionResult(entity.getDecisionResult())
                 .setRejectReason(entity.getRejectReason())
                 .setDecisionDigest(entity.getDecisionDigest());
+    }
+
+    private @Nullable FundsAccountId toTargetAccountId(SpendRuleDecisionRecord entity) {
+        boolean hasTargetType = entity.getTargetSubjectType() != null;
+        boolean hasTargetId = StringUtils.hasText(entity.getTargetSubjectId());
+        AssertUtils.isTrue(hasTargetType == hasTargetId,
+                "Spend Rule 决策目标账户证据不完整，decisionSn = {}", entity.getDecisionSn());
+        if (!hasTargetType) {
+            return null;
+        }
+        return FundsAccountId.immutable(entity.getTargetSubjectId(), entity.getTargetSubjectType());
     }
 }

@@ -95,6 +95,9 @@ public class ResolveSpendControlAdmissionRequest {
     @Schema(description = "控制范围标识，可为空")
     private String controlScopeId;
 
+    @Schema(description = "控制周期标识；需要预算控制预留时必须由可信上层提供")
+    private String periodId;
+
     @Schema(description = "拒绝原因，可选回显字段，不作为准入依据")
     private String rejectReason;
 }

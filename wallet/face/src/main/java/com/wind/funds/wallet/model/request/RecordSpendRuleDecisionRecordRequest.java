@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -61,6 +62,18 @@ public class RecordSpendRuleDecisionRecordRequest implements Serializable {
 
     @Schema(description = "支付工具号")
     private String instrumentSn;
+
+    @Schema(description = "支付工具绑定版本")
+    private Integer instrumentBindingVersion;
+
+    @Schema(description = "预算控制范围标识；与 periodId 同时提供或同时省略")
+    private String controlScopeId;
+
+    @Schema(description = "预算控制周期标识；与 controlScopeId 同时提供或同时省略")
+    private String periodId;
+
+    @Schema(description = "规则评估目标账户，仅允许资金账户或信用账户")
+    private FundsAccountId targetAccountId;
 
     @Schema(description = "支付工具动作")
     @NotNull

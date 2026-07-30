@@ -311,7 +311,8 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
-                .setControlScopeId(CONTROL_SCOPE_ID);
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(PERIOD_ID);
     }
 
     private void recordDecision(SpendRuleEvaluationDecisionDTO evaluation) {
@@ -324,6 +325,10 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentBindingVersion(1)
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(PERIOD_ID)
+                .setTargetAccountId(targetAccountId())
                 .setAction(PaymentInstrumentAction.AUTHORIZE)
                 .setAmount(evaluation.getAmount())
                 .setCurrency(evaluation.getCurrency())

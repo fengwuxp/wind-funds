@@ -96,6 +96,9 @@ public class SpendControlAdmissionDecisionDTO implements Serializable {
     @Schema(description = "控制范围标识")
     private String controlScopeId;
 
+    @Schema(description = "控制周期标识")
+    private String periodId;
+
     @Schema(description = "拒绝原因")
     private String rejectReason;
 
