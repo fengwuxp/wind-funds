@@ -1209,3 +1209,223 @@ CREATE TABLE `t_reconciliation_difference_action`
     KEY `idx_reconciliation_difference_action_difference` (`tenant_id`, `difference_sn`, `id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '对账差错处理动作事实表';
+
+DROP TABLE IF EXISTS `t_settlement_order_item`;
+DROP TABLE IF EXISTS `t_settlement_order`;
+DROP TABLE IF EXISTS `t_payout_receipt`;
+DROP TABLE IF EXISTS `t_payout_order`;
+CREATE TABLE `t_settlement_order`
+(
+    `id`                          BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`                DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                          VARCHAR(64)  NOT NULL COMMENT '结算单流水号',
+    `tenant_id`                   BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `settlement_subject_type`     VARCHAR(50)  NOT NULL COMMENT '结算主体类型',
+    `settlement_subject_id`       VARCHAR(64)  NOT NULL COMMENT '结算主体 ID',
+    `currency`                    VARCHAR(10)  NOT NULL COMMENT '币种',
+    `settlement_period`           VARCHAR(30)  NOT NULL COMMENT '结算周期',
+    `settlement_mode`             VARCHAR(30)  NOT NULL COMMENT '结算模式；当前只支持 INTERMEDIARY_ACCOUNT',
+    `settlement_destination`      VARCHAR(50)  NOT NULL COMMENT '结算去向；INTERNAL_ACCOUNT/EXTERNAL_ENDPOINT',
+    `trigger_mode`                VARCHAR(30)  NOT NULL COMMENT '触发方式；当前只支持 HOST_COMMAND',
+    `timezone`                    VARCHAR(50)  NOT NULL COMMENT '策略时区',
+    `cutoff`                      VARCHAR(30)  NOT NULL COMMENT 'cutoff 规则快照',
+    `total_amount`                BIGINT(20)   NOT NULL COMMENT '金额项绝对值汇总，最小货币单位',
+    `add_amount`                  BIGINT(20)   NOT NULL COMMENT '加项金额，最小货币单位',
+    `deduct_amount`               BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '扣减金额，当前固定 0',
+    `reserve_amount`              BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '准备金金额，当前固定 0',
+    `net_amount`                  BIGINT(20)   NOT NULL COMMENT '净结算金额，最小货币单位',
+    `status`                      VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/APPROVED/LOCKED/FAILED/CANCELLED',
+    `settlement_approval_ref`     VARCHAR(128)          DEFAULT NULL COMMENT '结算审批引用',
+    `lock_funds_transaction_sn`   VARCHAR(64)           DEFAULT NULL COMMENT '锁定资金交易流水号',
+    `rule_code`                   VARCHAR(64)  NOT NULL COMMENT '结算策略编码',
+    `rule_version`                VARCHAR(64)  NOT NULL COMMENT '结算策略版本',
+    `policy_approval_ref`         VARCHAR(128)          DEFAULT NULL COMMENT '策略审批引用',
+    `amount_digest`               VARCHAR(64)  NOT NULL COMMENT '不可变金额项 SHA-256',
+    `source_digest`               VARCHAR(64)  NOT NULL COMMENT '排序后来源集合 SHA-256',
+    `policy_snapshot_digest`      VARCHAR(64)  NOT NULL COMMENT '策略快照 SHA-256',
+    `order_digest`                VARCHAR(64)  NOT NULL COMMENT '创建请求幂等摘要',
+    `created_by`                  VARCHAR(64)  NOT NULL COMMENT '创建人',
+    `submitted_by`                VARCHAR(64)           DEFAULT NULL COMMENT '提交人',
+    `submitted_time`              DATETIME              DEFAULT NULL COMMENT '提交时间',
+    `approved_by`                 VARCHAR(64)           DEFAULT NULL COMMENT '审批记录人',
+    `approved_time`               DATETIME              DEFAULT NULL COMMENT '审批时间',
+    `locked_by`                   VARCHAR(64)           DEFAULT NULL COMMENT '锁定人',
+    `locked_time`                 DATETIME              DEFAULT NULL COMMENT '锁定时间',
+    `returned_by`                 VARCHAR(64)           DEFAULT NULL COMMENT '退回人',
+    `returned_time`               DATETIME              DEFAULT NULL COMMENT '退回时间',
+    `return_reason`               VARCHAR(512)          DEFAULT NULL COMMENT '退回原因',
+    `cancelled_by`                VARCHAR(64)           DEFAULT NULL COMMENT '取消人',
+    `cancelled_time`              DATETIME              DEFAULT NULL COMMENT '取消时间',
+    `cancel_reason`               VARCHAR(512)          DEFAULT NULL COMMENT '取消原因',
+    `reconciliation_run_result_sn` VARCHAR(64)           DEFAULT NULL COMMENT '锁定时消费的对账运行结果流水号',
+    `reconciliation_result_digest` VARCHAR(64)           DEFAULT NULL COMMENT '锁定时对账结果 SHA-256',
+    `reconciliation_evidence_digest` VARCHAR(64)         DEFAULT NULL COMMENT '锁定时对账证据引用 SHA-256',
+    `active_order_digest`         VARCHAR(64)           DEFAULT NULL COMMENT '活动创建幂等占用；取消或明确失败后置 NULL',
+    `failed_by`                   VARCHAR(64)           DEFAULT NULL COMMENT '明确失败记录人',
+    `failed_time`                 DATETIME              DEFAULT NULL COMMENT '明确失败时间',
+    `failure_reason`              VARCHAR(512)          DEFAULT NULL COMMENT '明确失败原因',
+    `version`                     INT(11)      NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_settlement_order_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_settlement_order_active_digest` (`tenant_id`, `active_order_digest`),
+    KEY `idx_settlement_order_subject` (`tenant_id`, `settlement_subject_type`, `settlement_subject_id`, `settlement_period`),
+    KEY `idx_settlement_order_status` (`tenant_id`, `status`, `gmt_modified`),
+    KEY `idx_settlement_order_lock_transaction` (`tenant_id`, `lock_funds_transaction_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '结算单表';
+
+CREATE TABLE `t_settlement_order_item`
+(
+    `id`                    BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                    VARCHAR(64)  NOT NULL COMMENT '结算金额项流水号',
+    `tenant_id`             BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `settlement_order_sn`   VARCHAR(64)  NOT NULL COMMENT '结算单流水号',
+    `item_type`             VARCHAR(30)  NOT NULL COMMENT '金额项类型；当前固定 PRINCIPAL',
+    `direction`             VARCHAR(20)  NOT NULL COMMENT '金额方向；当前固定 ADD',
+    `source_type`           VARCHAR(30)  NOT NULL COMMENT '来源类型；当前固定 CLEARING_BATCH',
+    `source_sn`             VARCHAR(64)  NOT NULL COMMENT '已确认清算批次流水号',
+    `amount`                BIGINT(20)   NOT NULL COMMENT '金额，最小货币单位',
+    `currency`              VARCHAR(10)  NOT NULL COMMENT '币种',
+    `source_amount_digest`  VARCHAR(64)  NOT NULL COMMENT '创建时清算批次金额摘要',
+    `active_source_claim`   TINYINT(1)            DEFAULT NULL COMMENT '活动来源占用标记；活动时为 1，取消时置 NULL',
+    `created_by`            VARCHAR(64)  NOT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_settlement_order_item_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_settlement_order_item_source` (`tenant_id`, `settlement_order_sn`, `source_type`, `source_sn`),
+    UNIQUE KEY `uk_settlement_item_active_source` (`tenant_id`, `source_type`, `source_sn`, `active_source_claim`),
+    KEY `idx_settlement_order_item_order` (`tenant_id`, `settlement_order_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '结算金额项表';
+
+-- 出款单表：表达外部出款状态和终态资金事实，不承载通道执行
+CREATE TABLE `t_payout_order`
+(
+    `id`                             BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`                   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                             VARCHAR(64)  NOT NULL COMMENT '出款单流水号',
+    `tenant_id`                      BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `settlement_order_sn`            VARCHAR(64)  NOT NULL COMMENT '锁定结算单流水号',
+    `settlement_subject_type`        VARCHAR(50)  NOT NULL COMMENT '结算资金主体类型',
+    `settlement_subject_id`          VARCHAR(64)  NOT NULL COMMENT '结算资金主体 ID',
+    `amount`                         BIGINT(20)   NOT NULL COMMENT '出款金额，最小货币单位',
+    `currency`                       VARCHAR(10)  NOT NULL COMMENT '币种',
+    `status`                         VARCHAR(30)  NOT NULL COMMENT 'CREATED/SUBMITTED/ACCEPTED/PROCESSING/SUCCEEDED/FAILED/RETURNED/MISMATCHED',
+    `payout_account_ref`             VARCHAR(128)          DEFAULT NULL COMMENT '宿主出款账户引用',
+    `payee_endpoint_ref`             VARCHAR(128)          DEFAULT NULL COMMENT '宿主收款端点引用',
+    `channel_ref`                    VARCHAR(128)          DEFAULT NULL COMMENT '宿主通道引用',
+    `approval_ref`                   VARCHAR(128)          DEFAULT NULL COMMENT '出款审批引用',
+    `external_rule_evidence_digest`  VARCHAR(64)           DEFAULT NULL COMMENT '外部规则核验证据 SHA-256',
+    `reconciliation_run_result_sn`   VARCHAR(64)           DEFAULT NULL COMMENT '提交消费的对账运行结果流水号',
+    `reconciliation_result_digest`   VARCHAR(64)           DEFAULT NULL COMMENT '提交消费的对账结果 SHA-256',
+    `admission_decision_digest`      VARCHAR(64)           DEFAULT NULL COMMENT '宿主权威准入决策 SHA-256',
+    `admission_evidence_refs`        TEXT                  DEFAULT NULL COMMENT '宿主权威准入证据引用 JSON',
+    `submit_digest`                  VARCHAR(64)           DEFAULT NULL COMMENT '提交请求幂等摘要',
+    `external_reference`             VARCHAR(128)          DEFAULT NULL COMMENT '外部出款 reference',
+    `completion_funds_transaction_sn` VARCHAR(64)          DEFAULT NULL COMMENT '成功资金交易流水号',
+    `rollback_funds_transaction_sn`  VARCHAR(64)           DEFAULT NULL COMMENT '失败回退资金交易流水号',
+    `last_receipt_digest`            VARCHAR(64)           DEFAULT NULL COMMENT '最近规范化回单 SHA-256',
+    `failure_code`                   VARCHAR(64)           DEFAULT NULL COMMENT '脱敏失败码',
+    `failure_reason`                 VARCHAR(512)          DEFAULT NULL COMMENT '脱敏失败原因或冲突说明',
+    `created_by`                     VARCHAR(64)  NOT NULL COMMENT '创建人',
+    `submitted_by`                   VARCHAR(64)           DEFAULT NULL COMMENT '提交人',
+    `submitted_time`                 DATETIME              DEFAULT NULL COMMENT '提交时间',
+    `completed_time`                 DATETIME              DEFAULT NULL COMMENT '终态或冲突确认时间',
+    `version`                        INT(11)      NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_payout_order_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_payout_order_settlement` (`tenant_id`, `settlement_order_sn`),
+    UNIQUE KEY `uk_payout_order_external` (`tenant_id`, `channel_ref`, `external_reference`),
+    KEY `idx_payout_order_status` (`tenant_id`, `status`, `gmt_modified`),
+    KEY `idx_payout_order_completion` (`tenant_id`, `completion_funds_transaction_sn`),
+    KEY `idx_payout_order_rollback` (`tenant_id`, `rollback_funds_transaction_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '出款单事实表';
+
+-- 出款回单事实表：保留多次规范化回单并约束来源幂等
+CREATE TABLE `t_payout_receipt`
+(
+    `id`                         BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                 DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                         VARCHAR(64)  NOT NULL COMMENT '回单流水号',
+    `tenant_id`                  BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `payout_order_sn`            VARCHAR(64)  NOT NULL COMMENT '出款单流水号',
+    `channel_ref`                VARCHAR(128) NOT NULL COMMENT '宿主通道引用',
+    `external_receipt_ref`       VARCHAR(128) NOT NULL COMMENT '外部回单唯一引用',
+    `external_reference`         VARCHAR(128) NOT NULL COMMENT '外部出款 reference',
+    `status`                     VARCHAR(30)  NOT NULL COMMENT '归一化回单状态',
+    `amount`                     BIGINT(20)   NOT NULL COMMENT '回单金额，最小货币单位',
+    `currency`                   VARCHAR(10)  NOT NULL COMMENT '回单币种',
+    `source_receipt_digest`      VARCHAR(64)  NOT NULL COMMENT '来源回单 SHA-256',
+    `normalized_receipt_digest`  VARCHAR(64)  NOT NULL COMMENT '规范化回单 SHA-256',
+    `evidence_ref`               VARCHAR(256) NOT NULL COMMENT '受控回单证据引用',
+    `external_occurred_at`       DATETIME     NOT NULL COMMENT '外部发生时间',
+    `received_by`                VARCHAR(64)  NOT NULL COMMENT '记录人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_payout_receipt_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_payout_receipt_source` (`tenant_id`, `channel_ref`, `external_receipt_ref`),
+    KEY `idx_payout_receipt_order` (`tenant_id`, `payout_order_sn`, `id`),
+    KEY `idx_payout_receipt_external` (`tenant_id`, `channel_ref`, `external_reference`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '出款回单事实表';
+
+DROP TABLE IF EXISTS `t_recovery_result`;
+DROP TABLE IF EXISTS `t_recovery_order`;
+
+CREATE TABLE `t_recovery_order`
+(
+    `id`                        BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                        VARCHAR(64)  NOT NULL COMMENT '追偿单流水号',
+    `tenant_id`                 BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `source_type`               VARCHAR(50)  NOT NULL COMMENT '已确认责任来源类型',
+    `source_sn`                 VARCHAR(64)  NOT NULL COMMENT '已确认责任来源流水号',
+    `responsible_subject_type`  VARCHAR(50)  NOT NULL COMMENT '责任资金主体类型',
+    `responsible_subject_id`    VARCHAR(64)  NOT NULL COMMENT '责任资金主体 ID',
+    `expected_amount`           BIGINT(20)   NOT NULL COMMENT '应追金额，最小货币单位',
+    `recovered_amount`          BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '已追金额，最小货币单位',
+    `currency`                  VARCHAR(10)  NOT NULL COMMENT '币种',
+    `status`                    VARCHAR(30)  NOT NULL COMMENT 'CREATED/PARTIALLY_RECOVERED/RECOVERED',
+    `source_digest`             VARCHAR(64)  NOT NULL COMMENT '已确认责任来源 SHA-256',
+    `order_digest`              VARCHAR(64)  NOT NULL COMMENT '追偿单创建事实 SHA-256',
+    `approval_ref`              VARCHAR(128) NOT NULL COMMENT '责任确认审批引用',
+    `evidence_ref`              VARCHAR(256) NOT NULL COMMENT '责任确认受控证据引用',
+    `last_funds_transaction_sn` VARCHAR(64)           DEFAULT NULL COMMENT '最近登记的已完成资金交易流水号',
+    `created_by`                VARCHAR(64)  NOT NULL COMMENT '创建人',
+    `recovered_time`            DATETIME              DEFAULT NULL COMMENT '全额追偿完成时间',
+    `version`                   INT(11)      NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_recovery_order_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_recovery_order_source` (`tenant_id`, `source_type`, `source_sn`, `responsible_subject_type`, `responsible_subject_id`, `currency`),
+    KEY `idx_recovery_order_subject_status` (`tenant_id`, `responsible_subject_type`, `responsible_subject_id`, `status`, `gmt_modified`),
+    KEY `idx_recovery_order_last_transaction` (`tenant_id`, `last_funds_transaction_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '追偿责任事实表';
+
+CREATE TABLE `t_recovery_result`
+(
+    `id`                   BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                   VARCHAR(64)  NOT NULL COMMENT '追偿结果流水号',
+    `tenant_id`            BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `recovery_order_sn`    VARCHAR(64)  NOT NULL COMMENT '追偿单流水号',
+    `funds_transaction_sn` VARCHAR(64)  NOT NULL COMMENT '已完成资金交易流水号',
+    `amount`               BIGINT(20)   NOT NULL COMMENT '本次已追金额，最小货币单位',
+    `currency`             VARCHAR(10)  NOT NULL COMMENT '币种',
+    `idempotency_key`      VARCHAR(128) NOT NULL COMMENT '结果登记幂等键',
+    `result_digest`        VARCHAR(64)  NOT NULL COMMENT '结果登记请求 SHA-256',
+    `approval_ref`         VARCHAR(128) NOT NULL COMMENT '结果确认审批引用',
+    `evidence_ref`         VARCHAR(256) NOT NULL COMMENT '结果确认受控证据引用',
+    `recorded_by`          VARCHAR(64)  NOT NULL COMMENT '登记人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_recovery_result_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_recovery_result_transaction` (`tenant_id`, `funds_transaction_sn`),
+    UNIQUE KEY `uk_recovery_result_idempotency` (`tenant_id`, `idempotency_key`),
+    KEY `idx_recovery_result_order` (`tenant_id`, `recovery_order_sn`, `id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '追偿资金结果事实表';

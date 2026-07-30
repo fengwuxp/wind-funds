@@ -23,6 +23,12 @@ public final class FundsRouteCodes {
 
     public static final String CLEARING_CONFIRM_STANDARD = "CLEARING_CONFIRM_STANDARD";
 
+    public static final String SETTLEMENT_LOCK_STANDARD = "SETTLEMENT_LOCK_STANDARD";
+
+    public static final String PAYOUT_SUCCESS_STANDARD = "PAYOUT_SUCCESS_STANDARD";
+
+    public static final String PAYOUT_FAILURE_RETURN = "PAYOUT_FAILURE_RETURN";
+
     public static final String BALANCE_FREEZE_STANDARD = "BALANCE_FREEZE_STANDARD";
 
     public static final String BALANCE_UNFREEZE_STANDARD = "BALANCE_UNFREEZE_STANDARD";

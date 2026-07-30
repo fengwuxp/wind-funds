@@ -23,6 +23,14 @@ public final class FundsRouteLegIds {
 
     public static final String CLEARING_CONFIRM = "CLEARING_CONFIRM";
 
+    public static final String SETTLEMENT_LOCK = "SETTLEMENT_LOCK";
+
+    public static final String PAYOUT_SETTLEMENT = "PAYOUT_SETTLEMENT";
+
+    public static final String PAYOUT_FUND_OUT = "PAYOUT_FUND_OUT";
+
+    public static final String PAYOUT_FAILURE_RETURN = "PAYOUT_FAILURE_RETURN";
+
     public static final String FREEZE = "FREEZE";
 
     public static final String UNFREEZE = "UNFREEZE";

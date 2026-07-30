@@ -18,7 +18,8 @@ import org.jspecify.annotations.NullMarked;
  * 清算批次应用服务。
  *
  * <p>负责锁定同一账务主体和币种的清算候选，并在最终准入通过后原子执行
- * {@code CLEARING -> AVAILABLE}。清分归类、退款决策和结算出款不属于本服务。</p>
+ * {@code CLEARING -> AVAILABLE}。这是宿主发起内部清算的公共用例入口；交易层清算资金原语
+ * 只服务本用例编排，不是宿主直接调用能力。清分归类、退款决策和结算出款不属于本服务。</p>
  */
 @NullMarked
 public interface ClearingBatchApplicationService {
@@ -32,6 +33,13 @@ public interface ClearingBatchApplicationService {
 
     ClearingBatchDTO returnToDraft(ReturnClearingBatchToDraftRequest request, WindOperator operator);
 
+    /**
+     * 复核并原子确认清算批次，是宿主触发 {@code CLEARING -> AVAILABLE} 的唯一支持入口。
+     *
+     * @param request  清算批次确认请求
+     * @param operator 操作人
+     * @return 确认后的清算批次
+     */
     ClearingBatchDTO confirmBatch(ConfirmClearingBatchRequest request, WindOperator operator);
 
     ClearingBatchDTO cancelBatch(CancelClearingBatchRequest request, WindOperator operator);

@@ -2,9 +2,9 @@
 
 ## 1. 定位
 
-本文面向要接入 `ledger`、`wallet`、`transaction` 三个主链模块的业务系统和内部研发。它只说明当前代码中已有公共契约和测试证明过的接入方式，不承诺 VCC、全球账户、收单、清结算、对账、归档或治理的生产接入。
+本文面向要接入 `ledger`、`wallet`、`transaction` 三个主链模块，以及已声明对账、清分、内部清算、结算、出款和 W3 最小追偿责任/结果引用基础设施切片的业务系统和内部研发。它只说明当前代码中已有公共契约和本地测试证明过的接入方式，不承诺 VCC、全球账户、收单、具体通道执行、追偿策略与资金执行、归档或治理的生产接入。
 
-接入方只依赖 `core`、`ledger-face`、`wallet-face`、`transaction-face`。不要依赖 `*-impl`、Entity、Mapper、内部状态机或测试工具类。
+接入三层主链时只依赖 `core`、`ledger-face`、`wallet-face`、`transaction-face`；使用已声明的清结算与对账切片时可额外依赖 `reconciliation-face`。不要依赖 `*-impl`、Entity、Mapper、交易层清算/结算/出款资金原语或测试工具类。
 
 ## 2. 模块边界
 
@@ -13,6 +13,7 @@
 | `ledger` | 账本事实和余额投影。 | 查询账本、账本交易、分录和余额投影；在底层服务级测试中验证过账事实。 | 业务方不直接拼分录、不直接改余额、不把投影当事实源。 |
 | `wallet` | 账户、支付工具、资金责任、支出控制和准入快照。 | 建模资金账户/信用账户，解析账户能力、支付工具能力、资金责任和 Spend Rule 决策。 | 不创建交易事实，不写 route、posting、ledger entry 或余额投影。 |
 | `transaction` | 标准资金交易、授权交易、余额控制、让利出资记账和外部确认入金消费。 | 提交已经成立的资金事实，由交易层编排路由、账务和账本影响。 | 不接收页面动作、审批中、通道处理中或外部非终态。 |
+| `reconciliation` | 对账、清分、内部清算、结算和出款资金事实。 | 通过 `reconciliation-face` 管理批次、差错、Gate、SettlementOrder 和 PayoutOrder。 | 不直接调用交易层清算/结算/出款资金原语，不把 Gate 或预检结果当成提交授权，不在 wind-funds 内执行通道协议。 |
 
 依赖方向是 `transaction -> wallet -> ledger`。横向治理或对账能力只能通过 face/core 只读消费事实，不反写主链事实。
 
@@ -39,6 +40,7 @@
 | 余额控制 | `FundsBalanceControlService` | 冻结、解冻、受控调整；冻结不表达扣款。 | `FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests` |
 | 让利出资记账 | `FundsBenefitContributionTransactionService` | 平台/商户/合作方已决策让利出资入账和按原交易冲回。 | `FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests` |
 | 外部确认入金 | `ExternalFundsEventApplicationService` | 已确认外部入金消费为标准充值，目标必须是资金账户。 | `ExternalFundsEventApplicationServiceTests` |
+| 清结算、出款与追偿引用事实 | `ClearingBatchApplicationService`、`SettlementOrderApplicationService`、`PayoutOrderApplicationService`、`RecoveryOrderApplicationService` | 内部清算 `CLEARING -> AVAILABLE`；外部端点结算锁定 `AVAILABLE -> SETTLEMENT`；出款提交意图与归一回单；宿主已确认追偿责任和已完成 `RECOVERY` 资金交易引用。 | `ClearingBatchApplicationServiceTests`、`SettlementOrderApplicationServiceTests`、`PayoutOrderApplicationServiceTests`、`RecoveryOrderApplicationServiceTests`、对应公共契约与 DDL 测试 |
 
 ### 4.1 当前接入成熟度基线
 
@@ -56,7 +58,9 @@
 | 让利出资记账 | 开发 / 受控联调可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
 | 外部确认入金 | 开发 / 受控联调可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
 | FX 来源价格与金额换算 | 开发 / 受控联调可接入。 | `FxRateProvider` 是由接入方实现并注入的汇率来源端口，提供含 `snapshotId`、`observedAt` 和 `MID/BID/ASK` 的来源快照；跨币种换算可显式传入最终 `FxAppliedRate`，也可指定 `FxPriceType` 由换算服务查询来源快照并选价。 | wind-funds 不提供默认汇率来源实现；`FxAppliedRate` 与 `FxPriceType` 互斥且不默认选价。客户加点、quote、费用、有效期、锁汇、历史行情、换汇执行、合规和资金入账仍由上层业务或专项承接。 |
-| 清结算 / 对账 / 归档 / 治理 | 不作为本文生产接入承诺。 | 可只读消费主链事实；已存在局部服务和测试只能作为专项依据。 | 需要独立产品设计、系统设计、TDD、DDL/H2、服务级测试、Runbook 和 owner 确认。 |
+| 对账 / 清分 / 内部清算 / 结算 / 出款事实 | `GO`（wind-funds 已声明的基础设施切片）；不等同于宿主部署上线准出。 | 对账批次与结果、差错与 Gate、清分/清算批次、`CLEARING -> AVAILABLE`、`AVAILABLE -> SETTLEMENT`，以及基于锁定外部端点结算单的 PayoutOrder 创建、提交意图、归一回单、成功关闭和失败回退。W2 不启用 `IN_TRANSIT`，不支持失败后重试。 | 来源验签与归一、业务匹配执行、出款账户/端点/通道/合规准入、通道调用与状态归一、任务调度、宿主 IAM/审计、监控、Runbook、目标数据库与发布准出由接入方负责。 |
+| 追偿责任 / 结果引用 | `CONDITIONAL GO`（W3 本地切片）；不作为生产追偿执行承诺。 | `RecoveryOrderApplicationService` 登记已确认责任和已完成 `RECOVERY` 资金交易引用，支持部分/全部追回累计、来源与结果幂等、超额和重复认领阻断；登记本身不动账。 | 目标 MySQL 迁移与 RR 并发仍需专用环境证据；责任判断、退款/拒付/催收、准备金、抵扣、负余额、人工收款、核销和资金执行由宿主或后续专项承接。 |
+| 归档 / 治理 | 不作为当前生产接入承诺。 | 现有目标设计和局部治理能力只能作为后续专项输入。 | 需要按新切片补公共对象、状态机、DDL/H2、服务级测试和 owner 确认。 |
 | VCC / 全球账户 / ACH / 收单 / FX quote 与执行 / 退汇 | P2 边界设计，不进入默认实现。 | 可复用主链事实、外部引用边界和显式 FX 金额计算。 | 业务生命周期、外部规则、通道协议、合规、敏感数据和专项回归未确认前，不得声明生产可用。 |
 
 交易投影当前在资金事务提交后通过 `afterCommit` 尽力发布；发布失败只记录告警，事实仍可由治理重放重建，但仓库尚无持久待办、自动补偿和积压监控。因此投影不能作为同步资金结果，也不能作为生产完整性证据；宿主进入生产前必须提供可持久发现、幂等重放和告警闭环。
@@ -283,13 +287,14 @@ flowchart LR
 | 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume` 或 `PaymentInstrumentTransactionApplicationService.receiveByInstrument`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
 | 外部入金只是 accepted、submitted、processing、message sent 或待匹配。 | 不可以。 | 停在上游入金单、在途、挂账、对账或人工复核。 | 外部引用、状态、文件摘要、匹配原因、待处理 owner。 | 不增加 `AVAILABLE`，不生成 `topup`。 |
 | 外部出款已终态成功，且可以关闭内部冻结资金。 | 可以。 | 上层出款业务确认后调用 `FundsDirectTransactionService.withdraw`。 | 原冻结流水、经业务确认的外部出款事实、外部收款账户、金额、币种和业务流水。 | 不把 provider 状态解释下沉到资金底座；不按当前支付工具绑定重新选资金主体。 |
-| 外部出款已提交、受理、处理中或 message sent。 | 不可以。 | 停在上游 payout order、在途、对账或差错链路。 | 出款单、外部状态、回单拉取计划、超时告警、处理 owner。 | 不关闭 `FROZEN`、`SETTLEMENT` 或 `IN_TRANSIT`，不生成 `withdraw`。 |
+| `LOCKED + EXTERNAL_ENDPOINT` 结算单进入通用出款。 | 可以进入出款事实。 | 通过 `PayoutOrderApplicationService#createOrder/submitOrder/handleReceipt`；宿主实现唯一 `PayoutSubmissionAuthority` 并负责外部投递和状态归一。 | 锁定结算单、PAYOUT Gate 结果、宿主准入决策摘要与证据引用、回单唯一引用、外部 reference、金额币种、来源摘要。 | 不直接调用 `FundsPayoutTransactionService`，不把 submit 当外部受理，不在失败后覆盖原单重试。 |
+| 结算出款已提交、受理、处理中或 message sent。 | 只可进入 PayoutOrder 非终态。 | 宿主归一后调用 `handleReceipt`；W2 保持资金在 `SETTLEMENT`。 | 出款单、可信外部状态、回单唯一引用、证据摘要、回单拉取计划、超时告警和处理 owner。 | 不展示到账成功，不关闭 `SETTLEMENT`，不生成 `withdraw` 或 `IN_TRANSIT`。 |
 | 退汇、return、NOC、外部 rail reversal、金额不一致或费用不一致。 | 不可以直接进入默认交易入口。 | 进入对账差错、退汇专项或人工处理，明确责任后再生成资金事实。 | 原交易或原出款引用、外部原因、费用、责任方、审批或差错单。 | 不降级成普通 `refund`，不净额静默抵消。 |
 | 涉及跨币种、FX、汇兑损益或错币种到账。 | 默认不可以。 | 先由 FX / treasury 或差错链路确认。 | quoteRef、原币、目标币、汇率、有效期、执行结果、审批引用。 | 不自动换汇，不按期望币种静默入账。 |
 
 接入申请必须能回答四个问题：外部状态是否终态、内部账务主体是谁、金额币种是否可直接入账、失败或退回时由谁负责处理。回答不完整时，只能登记在途、差错或人工复核，不进入资金事实链路。
 
-验证锚点：`ExternalFundsEventApplicationServiceTests`、`PaymentInstrumentTransactionApplicationServiceTests`、`FundsWithdrawalSuccessFlowTests`、`PayoutPreflightServiceTests`；完整退汇、FX、跨境合规和多币种对账仍需独立业务专项。
+验证锚点：`ExternalFundsEventApplicationServiceTests`、`PaymentInstrumentTransactionApplicationServiceTests`、`FundsWithdrawalSuccessFlowTests`、`PayoutPreflightServiceTests`、`PayoutOrderApplicationServiceTests`、`PayoutPublicContractTests`；完整退汇、FX、跨境合规和多币种对账仍需独立业务专项。
 
 ## 7. 禁止路径
 
@@ -367,6 +372,8 @@ flowchart LR
 
 ## 11. 当前不在本指南承诺范围
 
-清结算、对账、归档、重放、指标治理、VCC 产品化、全球账户、ACH、收单和通道协议适配不在本文接入承诺范围内。它们可以消费本文三层主链事实，但需要单独的产品设计、系统设计、TDD 和工程变更边界。
+已声明的对账、清分、内部清算、结算和出款事实切片按专项设计与验收接入，不并入 ledger/wallet/transaction 三层主链的默认通用接入承诺。宿主只使用 `ClearingBatchApplicationService`、`SettlementOrderApplicationService` 和 `PayoutOrderApplicationService`；Gate 检查、出款预检和只读发现结果都不构成提交授权。
 
-全球账户或跨境出款接入时，外部状态归一、终态判定、通道回单和收款人信息属于上游 P2 出款业务。只有上游确认形成可关闭内部冻结的成功事实后，才可携带原 `referenceFreezeSn` 调用 `FundsDirectTransactionService.withdraw`；canonical 服务校验原冻结主体、金额币种、剩余可消费金额和幂等。外部 `submitted`、`accepted`、`processing`、`message sent` 等状态必须停在上游出款单、在途、对账或差错链路。当前不提供支付工具型出款完成 facade，因为冻结发起请求尚未固化可供完成阶段回放的原工具与绑定快照。
+具体银行/PSP/ACH/钱包通道协议、出款调度与重试、失败后换渠道、追偿策略与资金执行、归档、重放、指标治理、VCC 产品化、全球账户和收单不在当前接入承诺范围内。它们可以消费已有主链和清结算对账事实，但需要单独的产品设计、系统设计、TDD 和工程变更边界。
+
+全球账户或跨境出款接入时，外部状态归一、终态判定、通道回单和收款人信息仍属于上游 P2 出款业务。基于 `LOCKED + EXTERNAL_ENDPOINT` 结算单的通用出款必须走 `PayoutOrderApplicationService`，由宿主准入、投递并回传归一回单；宿主不得直接调用 `FundsPayoutTransactionService`。只有独立的“原冻结提现”场景在上游确认成功后，才携带原 `referenceFreezeSn` 调用 `FundsDirectTransactionService.withdraw`。两条路径不能互换；外部 `submitted`、`accepted`、`processing`、`message sent` 都不能解释为到账成功。

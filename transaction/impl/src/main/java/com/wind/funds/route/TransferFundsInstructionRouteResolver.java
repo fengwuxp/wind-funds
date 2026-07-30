@@ -76,6 +76,9 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
                 && instruction.getEventType() != FundsTransactionEventType.CLEARING_CONFIRM
+                && instruction.getEventType() != FundsTransactionEventType.SETTLEMENT_LOCK
+                && instruction.getEventType() != FundsTransactionEventType.PAYOUT_SUCCEEDED
+                && instruction.getEventType() != FundsTransactionEventType.PAYOUT_FAILED
                 && !RouteReplaySupport.isReplayInstruction(instruction);
     }
 
@@ -89,6 +92,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
             case WITHDRAW -> resolveWithdraw(instruction);
             case FEE -> resolveFee(instruction);
             case CLEARING -> throw new IllegalArgumentException("清算交易必须由清算路由解析器处理");
+            case SETTLEMENT -> throw new IllegalArgumentException("结算交易必须由结算路由解析器处理");
+            case PAYOUT -> throw new IllegalArgumentException("出款交易必须由出款路由解析器处理");
             case ADJUSTMENT -> throw new IllegalArgumentException(UNSUPPORTED_ADJUSTMENT_MESSAGE);
         };
     }

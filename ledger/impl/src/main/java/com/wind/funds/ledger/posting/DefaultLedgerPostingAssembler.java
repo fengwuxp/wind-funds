@@ -322,6 +322,9 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPostingIntentType.ADJUSTMENT;
             case WITHDRAW -> LedgerPostingIntentType.WITHDRAWAL;
             case CLEARING_CONFIRM -> LedgerPostingIntentType.SETTLEMENT;
+            case SETTLEMENT_LOCK -> LedgerPostingIntentType.SETTLEMENT;
+            case PAYOUT_SUCCEEDED -> LedgerPostingIntentType.WITHDRAWAL;
+            case PAYOUT_FAILED -> LedgerPostingIntentType.REFUND;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedIntent(resolvedRoute.getTransactionType());
         };
     }
@@ -334,6 +337,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case FEE -> LedgerPostingIntentType.FEE;
             case REFUND -> LedgerPostingIntentType.REFUND;
             case CLEARING -> LedgerPostingIntentType.SETTLEMENT;
+            case SETTLEMENT -> LedgerPostingIntentType.SETTLEMENT;
+            case PAYOUT -> LedgerPostingIntentType.WITHDRAWAL;
             case ADJUSTMENT -> LedgerPostingIntentType.ADJUSTMENT;
         };
     }

@@ -53,6 +53,11 @@ class FundsModuleDependencyBoundaryTests {
                     "dependencies/pom.xml"),
             PRODUCTION_MODULE_POMS.stream()).toList();
 
+    private static final List<String> NON_TRANSACTION_PRODUCTION_JAVA_SOURCE_SCAN_PATHS = PRODUCTION_MODULE_POMS.stream()
+            .filter(pomPath -> !pomPath.startsWith("transaction/"))
+            .map(pomPath -> pomPath.substring(0, pomPath.length() - "pom.xml".length()) + "src/main/java")
+            .toList();
+
     private static final List<String> ROOT_MODULES = List.of(
             "core",
             "fx",
@@ -256,6 +261,30 @@ class FundsModuleDependencyBoundaryTests {
                     "com.wind.funds.wallet.service.FundingAccountService",
                     "com.wind.funds.wallet.service.CreditAccountService",
                     "com.wind.funds.wallet.service.SpendControlScopeService"));
+
+    private static final List<String> CLEARING_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST = List.of(
+            "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/clearing/impl/"
+                    + "ClearingBatchApplicationServiceImpl.java");
+
+    private static final List<String> CLEARING_TRANSACTION_PRIMITIVE_TOKENS = List.of(
+            "FundsClearingTransactionService",
+            "FundsClearingConfirmRequest");
+
+    private static final List<String> SETTLEMENT_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST = List.of(
+            "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/settlement/impl/"
+                    + "SettlementOrderApplicationServiceImpl.java");
+
+    private static final List<String> SETTLEMENT_TRANSACTION_PRIMITIVE_TOKENS = List.of(
+            "FundsSettlementTransactionService",
+            "FundsSettlementLockRequest");
+
+    private static final List<String> PAYOUT_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST = List.of(
+            "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/payout/impl/"
+                    + "PayoutOrderApplicationServiceImpl.java");
+
+    private static final List<String> PAYOUT_TRANSACTION_PRIMITIVE_TOKENS = List.of(
+            "FundsPayoutTransactionService",
+            "FundsPayoutRequest");
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
@@ -586,6 +615,123 @@ class FundsModuleDependencyBoundaryTests {
                 .isEmpty();
     }
 
+    /**
+     * 场景：清算批次通过交易层内部资金原语完成 {@code CLEARING -> AVAILABLE}。
+     * 预期：生产源码只有清算批次编排可以消费该原语，宿主和其他模块通过清算批次应用服务协作。
+     * 红线：不得绕过批次锁定、最终 Gate 和来源事实复核直接生成清算资金事实。
+     */
+    @Test
+    void testClearingFundsPrimitiveShouldOnlyBeUsedByClearingBatchOrchestration() throws Exception {
+        assertFundsPrimitiveAllowlist(CLEARING_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST,
+                CLEARING_TRANSACTION_PRIMITIVE_TOKENS, "clearing");
+    }
+
+    /**
+     * 场景：结算单通过交易层内部资金原语完成 {@code AVAILABLE -> SETTLEMENT}。
+     * 预期：生产源码只有结算单编排可以消费该原语，宿主通过结算单公共应用服务协作。
+     * 红线：不得绕过结算状态机、最终 Gate 和来源复核直接锁定结算资金。
+     */
+    @Test
+    void testSettlementFundsPrimitiveShouldOnlyBeUsedBySettlementOrderOrchestration() throws Exception {
+        assertFundsPrimitiveAllowlist(SETTLEMENT_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST,
+                SETTLEMENT_TRANSACTION_PRIMITIVE_TOKENS, "settlement");
+    }
+
+    /**
+     * 场景：出款单通过交易层内部资金原语完成成功关闭或失败回退。
+     * 预期：生产源码只有出款单编排可以消费该原语，宿主通过出款单公共应用服务协作。
+     * 红线：不得绕过出款状态机、回单幂等和外部引用唯一性直接生成出款资金事实。
+     */
+    @Test
+    void testPayoutFundsPrimitiveShouldOnlyBeUsedByPayoutOrderOrchestration() throws Exception {
+        assertFundsPrimitiveAllowlist(PAYOUT_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST,
+                PAYOUT_TRANSACTION_PRIMITIVE_TOKENS, "payout");
+    }
+
+    /**
+     * 场景：两个出款单并发消费同一个外部回单引用，唯一键失败方需要读取已提交胜者。
+     * 预期：冲突恢复使用 current read，避免 MySQL REPEATABLE-READ 继续命中旧快照。
+     * 红线：唯一键失败后不得继续使用普通一致性读判断胜者不存在。
+     */
+    @Test
+    void testPayoutReceiptConflictRecoveryShouldUseCurrentRead() throws Exception {
+        String mapper = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/dal/mapper/PayoutReceiptMapper.java"));
+        String service = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/payout/impl/"
+                        + "PayoutOrderApplicationServiceImpl.java"));
+
+        assertThat(mapper).contains("PayoutReceipt selectBySourceForUpdate", "FOR UPDATE");
+        assertThat(service).contains("payoutReceiptMapper.selectBySourceForUpdate(");
+    }
+
+    /**
+     * 场景：追偿应用服务只登记责任与已完成资金结果。
+     * 预期：服务只查询资金交易事实，不执行交易、余额或账本命令。
+     * 红线：不得把追偿资金策略或资金执行收进 reconciliation。
+     */
+    @Test
+    void testRecoveryOrderShouldOnlyReferenceCompletedFundsFacts() throws Exception {
+        String service = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/recovery/impl/"
+                        + "RecoveryOrderApplicationServiceImpl.java"));
+
+        assertThat(service)
+                .contains("FundsTransactionQueryService")
+                .doesNotContain("FundsDirectTransactionService",
+                        "FundsBalanceControlService",
+                        "FundsClearingTransactionService",
+                        "FundsSettlementTransactionService",
+                        "FundsPayoutTransactionService",
+                        "LedgerService");
+    }
+
+    /**
+     * 场景：追偿来源、幂等键或资金交易唯一键发生并发冲突。
+     * 预期：冲突恢复使用 current read，能在 MySQL REPEATABLE-READ 下读取已提交胜者。
+     * 红线：唯一键失败后不得继续使用普通一致性读判断胜者不存在。
+     */
+    @Test
+    void testRecoveryConflictRecoveryShouldUseCurrentRead() throws Exception {
+        String orderMapper = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/dal/mapper/RecoveryOrderMapper.java"));
+        String resultMapper = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/dal/mapper/RecoveryResultMapper.java"));
+        String service = Files.readString(workspaceRoot().resolve(
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/recovery/impl/"
+                        + "RecoveryOrderApplicationServiceImpl.java"));
+
+        assertThat(orderMapper).contains("selectBySourceForUpdate", "FOR UPDATE");
+        assertThat(resultMapper).contains("selectByIdempotencyKeyForUpdate",
+                "selectByFundsTransactionSnForUpdate", "FOR UPDATE");
+        assertThat(service).contains("recoveryOrderMapper.selectBySourceForUpdate(",
+                "recoveryResultMapper.selectByIdempotencyKeyForUpdate(",
+                "recoveryResultMapper.selectByFundsTransactionSnForUpdate(");
+    }
+
+    private void assertFundsPrimitiveAllowlist(List<String> allowlist,
+                                               List<String> primitiveTokens,
+                                               String capability) throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : nonTransactionProductionJavaSourceFiles()) {
+            String relativePath = workspaceRoot().relativize(javaFile).toString();
+            if (allowlist.contains(relativePath)) {
+                continue;
+            }
+            String content = Files.readString(javaFile);
+            for (String primitiveToken : primitiveTokens) {
+                if (content.contains(primitiveToken)) {
+                    violations.add(relativePath + " contains " + capability
+                            + " transaction primitive " + primitiveToken);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as(capability + " funds primitive must stay behind its canonical orchestration")
+                .isEmpty();
+    }
+
     private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
         NodeList dependencyNodes = parsePom(pomPath).getElementsByTagName("dependency");
@@ -675,6 +821,10 @@ class FundsModuleDependencyBoundaryTests {
 
     private List<Path> nonWalletProductionJavaSourceFiles() throws IOException {
         return javaSourceFiles(NON_WALLET_PRODUCTION_SOURCE_SCAN_PATHS);
+    }
+
+    private List<Path> nonTransactionProductionJavaSourceFiles() throws IOException {
+        return javaSourceFiles(NON_TRANSACTION_PRODUCTION_JAVA_SOURCE_SCAN_PATHS);
     }
 
     private List<Path> javaSourceFiles(List<String> scanPaths) throws IOException {

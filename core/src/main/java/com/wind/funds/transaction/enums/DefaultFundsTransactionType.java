@@ -73,6 +73,18 @@ public enum DefaultFundsTransactionType implements DescriptiveEnum {
     @Schema(description = "Clearing")
     CLEARING("清算确认"),
 
+    /**
+     * 已审批结算单对应的账户内可用资金转结算锁定。
+     */
+    @Schema(description = "Settlement")
+    SETTLEMENT("结算锁定"),
+
+    /**
+     * 已锁定结算资金的外部出款结果。
+     */
+    @Schema(description = "Payout")
+    PAYOUT("结算出款"),
+
     /*=================== 调账相关 ======================*/
 
     /**

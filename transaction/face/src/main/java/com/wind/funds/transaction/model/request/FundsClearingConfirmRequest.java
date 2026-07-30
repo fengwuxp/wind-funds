@@ -11,7 +11,9 @@ import lombok.experimental.Accessors;
 import java.util.List;
 
 /**
- * 清算确认资金请求。
+ * 清算批次编排使用的内部资金请求。
+ *
+ * <p>本请求只用于清算批次完成最终复核后的原子确认，不是宿主可独立构造的清算命令。</p>
  */
 @Data
 @Accessors(chain = true)
@@ -25,7 +27,7 @@ public class FundsClearingConfirmRequest {
     @NotNull
     private Money amount;
 
-    @Schema(description = "已确认的清算批次流水号，也是本次资金事实的业务幂等键")
+    @Schema(description = "正在原子确认的清算批次流水号，也是本次资金事实的业务幂等键")
     @NotNull
     private String clearingBatchSn;
 

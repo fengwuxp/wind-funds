@@ -24,6 +24,8 @@ import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.wind.funds.route.ClearingFundsInstructionRouteResolver;
+import com.wind.funds.route.SettlementFundsInstructionRouteResolver;
+import com.wind.funds.route.PayoutFundsInstructionRouteResolver;
 import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteReplayService;
@@ -45,9 +47,13 @@ import com.wind.funds.transaction.application.impl.FundsBenefitContributionTrans
 import com.wind.funds.transaction.application.impl.DefaultFundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsClearingTransactionServiceImpl;
+import com.wind.funds.transaction.application.impl.FundsSettlementTransactionServiceImpl;
+import com.wind.funds.transaction.application.impl.FundsPayoutTransactionServiceImpl;
 import com.wind.funds.transaction.projection.impl.DefaultFundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsClearingInstructionConverter;
+import com.wind.funds.transaction.converter.FundsSettlementInstructionConverter;
+import com.wind.funds.transaction.converter.FundsPayoutInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
@@ -1318,6 +1324,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             FundsBalanceControlInstructionConverter.class,
             FundsAuthorizationInstructionConverter.class,
             FundsClearingInstructionConverter.class,
+            FundsSettlementInstructionConverter.class,
+            FundsPayoutInstructionConverter.class,
             RouteParticipantFactory.class,
             RouteSubjectSupport.class,
             PlatformAccountRouteSupport.class,
@@ -1329,6 +1337,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,
             ClearingFundsInstructionRouteResolver.class,
+            SettlementFundsInstructionRouteResolver.class,
+            PayoutFundsInstructionRouteResolver.class,
             CompositeRouteResolver.class,
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
@@ -1338,6 +1348,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             FundsClearingTransactionServiceImpl.class,
+            FundsSettlementTransactionServiceImpl.class,
+            FundsPayoutTransactionServiceImpl.class,
             LedgerServiceImpl.class,
             LedgerTransactionServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class,

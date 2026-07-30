@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
+
 /**
  * 清算批次 Mapper。
  */
@@ -25,6 +27,21 @@ public interface ClearingBatchMapper extends BaseMapper<ClearingBatch> {
             FOR UPDATE
             """)
     ClearingBatch selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
+
+    @Select("""
+            <script>
+            SELECT * FROM t_clearing_batch
+            WHERE tenant_id = #{tenantId}
+              AND sn IN
+              <foreach collection="sns" item="sn" open="(" separator="," close=")">
+                #{sn}
+              </foreach>
+            ORDER BY sn
+            FOR UPDATE
+            </script>
+            """)
+    List<ClearingBatch> selectBySnsForUpdate(@Param("tenantId") Long tenantId,
+                                             @Param("sns") List<String> sns);
 
     @Update("""
             UPDATE t_clearing_batch

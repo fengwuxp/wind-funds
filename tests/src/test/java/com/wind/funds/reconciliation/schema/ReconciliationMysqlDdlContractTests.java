@@ -26,6 +26,12 @@ class ReconciliationMysqlDdlContractTests {
             "t_clearing_candidate",
             "t_clearing_batch",
             "t_clearing_batch_detail",
+            "t_settlement_order",
+            "t_settlement_order_item",
+            "t_payout_order",
+            "t_payout_receipt",
+            "t_recovery_order",
+            "t_recovery_result",
             "t_reconciliation_batch",
             "t_reconciliation_batch_lineage",
             "t_reconciliation_source_snapshot",
@@ -104,12 +110,19 @@ class ReconciliationMysqlDdlContractTests {
     @Test
     void testMysqlReconciliationCommandShouldRequireDedicatedDatabase() throws IOException {
         String justfile = Files.readString(workspaceRoot().resolve("Justfile"));
+        String integrationTest = Files.readString(workspaceRoot().resolve(
+                "tests/src/test/java/com/wind/funds/reconciliation/schema/"
+                        + "ReconciliationMysqlMigrationIntegrationTests.java"));
 
         assertThat(justfile)
                 .contains("database_name=\"${database_url##*/}\"")
                 .contains("[[ \"$database_name\" == \"wind_funds_reconciliation_test\" ]]")
                 .contains("WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX")
                 .contains("ReconciliationMysqlMigrationIntegrationTests");
+        assertThat(integrationTest)
+                .contains("verifyRecoveryConflictRecoveryUsesCurrentRead",
+                        "t_recovery_order", "t_recovery_result",
+                        "idempotency_key", "funds_transaction_sn");
     }
 
     @Test
@@ -117,8 +130,8 @@ class ReconciliationMysqlDdlContractTests {
         String readme = readDatabaseFile("README.md");
 
         assertThat(readme)
-                .contains("十五张表", "just test-mysql-reconciliation")
-                .doesNotContain("九张表");
+                .contains("二十一张表", "just test-mysql-reconciliation")
+                .doesNotContain("十九张表");
     }
 
     @Test
@@ -138,6 +151,18 @@ class ReconciliationMysqlDdlContractTests {
         assertThat(extractCreateTable(forwardDdl, "t_clearing_batch"))
                 .contains("KEY `idx_clearing_batch_status_age` "
                         + "(`tenant_id`, `status`, `gmt_modified`)");
+        assertThat(extractCreateTable(forwardDdl, "t_settlement_order_item"))
+                .contains("UNIQUE KEY `uk_settlement_item_active_source` "
+                        + "(`tenant_id`, `source_type`, `source_sn`, `active_source_claim`)");
+        assertThat(extractCreateTable(forwardDdl, "t_recovery_order"))
+                .contains("UNIQUE KEY `uk_recovery_order_source` "
+                        + "(`tenant_id`, `source_type`, `source_sn`, `responsible_subject_type`, "
+                        + "`responsible_subject_id`, `currency`)");
+        assertThat(extractCreateTable(forwardDdl, "t_recovery_result"))
+                .contains("UNIQUE KEY `uk_recovery_result_transaction` "
+                        + "(`tenant_id`, `funds_transaction_sn`)")
+                .contains("UNIQUE KEY `uk_recovery_result_idempotency` "
+                        + "(`tenant_id`, `idempotency_key`)");
     }
 
     private String readDatabaseFile(String fileName) throws IOException {
