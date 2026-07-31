@@ -1,14 +1,17 @@
 package com.wind.funds.route;
 
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
+import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountBalanceView;
 import com.wind.funds.wallet.FundsAccountId;
@@ -87,12 +90,51 @@ class CompositeRouteResolverTests {
         assertThat(second.resolveCalls).isZero();
     }
 
+    @Test
+    void testResolveShouldRejectInvalidInstructionCombinationBeforeSelectingDelegate() {
+        RecordingRouteResolver delegate = new RecordingRouteResolver(true);
+        FundsInstructionSpec instruction = org.mockito.Mockito.mock(FundsInstructionSpec.class);
+        org.mockito.Mockito.when(instruction.getInstructionType()).thenReturn(FundsInstructionType.DIRECT_TRANSACTION);
+        org.mockito.Mockito.when(instruction.getEventType()).thenReturn(FundsTransactionEventType.FREEZE);
+        org.mockito.Mockito.when(instruction.getTransactionType()).thenReturn(DefaultFundsTransactionType.ADJUSTMENT);
+
+        assertThatThrownBy(() -> resolver(List.of(delegate)).resolve(instruction))
+                .hasMessageContaining("instructionType/eventType/transactionType combination is invalid");
+        assertThat(delegate.supportsCalls).isZero();
+        assertThat(delegate.resolveCalls).isZero();
+    }
+
+    /**
+     * 场景：PAYOUT 资金事件进入组合路由候选选择。
+     * 输入：出款成功和出款失败指令。
+     * 输出：通用直接交易解析器均不声明支持。
+     * 红线：PAYOUT 只能由专用出款解析器承接，不能产生多个候选。
+     */
+    @Test
+    void testPayoutEventsShouldNotMatchTransferResolver() {
+        TransferFundsInstructionRouteResolver resolver = new TransferFundsInstructionRouteResolver(
+                new RouteParticipantFactory(),
+                org.mockito.Mockito.mock(RouteSubjectSupport.class),
+                org.mockito.Mockito.mock(PlatformAccountRouteSupport.class),
+                org.mockito.Mockito.mock(FundsTransactionQueryService.class));
+
+        assertThat(resolver.supports(directInstruction(FundsTransactionEventType.PAYOUT_SUCCEEDED,
+                DefaultFundsTransactionType.PAYOUT))).isFalse();
+        assertThat(resolver.supports(directInstruction(FundsTransactionEventType.PAYOUT_FAILED,
+                DefaultFundsTransactionType.PAYOUT))).isFalse();
+    }
+
     private FundsInstructionSpec directInstruction() {
+        return directInstruction(FundsTransactionEventType.PAY, DefaultFundsTransactionType.PAY);
+    }
+
+    private FundsInstructionSpec directInstruction(FundsTransactionEventType eventType,
+                                                   DefaultFundsTransactionType transactionType) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
-                .eventType(FundsTransactionEventType.PAY)
-                .transactionType(DefaultFundsTransactionType.PAY)
+                .eventType(eventType)
+                .transactionType(transactionType)
                 .amount(Money.immutable(10L, CurrencyIsoCode.USD))
                 .businessScene("PAY")
                 .businessSn("ROUTE_SUPPORTS_NO_SIDE_EFFECT")
@@ -125,6 +167,11 @@ class CompositeRouteResolverTests {
             @Override
             public FundsAccount getAccount(FundsAccountId accountId) {
                 throw new AssertionError("route post-processing must not query accounts in resolver selection tests");
+            }
+
+            @Override
+            public LedgerProfileCode getLedgerProfileCode(FundsAccountId accountId) {
+                throw new AssertionError("route post-processing must not query ledger profiles in resolver selection tests");
             }
 
             @Override

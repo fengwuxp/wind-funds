@@ -46,6 +46,7 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -113,7 +114,16 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     public @NonNull FundsInstructionLifecycleResult beforePosting(@NonNull FundsInstructionSpec instruction,
                                                                   @NonNull ResolvedRouteSpec resolvedRoute,
                                                                   @NonNull RouteSnapshotSpec routeSnapshot) {
-        FundsTransaction transaction = findOrCreateTransaction(instruction, routeSnapshot);
+        FundsTransaction transaction;
+        try {
+            transaction = findOrCreateTransaction(instruction, routeSnapshot);
+        } catch (DuplicateKeyException exception) {
+            FundsInstructionLifecycleResult concurrentReplay = resolveConcurrentExternalFundsFactReplay(instruction);
+            if (concurrentReplay != null) {
+                return concurrentReplay;
+            }
+            throw exception;
+        }
         List<FundsTransactionDetail> existingDetails = findExistingTransactionDetails(instruction, routeSnapshot,
                 transaction.getSn());
         assertFailedTransactionCannotBeReposted(instruction, transaction, existingDetails);
@@ -123,6 +133,24 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         assertPostingSummaryAllowed(instruction, transaction);
         List<FundsTransactionDetail> details = findOrCreateTransactionDetails(instruction, routeSnapshot,
                 transaction.getSn());
+        return lifecycleResult(transaction.getSn(), details);
+    }
+
+    private @Nullable FundsInstructionLifecycleResult resolveConcurrentExternalFundsFactReplay(
+            FundsInstructionSpec instruction) {
+        FundsTransaction transaction = findExternalFundsFactTransaction(instruction);
+        if (transaction == null) {
+            return null;
+        }
+        AssertUtils.equals(transaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest(),
+                "外部资金事实请求参数不一致，transactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
+                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                transaction.getSn(), transaction.getStatus());
+        List<FundsTransactionDetail> details = findTransactionDetails(transaction.getSn());
+        AssertUtils.notEmpty(details, "外部资金事实缺少交易明细，transactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(details.stream().allMatch(this::isCompletedDetail),
+                "外部资金事实交易明细尚未完成，transactionSn = {}", transaction.getSn());
         return lifecycleResult(transaction.getSn(), details);
     }
 
@@ -384,6 +412,26 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 .and(ref.businessScene.eq(instruction.getBusinessScene()))
                 .and(ref.businessSn.eq(businessSn));
         return fundsTransactionMapper.selectOneByQuery(wrapper);
+    }
+
+    private @Nullable FundsTransaction findExternalFundsFactTransaction(FundsInstructionSpec instruction) {
+        if (!StringUtils.hasText(instruction.getExternalSourceCode())) {
+            return null;
+        }
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(instruction.getTenantId()))
+                .and(ref.externalSourceCode.eq(instruction.getExternalSourceCode()))
+                .and(ref.externalFundsFactSn.eq(instruction.getExternalFundsFactSn()))
+                .and(ref.externalFundsEffectType.eq(instruction.getExternalFundsEffectType()));
+        return fundsTransactionMapper.selectOneByQuery(wrapper);
+    }
+
+    private List<FundsTransactionDetail> findTransactionDetails(String transactionSn) {
+        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.transactionSn.eq(transactionSn));
+        return fundsTransactionDetailMapper.selectListByQuery(wrapper);
     }
 
     private FundsTransactionDetail findDetailByBusinessEventAndParticipant(FundsInstructionSpec instruction,
@@ -682,6 +730,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case CLEARING -> FundsEffectType.RELEASE;
             case SETTLEMENT -> FundsEffectType.CONSUME;
             case PAYOUT -> FundsEffectType.CONSUME;
+            case BALANCE_CONTROL -> throw new IllegalArgumentException(
+                    "balance-control transaction type requires FREEZE or UNFREEZE event");
             case ADJUSTMENT -> FundsEffectType.ADJUST;
         };
     }

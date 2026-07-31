@@ -54,6 +54,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
             "amount",
             "costbearersubjectref",
             "benefitreceiversubjectref",
+            "benefitreceiverledgersubjectcode",
             "benefitsettlementsubjectref",
             "fundingnature",
             "fundingnaturecode",
@@ -70,6 +71,10 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
             FundsBenefitFundingNature.PLATFORM_OWN_FUNDS,
             FundsBenefitFundingNature.PARTNER_FUNDED);
 
+    private static final Set<LedgerSubjectCode> SUPPORTED_RECEIVER_LEDGER_SUBJECT_CODES = Set.of(
+            LedgerSubjectCode.CLEARING,
+            LedgerSubjectCode.SETTLEMENT);
+
     private final FundsDirectTransactionService directTransactionService;
 
     @Override
@@ -83,7 +88,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(costBearer)
                 .setPayeeId(receiver)
-                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(request.getBenefitReceiverLedgerSubjectCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
@@ -115,6 +120,11 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利原始订单号不能为空");
         AssertUtils.notNull(request.getCostBearerSubjectRef(), "权益让利承担方不能为空");
         AssertUtils.notNull(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体不能为空");
+        AssertUtils.notNull(request.getBenefitReceiverLedgerSubjectCode(), "权益让利承接目标账目不能为空");
+        AssertUtils.isTrue(SUPPORTED_RECEIVER_LEDGER_SUBJECT_CODES
+                        .contains(request.getBenefitReceiverLedgerSubjectCode()),
+                "权益让利承接目标账目仅支持 CLEARING 或 SETTLEMENT，ledgerSubjectCode = {}",
+                request.getBenefitReceiverLedgerSubjectCode());
         AssertUtils.notNull(request.getAmount(), "权益让利金额不能为空");
         AssertUtils.isTrue(request.getAmount().getAmount() > 0, "权益让利金额必须大于 0");
         AssertUtils.notNull(request.getFundingNature(), "权益让利资金性质不能为空");
@@ -180,10 +190,30 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         if (contextVariables == null || contextVariables.getContextVariables() == null) {
             return;
         }
-        for (String key : contextVariables.getContextVariables().keySet()) {
-            String normalizedKey = normalizeBenefitContextKey(key);
-            AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS.contains(normalizedKey),
-                    "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
+        assertLightweightContextValue(contextVariables.getContextVariables());
+    }
+
+    private void assertLightweightContextValue(@Nullable Object value) {
+        if (value instanceof Map<?, ?> values) {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                String key = entry.getKey() == null ? "" : entry.getKey().toString();
+                AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS.contains(normalizeBenefitContextKey(key)),
+                        "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
+                for (String pathSegment : key.split("[^A-Za-z0-9]+")) {
+                    AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS
+                                    .contains(normalizeBenefitContextKey(pathSegment)),
+                            "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
+                }
+                assertLightweightContextValue(entry.getValue());
+            }
+        } else if (value instanceof Iterable<?> values) {
+            for (Object nestedValue : values) {
+                assertLightweightContextValue(nestedValue);
+            }
+        } else if (value instanceof Object[] values) {
+            for (Object nestedValue : values) {
+                assertLightweightContextValue(nestedValue);
+            }
         }
     }
 
@@ -193,8 +223,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         }
         return key.trim()
                 .toLowerCase(Locale.ROOT)
-                .replace("_", "")
-                .replace("-", "");
+                .replaceAll("[^a-z0-9]", "");
     }
 
 }

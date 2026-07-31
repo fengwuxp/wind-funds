@@ -8,7 +8,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * 交易结果消费控制额度变动流水应用服务。
  *
- * <p>职责：在资金交易事实已经存在后，把交易成功或退款补偿结果翻译为
+ * <p>职责：在资金交易事实已经存在后，把交易成功、可信授权撤销或退款补偿结果翻译为
  * Spend Rule 控制额度变动事实；业务确认型退款补偿可在没有原控制流水时显式写入控制补偿事实。</p>
  *
  * <p>资金退款和支付工具周期额度回补属于两个抽象层次：资金退款只处理资金事实；
@@ -29,6 +29,17 @@ public interface SpendControlTransactionConsumptionApplicationService {
      * @return 支出控制消耗活动
      */
     @NonNull SpendControlMovementDTO consume(@NonNull SpendControlTransactionConsumptionRequest request);
+
+    /**
+     * 记录可信授权撤销后的控制释放活动。
+     *
+     * <p>控制释放累计金额不得超过原授权资金交易已经确认的累计撤销金额；超时、过期或本地推断
+     * 不会形成可供本入口消费的可信资金撤销事实。</p>
+     *
+     * @param request 可信授权撤销释放控制额度变动流水请求
+     * @return 支出控制释放活动
+     */
+    @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request);
 
     /**
      * 记录退款成功后的控制补偿活动。

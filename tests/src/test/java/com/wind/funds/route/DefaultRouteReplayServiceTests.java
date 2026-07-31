@@ -319,6 +319,35 @@ class DefaultRouteReplayServiceTests {
                 .doesNotContainKey("requestChannel");
     }
 
+    /**
+     * 场景：升级前的冻结路径快照仍以 ADJUSTMENT 记录 transactionType。
+     * 预期：解冻回放归一为新的 BALANCE_CONTROL 动作族，同时保留原冻结路径。
+     * 红线：历史快照不能让新解冻事实继续落为 ADJUSTMENT。
+     */
+    @Test
+    void testUnfreezeReplayShouldNormalizeLegacyFreezeTransactionType() {
+        RouteSnapshotSpec snapshot = legacyFreezeRouteSnapshot();
+
+        ResolvedRouteSpec resolvedRoute = routeReplayService.replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.UNFREEZE)
+                        .eventType(FundsTransactionEventType.UNFREEZE)
+                        .businessScene("UNFREEZE")
+                        .businessSn("LEGACY_FREEZE_UNFREEZE_001")
+                        .referenceSnapshotId(snapshot.getSnapshotId())
+                        .amount(Money.immutable(5L, CurrencyIsoCode.USD))
+                        .originalAmount(Money.immutable(5L, CurrencyIsoCode.USD))
+                        .exchangeRate(BigDecimal.ONE)
+                        .eventTime(LocalDateTime.of(2026, 7, 30, 16, 30))
+                        .contextVariables(Map.of())
+                        .build());
+
+        assertThat(resolvedRoute.getInstructionType()).isEqualTo(FundsInstructionType.BALANCE_CONTROL);
+        assertThat(resolvedRoute.getEventType()).isEqualTo(FundsTransactionEventType.UNFREEZE);
+        assertThat(resolvedRoute.getTransactionType())
+                .isEqualTo(DefaultFundsTransactionType.valueOf("BALANCE_CONTROL"));
+    }
+
     @Test
     void testPartialFxRefundShouldUsePaymentSnapshotFacts() {
         SubjectRef payer = fundingAccount("PAYER-FX-001");
@@ -454,6 +483,38 @@ class DefaultRouteReplayServiceTests {
                 .legs(List.of(authorizationHoldLeg(payer)))
                 .routingDecision(routingDecision("ROUTE-AUTH", payer))
                 .resolvedAt(LocalDateTime.of(2026, 5, 18, 12, 0))
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private RouteSnapshotSpec legacyFreezeRouteSnapshot() {
+        SubjectRef account = fundingAccount("LEGACY-FREEZE-ACCOUNT-001");
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("LEGACY-FREEZE-SNAPSHOT-001")
+                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION)
+                .routeCode("BALANCE_FREEZE_STANDARD")
+                .routeVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .businessScene("FREEZE")
+                .businessSn("LEGACY_FREEZE_001")
+                .instructionType(FundsInstructionType.BALANCE_CONTROL)
+                .eventType(FundsTransactionEventType.FREEZE)
+                .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
+                .participants(List.of(participant(RouteParticipantRole.PAYER, account)))
+                .legs(List.of(ImmutableRouteLegSpec.builder()
+                        .legId("FREEZE")
+                        .sequence(1)
+                        .legType(RouteLegType.HOLD)
+                        .sourceNode(routeNode(account, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
+                        .targetNode(routeNode(account, RouteNodeRole.TARGET, LedgerSubjectCode.FROZEN))
+                        .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                        .balanceEffectType(LedgerBalanceEffectType.HOLD)
+                        .phaseCode(LedgerPhaseCode.FREEZE)
+                        .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                        .constraintOverrides(Map.of())
+                        .contextVariables(Map.of())
+                        .build()))
+                .resolvedAt(LocalDateTime.of(2026, 7, 29, 16, 30))
                 .contextVariables(Map.of())
                 .build();
     }

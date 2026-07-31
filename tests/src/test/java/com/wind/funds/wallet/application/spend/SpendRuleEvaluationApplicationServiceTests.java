@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.application.spend;
 
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -1514,6 +1515,11 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 @Override
                 public FundsAccount getAccount(FundsAccountId accountId) {
                     throw new UnsupportedOperationException("Spend Rule evaluation projection test does not write movement");
+                }
+
+                @Override
+                public LedgerProfileCode getLedgerProfileCode(FundsAccountId accountId) {
+                    throw new UnsupportedOperationException("Spend Rule evaluation projection test does not query ledger profiles");
                 }
 
                 @Override

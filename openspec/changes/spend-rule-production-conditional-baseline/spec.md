@@ -46,9 +46,10 @@ For a corporate card or VCC authorization, an owner defines a rule, publishes an
 5. The evaluator MUST remain a read-only candidate decision for one supported published rule. It MUST NOT write a decision record, control movement, funds transaction, route, posting, ledger entry, or balance projection.
 6. Wallet admission MUST accept persisted and context-matching decision evidence. Bare results, digest mismatch, unresolved scope, multiple applicable bindings, or tenant mismatch MUST fail closed.
 7. A passed Spend Rule decision MUST NOT bypass payment-instrument capability, account capability, funding responsibility, balance, route, or ledger checks.
-8. H2 service evidence MUST NOT be represented as production schema, external adapter adoption, operational readiness, or production approval.
+8. H2 service evidence proves repository functional and local-transaction behavior only. Production schema requires repository DDL plus target-MySQL tests; external adapter adoption and deployed-runtime stability remain outside this Goal.
 9. A decision that identifies a payment instrument MUST bind its actual instrument binding version. `controlScopeId` and `periodId` MUST be both absent or both present. An optional `targetAccountId` MUST contain only a Funding Account or Credit Account subject.
 10. Wallet admission MUST compare the persisted instrument binding version and control window with the current payment-instrument snapshot and request. When the decision contains a target account, it MUST also equal the account resolved by the current funding-responsibility snapshot. Missing legacy evidence or any mismatch MUST fail closed without funds side effects.
+11. A controlled authorization MUST derive `controlReservationSn` deterministically from tenant and authorization business identity so concurrent first submissions produce the same funds request digest and control idempotency key.
 
 ## Acceptance And Evidence
 
@@ -61,6 +62,7 @@ For a corporate card or VCC authorization, an owner defines a rule, publishes an
 | `AC-SR-BASE-005` | Admission returns explicit no-rule, verifies one persisted decision, and rejects bare, mismatched, unresolved, cross-tenant, or multi-binding evidence without funds side effects. | `SpendControlAdmissionApplicationServiceTests` |
 | `AC-SR-BASE-006` | Decision persistence stores and returns instrument binding version, an all-or-nothing control window, and an optional Funding/Credit Account target; idempotent replay includes those fields and rejects context drift. | `SpendRuleDecisionRecordServiceTests` |
 | `AC-SR-BASE-007` | Admission rejects cross-scope, cross-period, stale-binding, and mismatched-target-account decision reuse before transaction, route, posting, ledger entry, or balance facts. | `SpendControlAdmissionApplicationServiceTests`, `PaymentInstrumentTransactionAuthorizationTests` |
+| `AC-SR-BASE-008` | The same authorization business identity produces the same 64-character `SCR` control reservation key. | `PaymentInstrumentTransactionAuthorizationTests#testAuthorizeByInstrumentShouldExposeSpendRuleDecisionInProjectionExplanation` |
 
 Fresh A2 verification on 2026-07-30 used Java 21. `SC-LOOP-04` passed 56 tests, and the
 module-boundary suite passed 188 tests, all with 0 failures, 0 errors, and 0 skipped.
@@ -87,9 +89,9 @@ code-generation checks across 21 Maven modules: 983 tests, 0 failures, 0 errors,
 | Gate | State | Stop Condition |
 | --- | --- | --- |
 | Product rule scope | `PENDING_OWNER_REVIEW` | Do not add unsupported rules or multi-rule composition until priority, conflict, final-decision, and historical-explanation semantics are signed off. |
-| Trusted decision producer | `OUTSIDE_REPOSITORY_EVIDENCE` | Do not claim end-to-end admission until a trusted host records decisions and passes contract tests. |
+| Decision producer contract | `REPOSITORY_EVIDENCE_REQUIRED` | The repository must fail closed on missing, stale, mismatched, or unverifiable persisted decisions; actual host adoption is outside the Goal. |
 | A2 decision context binding | `ENGINEERING_VERIFIED_2026-07-30` | Do not admit a decision whose persisted binding version, control window, or optional target account conflicts with the current wallet snapshot. |
 | Production schema and migration | `NOT_IMPLEMENTED` | Do not enable production persistence until DDL, indexes, migration, validation, rollback, and historical-data handling have an approved change boundary. |
 | IAM and change audit | `NOT_IMPLEMENTED_IN_THIS_REPOSITORY` | Do not expose rule lifecycle operations until caller authority, operator, reason, approval or audit reference, and before/after digest are traceable. |
-| Observability and Runbook | `NOT_IMPLEMENTED` | Do not claim operational readiness until result signals, runtime samples, alerts, thresholds, owners, recovery drills, and acceptance checks are implemented and verified. |
+| Recovery and explainability | `REPOSITORY_EVIDENCE_REQUIRED` | Tests must prove decision/control facts are queryable, explainable, idempotent, and fail without funds side effects. Host metrics, alerts, and runtime drills are adopter responsibilities, not repository completion anchors. |
 | External practice verification | `LOCAL_REFERENCE_ONLY_NOT_REFRESHED` | Do not claim current Highnote, issuer, or network compatibility without separately authorized source verification. |

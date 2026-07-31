@@ -17,10 +17,13 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
+import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
@@ -28,8 +31,10 @@ import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -42,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 
 /**
  * 支付工具授权处理器。
@@ -56,9 +62,19 @@ import java.util.Optional;
 @AllArgsConstructor
 public class PaymentInstrumentAuthorizationProcessor {
 
+    private static final String SHA256_PREFIX = "sha256:";
+
+    private static final String CONTROL_RESERVATION_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_RESERVE";
+
+    private static final String CONTROL_RESERVATION_MOVEMENT_PREFIX = "SCR";
+
+    private static final int CONTROL_RESERVATION_MOVEMENT_MAX_LENGTH = 64;
+
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
     private final SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
+
+    private final SpendControlMovementService spendControlMovementService;
 
     private final FundsAuthorizationTransactionService authorizationTransactionService;
 
@@ -77,9 +93,12 @@ public class PaymentInstrumentAuthorizationProcessor {
             return establishedAuthorizationSn;
         }
         AuthorizationAdmissionDecision admissionDecision = resolveAdmissionDecision(request);
-        return authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
+        String authorizationSn = authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
                 admissionDecision.snapshot(),
-                admissionDecision.spendControlDecision()), operator);
+                admissionDecision.spendControlDecision(),
+                admissionDecision.controlReservation()), operator);
+        recordControlReservation(request, authorizationSn, admissionDecision);
+        return authorizationSn;
     }
 
     private @Nullable String findEstablishedAuthorizationReplay(AuthorizeByPaymentInstrumentRequest request) {
@@ -137,6 +156,7 @@ public class PaymentInstrumentAuthorizationProcessor {
             return;
         }
         AssertUtils.isTrue(Objects.equals(decision.getString("controlScopeId"), request.getControlScopeId())
+                        && Objects.equals(decision.getString("periodId"), request.getPeriodId())
                         && matchesOptionalText(request.getSpendRuleId(), decision.getString("ruleId"))
                         && matchesOptionalText(request.getSpendRuleVersion(), decision.getString("ruleVersion"))
                         && matchesOptionalText(request.getSpendRuleBindingSn(), decision.getString("spendRuleBindingSn"))
@@ -205,10 +225,34 @@ public class PaymentInstrumentAuthorizationProcessor {
                     decision.getSpendDecisionSn(),
                     decision.getRejectReason());
             AssertUtils.notNull(decision.getPreTransactionSnapshot(), "Spend Rule 准入缺少预交易快照");
-            return new AuthorizationAdmissionDecision(decision.getPreTransactionSnapshot(), decision);
+            return new AuthorizationAdmissionDecision(decision.getPreTransactionSnapshot(),
+                    decision,
+                    resolveControlReservation(request, decision));
         }
         return new AuthorizationAdmissionDecision(preTransactionSnapshotApplicationService
-                .resolvePreTransactionSnapshot(toPreTransactionRequest(request)), null);
+                .resolvePreTransactionSnapshot(toPreTransactionRequest(request)), null, null);
+    }
+
+    private @Nullable ControlReservation resolveControlReservation(
+            AuthorizeByPaymentInstrumentRequest request,
+            SpendControlAdmissionDecisionDTO decision) {
+        if (!Boolean.TRUE.equals(request.getApproved())
+                || decision.getSpendDecisionResult() != SpendControlDecisionResult.PASSED
+                || !StringUtils.hasText(decision.getControlScopeId())) {
+            return null;
+        }
+        AssertUtils.hasText(decision.getPeriodId(), "预算控制预留缺少控制周期标识");
+        AssertUtils.notNull(decision.getTargetAccountId(), "预算控制预留缺少目标账户");
+        return new ControlReservation(controlReservationMovementSn(request), decision.getPeriodId());
+    }
+
+    private String controlReservationMovementSn(AuthorizeByPaymentInstrumentRequest request) {
+        String digest = FundsStableHashSupport.sha256(CONTROL_RESERVATION_MOVEMENT_DOMAIN
+                + "|" + request.getTenantId()
+                + "|" + request.getBusinessScene()
+                + "|" + request.getBusinessSn());
+        return CONTROL_RESERVATION_MOVEMENT_PREFIX + digest.substring(0,
+                CONTROL_RESERVATION_MOVEMENT_MAX_LENGTH - CONTROL_RESERVATION_MOVEMENT_PREFIX.length());
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(
@@ -254,7 +298,8 @@ public class PaymentInstrumentAuthorizationProcessor {
     private FundsAuthorizationTransactionAuthorizeRequest convertToAuthorizeRequest(
             AuthorizeByPaymentInstrumentRequest request,
             PaymentInstrumentPreTransactionSnapshotDTO snapshot,
-            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision,
+            @Nullable ControlReservation controlReservation) {
         FundsAccountId authorizationAccountId = authorizationAccountId(snapshot);
         FundsAccountId linkedFundingAccountId = linkedFundingAccountId(authorizationAccountId,
                 snapshot.getTargetAccountId());
@@ -270,15 +315,16 @@ public class PaymentInstrumentAuthorizationProcessor {
                 .setDeclineReason(request.getDeclineReason())
                 .setPaymentInstrumentRef(paymentInstrumentRef(request, snapshot.getPaymentInstrumentCapability()))
                 .setLinkedFundingAccountId(linkedFundingAccountId)
-                .setContextVariables(admissionContextVariables(snapshot, spendControlDecision))
+                .setContextVariables(admissionContextVariables(snapshot, spendControlDecision, controlReservation))
                 .setDescription(request.getDescription());
     }
 
     private @NonNull ReadonlyContextVariables admissionContextVariables(
             PaymentInstrumentPreTransactionSnapshotDTO snapshot,
-            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision,
+            @Nullable ControlReservation controlReservation) {
         Map<String, Object> values = new LinkedHashMap<>(walletAdmissionContext(snapshot));
-        Map<String, Object> decision = spendRuleDecisionSnapshot(spendControlDecision);
+        Map<String, Object> decision = spendRuleDecisionSnapshot(spendControlDecision, controlReservation);
         if (!decision.isEmpty()) {
             values.put(FundsInstructionContextKeys.SPEND_RULE_DECISION, decision);
         }
@@ -316,7 +362,8 @@ public class PaymentInstrumentAuthorizationProcessor {
     }
 
     private @NonNull Map<String, Object> spendRuleDecisionSnapshot(
-            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision,
+            @Nullable ControlReservation controlReservation) {
         if (spendControlDecision == null) {
             return Map.of();
         }
@@ -335,7 +382,65 @@ public class PaymentInstrumentAuthorizationProcessor {
         }
         putIfText(values, "decisionDigest", spendControlDecision.getSpendDecisionDigest());
         putIfText(values, "controlScopeId", spendControlDecision.getControlScopeId());
+        putIfText(values, "periodId", spendControlDecision.getPeriodId());
+        if (controlReservation != null) {
+            values.put("controlReservationSn", controlReservation.movementSn());
+        }
         return Map.copyOf(values);
+    }
+
+    private void recordControlReservation(AuthorizeByPaymentInstrumentRequest request,
+                                          String authorizationSn,
+                                          AuthorizationAdmissionDecision admissionDecision) {
+        ControlReservation reservation = admissionDecision.controlReservation();
+        SpendControlAdmissionDecisionDTO decision = admissionDecision.spendControlDecision();
+        if (reservation == null || decision == null) {
+            return;
+        }
+        spendControlMovementService.recordMovement(new RecordSpendControlMovementRequest()
+                .setTenantId(request.getTenantId())
+                .setMovementSn(reservation.movementSn())
+                .setMovementType(SpendControlMovementType.RESERVED)
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setTransactionSn(authorizationSn)
+                .setInstrumentSn(request.getInstrumentSn())
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setTargetAccountId(decision.getTargetAccountId())
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setSpendRuleId(decision.getSpendRuleId())
+                .setSpendRuleVersion(decision.getSpendRuleVersion())
+                .setSpendDecisionSn(decision.getSpendDecisionSn())
+                .setSpendDecisionResult(decision.getSpendDecisionResult())
+                .setSpendDecisionDigest(decision.getSpendDecisionDigest())
+                .setControlScopeId(decision.getControlScopeId())
+                .setPeriodId(reservation.periodId())
+                .setMovementDigest(controlReservationDigest(request, authorizationSn, decision, reservation))
+                .setDescription("支付工具授权预算控制预留"));
+    }
+
+    private String controlReservationDigest(AuthorizeByPaymentInstrumentRequest request,
+                                            String authorizationSn,
+                                            SpendControlAdmissionDecisionDTO decision,
+                                            ControlReservation reservation) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("controlScopeId", decision.getControlScopeId());
+        values.put("currency", request.getCurrency().name());
+        values.put("instrumentSn", request.getInstrumentSn());
+        values.put("movementSn", reservation.movementSn());
+        values.put("periodId", reservation.periodId());
+        values.put("spendDecisionSn", decision.getSpendDecisionSn());
+        values.put("spendRuleId", decision.getSpendRuleId());
+        values.put("spendRuleVersion", decision.getSpendRuleVersion());
+        values.put("targetAccountId",
+                decision.getTargetAccountId().type() + ":" + decision.getTargetAccountId().id());
+        values.put("tenantId", request.getTenantId());
+        values.put("transactionSn", authorizationSn);
+        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
     }
 
     private PaymentInstrumentRefSpec paymentInstrumentRef(AuthorizeByPaymentInstrumentRequest request,
@@ -397,6 +502,10 @@ public class PaymentInstrumentAuthorizationProcessor {
 
     private record AuthorizationAdmissionDecision(
             @NonNull PaymentInstrumentPreTransactionSnapshotDTO snapshot,
-            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+            @Nullable SpendControlAdmissionDecisionDTO spendControlDecision,
+            @Nullable ControlReservation controlReservation) {
+    }
+
+    private record ControlReservation(@NonNull String movementSn, @NonNull String periodId) {
     }
 }

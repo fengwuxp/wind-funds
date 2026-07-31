@@ -3,6 +3,7 @@ package com.wind.funds.route;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
@@ -22,6 +23,7 @@ import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.service.PlatformFundingAccountService;
 import com.wind.transaction.core.Money;
@@ -34,6 +36,8 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 授权交易路由解析契约测试。
@@ -54,9 +58,12 @@ class AuthorizationFundsInstructionRouteResolverTests {
     void setUp() {
         TenantContextHolder.setTenantId(TENANT_ID);
         PlatformFundingAccountService platformFundingAccountService = new FixedPlatformFundingAccountService();
+        FundsAccountQueryService fundsAccountQueryService = mock(FundsAccountQueryService.class);
+        when(fundsAccountQueryService.getLedgerProfileCode(USER_ACCOUNT))
+                .thenReturn(LedgerProfileCode.FUNDING_BASIC);
         resolver = new AuthorizationFundsInstructionRouteResolver(
                 new RouteParticipantFactory(),
-                new RouteSubjectSupport(),
+                new RouteSubjectSupport(fundsAccountQueryService),
                 new PlatformAccountRouteSupport(platformFundingAccountService));
     }
 

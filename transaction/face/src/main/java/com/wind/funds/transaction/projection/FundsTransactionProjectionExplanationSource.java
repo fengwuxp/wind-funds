@@ -203,6 +203,10 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String CONTROL_SCOPE_ID_FIELD = "controlScopeId";
 
+    private static final String CONTROL_RESERVATION_SN_FIELD = "controlReservationSn";
+
+    private static final String PERIOD_ID_FIELD = "periodId";
+
     private static final List<String> SPEND_RULE_DECISION_EXPLAIN_FIELDS = List.of(
             SPEND_RULE_DECISION_RECORD_ID_FIELD,
             SPEND_RULE_ID_FIELD,
@@ -213,7 +217,9 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             SPEND_RULE_DECISION_SN_FIELD,
             SPEND_RULE_DECISION_RESULT_FIELD,
             SPEND_RULE_DECISION_DIGEST_FIELD,
-            CONTROL_SCOPE_ID_FIELD);
+            CONTROL_SCOPE_ID_FIELD,
+            CONTROL_RESERVATION_SN_FIELD,
+            PERIOD_ID_FIELD);
 
     public FundsTransactionProjectionExplanationSource {
         AssertUtils.hasText(businessScene, "交易投影解释业务场景不能为空");

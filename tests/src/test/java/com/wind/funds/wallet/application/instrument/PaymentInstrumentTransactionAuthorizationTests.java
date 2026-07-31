@@ -25,15 +25,19 @@ import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
+import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
@@ -42,6 +46,7 @@ import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycle
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
@@ -51,6 +56,7 @@ import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentT
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
+import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -60,14 +66,19 @@ import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
+import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
+import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.CompleteAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
@@ -76,12 +87,18 @@ import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
+import com.wind.funds.wallet.model.request.ReverseAuthorizationByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
+import com.wind.funds.wallet.model.request.UnbindPaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleBindingService;
@@ -97,6 +114,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlMovementServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
@@ -111,6 +129,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -132,6 +151,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         PaymentInstrumentTransactionAuthorizationTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServiceTest {
 
@@ -189,6 +209,20 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
 
     private static final String CONTROL_PERIOD_ID = "2026-07";
 
+    private static final String CONTROL_LIMIT_MOVEMENT_SN = "auth_admission_control_limit";
+
+    private static final String COMPLETION_BUSINESS_SCENE = "AUTHORIZATION_COMPLETION";
+
+    private static final String COMPLETION_BUSINESS_SN = "AUTH_ADMISSION_COMPLETE";
+
+    private static final String REVERSAL_BUSINESS_SCENE = "AUTHORIZATION_REVERSAL";
+
+    private static final String REVERSAL_BUSINESS_SN = "AUTH_ADMISSION_REVERSAL";
+
+    private static final String REFUND_BUSINESS_SCENE = "AUTHORIZATION_REFUND";
+
+    private static final String REFUND_BUSINESS_SN = "AUTH_ADMISSION_REFUND";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -211,13 +245,22 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     private SpendRuleBindingService spendRuleBindingService;
 
     @Autowired
+    private SpendControlMovementService spendControlMovementService;
+
+    @Autowired
     private FundsBalanceControlService balanceControlService;
+
+    @Autowired
+    private FundsAuthorizationTransactionService authorizationTransactionService;
 
     @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
     private PaymentInstrumentTransactionApplicationService paymentInstrumentTransactionApplicationService;
+
+    @Autowired
+    private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
 
     @Autowired
     private FundsTransactionProjectionExplainApplicationService projectionExplainApplicationService;
@@ -394,11 +437,23 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 null,
                 SPEND_PASS_DECISION_DIGEST);
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        prepareBudgetControlLimit(100L);
 
         String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(authorizationSn).isNotBlank();
+        SpendControlMovementDTO reservation = findControlReservation(authorizationSn);
+        assertThat(reservation.getMovementType()).isEqualTo(SpendControlMovementType.RESERVED);
+        assertThat(reservation.getMovementSn()).isEqualTo(controlReservationMovementSn(AUTHORIZE_BUSINESS_SN));
+        assertThat(reservation.getAmount()).isEqualTo(60L);
+        assertThat(reservation.getControlScopeId()).isEqualTo(CONTROL_SCOPE_ID);
+        assertThat(reservation.getPeriodId()).isEqualTo(CONTROL_PERIOD_ID);
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getLimitAmount()).isEqualTo(100L);
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
         var beforeExplainFacts = ledgerFactSnapshot(jdbcTemplate);
         assertAuthorizationProjectionSpendRuleExplanation(authorizationSn);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeExplainFacts);
@@ -426,6 +481,396 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     /**
+     * 场景：支付工具授权生成控制预留后，可信部分完成同步消费对应控制占用。
+     * 输入：原授权 60，本次完成 40，完成动作使用独立稳定 businessSn，并重放同一完成请求。
+     * 输出：授权聚合保持 OPEN，资金累计完成和控制 CONSUMED 均为 40，控制流水只生成一次。
+     * 红线：资金完成与控制消费必须同事务，重放不得重复完成或重复消费，也不得按当前绑定重新选路。
+     */
+    @Test
+    void testPartialCompletionByInstrumentShouldConsumeLinkedControlReservationOnce() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        SpendControlMovementDTO reservation = findControlReservation(authorizationSn);
+
+        String completionSn = paymentInstrumentTransactionApplicationService.completeAuthorizationByInstrument(
+                completeAuthorizationRequest(authorizationSn, 40L),
+                WindOperatorFactory.system());
+        String replayedCompletionSn = paymentInstrumentTransactionApplicationService.completeAuthorizationByInstrument(
+                completeAuthorizationRequest(authorizationSn, 40L),
+                WindOperatorFactory.system());
+
+        assertThat(completionSn).isEqualTo(authorizationSn);
+        assertThat(replayedCompletionSn).isEqualTo(completionSn);
+        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionAmounts(AUTHORIZE_BUSINESS_SN)).containsExactly(60L, 0L, 40L, 0L);
+        assertThat(ledgerTransactionEvents(COMPLETION_BUSINESS_SCENE, COMPLETION_BUSINESS_SN))
+                .containsExactly(FundsTransactionEventType.COMPLETE.name());
+
+        List<SpendControlMovementDTO> consumedMovements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
+                        .setTenantId(TENANT_ID)
+                        .setOriginalMovementSn(reservation.getMovementSn())
+                        .setMovementType(SpendControlMovementType.CONSUMED));
+
+        assertThat(consumedMovements).hasSize(1);
+        SpendControlMovementDTO consumed = consumedMovements.getFirst();
+        assertThat(consumed.getMovementType()).isEqualTo(SpendControlMovementType.CONSUMED);
+        assertThat(consumed.getOriginalMovementSn()).isEqualTo(reservation.getMovementSn());
+        assertThat(consumed.getTransactionSn()).isEqualTo(completionSn);
+        assertThat(consumed.getAmount()).isEqualTo(40L);
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getConsumedAmount()).isEqualTo(40L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(20L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+    }
+
+    private CompleteAuthorizationByPaymentInstrumentRequest completeAuthorizationRequest(String authorizationSn,
+                                                                                          long amount) {
+        return new CompleteAuthorizationByPaymentInstrumentRequest()
+                .setTenantId(TENANT_ID)
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setAmount(amount)
+                .setCurrency(CURRENCY)
+                .setBusinessScene(COMPLETION_BUSINESS_SCENE)
+                .setBusinessSn(COMPLETION_BUSINESS_SN)
+                .setDescription("trusted payment instrument authorization completion");
+    }
+
+    /**
+     * 场景：VCC 授权完成命中已存在但摘要冲突的控制消费幂等键。
+     * 输入：授权 60 后预置一条同完成幂等键、不同摘要的控制消费，再请求可信完成 20。
+     * 输出：统一完成入口失败，资金累计完成和完成账务事实整体回滚，既有控制事实保持不变。
+     * 红线：控制消费失败不得留下资金已完成、预算仍预留的半完成状态。
+     */
+    @Test
+    void testCompleteAuthorizationByInstrumentShouldRollbackFundsCompletionWhenControlConsumptionConflicts() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        SpendControlMovementDTO reservation = findControlReservation(authorizationSn);
+        String consumeMovementSn = controlConsumeMovementSn(authorizationSn);
+        spendControlMovementService.recordMovement(conflictingControlMovementRequest(
+                consumeMovementSn, SpendControlMovementType.CONSUMED, reservation, authorizationSn,
+                "sha256:conflicting-existing-control-consumption"));
+        var beforeCompletion = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.completeAuthorizationByInstrument(
+                completeAuthorizationRequest(authorizationSn, 20L), WindOperatorFactory.system()))
+                .hasMessageContaining("控制额度变动流水已存在但摘要不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeCompletion);
+        assertThat(fundsTransactionAmounts(AUTHORIZE_BUSINESS_SN)).containsExactly(60L, 0L, 0L, 0L);
+        assertThat(ledgerTransactionEvents(COMPLETION_BUSINESS_SCENE, COMPLETION_BUSINESS_SN)).isEmpty();
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getConsumedAmount()).isEqualTo(1L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(59L);
+    }
+
+    /**
+     * 场景：VCC 授权生成控制预留后，可信撤销释放部分资金占用和控制占用。
+     * 输入：原授权 60，本次可信撤销 20，控制释放仍回链原授权和原控制预留。
+     * 输出：授权聚合保持 OPEN，资金累计撤销和控制 RELEASED 均为 20，剩余控制占用为 40。
+     * 红线：没有新增可信撤销金额时，不得仅凭超时或本地判断继续释放控制占用。
+     */
+    @Test
+    void testTrustedAuthorizationReversalShouldReleaseLinkedControlReservation() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        SpendControlMovementDTO reservation = findControlReservation(authorizationSn);
+
+        String reversalSn = paymentInstrumentTransactionApplicationService.reverseAuthorizationByInstrument(
+                reverseAuthorizationRequest(authorizationSn, 20L),
+                WindOperatorFactory.system());
+        String replayedReversalSn = paymentInstrumentTransactionApplicationService.reverseAuthorizationByInstrument(
+                reverseAuthorizationRequest(authorizationSn, 20L),
+                WindOperatorFactory.system());
+
+        assertThat(reversalSn).isEqualTo(authorizationSn);
+        assertThat(replayedReversalSn).isEqualTo(reversalSn);
+        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(ledgerTransactionEvents(REVERSAL_BUSINESS_SCENE, REVERSAL_BUSINESS_SN))
+                .containsExactly(FundsTransactionEventType.REVERSAL.name());
+
+        List<SpendControlMovementDTO> releasedMovements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
+                        .setTenantId(TENANT_ID)
+                        .setOriginalMovementSn(reservation.getMovementSn())
+                        .setMovementType(SpendControlMovementType.RELEASED));
+
+        assertThat(releasedMovements).hasSize(1);
+        SpendControlMovementDTO released = releasedMovements.getFirst();
+        assertThat(released.getMovementType()).isEqualTo(SpendControlMovementType.RELEASED);
+        assertThat(released.getOriginalMovementSn()).isEqualTo(reservation.getMovementSn());
+        assertThat(released.getTransactionSn()).isEqualTo(reversalSn);
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getReleasedAmount()).isEqualTo(20L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(60L);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
+                controlMovementRequest("auth_admission_control_untrusted_release", reservation, reversalSn, 1L,
+                        "sha256:auth-admission-control-untrusted-release")))
+                .hasMessageContaining("控制释放累计金额超过资金交易可信撤销金额");
+        assertThat(spendControlMovementService.queryMovements(new SpendControlMovementQuery()
+                .setTenantId(TENANT_ID)
+                .setMovementSn("auth_admission_control_untrusted_release"))).isEmpty();
+        BudgetControlProjectionDTO afterRejectedRelease = budgetControlProjection();
+        assertThat(afterRejectedRelease.getReleasedAmount()).isEqualTo(20L);
+        assertThat(afterRejectedRelease.getRemainingControlAmount()).isEqualTo(40L);
+    }
+
+    /**
+     * 场景：VCC 授权撤销命中已存在但摘要冲突的控制释放幂等键。
+     * 输入：授权 60 后预置一条同撤销幂等键、不同摘要的控制释放，再请求可信撤销 20。
+     * 输出：统一撤销入口失败，资金累计撤销和撤销账务事实整体回滚，既有控制事实保持不变。
+     * 红线：控制释放失败不得留下资金已撤销、预算仍占用的半完成状态。
+     */
+    @Test
+    void testReverseAuthorizationByInstrumentShouldRollbackFundsReversalWhenControlReleaseConflicts() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        SpendControlMovementDTO reservation = findControlReservation(authorizationSn);
+        String releaseMovementSn = controlReleaseMovementSn(authorizationSn);
+        spendControlMovementService.recordMovement(conflictingControlMovementRequest(
+                releaseMovementSn, SpendControlMovementType.RELEASED, reservation, authorizationSn,
+                "sha256:conflicting-existing-control-release"));
+        var beforeReversal = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.reverseAuthorizationByInstrument(
+                reverseAuthorizationRequest(authorizationSn, 20L), WindOperatorFactory.system()))
+                .hasMessageContaining("控制额度变动流水已存在但摘要不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeReversal);
+        assertThat(fundsTransactionAmounts(AUTHORIZE_BUSINESS_SN)).containsExactly(60L, 0L, 0L, 0L);
+        assertThat(ledgerTransactionEvents(REVERSAL_BUSINESS_SCENE, REVERSAL_BUSINESS_SN)).isEmpty();
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getReleasedAmount()).isEqualTo(1L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(59L);
+    }
+
+    /**
+     * 场景：VCC 授权后，当前支付工具从原信用账户改绑到另一资金账户，再收到可信完成和撤销。
+     * 输入：原授权 60，改绑后分别完成 20、撤销 20，当前绑定主体已不再是原授权主体。
+     * 输出：完成和撤销账务分录仍只落在原授权快照中的信用账户，控制消费和释放各为 20。
+     * 红线：授权后绑定变化不得改写历史路由，否则会把同一授权聚合的后续账务事实记到不同主体。
+     */
+    @Test
+    void testAuthorizationCompletionAndReversalShouldUseHistoricalSubjectAfterInstrumentRebind() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        rebindPaymentInstrumentToParentFundingAccount();
+
+        paymentInstrumentTransactionApplicationService.completeAuthorizationByInstrument(
+                completeAuthorizationRequest(authorizationSn, 20L), WindOperatorFactory.system());
+        paymentInstrumentTransactionApplicationService.reverseAuthorizationByInstrument(
+                reverseAuthorizationRequest(authorizationSn, 20L), WindOperatorFactory.system());
+
+        assertThat(fundsTransactionAmounts(AUTHORIZE_BUSINESS_SN)).containsExactly(60L, 20L, 20L, 0L);
+        assertThat(ledgerEntrySubjects(COMPLETION_BUSINESS_SCENE, COMPLETION_BUSINESS_SN))
+                .containsOnly(CREDIT_ACCOUNT_SN);
+        assertThat(ledgerEntrySubjects(REVERSAL_BUSINESS_SCENE, REVERSAL_BUSINESS_SN))
+                .containsOnly(CREDIT_ACCOUNT_SN);
+        FundsSubjectBalanceDTO reboundAccountBalance = balance(parentFundingAccountId());
+        assertBucket(reboundAccountBalance, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(reboundAccountBalance, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getConsumedAmount()).isEqualTo(20L);
+        assertThat(projection.getReleasedAmount()).isEqualTo(20L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(20L);
+    }
+
+    /**
+     * 场景：VCC 授权完成后支付工具改绑，再通过账户主体型 canonical 服务退回原交易本金。
+     * 输入：原授权 60、完成 40、改绑到另一资金账户后退款 30。
+     * 输出：退款仍只回放原信用账户和原 RouteSnapshot，资金累计退款为 30，控制消费不自动补偿。
+     * 红线：退款不得按当前支付工具绑定重新选路，也不得把资金退款自动解释为周期控制额度恢复。
+     */
+    @Test
+    void testAuthorizationRefundShouldUseHistoricalSubjectWithoutAutomaticControlCompensationAfterRebind() {
+        preparePassedAuthorizationData();
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system());
+        paymentInstrumentTransactionApplicationService.completeAuthorizationByInstrument(
+                completeAuthorizationRequest(authorizationSn, 40L), WindOperatorFactory.system());
+        rebindPaymentInstrumentToParentFundingAccount();
+
+        String refundSn = authorizationTransactionService.refund(
+                refundAuthorizationRequest(authorizationSn, 30L), WindOperatorFactory.system());
+
+        assertThat(refundSn).isEqualTo(authorizationSn);
+        assertThat(fundsRefundedAmount(AUTHORIZE_BUSINESS_SN)).isEqualTo(30L);
+        assertThat(ledgerTransactionEvents(REFUND_BUSINESS_SCENE, REFUND_BUSINESS_SN))
+                .containsExactly(FundsTransactionEventType.AUTH_REFUND.name());
+        assertThat(ledgerEntrySubjects(REFUND_BUSINESS_SCENE, REFUND_BUSINESS_SN))
+                .containsOnly(CREDIT_ACCOUNT_SN);
+        FundsSubjectBalanceDTO originalAccountBalance = balance(creditAccountId());
+        assertBucket(originalAccountBalance, LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
+        assertBucket(originalAccountBalance, LedgerSubjectCode.AUTHORIZATION, 20L, CURRENCY);
+        FundsSubjectBalanceDTO reboundAccountBalance = balance(parentFundingAccountId());
+        assertBucket(reboundAccountBalance, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(reboundAccountBalance, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getConsumedAmount()).isEqualTo(40L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(20L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(spendControlMovementService.queryMovements(new SpendControlMovementQuery()
+                .setTenantId(TENANT_ID)
+                .setMovementType(SpendControlMovementType.REFUND_COMPENSATED))).isEmpty();
+    }
+
+    private FundsAuthorizationTransactionRefundRequest refundAuthorizationRequest(String authorizationSn,
+                                                                                    long amount) {
+        return new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(creditAccountId())
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene(REFUND_BUSINESS_SCENE)
+                .setBusinessSn(REFUND_BUSINESS_SN)
+                .setDescription("payment instrument authorization principal refund");
+    }
+
+    private ReverseAuthorizationByPaymentInstrumentRequest reverseAuthorizationRequest(String authorizationSn,
+                                                                                         long amount) {
+        return new ReverseAuthorizationByPaymentInstrumentRequest()
+                .setTenantId(TENANT_ID)
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setAmount(amount)
+                .setCurrency(CURRENCY)
+                .setBusinessScene(REVERSAL_BUSINESS_SCENE)
+                .setBusinessSn(REVERSAL_BUSINESS_SN)
+                .setDescription("trusted payment instrument authorization reversal");
+    }
+
+    private void rebindPaymentInstrumentToParentFundingAccount() {
+        fundingAccountService.createFundingAccount(createParentFundingAccountRequest());
+        String bindingSn = jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_payment_instrument_binding
+                WHERE tenant_id = ? AND instrument_sn = ? AND binding_role = ?
+                """, String.class, TENANT_ID, PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
+        paymentInstrumentService.unbindPaymentInstrumentBinding(new UnbindPaymentInstrumentBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setBindingSn(bindingSn)
+                .setOperatorId("codex")
+                .setChangeReason("rebind after authorization"));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setSubjectId(PARENT_FUNDING_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setOperatorId("codex")
+                .setChangeReason("rebind after authorization"));
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT subject_id FROM t_payment_instrument_binding
+                WHERE tenant_id = ? AND instrument_sn = ? AND binding_role = ?
+                """, String.class, TENANT_ID, PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name())).isEqualTo(PARENT_FUNDING_ACCOUNT_SN);
+    }
+
+    private RecordSpendControlMovementRequest conflictingControlMovementRequest(String movementSn,
+                                                                                 SpendControlMovementType movementType,
+                                                                                 SpendControlMovementDTO reservation,
+                                                                                 String authorizationSn,
+                                                                                 String movementDigest) {
+        return new RecordSpendControlMovementRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(movementSn)
+                .setMovementType(movementType)
+                .setBusinessScene(reservation.getBusinessScene())
+                .setBusinessSn(reservation.getBusinessSn())
+                .setOriginalMovementSn(reservation.getMovementSn())
+                .setTransactionSn(authorizationSn)
+                .setInstrumentSn(reservation.getInstrumentSn())
+                .setAction(reservation.getAction())
+                .setTargetAccountId(reservation.getTargetAccountId())
+                .setAmount(1L)
+                .setCurrency(reservation.getCurrency())
+                .setSpendRuleId(reservation.getSpendRuleId())
+                .setSpendRuleVersion(reservation.getSpendRuleVersion())
+                .setSpendDecisionSn(reservation.getSpendDecisionSn())
+                .setSpendDecisionResult(reservation.getSpendDecisionResult())
+                .setSpendDecisionDigest(reservation.getSpendDecisionDigest())
+                .setControlScopeId(reservation.getControlScopeId())
+                .setPeriodId(reservation.getPeriodId())
+                .setMovementDigest(movementDigest);
+    }
+
+    private String controlConsumeMovementSn(String authorizationSn) {
+        return FundsStableHashSupport.sha256("SPEND_CONTROL_AUTHORIZATION_CONSUME|"
+                + TENANT_ID + "|" + authorizationSn + "|" + COMPLETION_BUSINESS_SCENE + "|" + COMPLETION_BUSINESS_SN);
+    }
+
+    private String controlReservationMovementSn(String businessSn) {
+        return "SCR" + FundsStableHashSupport.sha256("SPEND_CONTROL_AUTHORIZATION_RESERVE|"
+                + TENANT_ID + "|" + BUSINESS_SCENE + "|" + businessSn).substring(0, 61);
+    }
+
+    private String controlReleaseMovementSn(String authorizationSn) {
+        return FundsStableHashSupport.sha256("SPEND_CONTROL_AUTHORIZATION_RELEASE|"
+                + TENANT_ID + "|" + authorizationSn + "|" + REVERSAL_BUSINESS_SCENE + "|" + REVERSAL_BUSINESS_SN);
+    }
+
+    private SpendControlTransactionConsumptionRequest controlMovementRequest(String movementSn,
+                                                                              SpendControlMovementDTO reservation,
+                                                                              String transactionSn,
+                                                                              long amount,
+                                                                              String movementDigest) {
+        return new SpendControlTransactionConsumptionRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(movementSn)
+                .setOriginalMovementSn(reservation.getMovementSn())
+                .setTransactionSn(transactionSn)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(AUTHORIZE_BUSINESS_SN)
+                .setTargetAccountId(creditAccountId())
+                .setAmount(amount)
+                .setCurrency(CURRENCY)
+                .setMovementDigest(movementDigest);
+    }
+
+    /**
+     * 场景：Spend Rule 已通过，但控制周期可用预算不足。
+     * 输入：资金账户可授权 60，预算控制周期仅剩 50。
+     * 输出：授权请求失败，预算预留和资金授权事实均不落库。
+     * 红线：预算预留失败不得留下交易、route、posting、LedgerEntry 或授权余额占用。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRollbackFundsFactsWhenControlReservationFails() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData(50L);
+        var beforeAuthorize = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("控制占用金额超过可用控制额度");
+
+        assertNoFundsOrLedgerFacts(AUTHORIZE_BUSINESS_SN);
+        assertThat(spendControlMovementService.queryMovements(new SpendControlMovementQuery()
+                .setTenantId(TENANT_ID)
+                .setMovementType(SpendControlMovementType.RESERVED)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(AUTHORIZE_BUSINESS_SN))).isEmpty();
+        BudgetControlProjectionDTO projection = budgetControlProjection();
+        assertThat(projection.getLimitAmount()).isEqualTo(50L);
+        assertThat(projection.getReservedAmount()).isZero();
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(50L);
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeAuthorize);
+        FundsSubjectBalanceDTO balance = balance(creditAccount);
+        assertBucket(balance, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+    }
+
+    /**
      * 场景：已成功授权后，原 Spend Rule 挂载被暂停，调用方重放完全相同的业务请求。
      * 输入：首次授权已固化准入和资金事实，随后暂停原规则挂载，再提交相同 businessSn 和 decisionSn。
      * 输出：返回原授权交易号，不重新按当前挂载拒绝，也不重复生成资金或账务事实。
@@ -448,6 +893,68 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 request, WindOperatorFactory.system());
 
         assertThat(replayedAuthorizationSn).isEqualTo(firstAuthorizationSn);
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
+     * 场景：未命中 Spend Rule 的授权携带控制周期，随后先原样重放、再切换周期重放。
+     * 输入：首次和第二次均为 scope + 2026-07，第三次沿用业务键但改为 2026-08。
+     * 输出：完全相同重放返回原交易号，跨周期重放被拒绝且不改变既有资金与账务事实。
+     * 红线：NO_APPLICABLE_RULE 也必须固化周期，不能误拒绝原样重放或放过跨周期重放。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldReplayNoApplicableRuleOnlyWithinEstablishedPeriod() {
+        FundsAccountId creditAccount = creditAccountId();
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        AuthorizeByPaymentInstrumentRequest request = authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
+                .setControlScopeId("budget_without_applicable_rule")
+                .setPeriodId(CONTROL_PERIOD_ID);
+
+        String firstAuthorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                request, WindOperatorFactory.system());
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThat(paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                request, WindOperatorFactory.system())).isEqualTo(firstAuthorizationSn);
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                request.setPeriodId("2026-08"), WindOperatorFactory.system()))
+                .hasMessageContaining("已成立授权 Spend Rule 证据不一致");
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
+     * 场景：已成功授权后，调用方沿用业务幂等键和决策引用但切换预算周期重放。
+     * 输入：首次授权绑定 2026-07，重放仅把 periodId 改为 2026-08。
+     * 输出：幂等身份校验拒绝，原交易、余额和账务事实保持不变。
+     * 红线：已成立授权的预算周期必须精确重放，不能复用到另一个控制窗口。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectEstablishedReplayAcrossPeriod() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData();
+        AuthorizeByPaymentInstrumentRequest request =
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
+        paymentInstrumentTransactionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                request.setPeriodId("2026-08"), WindOperatorFactory.system()))
+                .hasMessageContaining("已成立授权 Spend Rule 证据不一致");
+
         assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
         assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
         assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
@@ -703,6 +1210,35 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     /**
+     * 场景：租户存在有效支出控制范围挂载，但支付工具授权请求省略 controlScopeId。
+     * 输入：支付工具、资金责任和账户能力可用，SPEND_CONTROL_SCOPE 挂载有效，请求未提供控制范围。
+     * 输出：支付工具业务入口 fail-closed，不创建资金交易、route、posting plan、账本交易或分录。
+     * 红线：调用方省略控制范围不能把已有支出控制策略降级为无适用规则。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectUnresolvedSpendControlScopeWithoutFundsFacts() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE)
+                .setScopeId(CONTROL_SCOPE_ID)
+                .setDescription("挂载到支付工具授权控制范围"));
+        var before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
+                authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system()))
+                .hasMessageContaining("SPEND_CONTROL_SCOPE 挂载无法从可信上下文解析");
+
+        assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：授权请求只携带裸 PASSED 和格式化摘要，没有可回读 decisionRef。
      * 输入：调用方自报 PASSED 与 sha256 摘要。
      * 输出：授权入口直接拒绝，不创建任何资金或账务事实。
@@ -734,6 +1270,8 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     private void cleanupAuthorizationAdmissionTestData() {
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
@@ -746,25 +1284,31 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_sn IN (?, ?, ?, ?, ?, ?)
+                    WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 )
                 """, AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                DECLINE_BUSINESS_SN, SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
+                DECLINE_BUSINESS_SN, SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN,
+                REVERSAL_BUSINESS_SN, REFUND_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
-                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
+                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN, REVERSAL_BUSINESS_SN,
+                REFUND_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
-                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
+                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN, REVERSAL_BUSINESS_SN,
+                REFUND_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
-                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
+                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN, REVERSAL_BUSINESS_SN,
+                REFUND_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
-                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
+                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN, REVERSAL_BUSINESS_SN,
+                REFUND_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
-                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
+                SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN, COMPLETION_BUSINESS_SN, REVERSAL_BUSINESS_SN,
+                REFUND_BUSINESS_SN);
         jdbcTemplate.update("""
                 DELETE FROM t_spend_subject_funding_rel
                 WHERE tenant_id = ? AND spend_subject_id IN (?, ?)
@@ -897,6 +1441,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     private FundsAccountId preparePassedAuthorizationData() {
+        return preparePassedAuthorizationData(100L);
+    }
+
+    private FundsAccountId preparePassedAuthorizationData(long controlLimit) {
         FundsAccountId creditAccount = creditAccountId();
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
@@ -911,7 +1459,49 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 null,
                 SPEND_PASS_DECISION_DIGEST);
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        prepareBudgetControlLimit(controlLimit);
         return creditAccount;
+    }
+
+    private void prepareBudgetControlLimit(long amount) {
+        spendControlMovementService.recordMovement(new RecordSpendControlMovementRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(CONTROL_LIMIT_MOVEMENT_SN)
+                .setMovementType(SpendControlMovementType.LIMIT_INCREASED)
+                .setBusinessScene("AUTHORIZATION_ADMISSION_CONTROL_LIMIT")
+                .setBusinessSn(CONTROL_LIMIT_MOVEMENT_SN)
+                .setTargetAccountId(creditAccountId())
+                .setAmount(amount)
+                .setCurrency(CURRENCY)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(CONTROL_PERIOD_ID)
+                .setReasonCode("RULE_LIMIT_INITIALIZED")
+                .setOperatorId("codex")
+                .setAuditReferenceSn("grant:AUTHORIZATION_ADMISSION_CONTROL_LIMIT")
+                .setMovementDigest("sha256:auth-admission-control-limit-" + amount));
+    }
+
+    private SpendControlMovementDTO findControlReservation(String authorizationSn) {
+        List<SpendControlMovementDTO> reservations = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
+                        .setTenantId(TENANT_ID)
+                        .setMovementType(SpendControlMovementType.RESERVED)
+                        .setTransactionSn(authorizationSn));
+        assertThat(reservations).hasSize(1);
+        return reservations.getFirst();
+    }
+
+    private BudgetControlProjectionDTO budgetControlProjection() {
+        return spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
+                .setTenantId(TENANT_ID)
+                .setControlScopeId(CONTROL_SCOPE_ID)
+                .setPeriodId(CONTROL_PERIOD_ID)
+                .setCurrency(CURRENCY)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setTargetAccountId(creditAccountId()));
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -1067,11 +1657,15 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     private List<String> ledgerTransactionEvents(String businessSn) {
+        return ledgerTransactionEvents(BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> ledgerTransactionEvents(String businessScene, String businessSn) {
         return jdbcTemplate.queryForList("""
                 SELECT event_type FROM t_ledger_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 ORDER BY id ASC
-                """, String.class, BUSINESS_SCENE, businessSn);
+                """, String.class, businessScene, businessSn);
     }
 
     private List<Long> fundsTransactionAmounts(String businessSn) {
@@ -1086,12 +1680,23 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 rs.getLong("declined_amount")), BUSINESS_SCENE, businessSn);
     }
 
+    private Long fundsRefundedAmount(String businessSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT refunded_amount FROM t_funds_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                """, Long.class, BUSINESS_SCENE, businessSn);
+    }
+
     private List<String> ledgerEntrySubjects(String businessSn) {
+        return ledgerEntrySubjects(BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> ledgerEntrySubjects(String businessScene, String businessSn) {
         return jdbcTemplate.queryForList("""
                 SELECT subject_id FROM t_ledger_entry
                 WHERE business_scene = ? AND business_sn = ?
                 ORDER BY id ASC
-                """, String.class, BUSINESS_SCENE, businessSn);
+                """, String.class, businessScene, businessSn);
     }
 
     private List<String> ledgerEntrySubjectCodes(String businessSn) {
@@ -1257,8 +1862,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .containsEntry("decisionSn", SPEND_PASS_DECISION_SN)
                 .containsEntry("decisionResult", SpendControlDecisionResult.PASSED.name())
                 .containsEntry("decisionDigest", SPEND_PASS_DECISION_DIGEST)
-                .containsEntry("controlScopeId", "budget_auth_admission");
-        assertThat(spendRuleDecision).containsKey("decisionRecordId");
+                .containsEntry("controlScopeId", CONTROL_SCOPE_ID)
+                .containsEntry("periodId", CONTROL_PERIOD_ID);
+        assertThat(spendRuleDecision).containsKeys("decisionRecordId", "controlReservationSn");
+        assertThat(spendRuleDecision.get("controlReservationSn")).asString().startsWith("SCR");
         assertThat(explanation.payload().toString())
                 .doesNotContain("dslCaseId")
                 .doesNotContain("script");
@@ -1348,6 +1955,8 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
             SpendRuleVersionServiceImpl.class,
             SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
+            SpendControlMovementServiceImpl.class,
+            SpendControlTransactionConsumptionApplicationServiceImpl.class,
             PaymentInstrumentAuthorizationProcessor.class,
             PaymentInstrumentTransactionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

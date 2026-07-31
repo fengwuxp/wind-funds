@@ -661,6 +661,38 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
+     * 场景：退款资金事实存在，但调用方没有提供产品策略授权审计证据。
+     * 输入：已有 RESERVED、CONSUMED 控制额度变动和成功退款资金交易，退款补偿请求缺少原因、操作者和审计引用。
+     * 输出：请求被拒绝，不写新的退款控制补偿变动。
+     * 红线：资金退款本身不足以恢复周期控制额度，REFUND_COMPENSATED 必须能追溯产品策略授权。
+     */
+    @Test
+    void testRefundWithoutPolicyAuditEvidenceShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed"));
+        insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                        "sha256:sctc-refund-without-policy-audit").setAmount(40L)))
+                .hasMessageContaining("退款控制补偿原因码不能为空");
+
+        assertThat(activityCount(REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(REFUND_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：退款交易成功后对已消费 Spend Rule 控制额度变动做补偿。
      * 输入：已有 RESERVED、CONSUMED 控制额度变动和成功退款资金交易事实。
      * 输出：记录 REFUND_COMPENSATED 控制额度变动，减少净消费但不恢复已消费的控制占用。
@@ -682,7 +714,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendControlMovementDTO activity = spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                policyAuthorizedRefundRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
                         "sha256:sctc-refund-compensated")
                         .setAmount(40L)
                         .setDescription("退款成功后补偿 Spend Rule 控制消耗"));
@@ -691,6 +723,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.REFUND_COMPENSATED);
         assertThat(activity.getOriginalMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertThat(activity.getTransactionSn()).isEqualTo(REFUND_TRANSACTION_SN);
+        assertThat(activity.getReasonCode()).isEqualTo("PRODUCT_POLICY_REFUND_RESTORE");
+        assertThat(activity.getOperatorId()).isEqualTo("spend-control-refund-service");
+        assertThat(activity.getAuditReferenceSn()).isEqualTo("audit:sctc-refund-policy");
 
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery());
@@ -724,7 +759,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(UNLINKED_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                policyAuthorizedRefundRequest(UNLINKED_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
                         UNLINKED_REFUND_TRANSACTION_SN, "sha256:sctc-refund-unlinked")
                         .setAmount(40L)
                         .setDescription("退款成功但没有已消费控制额度变动时拒绝补偿")))
@@ -768,7 +803,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(MISSING_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                policyAuthorizedRefundRequest(MISSING_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
                         MISSING_REFERENCE_REFUND_TRANSACTION_SN, "sha256:sctc-refund-missing-reference-tx")
                         .setAmount(40L)
                         .setDescription("退款引用的原消费交易不存在时拒绝补偿")))
@@ -807,7 +842,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(INCONSISTENT_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                policyAuthorizedRefundRequest(INCONSISTENT_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
                         INCONSISTENT_REFUND_TRANSACTION_SN, "sha256:sctc-refund-inconsistent")
                         .setAmount(40L)
                         .setDescription("退款引用的已消费控制额度变动与原占用不一致时拒绝补偿")))
@@ -845,7 +880,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(INCONSISTENT_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                policyAuthorizedRefundRequest(INCONSISTENT_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
                         INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN,
                         "sha256:sctc-refund-inconsistent-reference-tx")
                         .setAmount(40L)
@@ -891,7 +926,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(OVER_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                policyAuthorizedRefundRequest(OVER_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
                         OVER_REFERENCE_REFUND_TRANSACTION_SN, "sha256:sctc-refund-over-reference")
                         .setAmount(40L)
                         .setDescription("退款补偿金额超过被引用消费控制额度变动净额时拒绝")))
@@ -928,7 +963,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(NON_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                policyAuthorizedRefundRequest(NON_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-non-refund-compensated")))
                 .hasMessageContaining("退款控制补偿必须使用退款交易事实");
 
@@ -963,12 +998,12 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                policyAuthorizedRefundRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
                         "sha256:sctc-refund-compensated").setAmount(25L));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(SECOND_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                policyAuthorizedRefundRequest(SECOND_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
                         "sha256:sctc-second-refund-compensated").setAmount(20L)))
                 .hasMessageContaining("退款控制补偿累计金额超过资金交易金额");
 
@@ -1026,7 +1061,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 20L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         spendControlTransactionConsumptionApplicationService.refund(
-                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                policyAuthorizedRefundRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
                         "sha256:sctc-refund-compensated").setAmount(20L));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -1149,6 +1184,16 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setCurrency(CurrencyIsoCode.USD)
                 .setMovementDigest(movementDigest)
                 .setDescription("交易成功后消费 Spend Rule 控制占用");
+    }
+
+    private SpendControlTransactionConsumptionRequest policyAuthorizedRefundRequest(String movementSn,
+                                                                                     String originalMovementSn,
+                                                                                     String transactionSn,
+                                                                                     String movementDigest) {
+        return consumptionRequest(movementSn, originalMovementSn, transactionSn, movementDigest)
+                .setReasonCode("PRODUCT_POLICY_REFUND_RESTORE")
+                .setOperatorId("spend-control-refund-service")
+                .setAuditReferenceSn("audit:sctc-refund-policy");
     }
 
     private SpendControlBusinessConfirmedRefundCompensationRequest confirmedRefundRequest(String movementSn) {

@@ -87,6 +87,11 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Override
+    public @NonNull LedgerProfileCode getLedgerProfileCode(@NonNull FundsAccountId accountId) {
+        return findRequired(accountId).ledgerProfileCode();
+    }
+
+    @Override
     public @NonNull FundsAccountBalanceView getBalance(@NonNull FundsAccountId accountId) {
         ResolvedFundsSubject subject = findRequired(accountId);
         List<LedgerDTO> ledgers = loadLedgers(subject);

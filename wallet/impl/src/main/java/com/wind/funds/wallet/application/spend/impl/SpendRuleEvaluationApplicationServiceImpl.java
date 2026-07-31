@@ -17,6 +17,7 @@ import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.service.SpendRuleVersionService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvaluationApplicationService {
 
     private static final String SHA_256_ALGORITHM = "SHA-256";
@@ -182,7 +184,13 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         assertSingleExecutableControl(ruleSpec);
         SpendControlDecisionResult result = evaluateRule(request, ruleSpec);
         String rejectReason = rejectReason(result, ruleSpec);
-        return toDecision(request, result, rejectReason);
+        SpendRuleEvaluationDecisionDTO decision = toDecision(request, result, rejectReason);
+        log.info("Spend Rule 评估完成，tenantId={}, ruleId={}, ruleVersion={}, businessScene={}, businessSn={}, "
+                        + "action={}, amount={}, currency={}, decisionResult={}, rejectReason={}, decisionDigest={}",
+                request.getTenantId(), request.getRuleId(), request.getRuleVersion(), request.getBusinessScene(),
+                request.getBusinessSn(), request.getAction(), request.getAmount(), request.getCurrency(),
+                decision.getDecisionResult(), decision.getRejectReason(), decision.getDecisionDigest());
+        return decision;
     }
 
     private void validateRequest(EvaluateSpendRuleRequest request) {

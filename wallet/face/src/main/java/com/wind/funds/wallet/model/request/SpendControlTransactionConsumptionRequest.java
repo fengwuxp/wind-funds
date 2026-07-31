@@ -17,7 +17,7 @@ import java.io.Serializable;
 /**
  * 交易结果消费控制额度变动流水请求。
  *
- * <p>本请求用于已存在原控制额度变动流水的交易消费和退款补偿链路。业务确认型退款找不到原控制事实时，
+ * <p>本请求用于已存在原控制额度变动流水的交易消费、可信授权撤销释放和退款补偿链路。业务确认型退款找不到原控制事实时，
  * 不应通过资金退款入口自动回补周期额度；应由业务侧确认支付工具存在且状态有效，并显式给出周期和金额等控制补偿依据。</p>
  *
  * @author Codex
@@ -37,7 +37,7 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "本次控制消费或补偿变动流水号")
+    @Schema(description = "本次控制消费、释放或补偿变动流水号")
     @NotBlank
     private String movementSn;
 
@@ -72,6 +72,15 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @Schema(description = "控制额度变动摘要，用于幂等、回放和审计追踪")
     @NotBlank
     private String movementDigest;
+
+    @Schema(description = "退款控制补偿的产品策略原因码")
+    private String reasonCode;
+
+    @Schema(description = "退款控制补偿的操作者标识")
+    private String operatorId;
+
+    @Schema(description = "退款控制补偿的审计引用流水号")
+    private String auditReferenceSn;
 
     @Schema(description = "控制额度变动说明")
     private String description;

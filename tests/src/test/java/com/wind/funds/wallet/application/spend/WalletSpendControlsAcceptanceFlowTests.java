@@ -226,7 +226,10 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 FundsTransactionStatus.CLOSED, 20L, FUNDS_TRANSACTION_SN);
         SpendControlMovementDTO refund = spendControlTransactionConsumptionApplicationService.refund(
                 transactionConsumptionRequest(REFUND_MOVEMENT_SN, REFUND_TRANSACTION_SN,
-                        "sha256:wallet-spend-controls-refund", 20L));
+                        "sha256:wallet-spend-controls-refund", 20L)
+                        .setReasonCode("PRODUCT_POLICY_REFUND_RESTORE")
+                        .setOperatorId("spend-control-refund-service")
+                        .setAuditReferenceSn("audit:wallet-spend-controls-refund"));
         assertThat(refund.getMovementType()).isEqualTo(SpendControlMovementType.REFUND_COMPENSATED);
 
         BudgetControlProjectionDTO afterRefund = spendControlMovementService.getBudgetControlProjection(

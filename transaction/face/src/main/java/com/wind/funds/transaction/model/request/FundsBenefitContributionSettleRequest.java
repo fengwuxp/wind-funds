@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
 import com.wind.transaction.core.Money;
@@ -52,6 +53,10 @@ public class FundsBenefitContributionSettleRequest {
     @Schema(description = "让利账务承接主体，目标态语义等同 benefitSettlementSubjectRef，例如用户或订单让利归集账目、商户清结算账户或等价被补足账户")
     @NotNull
     private SubjectRef benefitReceiverSubjectRef;
+
+    @Schema(description = "让利承接目标账目；平台补足商户使用 CLEARING，用户或订单归集使用 SETTLEMENT")
+    @NotNull
+    private LedgerSubjectCode benefitReceiverLedgerSubjectCode;
 
     @Schema(description = "本出资方承担的让利金额")
     @NotNull

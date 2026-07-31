@@ -14,9 +14,31 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 对账 MySQL 生产 DDL 与测试 schema 漂移守卫。
+ * 主资金链与对账 MySQL 生产 DDL 和测试 schema 漂移守卫。
  */
 class ReconciliationMysqlDdlContractTests {
+
+    private static final List<String> CORE_TABLE_NAMES = List.of(
+            "t_funding_account",
+            "t_credit_account",
+            "t_account_hierarchy_relation",
+            "t_spend_control_scope",
+            "t_payment_instrument",
+            "t_payment_instrument_binding",
+            "t_payment_instrument_binding_history",
+            "t_spend_subject_funding_rel",
+            "t_spend_rule_definition",
+            "t_spend_rule_version",
+            "t_spend_rule_binding",
+            "t_spend_rule_decision_record",
+            "t_spend_control_movement",
+            "t_funds_transaction",
+            "t_funds_transaction_detail",
+            "t_funds_frozen_order",
+            "t_ledger",
+            "t_ledger_transaction",
+            "t_ledger_posting_plan",
+            "t_ledger_entry");
 
     private static final List<String> TABLE_NAMES = List.of(
             "t_clearing_splittable_detail",
@@ -40,6 +62,22 @@ class ReconciliationMysqlDdlContractTests {
             "t_reconciliation_match_result",
             "t_reconciliation_difference",
             "t_reconciliation_difference_action");
+
+    @Test
+    void testCoreForwardDdlShouldMatchTestSchemaWithoutDestructiveStatements() throws IOException {
+        String testSchema = Files.readString(workspaceRoot().resolve("tests/src/test/resources/jdbc-schema.sql"));
+        String forwardDdl = Files.readString(
+                workspaceRoot().resolve("database/mysql/core/001_create_core_tables.sql"));
+
+        assertThat(forwardDdl)
+                .doesNotContain("DROP TABLE")
+                .doesNotContain("CREATE TABLE IF NOT EXISTS");
+        for (String tableName : CORE_TABLE_NAMES) {
+            assertThat(normalize(extractCreateTable(forwardDdl, tableName)))
+                    .as("MySQL core DDL table %s must match the executable test schema", tableName)
+                    .isEqualTo(normalize(extractCreateTable(testSchema, tableName)));
+        }
+    }
 
     @Test
     void testForwardDdlShouldMatchTestSchemaWithoutDestructiveStatements() throws IOException {
@@ -118,11 +156,20 @@ class ReconciliationMysqlDdlContractTests {
                 .contains("database_name=\"${database_url##*/}\"")
                 .contains("[[ \"$database_name\" == \"wind_funds_reconciliation_test\" ]]")
                 .contains("WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX")
-                .contains("ReconciliationMysqlMigrationIntegrationTests");
+                .contains("ReconciliationMysqlMigrationIntegrationTests")
+                .contains("PaymentInstrumentTransactionAuthorizationTests")
+                .contains("SpendControlTransactionConsumptionApplicationServiceTests")
+                .contains("WIND_FUNDS_TEST_SQL_INIT_MODE=never")
+                .doesNotContain("WIND_FUNDS_TEST_SQL_INIT_MODE=always");
         assertThat(integrationTest)
+                .contains("database/mysql/core", "001_create_core_tables.sql", "hasSize(41)",
+                        "verifyTargetTables", "verifyCoreTableStructures",
+                        "information_schema.columns", "information_schema.statistics")
                 .contains("verifyRecoveryConflictRecoveryUsesCurrentRead",
                         "t_recovery_order", "t_recovery_result",
-                        "idempotency_key", "funds_transaction_sn");
+                        "idempotency_key", "funds_transaction_sn")
+                .contains("verifyFundsTransactionBusinessKeyConflictRecoveryUsesCurrentRead",
+                        "t_funds_transaction", "business_scene", "business_sn");
     }
 
     @Test
@@ -130,7 +177,7 @@ class ReconciliationMysqlDdlContractTests {
         String readme = readDatabaseFile("README.md");
 
         assertThat(readme)
-                .contains("二十一张表", "just test-mysql-reconciliation")
+                .contains("二十一张表", "just test-mysql-reconciliation", "支付工具授权", "支出控制")
                 .doesNotContain("十九张表");
     }
 

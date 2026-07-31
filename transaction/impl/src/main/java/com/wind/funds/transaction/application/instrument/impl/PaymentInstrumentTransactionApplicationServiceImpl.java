@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.application.instrument.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
@@ -7,40 +9,55 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver.ExternalFundsRailDecision;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentTransactionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
+import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.CompleteAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
+import com.wind.funds.wallet.model.request.ReverseAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
+import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 
 /**
  * 支付工具交易应用服务实现。
@@ -53,6 +70,12 @@ import java.util.Optional;
 public class PaymentInstrumentTransactionApplicationServiceImpl
         implements PaymentInstrumentTransactionApplicationService {
 
+    private static final String SHA256_PREFIX = "sha256:";
+
+    private static final String CONTROL_CONSUME_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_CONSUME";
+
+    private static final String CONTROL_RELEASE_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_RELEASE";
+
     private final PaymentInstrumentAuthorizationProcessor authorizationProcessor;
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
@@ -61,11 +84,49 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
+    private final FundsAuthorizationTransactionService authorizationTransactionService;
+
+    private final SpendControlTransactionConsumptionApplicationService spendControlConsumptionService;
+
+    private final SpendControlMovementService spendControlMovementService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                  @NonNull WindOperator operator) {
         return authorizationProcessor.authorizeByInstrument(request, operator);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull String completeAuthorizationByInstrument(
+            @NonNull CompleteAuthorizationByPaymentInstrumentRequest request,
+            @NonNull WindOperator operator) {
+        validateCompletionRequest(request);
+        FundsTransactionDTO authorization = getPaymentInstrumentAuthorization(
+                request.getTenantId(), request.getAuthorizationTransactionSn(), request.getCurrency(), "支付工具授权完成");
+        PaymentInstrumentRefSpec instrumentRef = getPaymentInstrumentRef(authorization);
+        FundsAccountId authorizationAccountId = authorizationAccountId(instrumentRef, authorization.getSn());
+        String authorizationSn = authorizationTransactionService.complete(
+                toCompleteRequest(request, authorizationAccountId), operator);
+        consumeControlReservation(request, authorization, authorizationSn);
+        return authorizationSn;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull String reverseAuthorizationByInstrument(
+            @NonNull ReverseAuthorizationByPaymentInstrumentRequest request,
+            @NonNull WindOperator operator) {
+        validateReversalRequest(request);
+        FundsTransactionDTO authorization = getPaymentInstrumentAuthorization(
+                request.getTenantId(), request.getAuthorizationTransactionSn(), request.getCurrency(), "支付工具授权撤销");
+        PaymentInstrumentRefSpec instrumentRef = getPaymentInstrumentRef(authorization);
+        FundsAccountId authorizationAccountId = authorizationAccountId(instrumentRef, authorization.getSn());
+        String authorizationSn = authorizationTransactionService.reversal(
+                toReversalRequest(request, authorizationAccountId), operator);
+        releaseControlReservation(request, authorization, authorizationSn);
+        return authorizationSn;
     }
 
     @Override
@@ -117,6 +178,226 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
     private @Nullable Integer bindingVersion(PaymentInstrumentRefSpec instrumentRef) {
         Object value = instrumentRef.getBindingSnapshot().get("bindingVersion");
         return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private void validateReversalRequest(ReverseAuthorizationByPaymentInstrumentRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "支付工具授权撤销 tenantId 与当前租户不一致");
+        AssertUtils.hasText(request.getAuthorizationTransactionSn(), "原授权资金交易号不能为空");
+        AssertUtils.notNull(request.getAmount(), "撤销金额不能为空");
+        AssertUtils.isTrue(request.getAmount() > 0L, "撤销金额必须大于 0");
+        AssertUtils.notNull(request.getCurrency(), "撤销币种不能为空");
+        AssertUtils.hasText(request.getBusinessScene(), "撤销业务场景不能为空");
+        AssertUtils.hasText(request.getBusinessSn(), "撤销业务流水号不能为空");
+    }
+
+    private void validateCompletionRequest(CompleteAuthorizationByPaymentInstrumentRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "支付工具授权完成 tenantId 与当前租户不一致");
+        AssertUtils.hasText(request.getAuthorizationTransactionSn(), "原授权资金交易号不能为空");
+        AssertUtils.notNull(request.getAmount(), "完成金额不能为空");
+        AssertUtils.isTrue(request.getAmount() > 0L, "完成金额必须大于 0");
+        AssertUtils.notNull(request.getCurrency(), "完成币种不能为空");
+        AssertUtils.hasText(request.getBusinessScene(), "完成业务场景不能为空");
+        AssertUtils.hasText(request.getBusinessSn(), "完成业务流水号不能为空");
+    }
+
+    private FundsTransactionDTO getPaymentInstrumentAuthorization(
+            Long tenantId, String authorizationTransactionSn, CurrencyIsoCode currency, String actionName) {
+        FundsTransactionDTO authorization = fundsTransactionQueryService
+                .queryFundsTransaction(authorizationTransactionSn)
+                .orElse(null);
+        AssertUtils.notNull(authorization, "原授权资金交易不存在，authorizationTransactionSn = {}",
+                authorizationTransactionSn);
+        AssertUtils.isTrue(Objects.equals(authorization.getTenantId(), tenantId),
+                "原授权资金交易租户不一致，authorizationTransactionSn = {}", authorizationTransactionSn);
+        AssertUtils.isTrue(authorization.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
+                        && authorization.getTransactionType() == DefaultFundsTransactionType.PAY,
+                "{}必须引用 PAY 授权交易，authorizationTransactionSn = {}", actionName, authorizationTransactionSn);
+        AssertUtils.isTrue(authorization.getCurrency() == currency,
+                "{}币种与原授权不一致，authorizationTransactionSn = {}", actionName, authorizationTransactionSn);
+        return authorization;
+    }
+
+    private PaymentInstrumentRefSpec getPaymentInstrumentRef(FundsTransactionDTO authorization) {
+        RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
+                .findRouteSnapshotByTransactionSn(authorization.getSn())
+                .orElse(null);
+        AssertUtils.notNull(routeSnapshot, "支付工具授权缺少 RouteSnapshot，transactionSn = {}",
+                authorization.getSn());
+        PaymentInstrumentRefSpec instrumentRef = routeSnapshot.getPaymentInstrumentRef();
+        AssertUtils.notNull(instrumentRef, "支付工具授权缺少支付工具快照，transactionSn = {}",
+                authorization.getSn());
+        AssertUtils.isTrue(instrumentRef.getTenantId() == null
+                        || Objects.equals(instrumentRef.getTenantId(), authorization.getTenantId()),
+                "支付工具授权快照租户不一致，transactionSn = {}", authorization.getSn());
+        return instrumentRef;
+    }
+
+    private FundsAccountId authorizationAccountId(PaymentInstrumentRefSpec instrumentRef, String transactionSn) {
+        Object subjectId = instrumentRef.getBindingSnapshot().get("subjectId");
+        Object subjectType = instrumentRef.getBindingSnapshot().get("subjectType");
+        AssertUtils.isTrue(subjectId instanceof String value && StringUtils.hasText(value),
+                "支付工具授权快照缺少账务主体 ID，transactionSn = {}", transactionSn);
+        AssertUtils.isTrue(subjectType instanceof String value && FundsSubjectType.isLedgerPostableName(value),
+                "支付工具授权快照账务主体类型非法，transactionSn = {}", transactionSn);
+        return FundsAccountId.immutable((String) subjectId, (String) subjectType);
+    }
+
+    private FundsAuthorizationTransactionReversalRequest toReversalRequest(
+            ReverseAuthorizationByPaymentInstrumentRequest request,
+            FundsAccountId authorizationAccountId) {
+        return new FundsAuthorizationTransactionReversalRequest()
+                .setAccountId(authorizationAccountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(
+                        request.getAmount(), request.getCurrency())))
+                .setAuthorizationTransactionSn(request.getAuthorizationTransactionSn())
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setReversalTime(request.getReversalTime())
+                .setDescription(request.getDescription());
+    }
+
+    private FundsAuthorizationTransactionCompleteRequest toCompleteRequest(
+            CompleteAuthorizationByPaymentInstrumentRequest request,
+            FundsAccountId authorizationAccountId) {
+        return new FundsAuthorizationTransactionCompleteRequest()
+                .setAccountId(authorizationAccountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(
+                        request.getAmount(), request.getCurrency())))
+                .setAuthorizationTransactionSn(request.getAuthorizationTransactionSn())
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setCompletedTime(request.getCompletedTime())
+                .setDescription(request.getDescription());
+    }
+
+    private void consumeControlReservation(CompleteAuthorizationByPaymentInstrumentRequest request,
+                                           FundsTransactionDTO authorization,
+                                           String authorizationSn) {
+        SpendControlMovementDTO reservation = findControlReservation(authorization);
+        if (reservation == null) {
+            return;
+        }
+        String movementSn = controlConsumeMovementSn(request);
+        spendControlConsumptionService.consume(new SpendControlTransactionConsumptionRequest()
+                .setTenantId(request.getTenantId())
+                .setMovementSn(movementSn)
+                .setOriginalMovementSn(reservation.getMovementSn())
+                .setTransactionSn(authorizationSn)
+                .setBusinessScene(authorization.getBusinessScene())
+                .setBusinessSn(authorization.getBusinessSn())
+                .setTargetAccountId(reservation.getTargetAccountId())
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setMovementDigest(controlConsumeMovementDigest(request, reservation, movementSn))
+                .setDescription(request.getDescription())
+                .setContextVariables(completionContext(request)));
+    }
+
+    private String controlConsumeMovementSn(CompleteAuthorizationByPaymentInstrumentRequest request) {
+        return FundsStableHashSupport.sha256(CONTROL_CONSUME_MOVEMENT_DOMAIN
+                + "|" + request.getTenantId()
+                + "|" + request.getAuthorizationTransactionSn()
+                + "|" + request.getBusinessScene()
+                + "|" + request.getBusinessSn());
+    }
+
+    private String controlConsumeMovementDigest(CompleteAuthorizationByPaymentInstrumentRequest request,
+                                                SpendControlMovementDTO reservation,
+                                                String movementSn) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("authorizationTransactionSn", request.getAuthorizationTransactionSn());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("currency", request.getCurrency().name());
+        values.put("movementSn", movementSn);
+        values.put("originalMovementSn", reservation.getMovementSn());
+        values.put("tenantId", request.getTenantId());
+        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
+    }
+
+    private String completionContext(CompleteAuthorizationByPaymentInstrumentRequest request) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("completionBusinessScene", request.getBusinessScene());
+        values.put("completionBusinessSn", request.getBusinessSn());
+        return JSON.toJSONString(values);
+    }
+
+    private void releaseControlReservation(ReverseAuthorizationByPaymentInstrumentRequest request,
+                                           FundsTransactionDTO authorization,
+                                           String authorizationSn) {
+        SpendControlMovementDTO reservation = findControlReservation(authorization);
+        if (reservation == null) {
+            return;
+        }
+        String movementSn = controlReleaseMovementSn(request);
+        spendControlConsumptionService.release(new SpendControlTransactionConsumptionRequest()
+                .setTenantId(request.getTenantId())
+                .setMovementSn(movementSn)
+                .setOriginalMovementSn(reservation.getMovementSn())
+                .setTransactionSn(authorizationSn)
+                .setBusinessScene(authorization.getBusinessScene())
+                .setBusinessSn(authorization.getBusinessSn())
+                .setTargetAccountId(reservation.getTargetAccountId())
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setMovementDigest(controlReleaseMovementDigest(request, reservation, movementSn))
+                .setDescription(request.getDescription())
+                .setContextVariables(reversalContext(request)));
+    }
+
+    private @Nullable SpendControlMovementDTO findControlReservation(FundsTransactionDTO authorization) {
+        JSONObject context = JSON.parseObject(authorization.getContextVariables());
+        if (context == null) {
+            return null;
+        }
+        JSONObject spendRuleDecision = context.getJSONObject(FundsInstructionContextKeys.SPEND_RULE_DECISION);
+        if (spendRuleDecision == null) {
+            return null;
+        }
+        String reservationSn = spendRuleDecision.getString("controlReservationSn");
+        if (!StringUtils.hasText(reservationSn)) {
+            return null;
+        }
+        SpendControlMovementDTO reservation = spendControlMovementService.findSpendControlMovement(
+                authorization.getTenantId(), reservationSn);
+        AssertUtils.notNull(reservation, "支付工具授权控制预留不存在，transactionSn = {}, movementSn = {}",
+                authorization.getSn(), reservationSn);
+        return reservation;
+    }
+
+    private String controlReleaseMovementSn(ReverseAuthorizationByPaymentInstrumentRequest request) {
+        return FundsStableHashSupport.sha256(CONTROL_RELEASE_MOVEMENT_DOMAIN
+                + "|" + request.getTenantId()
+                + "|" + request.getAuthorizationTransactionSn()
+                + "|" + request.getBusinessScene()
+                + "|" + request.getBusinessSn());
+    }
+
+    private String controlReleaseMovementDigest(ReverseAuthorizationByPaymentInstrumentRequest request,
+                                                SpendControlMovementDTO reservation,
+                                                String movementSn) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("authorizationTransactionSn", request.getAuthorizationTransactionSn());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("currency", request.getCurrency().name());
+        values.put("movementSn", movementSn);
+        values.put("originalMovementSn", reservation.getMovementSn());
+        values.put("tenantId", request.getTenantId());
+        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
+    }
+
+    private String reversalContext(ReverseAuthorizationByPaymentInstrumentRequest request) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("reversalBusinessScene", request.getBusinessScene());
+        values.put("reversalBusinessSn", request.getBusinessSn());
+        return JSON.toJSONString(values);
     }
 
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {

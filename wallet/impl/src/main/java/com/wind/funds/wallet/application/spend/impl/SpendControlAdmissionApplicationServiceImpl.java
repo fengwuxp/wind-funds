@@ -61,11 +61,13 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 ? resolveNoApplicableRule(request, snapshot)
                 : resolveReferencedDecision(request, snapshot, applicableBindings);
         logAfterCommit(() -> log.info("支出控制准入已解析，tenantId={}, businessScene={}, businessSn={}, action={}, amount={}, "
-                        + "currency={}, spendRuleId={}, spendRuleVersion={}, spendDecisionSn={}, decisionResult={}, "
-                        + "admitted={}, targetAccountType={}",
+                        + "currency={}, spendRuleId={}, spendRuleVersion={}, spendRuleBindingSn={}, spendDecisionSn={}, "
+                        + "decisionResult={}, admitted={}, controlScopeId={}, periodId={}, rejectReason={}, "
+                        + "targetAccountType={}",
                 request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(), request.getAction(),
                 request.getAmount(), request.getCurrency(), decision.getSpendRuleId(), decision.getSpendRuleVersion(),
-                decision.getSpendDecisionSn(), decision.getSpendDecisionResult(), decision.getAdmitted(),
+                decision.getSpendRuleBindingSn(), decision.getSpendDecisionSn(), decision.getSpendDecisionResult(),
+                decision.getAdmitted(), decision.getControlScopeId(), decision.getPeriodId(), decision.getRejectReason(),
                 snapshot.getTargetAccountId() == null ? null : snapshot.getTargetAccountId().type()));
         return decision;
     }
@@ -231,6 +233,12 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 "Spend Rule 决策引用结果不可用于准入，decisionRef = {}, decisionResult = {}",
                 request.getSpendDecisionSn(),
                 decisionRecord.getDecisionResult());
+        if (decisionRecord.getDecisionResult() == SpendControlDecisionResult.PASSED
+                && StringUtils.hasText(request.getControlScopeId())) {
+            AssertUtils.hasText(request.getPeriodId(),
+                    "预算控制准入通过时必须提供控制周期标识，decisionRef = {}",
+                    request.getSpendDecisionSn());
+        }
         assertOptionalEchoMatches(request, decisionRecord);
     }
 

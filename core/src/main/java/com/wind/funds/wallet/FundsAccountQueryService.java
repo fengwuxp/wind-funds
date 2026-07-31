@@ -1,5 +1,6 @@
 package com.wind.funds.wallet;
 
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -18,6 +19,15 @@ public interface FundsAccountQueryService {
      */
     @NonNull
     FundsAccount getAccount(@NonNull FundsAccountId accountId);
+
+    /**
+     * 获取资金账户实际使用的账本 Profile。
+     *
+     * @param accountId 账户标识
+     * @return 账本 Profile
+     */
+    @NonNull
+    LedgerProfileCode getLedgerProfileCode(@NonNull FundsAccountId accountId);
 
     /**
      * 获取账户余额

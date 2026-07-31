@@ -1,10 +1,14 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -233,41 +237,46 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
     }
 
     /**
-     * 场景：收单资金等价路径完成付款入商户待结算账户和部分退款。
-     * 输入：付款账户充值 100、向商户 SETTLEMENT 付款 70、商户部分退款 30。
-     * 输出：付款和退款分别形成账务事实与可解释交易，最终商户待结算余额 40。
-     * 红线：本测试不声明 payment attempt、PSP 协议、正式清分清算、商户出款或争议运营完成。
+     * 场景：收单资金等价路径完成付款入商户待清算账户和部分退款。
+     * 输入：付款账户充值 100、向商户 CLEARING 付款 70、按原交易路径退款 30。
+     * 输出：付款和退款分别形成账务事实与可解释交易，最终商户待清算余额 40。
+     * 红线：capture 不得直入 SETTLEMENT；本测试不声明 payment attempt、PSP 协议、正式清分清算、
+     * 商户出款或争议运营完成。
      */
     @Test
     void testAcquiringPaymentAndPartialRefundShouldKeepSeparateExplanations() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId merchant = fundingAccount("acq_merchant");
-        ensureLedger(merchant, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(merchant, LedgerSubjectCode.CLEARING);
         var before = snapshot(balances(payer, merchant, cashMappingAccount(), prepaymentAccount()));
 
         topup(payer, 100L, "PROJECTION_ACQUIRING_TOPUP");
         var afterTopup = snapshot(balances(payer, merchant, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
-                delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(merchant, LedgerSubjectCode.CLEARING, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
-        String paymentSn = pay(payer, merchant, LedgerSubjectCode.SETTLEMENT, 70L,
+        String paymentSn = pay(payer, merchant, LedgerSubjectCode.CLEARING, 70L,
                 "PROJECTION_ACQUIRING_PAYMENT");
         var afterPayment = snapshot(balances(payer, merchant, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterPayment,
                 delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
-                delta(merchant, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(merchant, LedgerSubjectCode.CLEARING, 70L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
-        refund(payer, merchant, LedgerSubjectCode.SETTLEMENT, 30L,
-                "PROJECTION_ACQUIRING_PARTIAL_REFUND");
+        directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(paymentSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("PROJECTION_ACQUIRING_PARTIAL_REFUND")
+                .setDescription("acquiring partial refund by original route"), WindOperatorFactory.system());
         var afterRefund = snapshot(balances(payer, merchant, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterPayment, afterRefund,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
-                delta(merchant, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(merchant, LedgerSubjectCode.CLEARING, -30L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 

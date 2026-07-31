@@ -169,9 +169,10 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         } else {
             AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
             AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
-            if (isBusinessConfirmedRefundCompensation(request)) {
-                assertAuditFields(request, "业务确认退款控制补偿");
-            } else {
+            if (request.getMovementType() == SpendControlMovementType.REFUND_COMPENSATED) {
+                assertAuditFields(request, "退款控制补偿");
+            }
+            if (!isBusinessConfirmedRefundCompensation(request)) {
                 AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
                 AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
                 SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");

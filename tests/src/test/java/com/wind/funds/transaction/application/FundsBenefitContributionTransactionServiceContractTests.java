@@ -65,6 +65,7 @@ class FundsBenefitContributionTransactionServiceContractTests {
                         "getReferenceTransactionSn",
                         "getCostBearerSubjectRef",
                         "getBenefitReceiverSubjectRef",
+                        "getBenefitReceiverLedgerSubjectCode",
                         "getAmount",
                         "getFundingNature")
                 .doesNotContain("getBenefitSnapshot",

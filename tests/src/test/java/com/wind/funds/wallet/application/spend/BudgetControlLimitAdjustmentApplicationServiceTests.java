@@ -91,8 +91,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     private static final String OWNER_ID = "budget_limit_adjust_owner";
 
-    private static final String OPERATOR_ID = WindOperatorFactory.system().getOperatorAsText();
-
     private static final String REASON_CODE = "BUDGET_RULE_LIMIT_CHANGE";
 
     private static final String AUDIT_REFERENCE_SN = "approval_budget_limit_001";
@@ -144,7 +142,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(result.getAmount()).isEqualTo(100L);
         assertThat(result.getIncrease()).isTrue();
         assertThat(result.getReasonCode()).isEqualTo(REASON_CODE);
-        assertThat(result.getOperatorId()).isEqualTo(OPERATOR_ID);
+        assertThat(result.getOperatorId()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertThat(result.getAuditReferenceSn()).isEqualTo(AUDIT_REFERENCE_SN);
 
         BudgetControlProjectionDTO projection = result.getProjection();
@@ -172,7 +170,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                     assertThat(activity.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
                     assertThat(activity.getPeriodId()).isEqualTo(PERIOD_ID);
                     assertThat(activity.getReasonCode()).isEqualTo(REASON_CODE);
-                    assertThat(activity.getOperatorId()).isEqualTo(OPERATOR_ID);
+                    assertThat(activity.getOperatorId()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
                     assertThat(activity.getAuditReferenceSn()).isEqualTo(AUDIT_REFERENCE_SN);
                 });
         assertNoTransactionFacts(INCREASE_BUSINESS_SN);
@@ -404,6 +402,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn("budget_limit_adjust_refund_tx_001")
                 .setAmount(40L)
+                .setReasonCode("PRODUCT_POLICY_REFUND_RESTORE")
+                .setOperatorId("spend-control-refund-service")
+                .setAuditReferenceSn("audit:budget-limit-refund")
                 .setMovementDigest("sha256:budget-limit-refund-compensated");
     }
 

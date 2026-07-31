@@ -4,6 +4,7 @@ import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -150,6 +151,8 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
 
         LedgerTransaction freezeTransaction = ledgerTransactionByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE");
+        assertThat(freezeTransaction.getTransactionType())
+                .isEqualTo(DefaultFundsTransactionType.BALANCE_CONTROL.name());
         assertThat(entriesOf(freezeTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())

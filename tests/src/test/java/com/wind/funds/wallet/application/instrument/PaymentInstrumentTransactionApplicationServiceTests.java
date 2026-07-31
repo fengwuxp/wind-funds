@@ -34,6 +34,7 @@ import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentAuthorizationProcessor;
 import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentTransactionApplicationServiceImpl;
+import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
@@ -87,6 +88,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlMovementServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
@@ -857,6 +859,8 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
             SpendRuleVersionServiceImpl.class,
             SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
+            SpendControlMovementServiceImpl.class,
+            SpendControlTransactionConsumptionApplicationServiceImpl.class,
             PaymentInstrumentAuthorizationProcessor.class,
             PaymentInstrumentTransactionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

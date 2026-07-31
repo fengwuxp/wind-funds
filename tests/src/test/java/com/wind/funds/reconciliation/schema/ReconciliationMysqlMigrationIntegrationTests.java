@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 在显式授权的专用 MySQL 库上执行对账生产 DDL 与部署回读。
+ * 在显式授权的专用 MySQL 库上执行主资金链和对账生产 DDL 与部署回读。
  */
 @EnabledIfEnvironmentVariable(named = "WIND_FUNDS_TEST_MYSQL_DESTRUCTIVE", matches = "true")
 class ReconciliationMysqlMigrationIntegrationTests {
@@ -35,24 +35,255 @@ class ReconciliationMysqlMigrationIntegrationTests {
 
     @Test
     void testForwardMigrationAndVerificationShouldPassOnTargetMysql() throws Exception {
-        Path databaseDirectory = workspaceRoot().resolve("database/mysql/reconciliation");
-        Path forwardDdl = databaseDirectory.resolve("001_create_reconciliation_tables.sql");
-        Path verificationDdl = databaseDirectory.resolve("001_verify_reconciliation_tables.sql");
+        Path coreDdl = workspaceRoot().resolve("database/mysql/core/001_create_core_tables.sql");
+        Path reconciliationDirectory = workspaceRoot().resolve("database/mysql/reconciliation");
+        Path reconciliationDdl = reconciliationDirectory.resolve("001_create_reconciliation_tables.sql");
+        Path verificationDdl = reconciliationDirectory.resolve("001_verify_reconciliation_tables.sql");
         String expectedVersionPrefix = requiredEnvironment("WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX");
-        List<String> tableNames = extractTableNames(Files.readString(forwardDdl));
-        assertThat(tableNames).hasSize(21);
+        String coreDdlSql = Files.readString(coreDdl);
+        List<String> coreTableNames = extractTableNames(coreDdlSql);
+        List<String> tableNames = new ArrayList<>(coreTableNames);
+        tableNames.addAll(extractTableNames(Files.readString(reconciliationDdl)));
+        assertThat(tableNames).doesNotHaveDuplicates().hasSize(41);
 
         Class.forName("com.mysql.cj.jdbc.Driver");
         try (Connection connection = openConnection()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("MySQL");
             assertThat(connection.getCatalog()).isEqualTo(EXPECTED_DATABASE);
             dropTables(connection, tableNames);
-            ScriptUtils.executeSqlScript(connection, new FileSystemResource(forwardDdl));
+            ScriptUtils.executeSqlScript(connection, new FileSystemResource(coreDdl));
+            ScriptUtils.executeSqlScript(connection, new FileSystemResource(reconciliationDdl));
+            verifyTargetTables(connection, tableNames);
+            verifyCoreTableStructures(connection, coreDdlSql, coreTableNames);
             assertThat(verifyDeployment(connection, Files.readString(verificationDdl), expectedVersionPrefix))
                     .isEqualTo(EXPECTED_VERIFICATION_RESULT_SET_COUNT);
+            verifyFundsTransactionBusinessKeyConflictRecoveryUsesCurrentRead();
             verifyPayoutReceiptConflictRecoveryUsesCurrentRead();
             verifyRecoveryConflictRecoveryUsesCurrentRead();
+            cleanupConflictFixtures(connection);
         }
+    }
+
+    private void verifyTargetTables(Connection connection, List<String> tableNames) throws SQLException {
+        List<String> actualTableNames = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = ? AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """)) {
+            statement.setString(1, EXPECTED_DATABASE);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    actualTableNames.add(resultSet.getString("table_name"));
+                }
+            }
+        }
+        assertThat(actualTableNames).containsExactlyInAnyOrderElementsOf(tableNames);
+
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = ? AND table_type = 'BASE TABLE'
+                  AND (engine <> 'InnoDB' OR table_collation <> 'utf8mb4_bin')
+                """)) {
+            statement.setString(1, EXPECTED_DATABASE);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                assertThat(resultSet.next()).as("all target tables must use InnoDB and utf8mb4_bin").isFalse();
+            }
+        }
+    }
+
+    private void verifyCoreTableStructures(Connection connection, String coreDdl,
+                                           List<String> coreTableNames) throws SQLException {
+        for (String tableName : coreTableNames) {
+            String tableDdl = extractCreateTable(coreDdl, tableName);
+            assertThat(readColumnSignatures(connection, tableName))
+                    .as("MySQL core table %s columns must match forward DDL", tableName)
+                    .containsExactlyElementsOf(parseColumnSignatures(tableDdl));
+            assertThat(readIndexSignatures(connection, tableName))
+                    .as("MySQL core table %s indexes must match forward DDL", tableName)
+                    .containsExactlyInAnyOrderElementsOf(parseIndexSignatures(tableDdl));
+        }
+    }
+
+    private List<String> readColumnSignatures(Connection connection, String tableName) throws SQLException {
+        List<String> signatures = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT ordinal_position, column_name, column_type, is_nullable, column_default,
+                       extra, character_set_name, collation_name
+                FROM information_schema.columns
+                WHERE table_schema = ? AND table_name = ?
+                ORDER BY ordinal_position
+                """)) {
+            statement.setString(1, EXPECTED_DATABASE);
+            statement.setString(2, tableName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    String extra = resultSet.getString("extra").toLowerCase();
+                    signatures.add(columnSignature(
+                            resultSet.getInt("ordinal_position"),
+                            resultSet.getString("column_name"),
+                            normalizeColumnType(resultSet.getString("column_type")),
+                            resultSet.getString("is_nullable"),
+                            normalizeDefault(resultSet.getString("column_default")),
+                            extra.contains("auto_increment"),
+                            extra.contains("on update current_timestamp"),
+                            resultSet.getString("character_set_name"),
+                            resultSet.getString("collation_name")));
+                }
+            }
+        }
+        return signatures;
+    }
+
+    private List<String> parseColumnSignatures(String tableDdl) {
+        Matcher columns = Pattern.compile(
+                        "(?m)^\\s*`([^`]+)`\\s+([A-Z]+(?:\\(\\d+(?:,\\d+)?\\))?)\\s+(.+?)(?:,)?$")
+                .matcher(tableDdl);
+        List<String> signatures = new ArrayList<>();
+        while (columns.find()) {
+            String type = normalizeColumnType(columns.group(2));
+            String definition = columns.group(3);
+            signatures.add(columnSignature(
+                    signatures.size() + 1,
+                    columns.group(1),
+                    type,
+                    definition.contains("NOT NULL") ? "NO" : "YES",
+                    parseDefault(definition),
+                    definition.contains("AUTO_INCREMENT"),
+                    definition.contains("ON UPDATE CURRENT_TIMESTAMP"),
+                    isCharacterType(type) ? "utf8mb4" : null,
+                    isCharacterType(type) ? "utf8mb4_bin" : null));
+        }
+        return signatures;
+    }
+
+    private String columnSignature(int position, String name, String type, String nullable,
+                                   String defaultValue, boolean autoIncrement, boolean onUpdate,
+                                   String characterSet, String collation) {
+        return "%03d|%s|%s|%s|%s|%d|%d|%s|%s".formatted(
+                position, name, type, nullable, defaultValue,
+                autoIncrement ? 1 : 0, onUpdate ? 1 : 0,
+                characterSet == null ? "<NULL>" : characterSet,
+                collation == null ? "<NULL>" : collation);
+    }
+
+    private String parseDefault(String definition) {
+        Matcher defaultValue = Pattern.compile(
+                        "\\bDEFAULT\\s+('(?:[^']|'')*'|CURRENT_TIMESTAMP(?:\\(\\))?|NULL|-?\\d+(?:\\.\\d+)?)")
+                .matcher(definition);
+        if (!defaultValue.find() || "NULL".equals(defaultValue.group(1))) {
+            return "<NULL>";
+        }
+        String value = defaultValue.group(1);
+        if (value.startsWith("'") && value.endsWith("'")) {
+            return value.substring(1, value.length() - 1).replace("''", "'");
+        }
+        return normalizeDefault(value);
+    }
+
+    private String normalizeDefault(String value) {
+        if (value == null) {
+            return "<NULL>";
+        }
+        return "CURRENT_TIMESTAMP()".equalsIgnoreCase(value) ? "CURRENT_TIMESTAMP" : value;
+    }
+
+    private String normalizeColumnType(String type) {
+        String normalized = type.toLowerCase();
+        return normalized.matches("(?:bigint|int|tinyint)\\(\\d+\\)")
+                ? normalized.substring(0, normalized.indexOf('(')) : normalized;
+    }
+
+    private boolean isCharacterType(String type) {
+        return type.startsWith("varchar") || type.contains("text");
+    }
+
+    private List<String> readIndexSignatures(Connection connection, String tableName) throws SQLException {
+        List<String> signatures = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT index_name, non_unique,
+                       GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',') AS column_names
+                FROM information_schema.statistics
+                WHERE table_schema = ? AND table_name = ?
+                GROUP BY index_name, non_unique
+                ORDER BY index_name
+                """)) {
+            statement.setString(1, EXPECTED_DATABASE);
+            statement.setString(2, tableName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    signatures.add(indexSignature(resultSet.getString("index_name"),
+                            resultSet.getInt("non_unique"), resultSet.getString("column_names")));
+                }
+            }
+        }
+        return signatures;
+    }
+
+    private List<String> parseIndexSignatures(String tableDdl) {
+        Matcher indexes = Pattern.compile(
+                        "(?m)^\\s*(PRIMARY KEY|UNIQUE KEY|KEY)(?:\\s+`([^`]+)`)?\\s*\\(([^)]+)\\)")
+                .matcher(tableDdl);
+        List<String> signatures = new ArrayList<>();
+        while (indexes.find()) {
+            String type = indexes.group(1);
+            signatures.add(indexSignature(
+                    "PRIMARY KEY".equals(type) ? "PRIMARY" : indexes.group(2),
+                    "KEY".equals(type) ? 1 : 0,
+                    indexes.group(3).replace("`", "").replaceAll("\\s+", "")));
+        }
+        return signatures;
+    }
+
+    private String indexSignature(String name, int nonUnique, String columns) {
+        return name + "|" + nonUnique + "|" + columns;
+    }
+
+    private String extractCreateTable(String sql, String tableName) {
+        int start = sql.indexOf("CREATE TABLE `" + tableName + "`");
+        assertThat(start).as("missing CREATE TABLE for %s", tableName).isGreaterThanOrEqualTo(0);
+        int end = sql.indexOf(';', start);
+        assertThat(end).as("missing statement terminator for %s", tableName).isGreaterThan(start);
+        return sql.substring(start, end + 1);
+    }
+
+    private void verifyFundsTransactionBusinessKeyConflictRecoveryUsesCurrentRead() throws Exception {
+        try (Connection staleSnapshot = openConnection(); Connection winner = openConnection()) {
+            configureRepeatableRead(staleSnapshot);
+            configureRepeatableRead(winner);
+
+            assertThat(fundsTransactionExists(staleSnapshot, false)).isFalse();
+            insertFundsTransaction(winner, "mysql-rr-funds-winner");
+            winner.commit();
+            assertDuplicateKey(() -> insertFundsTransaction(staleSnapshot, "mysql-rr-funds-loser"));
+            assertThat(fundsTransactionExists(staleSnapshot, false)).isFalse();
+            assertThat(fundsTransactionExists(staleSnapshot, true)).isTrue();
+            staleSnapshot.rollback();
+        }
+    }
+
+    private void insertFundsTransaction(Connection connection, String sn) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO t_funds_transaction
+                    (sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
+                     status, amount, currency)
+                VALUES (?, 1, 'DIRECT', 'PAY', 'MYSQL_RR', 'mysql-rr-business',
+                        'SUCCEEDED', 100, 'USD')
+                """)) {
+            statement.setString(1, sn);
+            statement.executeUpdate();
+        }
+    }
+
+    private boolean fundsTransactionExists(Connection connection, boolean forUpdate) throws SQLException {
+        return rowExists(connection, """
+                SELECT id FROM t_funds_transaction
+                WHERE tenant_id = 1
+                  AND business_scene = 'MYSQL_RR'
+                  AND business_sn = 'mysql-rr-business'
+                """, forUpdate);
     }
 
     private void verifyPayoutReceiptConflictRecoveryUsesCurrentRead() throws Exception {
@@ -218,6 +449,15 @@ class ReconciliationMysqlMigrationIntegrationTests {
             throw new AssertionError("duplicate unique key must fail");
         } catch (SQLException exception) {
             assertThat(exception.getSQLState()).isEqualTo("23000");
+        }
+    }
+
+    private void cleanupConflictFixtures(Connection connection) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM t_recovery_result WHERE sn LIKE 'mysql-rr-%'");
+            statement.executeUpdate("DELETE FROM t_recovery_order WHERE sn LIKE 'mysql-rr-%'");
+            statement.executeUpdate("DELETE FROM t_payout_receipt WHERE sn LIKE 'mysql-rr-%'");
+            statement.executeUpdate("DELETE FROM t_funds_transaction WHERE sn LIKE 'mysql-rr-%'");
         }
     }
 

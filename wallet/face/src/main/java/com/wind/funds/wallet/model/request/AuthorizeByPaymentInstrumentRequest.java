@@ -86,7 +86,7 @@ public class AuthorizeByPaymentInstrumentRequest {
     @Schema(description = "Spend Rule 最终决策摘要，可选回显字段，不作为授权准入依据")
     private String spendDecisionDigest;
 
-    @Schema(description = "控制范围标识，可为空")
+    @Schema(description = "控制范围标识；租户存在有效 SPEND_CONTROL_SCOPE 挂载时必须由可信上层提供")
     private String controlScopeId;
 
     @Schema(description = "控制周期标识；需要预算控制预留时必须由可信上层提供")

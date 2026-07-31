@@ -68,6 +68,28 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：DSL 样例把直接支付事件错误归入退款动作族。
+     * 预期：JSON 契约校验立即拒绝不合法三元组。
+     * 红线：文档夹具不能通过分别校验枚举值来绕过资金语义约束。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectIllegalInstructionSemanticCombination() {
+        Map<String, Object> document = Map.of(
+                "caseId", "DSL-INVALID-INSTRUCTION-SEMANTICS-001",
+                "fixtureLevel", "FUNDS_FLOW",
+                "instruction", Map.of(
+                        "instructionType", "DIRECT_TRANSACTION",
+                        "eventType", "PAY",
+                        "transactionType", "REFUND",
+                        "amount", Map.of("currency", "USD", "amount", 100),
+                        "originalAmount", Map.of("currency", "USD", "amount", 100)));
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instructionType/eventType/transactionType combination is invalid");
+    }
+
+    /**
      * 场景：CONTRACT_ONLY 夹具缺少执行化盘点字段。
      * 预期：JSON 契约校验显式失败。
      * 红线：contract-only 只能证明结构契约，必须标明目标测试、核心断言和未完成范围。

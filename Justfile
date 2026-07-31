@@ -83,11 +83,11 @@ _assert-surefire-reports tests marker:
 
 _run-test-classes tests module='tests':
     @just _assert-test-classes "{{tests}}"
-    @marker=$(mktemp /tmp/wind-funds-tests.XXXXXX); touch "$marker"; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test -Dtest="{{tests}}" {{test_flags}}; mvn_status=$?; just _assert-surefire-reports "{{tests}}" "$marker"; report_status=$?; rm -f "$marker"; if (( mvn_status != 0 || report_status != 0 )); then exit 1; fi; just verify-classfiles
+    @marker=$(mktemp /tmp/wind-funds-tests.XXXXXX); touch "$marker"; mkdir -p target/reports/css; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test -Dtest="{{tests}}" {{test_flags}}; mvn_status=$?; just _assert-surefire-reports "{{tests}}" "$marker"; report_status=$?; rm -f "$marker"; if (( mvn_status != 0 || report_status != 0 )); then exit 1; fi; just verify-classfiles
 
 # Run all tests in one Maven module.
 test-module module='tests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test {{test_flags}} && just verify-classfiles
+    @mkdir -p target/reports/css; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test {{test_flags}} && just verify-classfiles
 
 # Core DSL and contract tests.
 test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
@@ -110,7 +110,7 @@ test-balance-control tests='FundsBalanceControlFailureFlowTests,FundsWithdrawalS
     @just _run-test-classes "{{tests}}" tests
 
 # Business flow and balance assertion tests.
-test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests,FundsBalanceAssertionSupportTests':
+test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests,FundsBalanceAssertionSupportTests,FundsTransactionProjectionBusinessScenarioTests,GlobalAccountAchBusinessFlowTests,AgentCommissionSettlementBusinessFlowTests,AcquiringSettlementBusinessFlowTests,FundsBenefitContributionTransactionServiceFlowTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, wallet, and module dependency boundary tests.
@@ -125,7 +125,7 @@ test-governance tests='FundsProjectionReplayServiceTests':
 test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSplitBatchApplicationServiceTests,ClearingBatchApplicationServiceTests,FundsClearingTransactionFlowTests,SettlementPublicContractTests,FundsSettlementTransactionFlowTests,SettlementOrderApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,PayoutPublicContractTests,PayoutOrderApplicationServiceTests,RecoveryOrderApplicationServiceTests,ReconciliationBatchApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests,ReconciliationMysqlDdlContractTests':
     @just _run-test-classes "{{tests}}" tests
 
-# Run the reconciliation suite against a dedicated disposable MySQL database.
+# Migrate the 20 core and 21 reconciliation tables, then run target-MySQL funds and reconciliation tests.
 test-mysql-reconciliation:
     #!/usr/bin/env zsh
     set -euo pipefail
@@ -139,7 +139,8 @@ test-mysql-reconciliation:
     [[ -n "${WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX:-}" ]] || { echo "WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX is required"; exit 1; }
     export WIND_FUNDS_TEST_DATASOURCE_DRIVER=com.mysql.cj.jdbc.Driver
     just _run-test-classes ReconciliationMysqlMigrationIntegrationTests tests
-    export WIND_FUNDS_TEST_SQL_INIT_MODE=always
+    export WIND_FUNDS_TEST_SQL_INIT_MODE=never
+    just _run-test-classes "PaymentInstrumentTransactionAuthorizationTests,SpendControlTransactionConsumptionApplicationServiceTests" tests
     just test-reconciliation
 
 # Fast CAD verification for non-business tooling or test-asset changes.

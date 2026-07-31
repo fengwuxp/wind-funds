@@ -66,6 +66,11 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         AssertUtils.notNull(instructionType, "fundsInstruction.instructionType must not be null");
         AssertUtils.notNull(eventType, "fundsInstruction.eventType must not be null");
         AssertUtils.notNull(transactionType, "fundsInstruction.transactionType must not be null");
+        AssertUtils.isTrue(DefaultFundsTransactionType.isValidInstructionCombination(
+                        instructionType, eventType, transactionType),
+                "fundsInstruction instructionType/eventType/transactionType combination is invalid, "
+                        + "instructionType = {}, eventType = {}, transactionType = {}",
+                instructionType, eventType, transactionType);
         AssertUtils.notNull(amount, "fundsInstruction.amount must not be null");
         AssertUtils.notNull(eventTime, "fundsInstruction.eventTime must not be null");
         AssertUtils.notNull(operator, "fundsInstruction.operator must not be null");

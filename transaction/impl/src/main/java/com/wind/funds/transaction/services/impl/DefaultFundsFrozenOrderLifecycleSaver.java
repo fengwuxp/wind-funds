@@ -22,6 +22,7 @@ import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -337,7 +338,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
         values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
         values.put(ImmutableFundsInstructionSpec.Fields.eventType, instruction.getEventType().name());
-        values.put(ImmutableFundsInstructionSpec.Fields.transactionType, instruction.getTransactionType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.transactionType,
+                legacyCompatibleHashTransactionType(instruction.getEventType(), instruction.getTransactionType()));
         values.put(ImmutableFundsInstructionSpec.Fields.amount, instruction.getAmount().getAmount());
         values.put(HASH_FIELD_CURRENCY, instruction.getAmount().getCurrency().name());
         values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
@@ -355,10 +357,22 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return Map.of();
         }
         Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
+        values.put(ImmutableRouteSnapshotSpec.Fields.transactionType,
+                legacyCompatibleHashTransactionType(routeSnapshot.getEventType(),
+                        routeSnapshot.getTransactionType()));
         values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
         values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
         values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);
         return FundsStableHashSupport.stableHashMap(values);
+    }
+
+    // Preserve request hashes written before freeze/unfreeze moved from ADJUSTMENT to BALANCE_CONTROL.
+    static String legacyCompatibleHashTransactionType(FundsTransactionEventType eventType,
+                                                       DefaultFundsTransactionType transactionType) {
+        return switch (eventType) {
+            case FREEZE, UNFREEZE -> DefaultFundsTransactionType.ADJUSTMENT.name();
+            default -> transactionType.name();
+        };
     }
 
 }

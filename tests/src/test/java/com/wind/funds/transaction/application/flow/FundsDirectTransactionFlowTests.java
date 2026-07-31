@@ -2973,6 +2973,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testDirectSameBusinessSnWithDifferentEventShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("idem_event_payee");
+        ensureFundingAccount(payee);
         BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
 
         String firstTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()

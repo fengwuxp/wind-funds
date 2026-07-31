@@ -9,7 +9,7 @@
 - 评审结论摘要：本文作为 Spend Rule 支出规则的产品 PRD 主文档，保留当前有效产品结论、规则边界、验收和待确认项；过程性工程规划、历史争议和被拒方案不再作为当前交付材料保留。
 - 目标读者：产品、业务、运营、风控、客服、财务、审计、测试、架构师和研发。
 - 需要决策：确认 Spend Rule 的产品边界、产品能力、验收口径和是否允许进入后续单一编码 工程边界。
-- 当前可信度：产品语义、模块归属、控制事实和资金红线已确认；完整规则引擎、运营后台、生产迁移、外部规则适用性仍为待确认。
+- 当前可信度：规则定义、不可变版本、挂载、决策记录、轻量单规则 evaluator、准入验真、控制事实和资金红线已有服务层与测试证据；完整规则引擎、多规则裁决、运营后台、生产迁移、外部规则适用性仍为待确认。
 
 ## 1. 文档定位
 
@@ -144,7 +144,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 3. 准入和拒绝证据只进入 `SpendRuleDecisionRecord` / `recordDecision`，不定义为控制额度变动类型。
 4. `SpendControlMovementType` 只包含 `LIMIT_INCREASED`、`LIMIT_DECREASED`、`RESERVED`、`CONSUMED`、`REFUND_COMPENSATED`、`RELEASED`；超时不是可信释放事实，不写入控制流水。
 5. `remainingControlAmount` 在当前 DTO 中表达“未终局释放的控制占用”，后续如改名为 `occupiedControlAmount` 需单独评估兼容。
-6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减策略授权的退款控制补偿后的净消耗。资金退款本身不自动恢复周期控制额度，只有产品策略明确允许时才记录 `REFUND_COMPENSATED`。
+6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减策略授权的退款控制补偿后的净消耗。资金退款本身不自动恢复周期控制额度，只有产品策略明确允许且请求携带 `reasonCode + operatorId + auditReferenceSn` 时才记录 `REFUND_COMPENSATED`；任一证据缺失必须拒绝且不得新增控制流水。
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类”的分类口径；服务实现不得再各自硬编码一套类型解释。
 8. `controlScopeId` 是支出控制范围的公共契约和落库字段，`ResolveSpendControlAdmissionRequest`、`AuthorizeByPaymentInstrumentRequest`、控制额度变动流水和预算控制投影统一使用该字段。
 9. `periodId` 是 Spend Rule 控制周期标识，例如 `2026-07`，用于当前周期和历史周期查询；它不是账本周期 bucket，不会生成支出控制范围账本。
@@ -162,8 +162,8 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 产品语义 | 当前代码载体 | 已具备的服务层证据 | 不代表 |
 | --- | --- | --- | --- |
 | 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
-| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 可信规则或业务决策方可按单条 rule / binding / scope 固化 `PASSED` 或 `REJECTED` 决策结果、拒绝原因和 `decisionDigest`；支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用。 | `recordDecision` 不是开放给普通交易调用方的放行入口；不接受 `NO_APPLICABLE_RULE`，也不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
-| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`。 | 支持调额、预留、消耗、可信释放、策略授权的退款控制补偿和预算控制投影；周期额度流水携带 `controlScopeId`、`periodId`，准入和拒绝只进入决策记录。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
+| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 可信规则或业务决策方可按单条 rule / binding / scope 固化 `PASSED` 或 `REJECTED` 决策结果、拒绝原因、`decisionDigest`、支付工具绑定版本、完整控制窗口和可选目标账户；这些上下文同时参与幂等一致性和准入验真。支持窄条件只读查询和证据解释。 | `recordDecision` 不是开放给普通交易调用方的放行入口；不接受 `NO_APPLICABLE_RULE`，也不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
+| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`、`SpendControlTransactionConsumptionApplicationService`。 | 支持调额、预留、消耗、可信释放、策略授权的退款控制补偿和预算控制投影；所有 `REFUND_COMPENSATED` 在共享写入边界强制校验原因码、操作者和审计引用；支付工具可信授权完成与撤销由 `PaymentInstrumentTransactionApplicationService#completeAuthorizationByInstrument` / `#reverseAuthorizationByInstrument` 从原授权事实恢复账务主体和 `controlReservationSn`，在同一本地事务中分别写入资金完成与 `CONSUMED`、资金撤销与 `RELEASED`；累计消费/释放分别不得超过资金聚合的 `completedAmount` / `reversedAmount`。 | 不代表控制事实是资金交易、账本交易或账本余额；退款资金与可选控制补偿仍是分层事实，不代表已完成原子编排；强制完成、超时、expired 或本地推断不是可信控制事实；跨库或远程调用不适用本地原子性结论。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按 `controlScopeId + periodId` 查询当前或历史周期，并按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表支出控制范围、Spend Rule 或控制视图可以作为账务主体。 |
 
 产品到工程分层口径：
@@ -216,7 +216,7 @@ flowchart TD
 5. 当前单决策记录契约遇到多个适用挂载时 fail-closed，不按优先级擅自选第一条；需要 `evaluatedRules`、`decisionPolicy`、`finalDecision` 后才能承接多规则合成证据。
 6. 决策通过后仍要继续做支付工具能力、账户能力、资金责任、余额或额度校验；规则通过不代表最终授权成功。
 7. 决策拒绝或验真失败时，不生成资金交易、route、posting plan、LedgerEntry、ledger transaction、账本余额投影或清结算对象。
-8. 后续退款、可信撤销、争议资金结果、对账或投影解释，必须按原决策证据和原 route snapshot 处理；超时或 expired 只作观察，不进入资金回放。
+8. 后续可信完成、退款、可信撤销、争议资金结果、对账或投影解释，必须按原决策证据和原 route snapshot 处理；支付工具可信完成/撤销还必须从原授权读取控制预留引用，并以稳定业务幂等键完成资金与控制消费/释放的同事务写入，任一侧失败整体回滚；超时或 expired 只作观察，不进入资金回放。
 
 异常流程和人工兜底：
 
@@ -421,7 +421,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | AC-SR-001 / AC-SR-002 | SpendRuleDefinitionServiceTests、SpendRuleDefinitionServiceFlowTests | 标准基础服务和服务流测试证明规则定义、版本不可变、挂载 scope、冲突策略和有效期可追踪。 |
 | AC-SR-003 / AC-SR-004 / AC-SR-007 | SpendRuleDecisionRecordServiceTests、SpendControlAdmissionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验；decisionRef 不能跨绑定版本、控制窗口或目标账户复用。 |
 | AC-SR-005 | FundsTransactionProjectionExplainApplicationServiceTests | 投影只读读取历史规则版本、挂载、决策流水和控制引用，不输出敏感原文。 |
-| AC-SR-006 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests | 控制额度变动流水可重建预算控制视图，不反写账本余额。 |
+| AC-SR-006 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests | 控制额度变动流水可重建预算控制视图；可信授权部分完成同步消费原控制预留，重放不重复消费，控制消费冲突时资金完成、route、posting 和 ledger 事实整体回滚；可信撤销同理原子释放；授权后支付工具改绑时，完成和撤销仍只使用原授权快照中的账务主体。 |
 
 ## 14. 待确认项
 
@@ -432,3 +432,4 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | Q-SR-003 运营权限模型 | 影响规则创建、发布、挂载和查询。 | 产品、运营、安全。 | 先做服务层能力，不开放运营后台。 |
 | Q-SR-004 外部规则适用性 | 影响 VCC、ACH、卡组织、跨境等场景上线。 | 法务、合规、通道、财务。 | 文档只作设计参考，不作为上线规则。 |
 | Q-SR-005 生产迁移策略 | 影响规则表、历史控制额度变动流水和投影解释。 | 架构、DBA、研发、SRE。 | 独立工程边界明确 DDL、H2、迁移和回滚。 |
+| Q-SR-006 跨服务部署边界 | 影响支付工具完成/撤销与控制消费/释放能否继续使用本地事务。 | 架构、研发、SRE。 | 当前只允许同进程、同数据源和同事务管理器；一旦拆库或远程化，必须先评审 Outbox、补偿或差错恢复，不把现有原子性结论直接外推。 |

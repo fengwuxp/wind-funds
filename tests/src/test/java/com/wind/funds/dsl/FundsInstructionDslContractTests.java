@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,6 +31,97 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FundsInstructionDslContractTests {
 
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
+
+    /**
+     * 场景：余额冻结和解冻需要与余额调整形成两个稳定动作族。
+     * 预期：交易类型公开 BALANCE_CONTROL，供冻结和解冻指令归类。
+     * 红线：冻结、解冻不能继续伪装成人工或系统调账。
+     */
+    @Test
+    void testTransactionTypeShouldExposeBalanceControlActionFamily() {
+        DefaultFundsTransactionType transactionType = DefaultFundsTransactionType.valueOf("BALANCE_CONTROL");
+
+        assertThat(transactionType.getDesc()).isEqualTo("余额控制");
+    }
+
+    /**
+     * 场景：调用方尝试从粗粒度交易类型推导精确生命周期事件。
+     * 预期：旧方法仅作为待移除的兼容桥保留，精确事件仍由 eventType 显式表达。
+     * 红线：不得破坏已发布 Core API，也不得把兼容字符串当成唯一事件事实。
+     */
+    @Test
+    void testLegacyEventTypeProjectionShouldRemainDeprecatedDuringMigration() throws NoSuchMethodException {
+        Deprecated annotation = DefaultFundsTransactionType.class.getDeclaredMethod("asEventType")
+                .getAnnotation(Deprecated.class);
+
+        assertThat(annotation).isNotNull();
+        assertThat(annotation.forRemoval()).isTrue();
+        assertThat(DefaultFundsTransactionType.BALANCE_CONTROL.asEventType()).isEqualTo("balance.control");
+    }
+
+    /**
+     * 场景：调用方组合了直接交易处理模型、支付事件和退款动作族。
+     * 预期：资金指令构造阶段立即拒绝不合法三元组。
+     * 红线：非法组合不能进入 route、账本或生命周期持久化阶段。
+     */
+    @Test
+    void testFundsInstructionShouldRejectIllegalSemanticCombination() {
+        assertThatThrownBy(() -> instruction(FundsInstructionType.DIRECT_TRANSACTION,
+                FundsTransactionEventType.PAY,
+                DefaultFundsTransactionType.REFUND))
+                .hasMessageContaining("instructionType/eventType/transactionType combination is invalid");
+    }
+
+    /**
+     * 场景：公共资金能力按当前已实现的转换器和路由构造全部合法指令三元组。
+     * 预期：19 组 canonical 组合均可进入后续路由解析。
+     * 红线：跨主体调账和 PAYOUT_RETURNED 尚未闭合，不能混入当前白名单。
+     */
+    @Test
+    void testFundsInstructionShouldAcceptCanonicalSemanticCombinations() {
+        DefaultFundsTransactionType balanceControl = DefaultFundsTransactionType.valueOf("BALANCE_CONTROL");
+        List<InstructionCombination> combinations = List.of(
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.TOPUP,
+                        DefaultFundsTransactionType.TOPUP),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.TRANSFER,
+                        DefaultFundsTransactionType.TRANSFER),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAY,
+                        DefaultFundsTransactionType.PAY),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.REFUND,
+                        DefaultFundsTransactionType.REFUND),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.WITHDRAW,
+                        DefaultFundsTransactionType.WITHDRAW),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_CHARGE,
+                        DefaultFundsTransactionType.FEE),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_REFUND,
+                        DefaultFundsTransactionType.REFUND),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.CLEARING_CONFIRM,
+                        DefaultFundsTransactionType.CLEARING),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.SETTLEMENT_LOCK,
+                        DefaultFundsTransactionType.SETTLEMENT),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_SUCCEEDED,
+                        DefaultFundsTransactionType.PAYOUT),
+                combination(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_FAILED,
+                        DefaultFundsTransactionType.PAYOUT),
+                combination(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.AUTHORIZE,
+                        DefaultFundsTransactionType.PAY),
+                combination(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.REVERSAL,
+                        DefaultFundsTransactionType.PAY),
+                combination(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.COMPLETE,
+                        DefaultFundsTransactionType.PAY),
+                combination(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.AUTH_REFUND,
+                        DefaultFundsTransactionType.REFUND),
+                combination(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.FREEZE, balanceControl),
+                combination(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.UNFREEZE, balanceControl),
+                combination(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.BALANCE_ADJUST,
+                        DefaultFundsTransactionType.ADJUSTMENT),
+                combination(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.LIMIT_ADJUST,
+                        DefaultFundsTransactionType.ADJUSTMENT));
+
+        assertThat(combinations)
+                .allSatisfy(combination -> assertThat(instruction(combination.instructionType(),
+                        combination.eventType(), combination.transactionType())).isNotNull());
+    }
 
     /**
      * 场景：业务侧把外部交易流水带入资金指令，进入路由和账本前形成稳定 DSL 事实。
@@ -531,6 +623,40 @@ class FundsInstructionDslContractTests {
                         .build())
                 .contextVariables(contextVariables)
                 .build();
+    }
+
+    private FundsInstructionSpec instruction(FundsInstructionType instructionType,
+                                             FundsTransactionEventType eventType,
+                                             DefaultFundsTransactionType transactionType) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(instructionType)
+                .eventType(eventType)
+                .transactionType(transactionType)
+                .amount(Money.immutable(100L, CURRENCY))
+                .businessScene("FUNDS_INSTRUCTION_SEMANTIC_CONTRACT")
+                .businessSn("BIZ-FI-SEMANTIC-001")
+                .eventTime(LocalDateTime.of(2026, 7, 30, 16, 0))
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId("1")
+                        .operatorType("SYSTEM")
+                        .operatorName("Codex")
+                        .appName("wind-funds-tests")
+                        .contextVariables(Map.of())
+                        .build())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private InstructionCombination combination(FundsInstructionType instructionType,
+                                               FundsTransactionEventType eventType,
+                                               DefaultFundsTransactionType transactionType) {
+        return new InstructionCombination(instructionType, eventType, transactionType);
+    }
+
+    private record InstructionCombination(FundsInstructionType instructionType,
+                                          FundsTransactionEventType eventType,
+                                          DefaultFundsTransactionType transactionType) {
     }
 
     private FundsInstructionReferenceSpec externalTransactionReference() {

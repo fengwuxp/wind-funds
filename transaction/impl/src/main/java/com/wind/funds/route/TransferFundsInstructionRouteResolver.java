@@ -94,6 +94,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
             case CLEARING -> throw new IllegalArgumentException("清算交易必须由清算路由解析器处理");
             case SETTLEMENT -> throw new IllegalArgumentException("结算交易必须由结算路由解析器处理");
             case PAYOUT -> throw new IllegalArgumentException("出款交易必须由出款路由解析器处理");
+            case BALANCE_CONTROL -> throw new IllegalArgumentException(
+                    "balance-control transaction must handled by balance-control resolver");
             case ADJUSTMENT -> throw new IllegalArgumentException(UNSUPPORTED_ADJUSTMENT_MESSAGE);
         };
     }

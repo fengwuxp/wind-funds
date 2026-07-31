@@ -721,6 +721,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                                                               ReplayRequestSpec replayRequest) {
         return switch (replayRequest.getReplayType()) {
             case AUTHORIZATION_REFUND, REFUND, FEE_REFUND -> DefaultFundsTransactionType.REFUND;
+            case UNFREEZE -> DefaultFundsTransactionType.BALANCE_CONTROL;
             default -> snapshot.getTransactionType();
         };
     }

@@ -92,7 +92,7 @@ public class ResolveSpendControlAdmissionRequest {
             + "wallet 以 decisionSn 回读的已固化摘要为准")
     private String spendDecisionDigest;
 
-    @Schema(description = "控制范围标识，可为空")
+    @Schema(description = "控制范围标识；租户存在有效 SPEND_CONTROL_SCOPE 挂载时必须由可信上层提供")
     private String controlScopeId;
 
     @Schema(description = "控制周期标识；需要预算控制预留时必须由可信上层提供")

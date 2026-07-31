@@ -79,14 +79,14 @@ VCC 产品与系统设计的当前评审入口由 `fincone` 仓库维护。跨�
 | --- | --- | --- | --- |
 | 授权批准 | `authorizeByInstrument` | 对解析后主体建立 `AVAILABLE -> AUTHORIZATION` 占用，保存绑定、资金责任和 RouteSnapshot。 | 工具、账户、币种、唯一资金责任和余额/额度必须通过。 |
 | 授权拒绝 | 授权准入拒绝 | 只返回拒绝结果和稳定原因。 | 不生成账务 RouteLeg、posting、LedgerTransaction 或 LedgerEntry；允许保存不含 legs、不可回放的 RouteSnapshot 作为解释证据。 |
-| 授权交易完成 | `complete` | 核销本次授权占用并生成实际资金事实。 | issuer Clearing / Presentment 只是上游触发来源；资金内核使用原授权和原 RouteSnapshot，币种、累计金额和幂等必须一致。 |
-| 可信撤销/释放 | `reversal` | 同主体 `AUTHORIZATION -> AVAILABLE`。 | 只处理未使用授权；超时、expired 或本地猜测不得触发。 |
+| 授权交易完成 | `completeAuthorizationByInstrument` | 核销本次授权占用并生成实际资金事实；存在 Spend Control 预留时同步记录 `CONSUMED`。 | issuer Clearing / Presentment 只是上游触发来源；资金内核使用原授权和原 RouteSnapshot，累计控制消费不得超过 `completedAmount`。 |
+| 可信撤销/释放 | `reverseAuthorizationByInstrument` | 同主体 `AUTHORIZATION -> AVAILABLE`；存在 Spend Control 预留时同步记录 `RELEASED`。 | 只处理未使用授权；超时、expired 或本地猜测不得触发。 |
 | 原交易本金退款 | `refund` | 沿原 RouteSnapshot 回放，累计 `refundedAmount`。 | 本金币种与原完成交易一致，累计不超过 `completedAmount`，使用原交易汇率快照。 |
 | 业务确认的无原路由贷记 | 适用的直接退款或转账入口 | 向明确账户追加独立资金事实。 | 业务方必须明确资金来源、到账账户、金额、币种、原因、操作人和审批；资金底座不推断原消费。 |
 
-上述 canonical 语义由两组正交公共契约承接：首笔授权统一调用 `PaymentInstrumentTransactionApplicationService#authorizeByInstrument`，由支付工具入口解析当前有效 binding 和唯一资金责任；后续完成、撤销与退款分别调用 `FundsAuthorizationTransactionService#complete`、`#reversal`、`#refund`，并携带原 `authorizationTransactionSn` 和匹配的原授权主账户。后续动作必须锁定原授权事实、沿原 `RouteSnapshot` 回放，不读取当前 binding 重新选路，因此直接使用 transaction-face 的后授权契约不构成准入旁路。
+上述 canonical 语义由两组正交公共契约承接：支付工具首笔授权、可信完成和可信撤销分别调用 `PaymentInstrumentTransactionApplicationService#authorizeByInstrument`、`#completeAuthorizationByInstrument`、`#reverseAuthorizationByInstrument`；facade 从原授权恢复账务主体和可选控制预留，再委派账户主体型内核。原交易本金退款继续调用 `FundsAuthorizationTransactionService#refund`；纯账户主体工作流保留 `#complete` / `#reversal`。所有后续动作必须锁定原授权事实、沿原 `RouteSnapshot` 回放，不读取当前 binding 重新选路。
 
-每次动作使用稳定 `businessScene + businessSn` 幂等并返回资金交易流水号。`authorizationTransactionSn` 为空时，`refund` 表示无内部授权事实的退款，必须提供 `externalReferenceSn` 与 `refundReason`；非空时一律按授权链退款校验原授权事实。强制完成是独立高风险模式，必须携带已签收策略、限额、原因、外部事实和操作凭证。跨业务组件事务、VCC 事件状态更新及复合贷记进度不属于该公共契约。
+每次动作使用稳定 `businessScene + businessSn` 幂等并返回资金交易流水号。`authorizationTransactionSn` 为空时，`refund` 表示无内部授权事实的退款，必须提供 `externalReferenceSn` 与 `refundReason`；非空时一律按授权链退款校验原授权事实。强制完成是独立高风险模式，必须携带已签收策略、限额、原因、外部事实和操作凭证。可信完成/撤销只在同进程、同数据源和同事务管理器下原子联动控制事实；VCC 事件状态更新及复合贷记进度不属于该公共契约。
 
 ### 4.1 完成金额与余额桶
 
@@ -161,7 +161,7 @@ flowchart LR
 | 契约 | 当前边界 | owner |
 | --- | --- | --- |
 | VCC 支付工具与子/父账户初始化 | 资金底座已有账户、绑定和准入能力；生产字段、事务边界和账户模式仍需契约测试签收。 | fincone VCC、wallet |
-| 支付工具与授权生命周期 | 首笔授权使用 `PaymentInstrumentTransactionApplicationService#authorizeByInstrument`；后授权使用 `FundsAuthorizationTransactionService#complete/reversal/refund` 并按原授权事实和 RouteSnapshot 回放。VCC 同事务集成仍需在目标仓库验证。 | fincone VCC、wallet、transaction |
+| 支付工具与授权生命周期 | 首笔授权、可信完成和可信撤销使用 `PaymentInstrumentTransactionApplicationService` 统一入口；完成/撤销从原授权恢复主体和控制预留并在本地事务内联动，退款仍使用 `FundsAuthorizationTransactionService#refund`。当前仓库已验证支付工具改绑后退款仍沿原主体和原 RouteSnapshot，且不自动补偿周期控制额度；VCC 上游事件权威、补偿策略与目标部署事务拓扑仍待 Owner 签收。 | fincone VCC、wallet、transaction |
 | 原主体和原路由回放 | 需确认 binding snapshot、RouteParticipant、参与方账户层级快照和 RouteSnapshot 对外稳定引用；回放不得查询当前层级关系。 | wallet、transaction |
 | 资金解释查询 | 只返回 `wind-funds` 事实和不可用原因；不返回 VCC 事件应用状态或卡账单展示状态。 | transaction、fincone VCC |
 

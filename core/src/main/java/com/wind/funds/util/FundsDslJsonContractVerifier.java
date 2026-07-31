@@ -105,12 +105,17 @@ public final class FundsDslJsonContractVerifier {
         if (instruction == null) {
             return;
         }
-        verifyEnum(FundsInstructionType.class, instruction, ImmutableFundsInstructionSpec.Fields.instructionType,
-                "instruction.instructionType");
-        verifyEnum(FundsTransactionEventType.class, instruction, ImmutableFundsInstructionSpec.Fields.eventType,
-                "instruction.eventType");
-        verifyEnum(DefaultFundsTransactionType.class, instruction,
+        FundsInstructionType instructionType = verifyEnum(FundsInstructionType.class, instruction,
+                ImmutableFundsInstructionSpec.Fields.instructionType, "instruction.instructionType");
+        FundsTransactionEventType eventType = verifyEnum(FundsTransactionEventType.class, instruction,
+                ImmutableFundsInstructionSpec.Fields.eventType, "instruction.eventType");
+        DefaultFundsTransactionType transactionType = verifyEnum(DefaultFundsTransactionType.class, instruction,
                 ImmutableFundsInstructionSpec.Fields.transactionType, "instruction.transactionType");
+        if (!DefaultFundsTransactionType.isValidInstructionCombination(
+                instructionType, eventType, transactionType)) {
+            throw new IllegalArgumentException(
+                    "instruction instructionType/eventType/transactionType combination is invalid");
+        }
         verifyMoney(instruction, ImmutableFundsInstructionSpec.Fields.amount, "instruction.amount");
         verifyMoney(instruction, ImmutableFundsInstructionSpec.Fields.originalAmount, "instruction.originalAmount");
         verifyReference(asNullableMap(instruction.get(ImmutableFundsInstructionSpec.Fields.reference),

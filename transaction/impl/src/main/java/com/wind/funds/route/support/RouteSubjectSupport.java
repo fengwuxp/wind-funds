@@ -4,11 +4,13 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
@@ -18,9 +20,12 @@ import java.util.Objects;
  * 普通主体路由辅助。
  */
 @Component
+@RequiredArgsConstructor
 public class RouteSubjectSupport {
 
     private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
+
+    private final FundsAccountQueryService fundsAccountQueryService;
 
     public @NonNull SubjectRef createSubjectRef(@NonNull FundsAccountId accountId) {
         if (isExternalAccountType(accountId.type())) {
@@ -68,15 +73,12 @@ public class RouteSubjectSupport {
             throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能解析账本 Profile，accountId = "
                     + accountId);
         }
-        if (isMerchantFundingAccountType(accountId.type())) {
-            return LedgerProfileCode.FUNDING_MERCHANT;
-        }
-        return LedgerProfileCode.FUNDING_BASIC;
+        return fundsAccountQueryService.getLedgerProfileCode(accountId);
     }
 
     public boolean isFundingAccount(@NonNull FundsAccountId accountId) {
         return Objects.equals(accountId.type(), FundsSubjectType.FUNDING_ACCOUNT.name())
-                || isMerchantFundingAccountType(accountId.type());
+                || isSettlementFundingAccountType(accountId.type());
     }
 
     public boolean isCreditAccount(@NonNull FundsAccountId accountId) {
@@ -91,7 +93,8 @@ public class RouteSubjectSupport {
         return DefaultFundsAccountType.isExternalAccount(accountType);
     }
 
-    private boolean isMerchantFundingAccountType(String accountType) {
-        return Objects.equals(accountType, DefaultFundsAccountType.PLATFORM_MERCHANT.name());
+    private boolean isSettlementFundingAccountType(String accountType) {
+        return Objects.equals(accountType, DefaultFundsAccountType.PLATFORM_MERCHANT.name())
+                || Objects.equals(accountType, DefaultFundsAccountType.ACCOUNT_PAYABLE.name());
     }
 }

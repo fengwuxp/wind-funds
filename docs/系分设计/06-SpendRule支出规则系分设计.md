@@ -74,6 +74,10 @@
 2. 不改变交易 canonical 入参，不新增支付工具交易内核，不让 Spend Rule 或支出控制范围成为账本主体。
 3. 不替代外部风控、法务、合规、税务、会计、银行、ACH、卡组织或跨境规则专业确认。
 
+### 2.3 设计依据与当前事实
+
+设计依据包括产品分册、DSL v1.1、当前 wallet / transaction / ledger 模块边界、公共 face 契约、H2 表结构和服务层测试。当前事实以源码和测试为准：规则定义、不可变版本、挂载、决策记录、轻量单规则 evaluator 和准入验真已经落地；生产 MySQL 迁移、可信外部决策适配、IAM、操作审计、告警和 Runbook 尚未落地。外部规则只作为产品校准参考，其生产适用性、法域和版本仍是假设与待确认项。
+
 ## 3. 概要设计、核心方案和设计结论
 
 概要设计：Spend Rule 按“规则事实 -> 准入决策 -> 控制额度变动 -> 只读投影解释”四层承接。同步链路用于授权前准入和规则拒绝，异步或后置链路用于交易结果消费、预算控制投影重建和运营解释。
@@ -483,6 +487,9 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | spend_decision_sn | varchar(64) | 否 | Spend Rule 决策流水。 | DEC-001 |
 | control_scope_id | varchar(64) | 否 | 控制范围标识，不表达账务主体。 | BG-001 |
 | period_id | varchar(64) | 否 | 控制周期标识；预算控制投影类流水必填，用于当前周期和历史周期追溯。 | 2026-07 |
+| reason_code | varchar(64) | 条件必填 | 调额或退款控制补偿的策略原因码；`REFUND_COMPENSATED` 必填。 | PRODUCT_POLICY_REFUND_RESTORE |
+| operator_id | varchar(64) | 条件必填 | 调额或退款控制补偿的操作者；`REFUND_COMPENSATED` 必填。 | spend-control-refund-service |
+| audit_reference_sn | varchar(128) | 条件必填 | 调额或退款控制补偿的审批、策略或审计引用；`REFUND_COMPENSATED` 必填。 | AUDIT-REFUND-001 |
 | movement_digest | varchar(128) | 是 | 控制额度变动摘要。 | sha256:activity |
 
 索引：
@@ -505,7 +512,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | LIMIT_DECREASED | 控制额度调减流水 | 是 | 减少当前周期或 scope 的控制额度。 |
 | RESERVED | 控制预留流水 | 是 | 授权或付款前占用控制额度。 |
 | CONSUMED | 控制消耗流水 | 是 | 交易成功后将预留解释为已使用。 |
-| REFUND_COMPENSATED | 退款控制补偿流水 | 是 | 上层产品策略明确允许退款恢复周期控制额度后，降低周期净消费并恢复可用控制额度；资金退款事实本身不足以触发，不恢复已经被消费的原控制预留，也不允许同一 reservation 再次消费。 |
+| REFUND_COMPENSATED | 退款控制补偿流水 | 是 | 上层产品策略明确允许退款恢复周期控制额度后，降低周期净消费并恢复可用控制额度；资金退款事实本身不足以触发，写入必须携带 `reasonCode + operatorId + auditReferenceSn`，任一缺失在共享 movement 边界 fail-closed；不恢复已经被消费的原控制预留，也不允许同一 reservation 再次消费。 |
 | RELEASED | 控制释放流水 | 是 | 收到可信业务释放事实后释放已提交的预留控制占用；交易失败或拒绝由同一资金事务回滚控制预留，不写 `RELEASED` 补偿；超时不写控制流水。 |
 
 预算控制投影计算口径：
@@ -576,7 +583,7 @@ flowchart TD
 | 规则配置 | 创建定义、发布版本、挂载规则。 | 已发布版本不可变；挂载按生效时间、状态、优先级和冲突策略解释。 | 定义可用、版本摘要一致、scope 合法、冲突策略和生效时间完整。 | 快速失败，不覆盖既有版本，不生成交易或账本事实。 |
 | 交易准入 | wallet application 在交易内核前解析适用挂载并回读决策。 | `PASSED` 且验真通过或显式 `NO_APPLICABLE_RULE` 才能继续；`REJECTED`、不可验真、多挂载或存在无法解析的有效挂载时停在交易内核前。 | 当前有效 binding、决策引用、规则版本、scope、支付工具、动作、金额币种和业务上下文一致。 | 返回可审计原因，断言无 route、posting、LedgerEntry 和余额变化。 |
 | 已成立授权重放 | transaction application 先按业务键读取已成立授权。 | 完全相同的请求返回原交易号并沿用固化准入快照，不按当前 binding 重算；关键请求或决策证据变化时拒绝。 | 原交易状态稳定，交易模式、金额币种、工具、授权结果和 Spend Rule 快照与重放请求一致。 | 不新增交易、route、posting、LedgerEntry 或余额变化；处理中和失败状态继续走当前准入。 |
-| 控制额度变动 | 交易成功后记录预占、消耗、可信释放，或在产品策略明确授权时记录退款控制补偿。 | 控制事实与资金事实分层；资金退款不自动恢复周期控制额度，周期投影从控制流水重建。 | 原交易/控制流水引用、周期、scope、金额和 movementDigest 完整；`REFUND_COMPENSATED` 还需上层策略已明确。 | 记录失败进入补偿或人工处理，不回滚已经成功的资金事实。 |
+| 控制额度变动 | 交易成功后记录预占、消耗、可信释放，或在产品策略明确授权时记录退款控制补偿。 | 控制事实与资金事实分层；资金退款不自动恢复周期控制额度，周期投影从控制流水重建。 | 原交易/控制流水引用、周期、scope、金额和 movementDigest 完整；`REFUND_COMPENSATED` 还必须提供 `reasonCode + operatorId + auditReferenceSn`。 | 缺策略审计证据时拒绝且不写控制流水；其他记录失败进入补偿或人工处理，不回滚已经成功的资金事实。 |
 | 历史解释 | 查询交易投影和规则时间线。 | 只读历史规则、决策和控制事实，不按当前规则重算。 | 历史证据引用存在且调用方有权查看脱敏摘要。 | 标记证据缺失或转人工，不推断结果、不反写事实。 |
 
 ## 8. 一致性、事务与失败无副作用
@@ -740,7 +747,7 @@ Runbook 最低要求：
 | 测试资产 | 证明内容 |
 | --- | --- |
 | SpendRuleDefinitionServiceFlowTests | 规则定义、版本不可变、挂载、查询解释、决策记录和拒绝无资金副作用。 |
-| PaymentInstrumentTransactionAuthorizationTests | 支付工具、账户能力、资金责任和 Spend Rule 决策组合后，拒绝停在交易内核前。 |
+| PaymentInstrumentTransactionAuthorizationTests | 支付工具、账户能力、资金责任和 Spend Rule 决策组合后，拒绝停在交易内核前；授权后工具改绑时，可信完成和撤销仍从原 RouteSnapshot 恢复账务主体与控制预留。 |
 | SpendControlAdmissionApplicationServiceTests | 支出控制准入消费决策证据，证明通过、拒绝、缺证据、幂等和摘要冲突边界。 |
 | SpendControlMovementServiceFlowTests | 控制额度变动流水幂等、预算控制投影只读、历史决策兼容类型不再允许新写入。 |
 | BudgetControlLimitAdjustmentApplicationServiceTests | 预算额度调增、调减、投影占用下限和幂等摘要冲突。 |
@@ -896,16 +903,16 @@ Velocity 控制映射边界：
 
 ### 14.1 规则变更审计与 Runbook 工程门禁
 
-本节是 Spend Controls 生产准入的最小工程门禁，不新增运行时代码、不改变公共契约，也不把现有服务层测试外推为生产上线批准。后续若要编码落地审计表、运营后台、告警或迁移脚本，必须以本节为独立工程边界重新确认写入范围、数据结构决策、目标测试和停止条件。
+本节是 Spend Controls 生产准入的最小工程门禁。当前只补规则评估与准入结果的源码日志信号，不改变公共契约，也不把源码日志和服务层测试外推为生产上线批准。后续若要编码落地审计表、运营后台、告警或迁移脚本，必须以本节为独立工程边界重新确认写入范围、数据结构决策、目标测试和停止条件。
 
 | 项 | 结论 |
 | --- | --- |
 | 门禁项 | Spend Controls 规则变更审计与 Runbook |
 | 目标 | 让规则变更、准入决策、控制窗口和异常恢复在生产试点前具备可审计、可定位、可回滚和可验收的最小证据链。 |
-| 写入范围 | 仅文档和 TDD 锚点；不修改 Java、H2 schema、DDL、Mapper、公共 DTO 或交易 canonical 入参。 |
+| 写入范围 | `SpendRuleEvaluationApplicationServiceImpl` 与 `SpendControlAdmissionApplicationServiceImpl` 仅补白名单结果日志，并同步本系分与 OpenSpec；不修改规则判断、H2 schema、DDL、Mapper、公共 DTO 或交易 canonical 入参。 |
 | 只读范围 | `SpendRuleDefinitionServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`SpendControlMovementServiceFlowTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`WalletSpendControlsAcceptanceFlowTests`。 |
 | 数据结构决策 | 当前不新增表。生产落地审计和告警前，需单独评审接入统一操作审计或新增规则变更审计表；不得把操作者、原因、审批引用或变更摘要补回 SpendRuleBinding 生命周期请求。 |
-| 验证方式 | 文档切片执行 `git diff --check`；若进入代码或 schema，最小回归为 `just verify-slice SpendRuleDefinitionServiceTests,SpendControlAdmissionApplicationServiceTests,SpendControlMovementServiceFlowTests,WalletSpendControlsAcceptanceFlowTests tests`。 |
+| 验证方式 | 执行 `just verify-slice SpendRuleEvaluationApplicationServiceTests,SpendControlAdmissionApplicationServiceTests tests`、`just compile`、`just pmd`、系分结构校验和 `git diff --check`。日志字段只做源码与 CR 检查，不新建日志测试框架。 |
 | 停止条件 | 需要运营后台、审批流、webhook、生产 DDL / 索引、历史回填、强一致频控拦截、敏感原文存储或多规则明细落库时停止，拆独立工程任务。 |
 
 规则变更审计最小证据：
@@ -924,10 +931,13 @@ Runbook 最低信号和处置：
 | --- | --- | --- | --- |
 | 规则版本摘要冲突 | 版本发布或幂等重放返回摘要冲突。 | 暂停该规则新挂载，保留冲突请求和 traceId。 | 同 ruleId + version 只能保留一个已发布摘要；冲突请求无资金事实副作用。 |
 | 挂载冲突或缺冲突策略 | 挂载校验失败、准入无法解释有效挂载。 | 停用问题挂载或恢复旧挂载，不覆盖历史版本。 | 指定 scope 在评估时间只能得到可解释挂载集合。 |
-| 准入拒绝异常升高 | 拒绝率、拒绝原因或外部决策拒绝数量超过灰度阈值。 | 暂停灰度、切回旧挂载或转人工复核。 | 拒绝无 route、posting、LedgerEntry 和余额副作用；拒绝原因可查询。 |
+| 规则评估拒绝异常升高 | 按 `Spend Rule 评估完成` 检索 `decisionResult`、`rejectReason`、规则版本和业务引用；灰度阈值仍待生产 Owner 确认。 | 暂停该规则或版本的灰度评估，保留摘要和业务引用，不自动改写规则事实。 | 相同规则版本和输入得到稳定摘要；评估过程无资金事实副作用。 |
+| 准入拒绝异常升高 | 按 `支出控制准入已解析` 检索决策、挂载、控制范围、周期和拒绝原因；拒绝率阈值仍待生产 Owner 确认。 | 暂停灰度、切回旧挂载或转人工复核。 | 拒绝无 route、posting、LedgerEntry 和余额副作用；拒绝原因可查询。 |
 | 控制投影缺证据 | `controlScopeId + periodId` 查询缺 LIMIT 或历史控制流水不闭合。 | 阻断自动授权，要求补调额证据或人工处理。 | 指定控制窗口可以重建 limit、occupied、consumed、available 控制口径。 |
 | 滚动窗口查询慢或超阈值 | evaluator 查询耗时、扫描范围或 H2 / 生产索引评审失败。 | 关闭该滚动窗口规则或限制灰度范围。 | 只读评估不写资金事实；恢复前完成索引、容量和慢查询评审。 |
 | 生产迁移或回填失败 | dry-run、批次校验、摘要校验或回填差异失败。 | 停止批次、保留游标和差异样本，不推进生产启用。 | 回填范围、影响行数、差异报告、回滚或前滚方案可审计。 |
+
+当前日志只证明代码中存在可检索的结果信号，不证明日志已采集、字段已解析、告警已配置或阈值有效。生产试点前仍需用真实运行样本验收日志平台查询、告警 Owner、通知链路、恢复演练和误报/漏报边界。
 
 ## 15. 工程进入门禁
 
@@ -942,9 +952,11 @@ Runbook 最低信号和处置：
 | 资金不变量 | 拒绝无资金事实副作用；规则和预算控制不入账；历史解释不重算。 |
 | 验证方式 | 至少执行目标测试、compile、pmd 和 git diff --check；文档-only 切片只需结构检查和 git diff --check。 |
 
-### 15.1 研发计划与验收方式
+### 15.1 验收摘要与执行计划
 
-Spend Rule 后续研发计划按单一工程边界推进，不把本分册中的生产缺口合并成一次性大任务。每个里程碑进入编码前都必须重新确认负责人、写入范围、目标测试和停止条件。
+验收摘要：当前业务结果是可定义、发布、挂载、评估和验真一条受限 Spend Rule，并在拒绝、歧义或证据不匹配时保持资金事实为零；系统不变量是 Spend Rule 只做 can-spend 决策，不成为账务主体、资金来源或交易事实。质量目标是规则版本不可变、决策和挂载可追溯、查询有界、失败关闭且无资金副作用。
+
+执行计划按单一工程边界推进，不把本分册中的生产缺口合并成一次性大任务。执行计划的权威路径是本节、`openspec/changes/spend-rule-production-conditional-baseline/spec.md` 和对应 TDD 测试清单，适用版本为当前 Review 版；每个里程碑进入编码前都必须重新确认负责人、写入范围、目标测试和停止条件。
 
 | 里程碑 | 负责人 | 验收方式 |
 | --- | --- | --- |

@@ -278,7 +278,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 && entry.getLedgerSubjectCategory() == LedgerSubjectCategory.CLEARING
                 && entry.getEntryType() == EntrySide.CREDIT
                 && entry.getPostingRole() == LedgerPostingRole.DETAIL
-                && entry.getBalanceEffectType() == LedgerBalanceEffectType.INCREASE;
+                && (entry.getBalanceEffectType() == LedgerBalanceEffectType.INCREASE
+                || entry.getBalanceEffectType() == LedgerBalanceEffectType.CONSUME);
     }
 
     private String sourceDigest(IdentifyClearingSplittableDetailRequest request,

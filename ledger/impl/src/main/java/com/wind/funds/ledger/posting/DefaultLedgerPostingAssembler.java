@@ -339,6 +339,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case CLEARING -> LedgerPostingIntentType.SETTLEMENT;
             case SETTLEMENT -> LedgerPostingIntentType.SETTLEMENT;
             case PAYOUT -> LedgerPostingIntentType.WITHDRAWAL;
+            case BALANCE_CONTROL -> throw new IllegalArgumentException(
+                    "balance-control transaction type requires FREEZE or UNFREEZE event");
             case ADJUSTMENT -> LedgerPostingIntentType.ADJUSTMENT;
         };
     }

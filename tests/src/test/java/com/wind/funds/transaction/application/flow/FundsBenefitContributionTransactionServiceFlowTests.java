@@ -19,6 +19,7 @@ import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
 import java.util.Map;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -142,6 +143,39 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     }
 
     /**
+     * 场景：调用方未声明让利承接目标账目，或声明了方案外账目。
+     * 输入：目标账目为空或 AVAILABLE。
+     * 输出：服务 fail-fast，不生成资金或账务事实。
+     * 红线：公共契约不得默认猜测 CLEARING/SETTLEMENT，也不得把补贴直接记入可用余额。
+     */
+    @Test
+    void testSettleWithoutSupportedReceiverLedgerSubjectShouldFailWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_subject_cost");
+        FundsAccountId receiver = fundingAccount("ben_subject_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.AVAILABLE);
+        var before = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiver, 20L, "BENEFIT_MISSING_RECEIVER_SUBJECT_001")
+                        .setBenefitReceiverLedgerSubjectCode(null),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("让利承接目标账目不能为空");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_MISSING_RECEIVER_SUBJECT_001");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiver, 20L, "BENEFIT_UNSUPPORTED_RECEIVER_SUBJECT_001")
+                        .setBenefitReceiverLedgerSubjectCode(LedgerSubjectCode.AVAILABLE),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("仅支持 CLEARING 或 SETTLEMENT");
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(costBearer, receiver)),
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_UNSUPPORTED_RECEIVER_SUBJECT_001");
+    }
+
+    /**
      * 场景：商户承担优惠券或支付立减，资金底座记录商户让利的出资责任账目。
      * 输入：资金性质为 MERCHANT_BORNE。
      * 输出：生成一笔从商户让利责任账户到用户让利账目的标准资金交易和账务分录。
@@ -184,6 +218,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId receiver = fundingAccount("ben_idempotent_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(receiver, LedgerSubjectCode.CLEARING);
 
         topup(costBearer, 100L, "BENEFIT_IDEMPOTENT_TOPUP");
         var afterTopup = snapshot(balances(costBearer, receiver));
@@ -217,13 +252,26 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterSettleFacts);
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiver, 30L, businessSn)
+                        .setBenefitReceiverLedgerSubjectCode(LedgerSubjectCode.CLEARING),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertOnlyBalanceDeltas(afterConflict, snapshot(balances(costBearer, receiver)),
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.CLEARING, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterSettleFacts);
     }
 
     /**
      * 场景：平台补足商户、平台直补用户、合作方出资共同出现在让利方案中。
      * 输入：平台向商户结算主体出资 40，平台向用户可记账补贴账户出资 15，
      * 合作方向订单让利归集主体出资 8。
-     * 输出：每组成本承担主体和让利承接账务主体分别形成独立资金交易、账本分录和余额影响。
+     * 输出：每组成本承担主体和让利承接账务主体分别形成独立资金交易、账本分录和余额影响；
+     * 平台补足商户的退款沿原交易从商户 CLEARING 回补平台承担账户。
      * 红线：让利承接方可以是商户、用户或订单归集账目，但必须是可记账主体，
      * 不能退化为营销用户或券来源。
      */
@@ -231,12 +279,12 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     void testSettleScenarioMatrixShouldRecordConcreteContributionPairs() {
         FundsAccountId platformMarketing = fundingAccount("ben_matrix_platform");
         FundsAccountId partnerCostBearer = fundingAccount("ben_matrix_partner");
-        FundsAccountId merchantSettlement = fundingAccount("ben_matrix_merchant");
+        FundsAccountId merchantClearing = fundingAccount("ben_matrix_merchant");
         FundsAccountId userSubsidy = fundingAccount("ben_matrix_user");
         FundsAccountId orderBenefitPool = fundingAccount("ben_matrix_order");
         ensureLedger(platformMarketing, LedgerSubjectCode.AVAILABLE);
         ensureLedger(partnerCostBearer, LedgerSubjectCode.AVAILABLE);
-        ensureLedger(merchantSettlement, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(merchantClearing, LedgerSubjectCode.CLEARING);
         ensureLedger(userSubsidy, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(orderBenefitPool, LedgerSubjectCode.SETTLEMENT);
 
@@ -244,13 +292,14 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         topup(partnerCostBearer, 100L, "BENEFIT_MATRIX_PARTNER_TOPUP");
         var afterTopup = snapshot(balances(platformMarketing,
                 partnerCostBearer,
-                merchantSettlement,
+                merchantClearing,
                 userSubsidy,
                 orderBenefitPool));
 
         String platformToMerchantSn = benefitContributionTransactionService.settle(
-                settleRequest(platformMarketing, merchantSettlement, 40L, "BENEFIT_MATRIX_PLATFORM_MERCHANT_001")
-                        .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
+                settleRequest(platformMarketing, merchantClearing, 40L, "BENEFIT_MATRIX_PLATFORM_MERCHANT_001")
+                        .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS)
+                        .setBenefitReceiverLedgerSubjectCode(LedgerSubjectCode.CLEARING),
                 WindOperatorFactory.system());
         String platformToUserSn = benefitContributionTransactionService.settle(
                 settleRequest(platformMarketing, userSubsidy, 15L, "BENEFIT_MATRIX_PLATFORM_USER_001")
@@ -266,18 +315,40 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertThat(partnerToOrderSn).isNotBlank();
         var afterSettle = snapshot(balances(platformMarketing,
                 partnerCostBearer,
-                merchantSettlement,
+                merchantClearing,
                 userSubsidy,
                 orderBenefitPool));
         assertOnlyBalanceDeltas(afterTopup, afterSettle,
                 delta(platformMarketing, LedgerSubjectCode.AVAILABLE, -55L, CURRENCY),
                 delta(partnerCostBearer, LedgerSubjectCode.AVAILABLE, -8L, CURRENCY),
-                delta(merchantSettlement, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
+                delta(merchantClearing, LedgerSubjectCode.CLEARING, 40L, CURRENCY),
                 delta(userSubsidy, LedgerSubjectCode.SETTLEMENT, 15L, CURRENCY),
                 delta(orderBenefitPool, LedgerSubjectCode.SETTLEMENT, 8L, CURRENCY));
-        assertBenefitSettleFacts("BENEFIT_MATRIX_PLATFORM_MERCHANT_001");
+        assertBenefitSettleFacts("BENEFIT_MATRIX_PLATFORM_MERCHANT_001", LedgerSubjectCode.CLEARING);
         assertBenefitSettleFacts("BENEFIT_MATRIX_PLATFORM_USER_001");
         assertBenefitSettleFacts("BENEFIT_MATRIX_PARTNER_ORDER_001");
+
+        benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
+                .setTenantId(TENANT_ID)
+                .setReferenceBenefitTransactionSn(platformToMerchantSn)
+                .setReferenceTransactionSn("PAY_ORDER_001")
+                .setAmount(Money.immutable(10L, CURRENCY))
+                .setBusinessScene("BENEFIT_REFUND")
+                .setBusinessSn("BENEFIT_MATRIX_PLATFORM_MERCHANT_REFUND_001")
+                .setOriginalOrderSn("ORDER_001")
+                .setRefundReason("partial platform subsidy refund"), WindOperatorFactory.system());
+
+        var afterClearingRefund = snapshot(balances(platformMarketing,
+                partnerCostBearer,
+                merchantClearing,
+                userSubsidy,
+                orderBenefitPool));
+        assertOnlyBalanceDeltas(afterSettle, afterClearingRefund,
+                delta(platformMarketing, LedgerSubjectCode.AVAILABLE, 10L, CURRENCY),
+                delta(merchantClearing, LedgerSubjectCode.CLEARING, -10L, CURRENCY));
+        assertLedgerEventAndBuckets("BENEFIT_MATRIX_PLATFORM_MERCHANT_REFUND_001",
+                FundsTransactionEventType.REFUND, LedgerSubjectCode.CLEARING, LedgerSubjectCode.AVAILABLE);
+        assertThat(fundsTransaction(platformToMerchantSn).getRefundedAmount()).isEqualTo(10L);
     }
 
     /**
@@ -404,8 +475,8 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     }
 
     /**
-     * 场景：调用方试图把已删除的账务效果或来源归因字段塞进扩展上下文。
-     * 输入：contextVariables 包含 ledgerEffect。
+     * 场景：调用方试图把让利承接目标账目藏入嵌套上下文、列表或点号别名。
+     * 输入：contextVariables 包含嵌套或列表中的 benefitReceiverLedgerSubjectCode，或点号分隔别名。
      * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
      * 红线：contextVariables 只能放轻量关联信息，不能成为核心金额、分摊或规则事实旁路。
      */
@@ -418,17 +489,72 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         var before = snapshot(balances(costBearer, receiver));
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
-                "BENEFIT_CONTEXT_CORE_FIELD_001")
-                .setContextVariables(ReadonlyContextVariables.of(Map.of("ledgerEffect", "POSTING_REQUIRED"))),
+                "BENEFIT_CONTEXT_NESTED_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payload", Map.of("benefitReceiverLedgerSubjectCode", "CLEARING")))),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
-                .hasMessageContaining("ledgerEffect");
+                .hasMessageContaining("benefitReceiverLedgerSubjectCode");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_DOTTED_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payload.benefitReceiverLedgerSubjectCode", "CLEARING"))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("payload.benefitReceiverLedgerSubjectCode");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_SPLIT_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "benefitReceiver.LedgerSubjectCode", "CLEARING"))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("benefitReceiver.LedgerSubjectCode");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_LIST_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payloads", List.of(Map.of("benefitReceiverLedgerSubjectCode", "CLEARING"))))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("benefitReceiverLedgerSubjectCode");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_SLASH_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payload/benefitReceiverLedgerSubjectCode", "CLEARING"))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("payload/benefitReceiverLedgerSubjectCode");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_BRACKET_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payload[benefitReceiverLedgerSubjectCode]", "CLEARING"))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("payload[benefitReceiverLedgerSubjectCode]");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_ARRAY_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "payloads", new Object[]{Map.of("benefitReceiverLedgerSubjectCode", "CLEARING")}))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("benefitReceiverLedgerSubjectCode");
 
         var after = snapshot(balances(costBearer, receiver));
         assertOnlyBalanceDeltas(before, after,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
-        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_NESTED_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_DOTTED_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_SPLIT_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_LIST_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_SLASH_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_BRACKET_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_ARRAY_CORE_FIELD_001");
     }
 
     /**
@@ -481,6 +607,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setReferenceTransactionSn("PAY_ORDER_001")
                 .setCostBearerSubjectRef(subjectRef(costBearer))
                 .setBenefitReceiverSubjectRef(subjectRef(receiver))
+                .setBenefitReceiverLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setAmount(Money.immutable(amount, CURRENCY))
                 .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS);
     }
@@ -506,10 +633,14 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     }
 
     private void assertBenefitSettleFacts(String businessSn) {
+        assertBenefitSettleFacts(businessSn, LedgerSubjectCode.SETTLEMENT);
+    }
+
+    private void assertBenefitSettleFacts(String businessSn, LedgerSubjectCode receiverLedgerSubjectCode) {
         assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 2);
         assertLedgerFactsFollowRouteSnapshot(businessSn);
         assertLedgerEventAndBuckets(businessSn, FundsTransactionEventType.PAY,
-                LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
+                LedgerSubjectCode.AVAILABLE, receiverLedgerSubjectCode);
     }
 
     private void assertBenefitContributionDescription(String transactionSn, String expectedDescription) {

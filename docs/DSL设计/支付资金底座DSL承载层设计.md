@@ -562,7 +562,7 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 
 | 对象 | 用途 | 边界 |
 | --- | --- | --- |
-| `FundsBenefitContributionTransactionService` | 当前 Java 公共契约中的让利出资记账交易服务，提供 `complete`、`refund`，返回资金交易流水号。 | 和直接交易服务处于同一抽象层级；不直接写 route、posting、LedgerEntry 或余额投影。 |
+| `FundsBenefitContributionTransactionService` | 当前 Java 公共契约中的让利出资记账交易服务，提供 `settle`、`refund`，返回资金交易流水号。 | 和直接交易服务处于同一抽象层级；不直接写 route、posting、LedgerEntry 或余额投影。 |
 | `FundsBenefitContributionSettleRequest` | 表达已决策出资方到让利承接账务主体的一笔入账交易。 | 只承载业务流水、原订单或原交易引用、成本承担主体、让利承接账务主体、金额和资金性质；不承载完整营销规则、券包库存、最优券计算或来源归因列表。 |
 | `FundsBenefitContributionRefundRequest` | 表达原让利出资交易的退款、业务取消、人工纠错或反向冲销。 | 必须引用原让利出资交易流水号；不得携带当前重新计算的权益结果作为资金事实来源。 |
 
@@ -580,9 +580,9 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 
 1. 不改变 `FundsInstructionSpec` 既有主字段语义。
 2. 当前交易层入口使用 `FundsBenefitContributionTransactionService`；不得新增 `FundsMarketingTransactionService` 或 `authorizeBenefit/settleBenefit/refundBenefit` 平行生命周期。
-3. `complete` 即表示真实入账交易，公共请求不再暴露 `ledgerEffect`。
+3. `settle` 即表示真实入账交易，公共请求不再暴露 `ledgerEffect`。
 4. 商户让利、展示优惠等无资金转移解释事实不得进入 `complete` 入口，也不得通过 `contextVariables` 冒充入账事实。
-5. 平台补贴、商户承担、合作方补贴等已决策有资金影响的让利出资，按出资方拆成独立 `complete` 交易。
+5. 平台补贴、商户承担、合作方补贴等已决策有资金影响的让利出资，按出资方拆成独立 `settle` 交易。
 6. 券、活动、规则来源、分摊决策和营销归因由上游保留，本服务不定义 `benefitFundingSources` 或来源引用字段。
 
 现有字段对齐：
@@ -619,6 +619,7 @@ transaction/face/src/main/java/com/wind/funds/transaction/enums/
 | --- | --- | --- |
 | `costBearerSubjectRef` | 指向已解析的成本承担账务主体，例如平台营销资金账户、商户让利责任账户、合作方补贴账户或等价可入账账户 profile。 | 不能指向支付工具、活动、券实例、营销规则、用户或商户经营主体；单个平台营销账户只适合平台自有补贴，不能合并商户或合作方出资。 |
 | `benefitReceiverSubjectRef` | 指向本次让利出资交易的让利承接账务主体，例如商户清结算账户、用户补贴账户或订单维度让利归集账目。 | 是当前资金路径的结算目标主体，不等同于营销系统中的收券用户；不作为营销规则或券包状态。 |
+| `benefitReceiverLedgerSubjectCode` | 显式声明让利承接目标账目；平台补足商户使用 `CLEARING`，用户或订单归集使用 `SETTLEMENT`。 | 必填且只允许 `CLEARING/SETTLEMENT`，不得设置默认值或藏入 `contextVariables`。 |
 | `fundingNature` | 区分平台自有资金、商户承担、合作方出资等成本性质。 | 与账户引用共同用于 route、posting 和对账解释；不替代账户主体，也不承载活动、券或规则来源。 |
 
 营销/让利账户不替代让利出资记账交易。让利出资记账交易保存“某个已决策出资方，向某个让利承接账务主体，出资多少钱”；营销/让利账户只回答“该出资方的成本责任落到哪个可入账账户”。券、活动、规则、核销流水和分摊来源由上游保留；没有原让利出资交易或等价不可变事实时，后续退款、业务取消、清结算、对账和投影不得只凭营销账户重新构造历史让利。
@@ -628,7 +629,7 @@ transaction/face/src/main/java/com/wind/funds/transaction/enums/
 | 边界 | DSL 裁决 |
 | --- | --- |
 | 禁止新增权益交易 DSL 服务入口 | 不新增 `FundsMarketingTransactionService`、`authorizeBenefit`、`settleBenefit`、`refundBenefit` 等平行交易入口；权益授权、结算和退款必须落回现有直接交易、授权交易、退款和清结算生命周期。 |
-| 让利出资记账交易服务 | 当前 Java 公共契约为 `FundsBenefitContributionTransactionService`，提供 `complete`、`refund`，返回资金交易流水号。 |
+| 让利出资记账交易服务 | 当前 Java 公共契约为 `FundsBenefitContributionTransactionService`，提供 `settle`、`refund`，返回资金交易流水号。 |
 | 不设置独立来源归因解析服务 | 请求已经携带成本承担主体、让利承接账务主体和资金性质；券、活动、规则和分摊来源由上游保留，资金底座不新增来源归因解析服务或 `benefitFundingSources`。 |
 | 账户解析在进入本服务前完成 | 调用方必须把活动、券、规则或业务主体解析为可记账 `SubjectRef`；缺成本承担主体、缺承接主体或无真实入账影响时，应在 route leg、posting plan 或 LedgerEntry 生成前失败。 |
 | 事实进入既有资金链路 | 让利出资影响通过让利出资记账交易、route snapshot、posting context 和交易事实表达；不得新增独立 marketing transaction 指令类型替代原交易生命周期。 |
@@ -649,6 +650,7 @@ classDiagram
       +String referenceTransactionSn
       +SubjectRef costBearerSubjectRef
       +SubjectRef benefitReceiverSubjectRef
+      +LedgerSubjectCode benefitReceiverLedgerSubjectCode
       +Money amount
       +FundsBenefitFundingNature fundingNature
     }
@@ -689,7 +691,8 @@ public interface FundsBenefitContributionTransactionService {
 | `originalOrderSn` | 是 | 原始业务订单号。 |
 | `referenceTransactionSn` | 否 | 关联原主资金交易流水号，可用于伴随支付、退款、业务取消、争议或对账回放。 |
 | `costBearerSubjectRef` | 是 | 平台、商户或合作方让利责任承担账务主体。 |
-| `benefitReceiverSubjectRef` | 是 | 让利承接账务主体；`complete` 会作为标准直接交易的收款方。 |
+| `benefitReceiverSubjectRef` | 是 | 让利承接账务主体；`settle` 会作为标准直接交易的收款方。 |
+| `benefitReceiverLedgerSubjectCode` | 是 | 让利承接目标账目，只允许 `CLEARING` 或 `SETTLEMENT`；平台补足商户使用 `CLEARING`，用户或订单归集使用 `SETTLEMENT`，无默认值。 |
 | `amount` | 是 | 让利资金金额。 |
 | `fundingNature` | 是 | 让利资金性质，例如平台自有资金、商户承担、合作方出资。 |
 | `contextVariables` | 否 | 非关键只读上下文，不得承载核心金额、出资分摊、券、活动、规则来源或敏感原文。 |
@@ -1343,7 +1346,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001` | shared card 授权、可信撤销、完成和退款；过期不入资金交易。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、binding snapshot、cardholder/department/project 上下文、SpendControlScope 上下文、Spend Rule 快照和资金责任决策。 | 共享卡是使用模式；每张卡绑定一个信用子账户，多卡共享通过同一父账户约束，后续事件沿原快照回放，不读取当前绑定重选路。 | 共享卡、卡号或持卡人入账、缺信用子账户、缺父账户快照、缺绑定版本、当前换绑影响历史退款，或过期直接生成资金事实。 |
 | `DSL-PAYMENT-INSTRUMENT-FAIL-001` | 支付工具不可用或资金责任不唯一。 | command validation 和 route failure boundary。 | 失败无副作用，不生成 route/posting/entry。 | 自动换路、自动改绑定、失败仍写账。 |
 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001` | 工具换绑后退款、撤销、退费或拒付。 | 原 route snapshot、原工具快照和原费用 leg。 | 后续事件沿原路径回放，不读取当前绑定关系重选路。 | 退款入到新绑定账户、缺快照兜底重选路、累计超额。 |
-| `DSL-BENEFIT-CONTRIBUTION-SETTLE-001` | 优惠让利出资记账最小契约。 | `FundsBenefitContributionTransactionService#settle` 请求，包含成本承担主体、让利承接账务主体、金额、资金性质和原订单或交易引用。 | JSON 可表达谁承担成本、让利结果落到哪个账务承接主体、让了多少钱；`complete` 即真实入账交易。 | 恢复 `FundsInstruction.benefitSnapshot`、把核心金额和责任塞入 `contextVariables`、补贴与本金净额混记、把用户余额入账或返利分润塞进本服务。 |
+| `DSL-BENEFIT-CONTRIBUTION-SETTLE-001` | 优惠让利出资记账最小契约。 | `FundsBenefitContributionTransactionService#settle` 请求，包含成本承担主体、让利承接账务主体、目标账目、金额、资金性质和原订单或交易引用。 | JSON 可表达谁承担成本、让利结果落到哪个账务承接主体和账目、让了多少钱；`settle` 即真实入账交易。 | 恢复 `FundsInstruction.benefitSnapshot`、把核心金额和责任塞入 `contextVariables`、补贴与本金净额混记、把用户余额入账或返利分润塞进本服务。 |
 | `DSL-BENEFIT-MERCHANT-DISCOUNT-001` | 商户优惠券不入账。 | 非入账商户让利解释事实，由订单、清分、商户账单或对账解释承接。 | 商户让利进入清结算展示、商户账单或投影归因，不调用让利出资记账交易服务，不生成权益 posting。 | 商户让利生成 LedgerEntry、商户应收无法解释。 |
 | `DSL-BENEFIT-PLATFORM-SUBSIDY-001` | 平台补贴券补足商户。 | `FundsBenefitContributionTransactionService#settle`，成本承担主体为平台营销资金账户或等价责任账户。 | 补贴形成独立权益资金交易或伴随资金事实；本金和补贴拆分。 | 补贴与本金净额混记、缺平台资金来源、缺规则版本。 |
 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001` | 平台券不补足商户。 | 展示优惠仅用于降低用户实付和商户应收，不生成补贴资金事实。 | 不调用让利出资记账交易服务，不生成平台补贴 leg，不误生成平台补贴成本。 | 展示优惠被误当平台资金支出。 |
@@ -1368,7 +1371,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 
 ### 11.3 让利出资记账交易夹具场景示例
 
-本节是让利出资记账交易 DSL 场景示例的权威入口。样例只表达目标态交付口径：需要真实入账的让利出资通过 `FundsBenefitContributionTransactionService` 的 `complete`、`refund` 请求进入交易层；非入账优惠不进入本服务，`FundsInstruction.benefitSnapshot`、旧 `FundsBenefitSnapshotSpec` 及其组件、引用、退款策略对象不再作为 core DSL。
+本节是让利出资记账交易 DSL 场景示例的权威入口。样例只表达目标态交付口径：需要真实入账的让利出资通过 `FundsBenefitContributionTransactionService` 的 `settle`、`refund` 请求进入交易层；非入账优惠不进入本服务，`FundsInstruction.benefitSnapshot`、旧 `FundsBenefitSnapshotSpec` 及其组件、引用、退款策略对象不再作为 core DSL。
 
 #### 11.3.1 平台补贴：独立权益资金交易
 
@@ -1389,6 +1392,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "referenceTransactionSn": "PAY_202606160001",
     "costBearerSubjectRef": { "subjectType": "FUNDING_ACCOUNT", "subjectId": "fa_platform_marketing_usd" },
     "benefitReceiverSubjectRef": { "subjectType": "FUNDING_ACCOUNT", "subjectId": "fa_merchant_clearing_usd" },
+    "benefitReceiverLedgerSubjectCode": "CLEARING",
     "amount": { "currency": "USD", "amount": 2000 },
     "fundingNature": "PLATFORM_OWN_FUNDS"
   },

@@ -2,7 +2,7 @@
 
 ## 1. 定位
 
-本文面向要接入 `ledger`、`wallet`、`transaction` 三个主链模块，以及已声明对账、清分、内部清算、结算、出款和 W3 最小追偿责任/结果引用基础设施切片的业务系统和内部研发。它只说明当前代码中已有公共契约和本地测试证明过的接入方式，不承诺 VCC、全球账户、收单、具体通道执行、追偿策略与资金执行、归档或治理的生产接入。
+本文面向要接入 `ledger`、`wallet`、`transaction` 三个主链模块，以及已声明对账、清分、内部清算、结算、出款和 W3 最小追偿责任/结果引用基础设施切片的业务系统和内部研发。它只说明当前代码中已有公共契约和 `tests` 模块证明过的接入方式；VCC、全球账户、ACH、收单、代理分佣和优惠让利只验收归一后的资金底座能力，不承诺完整业务产品、外部通道执行或宿主已经上线。
 
 接入三层主链时只依赖 `core`、`ledger-face`、`wallet-face`、`transaction-face`；使用已声明的清结算与对账切片时可额外依赖 `reconciliation-face`。不要依赖 `*-impl`、Entity、Mapper、交易层清算/结算/出款资金原语或测试工具类。
 
@@ -44,7 +44,7 @@
 
 ### 4.1 当前接入成熟度基线
 
-本表只表示仓库当前已实现并由本地测试证明的能力成熟度，不等同于生产准出。主链缺少统一版本化生产迁移、运行环境演练、监控告警和 Runbook 证据时，只能用于开发或受控联调。新增公共契约、扩展业务能力或进入 P2 场景前，必须重新确认写入范围、验证命令和不接入范围。
+本表只表示仓库当前已实现并由 `tests` 模块证明的能力成熟度。生产可交付结论必须同时具备版本化目标 MySQL 迁移与专项测试、公共契约、业务流程、并发/幂等/重放/失败无副作用测试和独立 Checker；宿主运行环境、监控告警和 Runbook 属于部署接入证据，不作为本仓库完成锚点。新增公共契约或扩展场景能力前，仍需重新确认写入范围、验证命令和不接入范围。
 
 | 能力域 | 准出结论 | 当前可交付内容 | 生产接入前仍需确认 |
 | --- | --- | --- | --- |
@@ -58,10 +58,10 @@
 | 让利出资记账 | 开发 / 受控联调可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
 | 外部确认入金 | 开发 / 受控联调可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
 | FX 来源价格与金额换算 | 开发 / 受控联调可接入。 | `FxRateProvider` 是由接入方实现并注入的汇率来源端口，提供含 `snapshotId`、`observedAt` 和 `MID/BID/ASK` 的来源快照；跨币种换算可显式传入最终 `FxAppliedRate`，也可指定 `FxPriceType` 由换算服务查询来源快照并选价。 | wind-funds 不提供默认汇率来源实现；`FxAppliedRate` 与 `FxPriceType` 互斥且不默认选价。客户加点、quote、费用、有效期、锁汇、历史行情、换汇执行、合规和资金入账仍由上层业务或专项承接。 |
-| 对账 / 清分 / 内部清算 / 结算 / 出款事实 | `GO`（wind-funds 已声明的基础设施切片）；不等同于宿主部署上线准出。 | 对账批次与结果、差错与 Gate、清分/清算批次、`CLEARING -> AVAILABLE`、`AVAILABLE -> SETTLEMENT`，以及基于锁定外部端点结算单的 PayoutOrder 创建、提交意图、归一回单、成功关闭和失败回退。W2 不启用 `IN_TRANSIT`，不支持失败后重试。 | 来源验签与归一、业务匹配执行、出款账户/端点/通道/合规准入、通道调用与状态归一、任务调度、宿主 IAM/审计、监控、Runbook、目标数据库与发布准出由接入方负责。 |
+| 对账 / 清分 / 内部清算 / 结算 / 出款事实 | `CONDITIONAL GO`；H2 功能切片已成立，目标 MySQL 门禁未完成。 | 对账批次与结果、差错与 Gate、清分/清算批次、`CLEARING -> AVAILABLE`、`AVAILABLE -> SETTLEMENT`，以及基于锁定外部端点结算单的 PayoutOrder 创建、提交意图、归一回单、成功关闭和失败回退。W2 不启用 `IN_TRANSIT`，不支持失败后重试。 | 20 张主资金链表和 21 张清结算表的 MySQL DDL、精确回读与 RR 竞争测试资产已落地，但仍需在目标 MySQL 实际执行；来源验签与归一、业务匹配执行、外部通道、宿主 IAM/审计、监控和 Runbook 由接入方负责。 |
 | 追偿责任 / 结果引用 | `CONDITIONAL GO`（W3 本地切片）；不作为生产追偿执行承诺。 | `RecoveryOrderApplicationService` 登记已确认责任和已完成 `RECOVERY` 资金交易引用，支持部分/全部追回累计、来源与结果幂等、超额和重复认领阻断；登记本身不动账。 | 目标 MySQL 迁移与 RR 并发仍需专用环境证据；责任判断、退款/拒付/催收、准备金、抵扣、负余额、人工收款、核销和资金执行由宿主或后续专项承接。 |
 | 归档 / 治理 | 不作为当前生产接入承诺。 | 现有目标设计和局部治理能力只能作为后续专项输入。 | 需要按新切片补公共对象、状态机、DDL/H2、服务级测试和 owner 确认。 |
-| VCC / 全球账户 / ACH / 收单 / FX quote 与执行 / 退汇 | P2 边界设计，不进入默认实现。 | 可复用主链事实、外部引用边界和显式 FX 金额计算。 | 业务生命周期、外部规则、通道协议、合规、敏感数据和专项回归未确认前，不得声明生产可用。 |
+| VCC / 全球账户 / ACH / 收单 / 代理分佣 / 优惠让利 | 场景资金能力验证中；按各自测试证据分级，不等同于完整业务产品完成。 | 复用主链事实、外部引用边界、原路逆向、清结算出款和对账能力；已落地的组合测试作为对应场景证据。 | 尚未闭合的公共契约、关键组合流程、目标 MySQL 和独立 Checker 结论继续阻断整体 Goal；外部规则、通道协议、合规、业务生命周期和敏感数据治理仍由相应业务方确认。 |
 
 交易投影当前在资金事务提交后通过 `afterCommit` 尽力发布；发布失败只记录告警，事实仍可由治理重放重建，但仓库尚无持久待办、自动补偿和积压监控。因此投影不能作为同步资金结果，也不能作为生产完整性证据；宿主进入生产前必须提供可持久发现、幂等重放和告警闭环。
 
@@ -176,7 +176,7 @@ VCC 或其他业务接入方负责外部事件验真、金额拆分、责任方�
 
 已成立授权按 `tenantId + businessScene + businessSn` 回读原交易，并以原交易上下文核对金额、币种、支付工具、授权结果和 Spend Rule 决策证据。完全相同的请求即使当前 binding 已暂停也返回原交易号，不重新生成资金或账务事实；关键参数或决策引用变化时拒绝。该规则只用于已经成立的授权事实，不允许失败中的请求绕过当前准入。
 
-金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影。交易成功通过交易消费入口记录 `CONSUMED`，退款成功记录 `REFUND_COMPENSATED`；交易失败或拒绝依赖同一资金事务回滚预留，不写释放补偿；到期或超时不写控制流水；可信撤销、清算剩余释放或差错补事实由上层显式调用控制流水服务记录 `RELEASED`。
+金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影。支付工具型可信授权完成和撤销分别通过 `completeAuthorizationByInstrument`、`reverseAuthorizationByInstrument` 原子记录资金事实与 `CONSUMED`、`RELEASED`；原交易本金退款使用 `FundsAuthorizationTransactionService#refund`，传入原授权账务主体并沿原 `RouteSnapshot` 回放，不读取当前支付工具绑定。交易失败或拒绝依赖同一资金事务回滚预留，不写释放补偿；到期或超时不写控制流水；资金退款不会自动恢复周期控制额度，只有产品策略明确授权并携带原因、操作者和审计引用时才另行记录 `REFUND_COMPENSATED`。
 
 Velocity 控制口径：Highnote 的 `PER_TRANSACTION` 在本项目只对应本次评估；`DAILY` / `WEEKLY` / `MONTHLY` / `QUARTERLY` / `YEARLY` 由接入方生成稳定 `periodId` 后查询控制投影；滚动次数只按 `ROLLING + windowSizeMinutes` 做只读候选评估；`NINETY_DAYS`、`COOLDOWN_MINUTE`、`COOLDOWN_HOUR`、rolling amount 和 Highnote 的 velocity control 数量上限当前不是 wallet 硬约束。Highnote velocity balance 查询只对应 `BudgetControlProjectionDTO` 的控制口径，不是资金账户余额或账本余额。
 
@@ -239,7 +239,7 @@ SC-LOOP-06 准出交接卡：
 3. 普通交易调用方只把 `decisionSn` 作为决策引用交给 `SpendControlAdmissionApplicationService.resolveSpendControlAdmission`；rule、binding、结果和摘要字段即使提供也只用于一致性诊断
 4. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
 5. 交易层入口
-6. `SpendControlTransactionConsumptionApplicationService` 记录交易消费或退款补偿事实；可信控制释放直接调用 `SpendControlMovementService`
+6. 支付工具可信完成或撤销调用 `PaymentInstrumentTransactionApplicationService` 的统一 facade；`SpendControlTransactionConsumptionApplicationService` 承接已成立交易事实对应的控制消费、可信释放或策略授权退款补偿
 
 SpendControlScope 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
 
@@ -249,9 +249,9 @@ SpendControlScope 是控制范围，不是账本主体。接入侧使用 `contro
 flowchart LR
     A["Spend Rule 设置周期额度"] --> B["周期刷新任务生成 LIMIT_INCREASED"]
     B --> C["授权前记录 RESERVED"]
-    C --> D["交易成功记录 CONSUMED"]
-    C --> E["交易失败记录 RELEASED"]
-    D --> F["退款成功记录 REFUND_COMPENSATED"]
+    C --> D["可信完成：资金 + CONSUMED"]
+    C --> E["可信撤销：资金 + RELEASED"]
+    D --> F["策略授权退款：REFUND_COMPENSATED"]
     B --> G["按 controlScopeId + periodId 查询预算控制投影"]
 ```
 
@@ -270,7 +270,9 @@ flowchart LR
 | 记录出资 | `FundsBenefitContributionTransactionService.settle` |
 | 冲回出资 | `FundsBenefitContributionTransactionService.refund` |
 
-多方出资就多次调用 `complete`，不要批量 API，也不要把多个出资方合并到一个营销账户。
+`settle` 必须显式传入 `benefitReceiverLedgerSubjectCode`：平台补足商户使用 `CLEARING`，用户或订单归集使用 `SETTLEMENT`；字段无默认值，也不接受其他账目。`refund` 只引用原让利出资交易，不重新传目标账目，由资金底座沿原 route snapshot 回放。
+
+多方出资就多次调用 `settle`，不要批量 API，也不要把多个出资方合并到一个营销账户。
 
 验证锚点：`FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests`。
 
@@ -323,7 +325,7 @@ flowchart LR
 | 失败无副作用 | 准入失败、余额不足、规则拒绝、外部非终态和路由失败不得留下错误资金事实。 |
 | 账务验收 | 已验证 transaction、route、posting、ledger transaction、ledger entry、余额桶和投影查询。 |
 | 敏感数据 | 不在 request、contextVariables、日志或审计摘要中保存 PAN、CVV、密钥、证件号、手机号或外部账号原文。 |
-| P2 边界 | VCC、全球账户、ACH、收单、FX quote 与执行、退汇、NOC、外部 rail reversal、多币种对账和通道协议未进入本轮交付承诺；已提供的 FX 来源价格与金额换算不改变该边界。 |
+| P2 边界 | 本轮只验收 VCC、全球账户、ACH 和收单等场景对公共资金能力的映射与可执行测试；完整业务产品、FX quote 与执行、退汇、NOC、外部 rail reversal、多币种对账和通道协议不属于 wind-funds 的交付承诺。 |
 
 ### 8.2 发布 Runbook
 

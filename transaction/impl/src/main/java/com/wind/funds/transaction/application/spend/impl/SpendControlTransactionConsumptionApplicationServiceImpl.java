@@ -3,6 +3,7 @@ package com.wind.funds.transaction.application.spend.impl;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -54,7 +55,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         validateTransactionControlRequest(request);
         SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
         FundsTransactionDTO transaction = getExistingFundsTransaction(request);
-        assertClosedTransaction(request, transaction);
+        assertConsumableTransaction(request, transaction);
         AssertUtils.isTrue(transaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
                 "控制消费不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
         assertControlMovementMatchesOriginalMovement(request, originalMovement, "控制消费");
@@ -62,8 +63,31 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalMovement, "控制消费金额超过原占用剩余额度");
         assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.CONSUMED, "控制消费");
-        return spendControlMovementService.recordMovement(
+        SpendControlMovementDTO consumedMovement = spendControlMovementService.recordMovement(
                 toRecordRequest(request, originalMovement, SpendControlMovementType.CONSUMED));
+        assertConsumeBackedByTrustedCompletion(request, transaction);
+        return consumedMovement;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request) {
+        validateTransactionControlRequest(request);
+        SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
+        FundsTransactionDTO transaction = getExistingFundsTransaction(request);
+        AssertUtils.isTrue(transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION,
+                "控制释放必须使用授权交易事实，transactionSn = {}", request.getTransactionSn());
+        AssertUtils.isTrue(Objects.equals(originalMovement.getTransactionSn(), request.getTransactionSn()),
+                "控制释放资金交易与原控制占用不一致，transactionSn = {}, originalMovementSn = {}",
+                request.getTransactionSn(), request.getOriginalMovementSn());
+        assertControlMovementMatchesOriginalMovement(request, originalMovement, "控制释放");
+        assertControlMovementMatchesTransaction(request, transaction, "控制释放");
+        assertTransactionBusinessSnMatches(request, transaction);
+        assertEnoughRemainingControlAmount(request, originalMovement, "控制释放金额超过原占用剩余额度");
+        SpendControlMovementDTO releasedMovement = spendControlMovementService.recordMovement(
+                toRecordRequest(request, originalMovement, SpendControlMovementType.RELEASED));
+        assertReleaseBackedByTrustedReversal(request, transaction);
+        return releasedMovement;
     }
 
     @Override
@@ -182,6 +206,17 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "资金交易必须已关闭，transactionSn = {}", request.getTransactionSn());
     }
 
+    private void assertConsumableTransaction(SpendControlTransactionConsumptionRequest request,
+                                             FundsTransactionDTO transaction) {
+        if (transaction.getTransactionMode() != FundsTransactionMode.AUTHORIZATION) {
+            assertClosedTransaction(request, transaction);
+            return;
+        }
+        long completedAmount = transaction.getCompletedAmount() == null ? 0L : transaction.getCompletedAmount();
+        AssertUtils.isTrue(completedAmount > 0L,
+                "授权交易必须已有可信完成金额，transactionSn = {}", request.getTransactionSn());
+    }
+
     private void assertControlMovementMatchesOriginalMovement(SpendControlTransactionConsumptionRequest request,
                                                               SpendControlMovementDTO originalMovement,
                                                               String actionName) {
@@ -236,6 +271,49 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 request.getMovementSn(),
                 request.getTransactionSn(),
                 remainingTransactionAmount,
+                request.getAmount());
+    }
+
+    private void assertReleaseBackedByTrustedReversal(SpendControlTransactionConsumptionRequest request,
+                                                      FundsTransactionDTO transaction) {
+        long releasedAmount = spendControlMovementService.queryMovements(new SpendControlMovementQuery()
+                        .setTenantId(request.getTenantId())
+                        .setOriginalMovementSn(request.getOriginalMovementSn())
+                        .setMovementType(SpendControlMovementType.RELEASED)
+                        .setTransactionSn(request.getTransactionSn()))
+                .stream()
+                .mapToLong(SpendControlMovementDTO::getAmount)
+                .sum();
+        long trustedReversedAmount = transaction.getReversedAmount() == null ? 0L : transaction.getReversedAmount();
+        AssertUtils.isTrue(releasedAmount <= trustedReversedAmount,
+                "控制释放累计金额超过资金交易可信撤销金额，movementSn = {}, transactionSn = {}, "
+                        + "trustedReversedAmount = {}, amount = {}",
+                request.getMovementSn(),
+                request.getTransactionSn(),
+                trustedReversedAmount,
+                request.getAmount());
+    }
+
+    private void assertConsumeBackedByTrustedCompletion(SpendControlTransactionConsumptionRequest request,
+                                                        FundsTransactionDTO transaction) {
+        if (transaction.getTransactionMode() != FundsTransactionMode.AUTHORIZATION) {
+            return;
+        }
+        long consumedAmount = spendControlMovementService.queryMovements(new SpendControlMovementQuery()
+                        .setTenantId(request.getTenantId())
+                        .setOriginalMovementSn(request.getOriginalMovementSn())
+                        .setMovementType(SpendControlMovementType.CONSUMED)
+                        .setTransactionSn(request.getTransactionSn()))
+                .stream()
+                .mapToLong(SpendControlMovementDTO::getAmount)
+                .sum();
+        long trustedCompletedAmount = transaction.getCompletedAmount() == null ? 0L : transaction.getCompletedAmount();
+        AssertUtils.isTrue(consumedAmount <= trustedCompletedAmount,
+                "控制消费累计金额超过资金交易可信完成金额，movementSn = {}, transactionSn = {}, "
+                        + "trustedCompletedAmount = {}, amount = {}",
+                request.getMovementSn(),
+                request.getTransactionSn(),
+                trustedCompletedAmount,
                 request.getAmount());
     }
 
@@ -489,6 +567,9 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 .setSpendDecisionDigest(originalMovement.getSpendDecisionDigest())
                 .setControlScopeId(originalMovement.getControlScopeId())
                 .setPeriodId(originalMovement.getPeriodId())
+                .setReasonCode(request.getReasonCode())
+                .setOperatorId(request.getOperatorId())
+                .setAuditReferenceSn(request.getAuditReferenceSn())
                 .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
                 .setContextVariables(request.getContextVariables());

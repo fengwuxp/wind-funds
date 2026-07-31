@@ -3,6 +3,9 @@ package com.wind.funds.route;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -37,6 +40,17 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
 
     @Override
     public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
+        FundsInstructionType instructionType = instruction.getInstructionType();
+        FundsTransactionEventType eventType = instruction.getEventType();
+        DefaultFundsTransactionType transactionType = instruction.getTransactionType();
+        AssertUtils.notNull(instructionType, "fundsInstruction.instructionType must not be null");
+        AssertUtils.notNull(eventType, "fundsInstruction.eventType must not be null");
+        AssertUtils.notNull(transactionType, "fundsInstruction.transactionType must not be null");
+        AssertUtils.isTrue(DefaultFundsTransactionType.isValidInstructionCombination(
+                        instructionType, eventType, transactionType),
+                "fundsInstruction instructionType/eventType/transactionType combination is invalid, "
+                        + "instructionType = {}, eventType = {}, transactionType = {}",
+                instructionType, eventType, transactionType);
         List<RouteResolver> candidates = delegates.stream()
                 .filter(delegate -> delegate != this)
                 .sorted(Comparator.comparingInt(this::orderOf))

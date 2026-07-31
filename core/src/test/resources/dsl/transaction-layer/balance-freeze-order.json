@@ -7,7 +7,7 @@
     "tenantId": 1,
     "instructionType": "BALANCE_CONTROL",
     "eventType": "FREEZE",
-    "transactionType": "ADJUSTMENT",
+    "transactionType": "BALANCE_CONTROL",
     "businessScene": "RISK_FREEZE",
     "businessSn": "FRZ_202605140001",
     "amount": {

@@ -2,6 +2,8 @@ package com.wind.funds.transaction.application.external;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.wind.common.exception.BaseException;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
@@ -102,6 +104,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -283,6 +290,57 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(replayTransactionSn).isEqualTo(firstTransactionSn);
         assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
         assertThat(externalFundsFactTransactionCount()).isOne();
+    }
+
+    /**
+     * 场景：同一 ACH confirmed credit 资金事实通过两个通知并发首次到达。
+     * 输入：相同来源命名空间、外部资金事实号、目标账户、金额和币种，不同通知号和业务流水。
+     * 输出：并发撞车方只允许返回同一已完成结果或领域级处理中失败，完成后重放返回原交易号。
+     * 红线：不得泄漏数据库重复键异常，不得把 PROCESSING 交易伪装成成功，也不得重复入账。
+     */
+    @Test
+    void testConcurrentFirstConsumeSameExternalFundsFactShouldFailClosedAndReplayAfterCompletion() throws Exception {
+        createCreditConsumeScenario();
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<ExternalFundsEventAttempt> first = executor.submit(() -> concurrentConsume(
+                    ready, start, consumeRequest()));
+            Future<ExternalFundsEventAttempt> second = executor.submit(() -> concurrentConsume(
+                    ready, start, consumeRequest()
+                            .setExternalEventSn("bank_event_concurrent_replay_001")
+                            .setBusinessSn(REPLAY_BUSINESS_SN)));
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).as("external event consumers are ready").isTrue();
+            start.countDown();
+            List<ExternalFundsEventAttempt> attempts = List.of(
+                    first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+
+            assertThat(attempts).allSatisfy(attempt -> {
+                if (attempt.failure() != null) {
+                    assertThat(attempt.failure())
+                            .isInstanceOf(BaseException.class)
+                            .hasMessageContaining("外部资金事实尚未成功完成");
+                }
+            });
+            String transactionSn = attempts.stream()
+                    .map(ExternalFundsEventAttempt::transactionSn)
+                    .filter(java.util.Objects::nonNull)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(attempts).extracting(ExternalFundsEventAttempt::transactionSn)
+                    .filteredOn(java.util.Objects::nonNull)
+                    .containsOnly(transactionSn);
+            assertThat(externalFundsEventApplicationService.consume(consumeRequest()
+                    .setExternalEventSn("bank_event_concurrent_replay_001")
+                    .setBusinessSn(REPLAY_BUSINESS_SN), WindOperatorFactory.system())).isEqualTo(transactionSn);
+            assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+            assertThat(externalFundsFactTransactionCount()).isOne();
+            assertThat(ledgerEntryCount(BUSINESS_SN) + ledgerEntryCount(REPLAY_BUSINESS_SN)).isEqualTo(4);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     /**
@@ -523,6 +581,24 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setDescription("external funds event contract");
     }
 
+    private ExternalFundsEventAttempt concurrentConsume(CountDownLatch ready,
+                                                        CountDownLatch start,
+                                                        ConsumeExternalFundsEventRequest request) {
+        try {
+            TenantContextHolder.setTenantId(TENANT_ID);
+            ready.countDown();
+            if (!start.await(5, TimeUnit.SECONDS)) {
+                return new ExternalFundsEventAttempt(null, new AssertionError("external event start timed out"));
+            }
+            return new ExternalFundsEventAttempt(externalFundsEventApplicationService.consume(
+                    request, WindOperatorFactory.system()), null);
+        } catch (Throwable failure) {
+            return new ExternalFundsEventAttempt(null, failure);
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
     private ReconciliationRunResultDTO recordReconciliationResult(
             String ledgerTransactionSn,
             ReconciliationMatchResultItem matchResult) {
@@ -759,10 +835,14 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     private Integer ledgerEntryCount() {
+        return ledgerEntryCount(BUSINESS_SN);
+    }
+
+    private Integer ledgerEntryCount(String businessSn) {
         return jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM t_ledger_entry
                 WHERE business_scene = ? AND business_sn = ?
-                """, Integer.class, BUSINESS_SCENE, BUSINESS_SN);
+                """, Integer.class, BUSINESS_SCENE, businessSn);
     }
 
     @Configuration
@@ -806,5 +886,8 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             ReconciliationRunResultApplicationServiceImpl.class
     })
     static class Config {
+    }
+
+    private record ExternalFundsEventAttempt(String transactionSn, Throwable failure) {
     }
 }

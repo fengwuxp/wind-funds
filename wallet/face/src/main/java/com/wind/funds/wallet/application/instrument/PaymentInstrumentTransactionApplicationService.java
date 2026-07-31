@@ -2,7 +2,9 @@ package com.wind.funds.wallet.application.instrument;
 
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.CompleteAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
+import com.wind.funds.wallet.model.request.ReverseAuthorizationByPaymentInstrumentRequest;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -35,6 +37,34 @@ public interface PaymentInstrumentTransactionApplicationService {
      */
     @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                           @NonNull WindOperator operator);
+
+    /**
+     * 沿原支付工具授权事实执行可信完成，并同步消费关联控制预留。
+     *
+     * <p>账务主体、支付工具绑定和控制预留均从原授权快照回放，不按当前绑定重新解析。
+     * 部分完成允许原授权保持 OPEN；控制累计消费不得超过资金聚合的可信累计完成金额。</p>
+     *
+     * @param request  支付工具授权完成请求
+     * @param operator 操作者
+     * @return 原授权交易流水号
+     */
+    @NonNull String completeAuthorizationByInstrument(
+            @NonNull CompleteAuthorizationByPaymentInstrumentRequest request,
+            @NonNull WindOperator operator);
+
+    /**
+     * 沿原支付工具授权事实执行可信撤销，并同步释放关联控制预留。
+     *
+     * <p>账务主体、支付工具绑定和控制预留均从原授权快照回放，不按当前绑定重新解析。
+     * 资金撤销与控制释放必须处于同一本地事务；任一侧失败时不得留下半完成事实。</p>
+     *
+     * @param request  支付工具授权撤销请求
+     * @param operator 操作者
+     * @return 原授权交易流水号
+     */
+    @NonNull String reverseAuthorizationByInstrument(
+            @NonNull ReverseAuthorizationByPaymentInstrumentRequest request,
+            @NonNull WindOperator operator);
 
     /**
      * 通过支付工具收款入口完成准入并委派充值交易内核。
