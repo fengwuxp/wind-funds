@@ -22,7 +22,9 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -190,29 +192,33 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         if (contextVariables == null || contextVariables.getContextVariables() == null) {
             return;
         }
-        assertLightweightContextValue(contextVariables.getContextVariables());
+        assertLightweightContextValue(contextVariables.getContextVariables(), List.of());
     }
 
-    private void assertLightweightContextValue(@Nullable Object value) {
+    private void assertLightweightContextValue(@Nullable Object value, @NonNull List<String> parentKeyPaths) {
         if (value instanceof Map<?, ?> values) {
             for (Map.Entry<?, ?> entry : values.entrySet()) {
                 String key = entry.getKey() == null ? "" : entry.getKey().toString();
-                AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS.contains(normalizeBenefitContextKey(key)),
+                String normalizedKey = normalizeBenefitContextKey(key);
+                List<String> keyPaths = new ArrayList<>(parentKeyPaths.size() + 1);
+                keyPaths.add(normalizedKey);
+                parentKeyPaths.forEach(parentKeyPath -> keyPaths.add(parentKeyPath + normalizedKey));
+                AssertUtils.isTrue(keyPaths.stream().noneMatch(FORBIDDEN_BENEFIT_CONTEXT_KEYS::contains),
                         "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
                 for (String pathSegment : key.split("[^A-Za-z0-9]+")) {
                     AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS
                                     .contains(normalizeBenefitContextKey(pathSegment)),
                             "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
                 }
-                assertLightweightContextValue(entry.getValue());
+                assertLightweightContextValue(entry.getValue(), keyPaths);
             }
         } else if (value instanceof Iterable<?> values) {
             for (Object nestedValue : values) {
-                assertLightweightContextValue(nestedValue);
+                assertLightweightContextValue(nestedValue, parentKeyPaths);
             }
         } else if (value instanceof Object[] values) {
             for (Object nestedValue : values) {
-                assertLightweightContextValue(nestedValue);
+                assertLightweightContextValue(nestedValue, parentKeyPaths);
             }
         }
     }

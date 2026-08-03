@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.dal.mapper;
 
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -27,4 +28,19 @@ public interface FundsTransactionMapper extends BaseMapper<FundsTransaction> {
             FOR UPDATE
             """)
     FundsTransaction selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
+
+    @Select("""
+            SELECT *
+            FROM t_funds_transaction
+            WHERE tenant_id = #{tenantId}
+              AND external_source_code = #{externalSourceCode}
+              AND external_funds_fact_sn = #{externalFundsFactSn}
+              AND external_funds_effect_type = #{externalFundsEffectType}
+            FOR UPDATE
+            """)
+    FundsTransaction selectByExternalFundsFactForUpdate(
+            @Param("tenantId") Long tenantId,
+            @Param("externalSourceCode") String externalSourceCode,
+            @Param("externalFundsFactSn") String externalFundsFactSn,
+            @Param("externalFundsEffectType") FundsEffectType externalFundsEffectType);
 }

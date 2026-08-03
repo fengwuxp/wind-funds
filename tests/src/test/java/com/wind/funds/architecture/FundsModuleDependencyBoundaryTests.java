@@ -649,6 +649,26 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
+     * 场景：两个外部资金事件并发消费同一个资金事实，唯一键失败方需要读取已提交胜者。
+     * 预期：冲突恢复使用 current read，避免 MySQL REPEATABLE-READ 继续命中旧快照。
+     * 红线：唯一键失败后不得继续使用普通一致性读判断胜者不存在。
+     */
+    @Test
+    void testExternalFundsFactConflictRecoveryShouldUseCurrentRead() throws Exception {
+        String mapper = Files.readString(workspaceRoot().resolve(
+                "transaction/impl/src/main/java/com/wind/funds/transaction/dal/mapper/FundsTransactionMapper.java"));
+        String service = Files.readString(workspaceRoot().resolve(
+                "transaction/impl/src/main/java/com/wind/funds/transaction/services/impl/"
+                        + "DefaultFundsInstructionLifecycleSaver.java"));
+
+        assertThat(mapper).containsSubsequence(
+                "AND external_funds_effect_type = #{externalFundsEffectType}",
+                "FOR UPDATE",
+                "FundsTransaction selectByExternalFundsFactForUpdate(");
+        assertThat(service).contains("fundsTransactionMapper.selectByExternalFundsFactForUpdate(");
+    }
+
+    /**
      * 场景：两个出款单并发消费同一个外部回单引用，唯一键失败方需要读取已提交胜者。
      * 预期：冲突恢复使用 current read，避免 MySQL REPEATABLE-READ 继续命中旧快照。
      * 红线：唯一键失败后不得继续使用普通一致性读判断胜者不存在。

@@ -418,13 +418,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (!StringUtils.hasText(instruction.getExternalSourceCode())) {
             return null;
         }
-        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref)
-                .where(ref.tenantId.eq(instruction.getTenantId()))
-                .and(ref.externalSourceCode.eq(instruction.getExternalSourceCode()))
-                .and(ref.externalFundsFactSn.eq(instruction.getExternalFundsFactSn()))
-                .and(ref.externalFundsEffectType.eq(instruction.getExternalFundsEffectType()));
-        return fundsTransactionMapper.selectOneByQuery(wrapper);
+        return fundsTransactionMapper.selectByExternalFundsFactForUpdate(
+                instruction.getTenantId(),
+                instruction.getExternalSourceCode(),
+                instruction.getExternalFundsFactSn(),
+                instruction.getExternalFundsEffectType());
     }
 
     private List<FundsTransactionDetail> findTransactionDetails(String transactionSn) {

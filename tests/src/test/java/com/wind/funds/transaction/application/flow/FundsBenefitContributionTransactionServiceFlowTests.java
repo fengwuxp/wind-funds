@@ -544,6 +544,23 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
                 .hasMessageContaining("benefitReceiverLedgerSubjectCode");
 
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_NESTED_SPLIT_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "rule", Map.of("id", "RULE_001")))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("id");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_MULTI_LEVEL_SPLIT_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of(
+                        "benefit", Map.of("receiver", Map.of("ledger", Map.of(
+                                "subject", Map.of("code", "CLEARING"))))))),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("code");
+
         var after = snapshot(balances(costBearer, receiver));
         assertOnlyBalanceDeltas(before, after,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
@@ -555,6 +572,8 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_SLASH_CORE_FIELD_001");
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_BRACKET_CORE_FIELD_001");
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_ARRAY_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_NESTED_SPLIT_CORE_FIELD_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_MULTI_LEVEL_SPLIT_CORE_FIELD_001");
     }
 
     /**

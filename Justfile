@@ -140,7 +140,7 @@ test-mysql-reconciliation:
     export WIND_FUNDS_TEST_DATASOURCE_DRIVER=com.mysql.cj.jdbc.Driver
     just _run-test-classes ReconciliationMysqlMigrationIntegrationTests tests
     export WIND_FUNDS_TEST_SQL_INIT_MODE=never
-    just _run-test-classes "PaymentInstrumentTransactionAuthorizationTests,SpendControlTransactionConsumptionApplicationServiceTests" tests
+    just _run-test-classes "ExternalFundsEventApplicationServiceTests,PaymentInstrumentTransactionAuthorizationTests,SpendControlTransactionConsumptionApplicationServiceTests" tests
     just test-reconciliation
 
 # Fast CAD verification for non-business tooling or test-asset changes.
