@@ -1,11 +1,11 @@
 package com.wind.funds.route;
 
 import com.wind.integration.core.context.TenantContextHolder;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -137,12 +137,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
                 .businessScene("AUTHORIZATION_NO_AUTH_REFUND")
                 .businessSn("NO_AUTH_REFUND_BY_EXTERNAL_REFERENCE")
                 .eventTime(LocalDateTime.of(2026, 6, 4, 0, 0))
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("1")
-                        .operatorType("SYSTEM")
-                        .appName("wind-funds-tests")
-                        .contextVariables(Map.of())
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(contextVariables)
                 .build();
     }

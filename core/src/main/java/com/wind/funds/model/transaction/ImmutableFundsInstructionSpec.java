@@ -4,7 +4,6 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.fx.FxAppliedRate;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
@@ -16,6 +15,7 @@ import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
@@ -59,7 +59,7 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             String businessSn,
                                             LocalDateTime eventTime,
                                             @Nullable String description,
-                                            FundsOperationActorSpec operator,
+                                            WindOperator operator,
                                             Map<String, Object> contextVariables) implements FundsInstructionSpec {
 
     public ImmutableFundsInstructionSpec {
@@ -173,7 +173,7 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
     }
 
     @Override
-    public @NonNull FundsOperationActorSpec getOperator() {
+    public @NonNull WindOperator getOperator() {
         return operator;
     }
 

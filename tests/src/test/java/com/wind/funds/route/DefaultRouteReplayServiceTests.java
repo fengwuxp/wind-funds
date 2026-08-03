@@ -1,5 +1,6 @@
 package com.wind.funds.route;
 
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -8,7 +9,6 @@ import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
@@ -457,11 +457,7 @@ class DefaultRouteReplayServiceTests {
                 .businessScene("REFUND")
                 .businessSn("REPLAY_MISSING_REFERENCE")
                 .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("1")
-                        .operatorType("SYSTEM")
-                        .appName("wind-funds-tests")
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(contextVariables)
                 .build();
     }

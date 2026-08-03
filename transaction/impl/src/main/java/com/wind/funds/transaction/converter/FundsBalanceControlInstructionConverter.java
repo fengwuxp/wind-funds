@@ -9,10 +9,8 @@ import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.spec.SourceObjectType;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
@@ -92,7 +90,7 @@ public class FundsBalanceControlInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of()))
                 .build();
     }
@@ -115,7 +113,7 @@ public class FundsBalanceControlInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
                         FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn())))
                 .build();
@@ -146,7 +144,7 @@ public class FundsBalanceControlInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), adjustContext(request)))
                 .build();
     }
@@ -251,13 +249,4 @@ public class FundsBalanceControlInstructionConverter {
         return Map.copyOf(result);
     }
 
-    private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {
-        return ImmutableFundsOperationActorSpec.builder()
-                .operatorId(operator.getOperatorAsText())
-                .operatorType(operator.getActorType().name())
-                .operatorName(operator.getOperatorName())
-                .appName(operator.getAppName())
-                .contextVariables(Map.of())
-                .build();
-    }
 }

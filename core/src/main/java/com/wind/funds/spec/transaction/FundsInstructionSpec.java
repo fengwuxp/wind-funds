@@ -1,6 +1,5 @@
 package com.wind.funds.spec.transaction;
 
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
@@ -10,6 +9,7 @@ import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -149,8 +149,16 @@ public interface FundsInstructionSpec {
     @Nullable
     String getDescription();
 
+    /**
+     * 返回当前指令的运行时操作者上下文。
+     *
+     * <p>资金 Core 只使用稳定身份和主体类型，不得直接序列化、持久化该对象，
+     * 也不得在此执行权限判断或读取动态请求信息。</p>
+     *
+     * @return 当前运行时操作者
+     */
     @NonNull
-    FundsOperationActorSpec getOperator();
+    WindOperator getOperator();
 
     @NonNull
     Map<String, Object> getContextVariables();

@@ -1,9 +1,9 @@
 package com.wind.funds.model.route;
 
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.route.spec.ReplayRequestSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import lombok.Getter;
@@ -45,7 +45,7 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
 
     private final String description;
 
-    private final FundsOperationActorSpec operator;
+    private final WindOperator operator;
 
     private final Map<String, Object> contextVariables;
 
@@ -62,7 +62,7 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
                                        @Nullable List<String> replayLegIds,
                                        LocalDateTime eventTime,
                                        @Nullable String description,
-                                       @Nullable FundsOperationActorSpec operator,
+                                       @Nullable WindOperator operator,
                                        @Nullable Map<String, Object> contextVariables) {
         if (referenceSnapshotId == null || referenceSnapshotId.isBlank()) {
             throw new IllegalArgumentException("referenceSnapshotId is required for route replay");

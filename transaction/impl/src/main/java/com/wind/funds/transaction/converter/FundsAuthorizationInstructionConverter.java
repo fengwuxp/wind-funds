@@ -10,10 +10,8 @@ import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRef
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -93,7 +91,7 @@ public class FundsAuthorizationInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getAuthorizedTime()))
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
@@ -116,7 +114,7 @@ public class FundsAuthorizationInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getReversalTime()))
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .accountId(request.getAccountId())
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
                         FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
@@ -165,7 +163,7 @@ public class FundsAuthorizationInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getCompletedTime()))
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
@@ -207,7 +205,7 @@ public class FundsAuthorizationInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getRefundTime()))
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
@@ -312,13 +310,4 @@ public class FundsAuthorizationInstructionConverter {
         AssertUtils.isFalse(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE.equals(accountId.type()), message);
     }
 
-    private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {
-        return ImmutableFundsOperationActorSpec.builder()
-                .operatorId(operator.getOperatorAsText())
-                .operatorType(operator.getActorType().name())
-                .operatorName(operator.getOperatorName())
-                .appName(operator.getAppName())
-                .contextVariables(Map.of())
-                .build();
-    }
 }

@@ -14,11 +14,9 @@ import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
@@ -109,7 +107,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
@@ -154,7 +152,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
@@ -189,7 +187,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
@@ -224,7 +222,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
@@ -290,7 +288,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
@@ -316,7 +314,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
                         FundsInstructionContextKeys.FEE_TYPE, request.getFeeType())))
                 .build();
@@ -345,7 +343,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of()))
                 .build();
     }
@@ -407,13 +405,4 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.isFalse(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE.equals(accountId.type()), message);
     }
 
-    private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {
-        return ImmutableFundsOperationActorSpec.builder()
-                .operatorId(operator.getOperatorAsText())
-                .operatorType(operator.getActorType().name())
-                .operatorName(operator.getOperatorName())
-                .appName(operator.getAppName())
-                .contextVariables(Map.of())
-                .build();
-    }
 }

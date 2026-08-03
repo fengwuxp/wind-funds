@@ -1,6 +1,7 @@
 package com.wind.funds.dsl;
 
 import com.alibaba.fastjson2.JSON;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -9,7 +10,6 @@ import com.wind.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
@@ -153,7 +153,7 @@ class FundsAmountBoundaryContractTests {
                 .businessScene("AMOUNT_BOUNDARY_DSL")
                 .businessSn("BIZ-AMOUNT-001")
                 .eventTime(EVENT_TIME)
-                .operator(systemOperator())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
     }
@@ -261,40 +261,6 @@ class FundsAmountBoundaryContractTests {
                 .currency(CURRENCY.name())
                 .ledgerProfileCode("DEFAULT")
                 .build();
-    }
-
-    private FundsOperationActorSpec systemOperator() {
-        return new TestFundsOperationActorSpec("0", "SYSTEM", "wind-funds-tests");
-    }
-
-    private record TestFundsOperationActorSpec(String operatorId,
-                                               String operatorType,
-                                               String appName) implements FundsOperationActorSpec {
-
-        @Override
-        public String getOperatorId() {
-            return operatorId;
-        }
-
-        @Override
-        public String getOperatorType() {
-            return operatorType;
-        }
-
-        @Override
-        public String getOperatorName() {
-            return "System";
-        }
-
-        @Override
-        public String getAppName() {
-            return appName;
-        }
-
-        @Override
-        public Map<String, Object> getContextVariables() {
-            return Map.of();
-        }
     }
 
 }

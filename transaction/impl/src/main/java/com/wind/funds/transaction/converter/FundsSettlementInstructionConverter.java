@@ -1,8 +1,6 @@
 package com.wind.funds.transaction.converter;
 
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -35,18 +33,9 @@ public class FundsSettlementInstructionConverter {
                 .businessSn(request.getSettlementOrderSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
-                .operator(operationActor(operator))
+                .operator(operator)
                 .contextVariables(Map.of())
                 .build();
     }
 
-    private FundsOperationActorSpec operationActor(WindOperator operator) {
-        return ImmutableFundsOperationActorSpec.builder()
-                .operatorId(operator.getOperatorAsText())
-                .operatorType(operator.getActorType().name())
-                .operatorName(operator.getOperatorName())
-                .appName(operator.getAppName())
-                .contextVariables(Map.of())
-                .build();
-    }
 }

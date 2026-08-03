@@ -1,8 +1,8 @@
 package com.wind.funds.route.spec;
 
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -69,8 +69,15 @@ public interface ReplayRequestSpec {
         return null;
     }
 
+    /**
+     * 返回触发本次回放的运行时操作者上下文。
+     *
+     * <p>该对象不属于可持久化回放快照；审计需要在事实写入边界投影稳定身份字段。</p>
+     *
+     * @return 当前运行时操作者，无操作者上下文时返回 {@code null}
+     */
     @Nullable
-    default FundsOperationActorSpec getOperator() {
+    default WindOperator getOperator() {
         return null;
     }
 

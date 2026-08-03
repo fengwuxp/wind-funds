@@ -1,6 +1,7 @@
 package com.wind.funds.ledger.posting;
 
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
@@ -21,7 +22,6 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
@@ -304,12 +304,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .businessScene("POSTING_PERIOD")
                 .businessSn("BIZ-POSTING-PERIOD-001")
                 .eventTime(EVENT_TIME)
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("1")
-                        .operatorType("SYSTEM")
-                        .appName("funds-test")
-                        .contextVariables(Map.of())
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
     }
@@ -326,12 +321,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .businessScene("LIMIT_ADJUST")
                 .businessSn("BIZ-LIMIT-ADJUST-001")
                 .eventTime(EVENT_TIME)
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("1")
-                        .operatorType("SYSTEM")
-                        .appName("funds-test")
-                        .contextVariables(Map.of())
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
     }

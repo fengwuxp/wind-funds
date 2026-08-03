@@ -1,6 +1,6 @@
 package com.wind.funds.route;
 
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
@@ -128,11 +128,7 @@ class RouteAccountHierarchySnapshotAppenderTests {
                 .businessSn("ROUTE_HIERARCHY_" + eventType.name())
                 .reference(reference)
                 .eventTime(LocalDateTime.of(2026, 7, 23, 10, 0))
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("-1")
-                        .operatorType("SYSTEM")
-                        .appName("wind-funds-tests")
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
     }

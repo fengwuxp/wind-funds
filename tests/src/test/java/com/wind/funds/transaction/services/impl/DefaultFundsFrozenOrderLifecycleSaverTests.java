@@ -6,7 +6,6 @@ import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
@@ -24,6 +23,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -119,7 +119,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 .businessScene(eventType.name())
                 .businessSn(businessSn)
                 .eventTime(EVENT_TIME)
-                .operator(mock(FundsOperationActorSpec.class))
+                .operator(mock(WindOperator.class))
                 .contextVariables(Map.of())
                 .build();
     }

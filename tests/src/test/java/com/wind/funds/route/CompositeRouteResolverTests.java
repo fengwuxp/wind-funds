@@ -1,11 +1,11 @@
 package com.wind.funds.route;
 
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSubjectSupport;
-import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -139,11 +139,7 @@ class CompositeRouteResolverTests {
                 .businessScene("PAY")
                 .businessSn("ROUTE_SUPPORTS_NO_SIDE_EFFECT")
                 .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId("1")
-                        .operatorType("SYSTEM")
-                        .appName("wind-funds-tests")
-                        .build())
+                .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
     }
