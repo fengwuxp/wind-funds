@@ -1,6 +1,6 @@
 package com.wind.funds.ledger.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -141,7 +141,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
-        entity.setContextVariables(JSON.toJSONString(transaction.getContextVariables()));
+        entity.setContextVariables(WindJson.toJsonString(transaction.getContextVariables()));
         entity.setSha256(resolveLedgerTransactionSha256(entity, transaction));
         LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity);
         if (existingResult != null) {
@@ -281,7 +281,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setDebitAmount(plan.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(plan.getTotalCreditAmount().getAmount());
         entity.setDescription(defaultIfBlank(plan.getDescription(), transaction.getDescription()));
-        entity.setContextVariables(JSON.toJSONString(plan.getContextVariables()));
+        entity.setContextVariables(WindJson.toJsonString(plan.getContextVariables()));
         entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_POSTING_PLAN_SHA256_FIELDS));
         ledgerPostingPlanMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建账户账本记账计划失败");

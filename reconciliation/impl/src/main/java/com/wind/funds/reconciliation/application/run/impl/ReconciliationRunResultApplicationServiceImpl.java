@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.run.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -227,7 +227,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         result.setTotalCount(matchResults.size());
         result.setMatchedCount(matchedCount);
         result.setDifferenceCount(differenceCount);
-        result.setEvidenceRefs(JSON.toJSONString(evidenceRefs));
+        result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs));
         result.setResultDigest(resultDigest(batch, evidenceRefs, sourceSet, sourceDigest, status,
                 matchedCount, differenceCount, matchDigests));
         result.setCreatedBy(operator.getOperatorAsText());
@@ -486,7 +486,7 @@ public class ReconciliationRunResultApplicationServiceImpl
     }
 
     private List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? List.copyOf(JSON.parseArray(value, String.class)) : List.of();
+        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 
     private String normalizedOptionalText(String value) {

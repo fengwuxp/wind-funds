@@ -16,6 +16,7 @@ import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
@@ -434,6 +435,63 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FAILURE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FAILURE_PAY", 2, 2);
+    }
+
+    /**
+     * 场景：UNFREEZE 已提交，但事务后投影发布失败，随后仅从解冻事实恢复本次路径。
+     * 输入：账户先充值并冻结 40，再解冻 15；解冻后的投影发布端口抛出异常。
+     * 输出：解冻记录仍能恢复 UNFREEZE RouteSnapshot，读取过程不改写账本事实或余额。
+     * 预期：发布失败不丢失解冻路径，后续投影恢复可以从持久化事实重新读取。
+     * 红线：不得回退到原 FREEZE 路径伪装本次 UNFREEZE，也不得靠内存发布上下文恢复。
+     */
+    @Test
+    void testUnfreezeRouteShouldRemainRecoverableFromReleaseFactAfterPublisherFailure() {
+        FundsAccountId user = fundingAccount("funding_user");
+        var beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        topup(user, 100L, "PROJECTION_UNFREEZE_TOPUP");
+        var afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 40L, "PROJECTION_UNFREEZE_FREEZE");
+        var afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        projectionPublisher.clear();
+        projectionPublisher.failOnce();
+
+        unfreeze(user, 15L, freezeSn, "PROJECTION_UNFREEZE_RELEASE");
+        var afterUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterUnfreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 15L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -15L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(projectionPublisher.invocationCount()).isEqualTo(1);
+        assertThat(projectionPublisher.contexts()).isEmpty();
+
+        var releaseOrder = frozenOrderByBusinessSn("PROJECTION_UNFREEZE_RELEASE");
+        var beforeReadFacts = ledgerFactSnapshot();
+        var recovered = fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(releaseOrder.getSn());
+
+        assertThat(recovered).isPresent();
+        assertLedgerTransactionFactsUnchanged(beforeReadFacts);
+        assertThat(snapshot(balances(user, cashMappingAccount(), prepaymentAccount())))
+                .isEqualTo(afterUnfreeze);
+        assertThat(recovered.orElseThrow()).satisfies(routeSnapshot -> {
+            assertThat(routeSnapshot.getEventType()).isEqualTo(FundsTransactionEventType.UNFREEZE);
+            assertThat(routeSnapshot.getBusinessSn()).isEqualTo("PROJECTION_UNFREEZE_RELEASE");
+            assertThat(routeSnapshot.getLegs()).singleElement().satisfies(routeLeg -> {
+                assertThat(routeLeg.getLegType()).isEqualTo(RouteLegType.RELEASE);
+                assertThat(routeLeg.getPhaseCode()).isEqualTo(LedgerPhaseCode.UNFREEZE);
+            });
+        });
     }
 
     @AfterEach

@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.application.instrument.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
+import com.wind.jackson.WindJson;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
@@ -42,6 +41,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -108,8 +108,12 @@ public class PaymentInstrumentAuthorizationProcessor {
             return null;
         }
         FundsTransactionDTO transaction = existing.get();
-        JSONObject context = JSON.parseObject(transaction.getContextVariables());
-        if (context == null || !StringUtils.hasText(context.getString("instrumentSn"))) {
+        if (!StringUtils.hasText(transaction.getContextVariables())) {
+            return null;
+        }
+        Map<String, Object> context = WindJson.parseObject(transaction.getContextVariables(), new TypeReference<>() {
+        });
+        if (context == null || !StringUtils.hasText(stringValue(context, "instrumentSn"))) {
             return null;
         }
         assertEstablishedAuthorizationMatches(request, transaction, context);
@@ -124,29 +128,29 @@ public class PaymentInstrumentAuthorizationProcessor {
 
     private void assertEstablishedAuthorizationMatches(AuthorizeByPaymentInstrumentRequest request,
                                                         FundsTransactionDTO transaction,
-                                                        JSONObject context) {
+                                                        Map<String, Object> context) {
         AssertUtils.isTrue(transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
                         && transaction.getTransactionType() == DefaultFundsTransactionType.PAY
                         && Objects.equals(transaction.getAmount(), request.getAmount())
                         && transaction.getCurrency() == request.getCurrency()
-                        && Objects.equals(context.getString("instrumentSn"), request.getInstrumentSn())
+                        && Objects.equals(stringValue(context, "instrumentSn"), request.getInstrumentSn())
                         && (request.getExpectedBindingVersion() == null
-                        || Objects.equals(context.getInteger("instrumentBindingVersion"),
+                        || Objects.equals(integerValue(context, "instrumentBindingVersion"),
                         request.getExpectedBindingVersion()))
-                        && Objects.equals(context.getBoolean(FundsInstructionContextKeys.APPROVED), request.getApproved())
-                        && Objects.equals(context.getString(FundsInstructionContextKeys.DECLINE_REASON),
+                        && Objects.equals(booleanValue(context, FundsInstructionContextKeys.APPROVED), request.getApproved())
+                        && Objects.equals(stringValue(context, FundsInstructionContextKeys.DECLINE_REASON),
                         request.getDeclineReason())
-                        && Objects.equals(context.getString(FundsInstructionContextKeys.TRANSACTION_COUNTRY),
+                        && Objects.equals(stringValue(context, FundsInstructionContextKeys.TRANSACTION_COUNTRY),
                         enumName(request.getTransactionCountry())),
                 "已成立授权请求参数不一致，transactionSn = {}，businessSn = {}",
                 transaction.getSn(), request.getBusinessSn());
         assertEstablishedSpendDecisionMatches(request,
-                context.getJSONObject(FundsInstructionContextKeys.SPEND_RULE_DECISION),
+                mapValue(context, FundsInstructionContextKeys.SPEND_RULE_DECISION),
                 transaction.getSn());
     }
 
     private void assertEstablishedSpendDecisionMatches(AuthorizeByPaymentInstrumentRequest request,
-                                                       @Nullable JSONObject decision,
+                                                       @Nullable Map<?, ?> decision,
                                                        String transactionSn) {
         if (decision == null) {
             AssertUtils.isTrue(!hasSpendControlEvidence(request)
@@ -155,18 +159,38 @@ public class PaymentInstrumentAuthorizationProcessor {
                     "已成立授权 Spend Rule 证据不一致，transactionSn = {}", transactionSn);
             return;
         }
-        AssertUtils.isTrue(Objects.equals(decision.getString("controlScopeId"), request.getControlScopeId())
-                        && Objects.equals(decision.getString("periodId"), request.getPeriodId())
-                        && matchesOptionalText(request.getSpendRuleId(), decision.getString("ruleId"))
-                        && matchesOptionalText(request.getSpendRuleVersion(), decision.getString("ruleVersion"))
-                        && matchesOptionalText(request.getSpendRuleBindingSn(), decision.getString("spendRuleBindingSn"))
-                        && matchesOptionalEnum(request.getSpendRuleScopeType(), decision.getString("scopeType"))
-                        && matchesOptionalText(request.getSpendRuleScopeId(), decision.getString("scopeId"))
-                        && Objects.equals(request.getSpendDecisionSn(), decision.getString("decisionSn"))
-                        && matchesOptionalEnum(request.getSpendDecisionResult(), decision.getString("decisionResult"))
-                        && matchesOptionalText(request.getSpendDecisionDigest(), decision.getString("decisionDigest"))
+        AssertUtils.isTrue(Objects.equals(stringValue(decision, "controlScopeId"), request.getControlScopeId())
+                        && Objects.equals(stringValue(decision, "periodId"), request.getPeriodId())
+                        && matchesOptionalText(request.getSpendRuleId(), stringValue(decision, "ruleId"))
+                        && matchesOptionalText(request.getSpendRuleVersion(), stringValue(decision, "ruleVersion"))
+                        && matchesOptionalText(request.getSpendRuleBindingSn(), stringValue(decision, "spendRuleBindingSn"))
+                        && matchesOptionalEnum(request.getSpendRuleScopeType(), stringValue(decision, "scopeType"))
+                        && matchesOptionalText(request.getSpendRuleScopeId(), stringValue(decision, "scopeId"))
+                        && Objects.equals(request.getSpendDecisionSn(), stringValue(decision, "decisionSn"))
+                        && matchesOptionalEnum(request.getSpendDecisionResult(), stringValue(decision, "decisionResult"))
+                        && matchesOptionalText(request.getSpendDecisionDigest(), stringValue(decision, "decisionDigest"))
                         && !StringUtils.hasText(request.getSpendDecisionRejectReason()),
                 "已成立授权 Spend Rule 证据不一致，transactionSn = {}", transactionSn);
+    }
+
+    private @Nullable String stringValue(Map<?, ?> values, String key) {
+        Object value = values.get(key);
+        return value == null ? null : value.toString();
+    }
+
+    private @Nullable Integer integerValue(Map<?, ?> values, String key) {
+        Object value = values.get(key);
+        return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private @Nullable Boolean booleanValue(Map<?, ?> values, String key) {
+        Object value = values.get(key);
+        return value instanceof Boolean bool ? bool : null;
+    }
+
+    private @Nullable Map<?, ?> mapValue(Map<?, ?> values, String key) {
+        Object value = values.get(key);
+        return value instanceof Map<?, ?> map ? map : null;
     }
 
     private boolean matchesOptionalText(@Nullable String provided, @Nullable String persisted) {

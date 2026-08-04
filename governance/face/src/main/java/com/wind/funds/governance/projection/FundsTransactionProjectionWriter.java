@@ -15,6 +15,25 @@ import java.util.List;
  */
 public interface FundsTransactionProjectionWriter {
 
+    default @NonNull List<FundsTransactionProjectionDifference> compare(
+            @NonNull Long tenantId,
+            @NonNull String viewDomain,
+            @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
+        throw new IllegalStateException("持久投影重放写入器必须显式实现 tenant 有界差异比较");
+    }
+
+    default void upsertShadow(@NonNull Long tenantId,
+                              @NonNull String taskSn,
+                              @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
+        throw new IllegalStateException("持久投影重放写入器必须显式实现 tenant 有界影子写入");
+    }
+
+    default void upsertOfficial(@NonNull Long tenantId,
+                                @NonNull String taskSn,
+                                @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
+        throw new IllegalStateException("持久投影重放写入器必须显式实现 tenant 有界正式写入");
+    }
+
     /**
      * 比较现有投影视图与本次重建结果之间的差异。
      *

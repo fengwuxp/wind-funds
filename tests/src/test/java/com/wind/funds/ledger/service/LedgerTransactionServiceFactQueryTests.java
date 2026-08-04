@@ -2,6 +2,7 @@ package com.wind.funds.ledger.service;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.dto.LedgerDTO;
@@ -25,7 +26,6 @@ import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
@@ -67,6 +67,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 
 /**
  * 账本交易基础服务事实查询契约测试。
@@ -102,6 +103,9 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
 
     @Autowired
     private LedgerService ledgerService;
+
+    @Autowired
+    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -358,10 +362,10 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setDebitAmountDelta(initialBalance)
-                    .setCreditAmountDelta(0L));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    EntrySide.DEBIT,
+                    initialBalance)));
         }
         return ledgerId;
     }

@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 在显式授权的专用 MySQL 库上执行主资金链和对账生产 DDL 与部署回读。
+ * 在显式授权的专用 MySQL 库上执行主资金链、对账和治理生产 DDL 与部署回读。
  */
 @EnabledIfEnvironmentVariable(named = "WIND_FUNDS_TEST_MYSQL_DESTRUCTIVE", matches = "true")
 class ReconciliationMysqlMigrationIntegrationTests {
@@ -39,12 +39,17 @@ class ReconciliationMysqlMigrationIntegrationTests {
         Path reconciliationDirectory = workspaceRoot().resolve("database/mysql/reconciliation");
         Path reconciliationDdl = reconciliationDirectory.resolve("001_create_reconciliation_tables.sql");
         Path verificationDdl = reconciliationDirectory.resolve("001_verify_reconciliation_tables.sql");
+        Path governanceDdl = workspaceRoot().resolve(
+                "database/mysql/governance/001_create_governance_tables.sql");
         String expectedVersionPrefix = requiredEnvironment("WIND_FUNDS_TEST_MYSQL_EXPECTED_VERSION_PREFIX");
         String coreDdlSql = Files.readString(coreDdl);
+        String governanceDdlSql = Files.readString(governanceDdl);
         List<String> coreTableNames = extractTableNames(coreDdlSql);
+        List<String> governanceTableNames = extractTableNames(governanceDdlSql);
         List<String> tableNames = new ArrayList<>(coreTableNames);
         tableNames.addAll(extractTableNames(Files.readString(reconciliationDdl)));
-        assertThat(tableNames).doesNotHaveDuplicates().hasSize(41);
+        tableNames.addAll(governanceTableNames);
+        assertThat(tableNames).doesNotHaveDuplicates().hasSize(44);
 
         Class.forName("com.mysql.cj.jdbc.Driver");
         try (Connection connection = openConnection()) {
@@ -53,8 +58,10 @@ class ReconciliationMysqlMigrationIntegrationTests {
             dropTables(connection, tableNames);
             ScriptUtils.executeSqlScript(connection, new FileSystemResource(coreDdl));
             ScriptUtils.executeSqlScript(connection, new FileSystemResource(reconciliationDdl));
+            ScriptUtils.executeSqlScript(connection, new FileSystemResource(governanceDdl));
             verifyTargetTables(connection, tableNames);
-            verifyCoreTableStructures(connection, coreDdlSql, coreTableNames);
+            verifyTableStructures(connection, coreDdlSql, coreTableNames);
+            verifyTableStructures(connection, governanceDdlSql, governanceTableNames);
             assertThat(verifyDeployment(connection, Files.readString(verificationDdl), expectedVersionPrefix))
                     .isEqualTo(EXPECTED_VERIFICATION_RESULT_SET_COUNT);
             verifyFundsTransactionBusinessKeyConflictRecoveryUsesCurrentRead();
@@ -94,10 +101,10 @@ class ReconciliationMysqlMigrationIntegrationTests {
         }
     }
 
-    private void verifyCoreTableStructures(Connection connection, String coreDdl,
-                                           List<String> coreTableNames) throws SQLException {
-        for (String tableName : coreTableNames) {
-            String tableDdl = extractCreateTable(coreDdl, tableName);
+    private void verifyTableStructures(Connection connection, String ddl,
+                                       List<String> tableNames) throws SQLException {
+        for (String tableName : tableNames) {
+            String tableDdl = extractCreateTable(ddl, tableName);
             assertThat(readColumnSignatures(connection, tableName))
                     .as("MySQL core table %s columns must match forward DDL", tableName)
                     .containsExactlyElementsOf(parseColumnSignatures(tableDdl));

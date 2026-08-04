@@ -1,7 +1,5 @@
 package com.wind.funds.wallet.application.spend.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.application.spend.SpendRuleEvaluationApplicationService;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
@@ -15,10 +13,12 @@ import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.EvaluateSpendRuleRequest;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.service.SpendRuleVersionService;
+import com.wind.jackson.WindJson;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -35,6 +35,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Spend Rule 规则评估应用服务实现。
@@ -180,7 +184,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 request.getTenantId(),
                 request.getRuleId(),
                 request.getRuleVersion());
-        JSONObject ruleSpec = ruleSpecOf(version.getRuleSpec());
+        ObjectNode ruleSpec = ruleSpecOf(version.getRuleSpec());
         assertSingleExecutableControl(ruleSpec);
         SpendControlDecisionResult result = evaluateRule(request, ruleSpec);
         String rejectReason = rejectReason(result, ruleSpec);
@@ -205,13 +209,13 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
     }
 
-    private JSONObject ruleSpecOf(String ruleSpec) {
-        JSONObject result = JSON.parseObject(ruleSpec);
+    private ObjectNode ruleSpecOf(String ruleSpec) {
+        ObjectNode result = WindJson.parseObject(ruleSpec, ObjectNode.class);
         AssertUtils.notNull(result, "Spend Rule 规则规格不能为空");
         return result;
     }
 
-    private void assertSingleExecutableControl(JSONObject ruleSpec) {
+    private void assertSingleExecutableControl(ObjectNode ruleSpec) {
         long controlCount = List.of(
                         hasCardDataInputCapabilityControl(ruleSpec),
                         hasCardTransactionProcessingTypeControl(ruleSpec),
@@ -232,40 +236,40 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         AssertUtils.isTrue(controlCount <= 1L, MULTIPLE_CONTROL_UNSUPPORTED_MESSAGE);
     }
 
-    private AmountLimit amountLimitOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private AmountLimit amountLimitOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject amountLimit = limitSpec.getJSONObject(AMOUNT_LIMIT_KEY);
+        ObjectNode amountLimit = objectValue(limitSpec, AMOUNT_LIMIT_KEY);
         AssertUtils.notNull(amountLimit, "Spend Rule 规则规格缺少 limitSpec.amountLimit");
-        Long amount = amountLimit.getLong(AMOUNT_KEY);
-        String currencyCode = amountLimit.getString(CURRENCY_KEY);
+        Long amount = longValue(amountLimit, AMOUNT_KEY);
+        String currencyCode = textValue(amountLimit, CURRENCY_KEY);
         AssertUtils.notNull(amount, "Spend Rule 单笔限额金额不能为空");
         AssertUtils.isTrue(amount > 0L, "Spend Rule 单笔限额金额必须大于 0");
         AssertUtils.hasText(currencyCode, "Spend Rule 单笔限额币种不能为空");
         return new AmountLimit(amount, CurrencyIsoCode.valueOf(currencyCode));
     }
 
-    private CountLimit countLimitOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private CountLimit countLimitOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject countLimit = limitSpec.getJSONObject(COUNT_LIMIT_KEY);
+        ObjectNode countLimit = objectValue(limitSpec, COUNT_LIMIT_KEY);
         AssertUtils.notNull(countLimit, "Spend Rule 规则规格缺少 limitSpec.countLimit");
-        Integer maxCount = countLimit.getInteger(MAX_COUNT_KEY);
+        Integer maxCount = integerValue(countLimit, MAX_COUNT_KEY);
         AssertUtils.notNull(maxCount, "Spend Rule 周期次数上限不能为空");
         AssertUtils.isTrue(maxCount > 0, "Spend Rule 周期次数上限必须大于 0");
         return new CountLimit(maxCount);
     }
 
-    private RollingWindow rollingWindowOf(JSONObject ruleSpec) {
-        JSONObject counterSpec = ruleSpec.getJSONObject(COUNTER_SPEC_KEY);
+    private RollingWindow rollingWindowOf(ObjectNode ruleSpec) {
+        ObjectNode counterSpec = objectValue(ruleSpec, COUNTER_SPEC_KEY);
         AssertUtils.notNull(counterSpec, "Spend Rule 滚动窗口规则规格缺少 counterSpec");
-        Integer windowSizeMinutes = counterSpec.getInteger(WINDOW_SIZE_MINUTES_KEY);
+        Integer windowSizeMinutes = integerValue(counterSpec, WINDOW_SIZE_MINUTES_KEY);
         AssertUtils.notNull(windowSizeMinutes, "Spend Rule 滚动窗口分钟数不能为空");
         AssertUtils.isTrue(windowSizeMinutes > 0, "Spend Rule 滚动窗口分钟数必须大于 0");
         return new RollingWindow(windowSizeMinutes);
     }
 
-    private SpendControlDecisionResult evaluateRule(EvaluateSpendRuleRequest request, JSONObject ruleSpec) {
+    private SpendControlDecisionResult evaluateRule(EvaluateSpendRuleRequest request, ObjectNode ruleSpec) {
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
         }
@@ -321,96 +325,96 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 request.getCurrency());
     }
 
-    private boolean hasCounterSpec(JSONObject ruleSpec) {
-        return ruleSpec.getJSONObject(COUNTER_SPEC_KEY) != null;
+    private boolean hasCounterSpec(ObjectNode ruleSpec) {
+        return objectValue(ruleSpec, COUNTER_SPEC_KEY) != null;
     }
 
-    private boolean isRollingWindowCounter(JSONObject ruleSpec) {
-        JSONObject counterSpec = ruleSpec.getJSONObject(COUNTER_SPEC_KEY);
+    private boolean isRollingWindowCounter(ObjectNode ruleSpec) {
+        ObjectNode counterSpec = objectValue(ruleSpec, COUNTER_SPEC_KEY);
         if (counterSpec == null) {
             return false;
         }
-        String windowMode = counterSpec.getString(WINDOW_MODE_KEY);
+        String windowMode = textValue(counterSpec, WINDOW_MODE_KEY);
         return StringUtils.hasText(windowMode) && ROLLING_WINDOW_MODE.equals(normalizeUpperCode(windowMode));
     }
 
-    private boolean hasCountLimit(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(COUNT_LIMIT_KEY) != null;
+    private boolean hasCountLimit(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, COUNT_LIMIT_KEY) != null;
     }
 
-    private boolean hasAmountLimit(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(AMOUNT_LIMIT_KEY) != null;
+    private boolean hasAmountLimit(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, AMOUNT_LIMIT_KEY) != null;
     }
 
-    private boolean hasMerchantCategoryControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(MERCHANT_CATEGORY_CONTROL_KEY) != null;
+    private boolean hasMerchantCategoryControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, MERCHANT_CATEGORY_CONTROL_KEY) != null;
     }
 
-    private boolean hasMerchantIdControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(MERCHANT_ID_CONTROL_KEY) != null;
+    private boolean hasMerchantIdControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, MERCHANT_ID_CONTROL_KEY) != null;
     }
 
-    private boolean hasMerchantCountryControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY) != null;
+    private boolean hasMerchantCountryControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, MERCHANT_COUNTRY_CONTROL_KEY) != null;
     }
 
-    private boolean hasCardDataInputCapabilityControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
+    private boolean hasCardDataInputCapabilityControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
     }
 
-    private boolean hasCardTransactionProcessingTypeControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY) != null;
+    private boolean hasCardTransactionProcessingTypeControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY) != null;
     }
 
-    private boolean hasCvvControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(CVV_CONTROL_KEY) != null;
+    private boolean hasCvvControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, CVV_CONTROL_KEY) != null;
     }
 
-    private boolean hasPanEntryModeControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(PAN_ENTRY_MODE_CONTROL_KEY) != null;
+    private boolean hasPanEntryModeControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, PAN_ENTRY_MODE_CONTROL_KEY) != null;
     }
 
-    private boolean hasPointOfServiceCategoryControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(POINT_OF_SERVICE_CATEGORY_CONTROL_KEY) != null;
+    private boolean hasPointOfServiceCategoryControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, POINT_OF_SERVICE_CATEGORY_CONTROL_KEY) != null;
     }
 
-    private boolean hasPostalCodeVerificationControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(POSTAL_CODE_VERIFICATION_CONTROL_KEY) != null;
+    private boolean hasPostalCodeVerificationControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, POSTAL_CODE_VERIFICATION_CONTROL_KEY) != null;
     }
 
-    private boolean hasCurrencyControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(CURRENCY_CONTROL_KEY) != null;
+    private boolean hasCurrencyControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, CURRENCY_CONTROL_KEY) != null;
     }
 
-    private boolean hasTimeWindowControl(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
-        return limitSpec != null && limitSpec.getJSONObject(TIME_WINDOW_CONTROL_KEY) != null;
+    private boolean hasTimeWindowControl(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
+        return limitSpec != null && objectValue(limitSpec, TIME_WINDOW_CONTROL_KEY) != null;
     }
 
-    private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private MerchantCategoryControl merchantCategoryControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject merchantCategoryControl = limitSpec.getJSONObject(MERCHANT_CATEGORY_CONTROL_KEY);
+        ObjectNode merchantCategoryControl = objectValue(limitSpec, MERCHANT_CATEGORY_CONTROL_KEY);
         AssertUtils.notNull(merchantCategoryControl, "Spend Rule 规则规格缺少 limitSpec.merchantCategoryControl");
         return new MerchantCategoryControl(
                 mccCodes(merchantCategoryControl, DENIED_MCC_CODES_KEY),
                 mccCodes(merchantCategoryControl, ALLOWED_MCC_CODES_KEY));
     }
 
-    private Set<String> mccCodes(JSONObject merchantCategoryControl, String key) {
-        List<String> codes = merchantCategoryControl.getList(key, String.class);
+    private Set<String> mccCodes(ObjectNode merchantCategoryControl, String key) {
+        List<String> codes = stringList(merchantCategoryControl, key);
         if (codes == null) {
             return Set.of();
         }
@@ -420,18 +424,18 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private MerchantIdControl merchantIdControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private MerchantIdControl merchantIdControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject merchantIdControl = limitSpec.getJSONObject(MERCHANT_ID_CONTROL_KEY);
+        ObjectNode merchantIdControl = objectValue(limitSpec, MERCHANT_ID_CONTROL_KEY);
         AssertUtils.notNull(merchantIdControl, "Spend Rule 规则规格缺少 limitSpec.merchantIdControl");
         return new MerchantIdControl(
                 merchantIds(merchantIdControl, DENIED_MERCHANT_IDS_KEY),
                 merchantIds(merchantIdControl, ALLOWED_MERCHANT_IDS_KEY));
     }
 
-    private Set<String> merchantIds(JSONObject merchantIdControl, String key) {
-        List<String> merchantIds = merchantIdControl.getList(key, String.class);
+    private Set<String> merchantIds(ObjectNode merchantIdControl, String key) {
+        List<String> merchantIds = stringList(merchantIdControl, key);
         if (merchantIds == null) {
             return Set.of();
         }
@@ -441,24 +445,24 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private MerchantCountryControl merchantCountryControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private MerchantCountryControl merchantCountryControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject merchantCountryControl = limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY);
+        ObjectNode merchantCountryControl = objectValue(limitSpec, MERCHANT_COUNTRY_CONTROL_KEY);
         AssertUtils.notNull(merchantCountryControl, "Spend Rule 规则规格缺少 limitSpec.merchantCountryControl");
         return new MerchantCountryControl(
                 countryCodes(merchantCountryControl, DENIED_COUNTRY_CODES_KEY),
                 countryCodes(merchantCountryControl, ALLOWED_COUNTRY_CODES_KEY));
     }
 
-    private Set<String> countryCodes(JSONObject merchantCountryControl, String key) {
+    private Set<String> countryCodes(ObjectNode merchantCountryControl, String key) {
         return normalizedCodes(merchantCountryControl, key);
     }
 
-    private CardDataInputCapabilityControl cardDataInputCapabilityControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private CardDataInputCapabilityControl cardDataInputCapabilityControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject cardDataInputCapabilityControl = limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY);
+        ObjectNode cardDataInputCapabilityControl = objectValue(limitSpec, CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY);
         AssertUtils.notNull(cardDataInputCapabilityControl,
                 "Spend Rule 规则规格缺少 limitSpec.cardDataInputCapabilityControl");
         return new CardDataInputCapabilityControl(
@@ -466,11 +470,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 normalizedCodes(cardDataInputCapabilityControl, ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY));
     }
 
-    private CardTransactionProcessingTypeControl cardTransactionProcessingTypeControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private CardTransactionProcessingTypeControl cardTransactionProcessingTypeControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject cardTransactionProcessingTypeControl =
-                limitSpec.getJSONObject(CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY);
+        ObjectNode cardTransactionProcessingTypeControl =
+                objectValue(limitSpec, CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY);
         AssertUtils.notNull(cardTransactionProcessingTypeControl,
                 "Spend Rule 规则规格缺少 limitSpec.cardTransactionProcessingTypeControl");
         return new CardTransactionProcessingTypeControl(
@@ -478,30 +482,30 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 normalizedCodes(cardTransactionProcessingTypeControl, ALLOWED_CARD_TRANSACTION_PROCESSING_TYPES_KEY));
     }
 
-    private PanEntryModeControl panEntryModeControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private PanEntryModeControl panEntryModeControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject panEntryModeControl = limitSpec.getJSONObject(PAN_ENTRY_MODE_CONTROL_KEY);
+        ObjectNode panEntryModeControl = objectValue(limitSpec, PAN_ENTRY_MODE_CONTROL_KEY);
         AssertUtils.notNull(panEntryModeControl, "Spend Rule 规则规格缺少 limitSpec.panEntryModeControl");
         return new PanEntryModeControl(
                 normalizedCodes(panEntryModeControl, DENIED_PAN_ENTRY_MODES_KEY),
                 normalizedCodes(panEntryModeControl, ALLOWED_PAN_ENTRY_MODES_KEY));
     }
 
-    private CvvRequired cvvRequiredOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private CvvRequired cvvRequiredOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject cvvControl = limitSpec.getJSONObject(CVV_CONTROL_KEY);
+        ObjectNode cvvControl = objectValue(limitSpec, CVV_CONTROL_KEY);
         AssertUtils.notNull(cvvControl, "Spend Rule 规则规格缺少 limitSpec.cvvControl");
-        Boolean required = cvvControl.getBoolean(REQUIRED_KEY);
+        Boolean required = booleanValue(cvvControl, REQUIRED_KEY);
         AssertUtils.notNull(required, "Spend Rule CVV 必填配置不能为空");
         return new CvvRequired(required);
     }
 
-    private PointOfServiceCategoryControl pointOfServiceCategoryControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private PointOfServiceCategoryControl pointOfServiceCategoryControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject pointOfServiceCategoryControl = limitSpec.getJSONObject(POINT_OF_SERVICE_CATEGORY_CONTROL_KEY);
+        ObjectNode pointOfServiceCategoryControl = objectValue(limitSpec, POINT_OF_SERVICE_CATEGORY_CONTROL_KEY);
         AssertUtils.notNull(pointOfServiceCategoryControl,
                 "Spend Rule 规则规格缺少 limitSpec.pointOfServiceCategoryControl");
         return new PointOfServiceCategoryControl(
@@ -509,10 +513,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 normalizedCodes(pointOfServiceCategoryControl, ALLOWED_POINT_OF_SERVICE_CATEGORIES_KEY));
     }
 
-    private PostalCodeVerificationControl postalCodeVerificationControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private PostalCodeVerificationControl postalCodeVerificationControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject postalCodeVerificationControl = limitSpec.getJSONObject(POSTAL_CODE_VERIFICATION_CONTROL_KEY);
+        ObjectNode postalCodeVerificationControl = objectValue(limitSpec, POSTAL_CODE_VERIFICATION_CONTROL_KEY);
         AssertUtils.notNull(postalCodeVerificationControl,
                 "Spend Rule 规则规格缺少 limitSpec.postalCodeVerificationControl");
         return new PostalCodeVerificationControl(
@@ -520,18 +524,18 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 normalizedCodes(postalCodeVerificationControl, ALLOWED_VERIFICATION_RESULTS_KEY));
     }
 
-    private CurrencyControl currencyControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private CurrencyControl currencyControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject currencyControl = limitSpec.getJSONObject(CURRENCY_CONTROL_KEY);
+        ObjectNode currencyControl = objectValue(limitSpec, CURRENCY_CONTROL_KEY);
         AssertUtils.notNull(currencyControl, "Spend Rule 规则规格缺少 limitSpec.currencyControl");
         return new CurrencyControl(
                 currencies(currencyControl, DENIED_CURRENCIES_KEY),
                 currencies(currencyControl, ALLOWED_CURRENCIES_KEY));
     }
 
-    private Set<CurrencyIsoCode> currencies(JSONObject control, String key) {
-        List<String> codes = control.getList(key, String.class);
+    private Set<CurrencyIsoCode> currencies(ObjectNode control, String key) {
+        List<String> codes = stringList(control, key);
         if (codes == null) {
             return Set.of();
         }
@@ -542,21 +546,21 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private TimeWindowControl timeWindowControlOf(JSONObject ruleSpec) {
-        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+    private TimeWindowControl timeWindowControlOf(ObjectNode ruleSpec) {
+        ObjectNode limitSpec = objectValue(ruleSpec, LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
-        JSONObject timeWindowControl = limitSpec.getJSONObject(TIME_WINDOW_CONTROL_KEY);
+        ObjectNode timeWindowControl = objectValue(limitSpec, TIME_WINDOW_CONTROL_KEY);
         AssertUtils.notNull(timeWindowControl, "Spend Rule 规则规格缺少 limitSpec.timeWindowControl");
-        List<JSONObject> windows = timeWindowControl.getList(ALLOWED_WINDOWS_KEY, JSONObject.class);
+        List<ObjectNode> windows = objectList(timeWindowControl, ALLOWED_WINDOWS_KEY);
         AssertUtils.isTrue(windows != null && !windows.isEmpty(), "Spend Rule 时间窗口不能为空");
         return new TimeWindowControl(windows.stream()
                 .map(this::timeWindowOf)
                 .collect(Collectors.toUnmodifiableList()));
     }
 
-    private TimeWindow timeWindowOf(JSONObject window) {
-        String startTime = window.getString(START_TIME_KEY);
-        String endTime = window.getString(END_TIME_KEY);
+    private TimeWindow timeWindowOf(ObjectNode window) {
+        String startTime = textValue(window, START_TIME_KEY);
+        String endTime = textValue(window, END_TIME_KEY);
         AssertUtils.hasText(startTime, "Spend Rule 时间窗口开始时间不能为空");
         AssertUtils.hasText(endTime, "Spend Rule 时间窗口结束时间不能为空");
         LocalTime parsedStartTime = LocalTime.parse(startTime);
@@ -565,8 +569,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new TimeWindow(parsedStartTime, parsedEndTime);
     }
 
-    private Set<String> normalizedCodes(JSONObject control, String key) {
-        List<String> codes = control.getList(key, String.class);
+    private Set<String> normalizedCodes(ObjectNode control, String key) {
+        List<String> codes = stringList(control, key);
         if (codes == null) {
             return Set.of();
         }
@@ -841,7 +845,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return SpendControlDecisionResult.PASSED;
     }
 
-    private String rejectReason(SpendControlDecisionResult result, JSONObject ruleSpec) {
+    private String rejectReason(SpendControlDecisionResult result, ObjectNode ruleSpec) {
         if (result == SpendControlDecisionResult.PASSED) {
             return null;
         }
@@ -942,7 +946,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("targetAccountId", targetAccountDigest(request));
         digestValues.put("decisionResult", result);
         digestValues.put("rejectReason", rejectReason == null ? "" : rejectReason);
-        return sha256(JSON.toJSONString(digestValues));
+        return sha256(WindJson.toJsonString(digestValues));
     }
 
     private String targetAccountDigest(EvaluateSpendRuleRequest request) {
@@ -959,6 +963,52 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 algorithm unavailable", exception);
         }
+    }
+
+    private static @Nullable ObjectNode objectValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value instanceof ObjectNode objectNode ? objectNode : null;
+    }
+
+    private static @Nullable ArrayNode arrayValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value instanceof ArrayNode arrayNode ? arrayNode : null;
+    }
+
+    private static @Nullable String textValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.asString();
+    }
+
+    private static @Nullable Long longValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.longValue();
+    }
+
+    private static @Nullable Integer integerValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.intValue();
+    }
+
+    private static @Nullable Boolean booleanValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.booleanValue();
+    }
+
+    private static List<String> stringList(ObjectNode values, String field) {
+        ArrayNode array = arrayValue(values, field);
+        if (array == null) {
+            return List.of();
+        }
+        return array.valueStream().map(JsonNode::asString).toList();
+    }
+
+    private static List<ObjectNode> objectList(ObjectNode values, String field) {
+        ArrayNode array = arrayValue(values, field);
+        if (array == null) {
+            return List.of();
+        }
+        return array.valueStream().map(JsonNode::asObject).toList();
     }
 
     private static String normalizeUpperCode(String code) {

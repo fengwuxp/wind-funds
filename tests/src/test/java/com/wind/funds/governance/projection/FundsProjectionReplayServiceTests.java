@@ -138,6 +138,34 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
+     * 场景：旧端口实现只实现不带 tenantId 的直接重放方法，却被持久任务控制面调用。
+     * 预期：tenant-aware 来源和写入入口全部失败关闭，不能静默降级为无租户实现。
+     */
+    @Test
+    void testPersistentReplayPortsShouldRejectLegacyTenantlessFallback() {
+        FixedProjectionReplaySource source = new FixedProjectionReplaySource();
+        RecordingProjectionWriter writer = new RecordingProjectionWriter();
+        FundsTransactionProjectionReplayRange range = FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build();
+        FundsTransactionProjectionCheckpoint checkpoint = FundsTransactionProjectionCheckpoint.builder()
+                .type(ProjectionCheckpointType.TRANSACTION_PROJECTION)
+                .checkpointSn("0:0:0:0")
+                .build();
+
+        assertThatThrownBy(() -> source.initializeCheckpoint(1L, "USER_BILL", range))
+                .hasMessageContaining("必须显式实现 tenant 有界");
+        assertThatThrownBy(() -> source.loadFactBatch(1L, "USER_BILL", range, checkpoint, 100))
+                .hasMessageContaining("必须显式实现 tenant 有界");
+        assertThatThrownBy(() -> writer.compare(1L, "USER_BILL", List.of()))
+                .hasMessageContaining("必须显式实现 tenant 有界");
+        assertThatThrownBy(() -> writer.upsertShadow(1L, "TASK-1", List.of()))
+                .hasMessageContaining("必须显式实现 tenant 有界");
+        assertThatThrownBy(() -> writer.upsertOfficial(1L, "TASK-1", List.of()))
+                .hasMessageContaining("必须显式实现 tenant 有界");
+    }
+
+    /**
      * 场景：先以校验模式重放单笔用户账单，准备生成差异报告。
      * 输入：单笔重放范围、`VERIFY_ONLY` 模式、合法交易投影 checkpoint。
      * 输出：读取事实并产出差异报告，不写影子投影，不写正式投影。
@@ -169,57 +197,53 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
-     * 场景：运营人员以影子模式重放单笔用户账单，用于正式覆盖前的灰度核对。
-     * 输入：单笔重放范围、`REBUILD_SHADOW` 模式、合法交易投影 checkpoint。
-     * 输出：读取事实、比较差异并写入影子投影。
-     * 预期：影子模式只写影子投影，不覆盖正式投影。
-     * 红线：影子重放不得借灰度核对修改正式用户账单、交易事实、账本事实或余额投影。
+     * 场景：控制面、审批与审计证据尚未落地时请求影子重放。
+     * 预期：服务在读取来源事实和调用 Writer 前拒绝请求。
+     * 红线：不能把有界范围和 checkpoint 当成影子写入授权。
      */
     @Test
-    void testShadowReplayShouldWriteOnlyShadowProjection() {
+    void testShadowReplayWithoutControlPlaneShouldFailClosed() {
+        RecordingProjectionReplaySource source = new RecordingProjectionReplaySource();
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsProjectionReplayService service = newService(writer);
+        FundsProjectionReplayService service = new FundsProjectionReplayService(source, writer);
 
-        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(
+        assertThatThrownBy(() -> service.replay(replayRequest(
                 ProjectionReplayMode.REBUILD_SHADOW,
                 FundsTransactionProjectionReplayRange.builder()
                         .sourceSn("FT202605190001")
-                        .build()));
+                        .build())))
+                .hasMessageContaining("交易投影重放控制面未开放")
+                .hasMessageContaining("VERIFY_ONLY");
 
-        assertThat(result.mode()).isEqualTo(ProjectionReplayMode.REBUILD_SHADOW);
-        assertThat(result.loadedFactCount()).isEqualTo(1);
-        assertThat(result.rebuiltRowCount()).isEqualTo(1);
-        assertThat(writer.comparedRows()).hasSize(1);
-        assertThat(writer.shadowWrites()).singleElement()
-                .satisfies(row -> assertThat(row.projectionSn()).isEqualTo("TP-FT202605190001"));
+        assertThat(source.loadCalls()).isZero();
+        assertThat(writer.comparedRows()).isEmpty();
+        assertThat(writer.shadowWrites()).isEmpty();
         assertThat(writer.officialWrites()).isEmpty();
     }
 
     /**
-     * 场景：影子核对完成后，运营人员以正式重建模式刷新只读用户账单。
-     * 输入：单笔重放范围、`REBUILD_APPLY` 模式、合法交易投影 checkpoint。
-     * 输出：读取事实、比较差异并写入正式投影。
-     * 预期：正式重建只覆盖只读投影，不写影子投影。
-     * 红线：正式投影重放仍不得重新入账、补写交易事实、修改账本分录或修正余额投影。
+     * 场景：控制面、审批与审计证据尚未落地时请求正式重放。
+     * 预期：服务在读取来源事实和调用 Writer 前拒绝请求。
+     * 红线：不能在缺少控制面时覆盖正式投影。
      */
     @Test
-    void testApplyReplayShouldWriteOnlyOfficialProjection() {
+    void testApplyReplayWithoutControlPlaneShouldFailClosed() {
+        RecordingProjectionReplaySource source = new RecordingProjectionReplaySource();
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsProjectionReplayService service = newService(writer);
+        FundsProjectionReplayService service = new FundsProjectionReplayService(source, writer);
 
-        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(
+        assertThatThrownBy(() -> service.replay(replayRequest(
                 ProjectionReplayMode.REBUILD_APPLY,
                 FundsTransactionProjectionReplayRange.builder()
                         .sourceSn("FT202605190001")
-                        .build()));
+                        .build())))
+                .hasMessageContaining("交易投影重放控制面未开放")
+                .hasMessageContaining("VERIFY_ONLY");
 
-        assertThat(result.mode()).isEqualTo(ProjectionReplayMode.REBUILD_APPLY);
-        assertThat(result.loadedFactCount()).isEqualTo(1);
-        assertThat(result.rebuiltRowCount()).isEqualTo(1);
-        assertThat(writer.comparedRows()).hasSize(1);
+        assertThat(source.loadCalls()).isZero();
+        assertThat(writer.comparedRows()).isEmpty();
         assertThat(writer.shadowWrites()).isEmpty();
-        assertThat(writer.officialWrites()).singleElement()
-                .satisfies(row -> assertThat(row.projectionSn()).isEqualTo("TP-FT202605190001"));
+        assertThat(writer.officialWrites()).isEmpty();
     }
 
     /**
@@ -465,6 +489,21 @@ class FundsProjectionReplayServiceTests {
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(explainablePayload())
                     .build());
+        }
+    }
+
+    private static final class RecordingProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+
+        private int loadCalls;
+
+        @Override
+        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+            loadCalls++;
+            return new FixedProjectionReplaySource().loadFacts(range);
+        }
+
+        private int loadCalls() {
+            return loadCalls;
         }
     }
 

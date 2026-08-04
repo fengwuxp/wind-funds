@@ -1,7 +1,5 @@
 package com.wind.funds.reconciliation.application.clearing.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
@@ -36,6 +34,7 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
+import com.wind.jackson.WindJson;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
@@ -49,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
+import tools.jackson.databind.JsonNode;
 
 /**
  * 可清分明细准入应用服务实现。
@@ -172,7 +173,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         result.setReconciliationDecisionStatus(reconciliationDecision.getDecisionStatus());
         result.setReconciliationRunResultSn(reconciliationDecision.getReconciliationRunResultSn());
         result.setReconciliationResultDigest(reconciliationDecision.getReconciliationResultDigest());
-        result.setReconciliationEvidenceRefs(JSON.toJSONString(reconciliationDecision.getEvidenceRefs()));
+        result.setReconciliationEvidenceRefs(WindJson.toJsonString(reconciliationDecision.getEvidenceRefs()));
         if (StringUtils.hasText(transaction.getRouteSnapshot())) {
             result.setRouteSnapshotDigest(FundsStableHashSupport.sha256Json(
                     Map.of("routeSnapshot", transaction.getRouteSnapshot())));
@@ -225,11 +226,11 @@ public class ClearingSplittableDetailApplicationServiceImpl
             return false;
         }
         try {
-            JSONObject snapshot = JSON.parseObject(routeSnapshot);
-            return StringUtils.hasText(snapshot.getString("routeCode"))
-                    && StringUtils.hasText(snapshot.getString("routeVersion"))
-                    && snapshot.getJSONArray("legs") != null
-                    && !snapshot.getJSONArray("legs").isEmpty();
+            JsonNode snapshot = WindJson.parseObject(routeSnapshot, JsonNode.class);
+            return snapshot != null
+                    && StringUtils.hasText(snapshot.path("routeCode").asString())
+                    && StringUtils.hasText(snapshot.path("routeVersion").asString())
+                    && !snapshot.path("legs").isEmpty();
         } catch (RuntimeException exception) {
             return false;
         }

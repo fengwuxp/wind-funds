@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.wallet.dal.entities.PaymentInstrument;
 import com.wind.funds.wallet.dal.entities.PaymentInstrumentBinding;
 import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentNameRefs;
@@ -500,7 +500,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         values.put(PaymentInstrumentBinding.Fields.validTo, binding.getValidTo());
         values.put(PaymentInstrumentBinding.Fields.description, binding.getDescription());
         values.put(PaymentInstrumentBinding.Fields.contextVariables, binding.getContextVariables());
-        return JSON.toJSONString(values);
+        return WindJson.toJsonString(values);
     }
 
     private PaymentInstrumentBindingDTO copyBinding(PaymentInstrumentBindingDTO source) {

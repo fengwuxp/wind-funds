@@ -1,16 +1,17 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
+import com.wind.jackson.WindJson;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -60,14 +61,16 @@ final class FundsAccountCapabilitySourceResolver {
         if (!contextVariables.contains(CONTEXT_CAPABILITIES_KEY)) {
             return null;
         }
-        JSONObject values = JSON.parseObject(contextVariables);
+        Map<String, Object> values = WindJson.parseObject(contextVariables, new TypeReference<>() {
+        });
         if (!values.containsKey(CONTEXT_CAPABILITIES_KEY)) {
             return null;
         }
-        JSONArray capabilities = values.getJSONArray(CONTEXT_CAPABILITIES_KEY);
-        AssertUtils.notNull(capabilities, "账户显式能力必须使用数组字段 {}", CONTEXT_CAPABILITIES_KEY);
+        Object capabilityValues = values.get(CONTEXT_CAPABILITIES_KEY);
+        AssertUtils.isTrue(capabilityValues instanceof List<?>, "账户显式能力必须使用数组字段 {}",
+                CONTEXT_CAPABILITIES_KEY);
         EnumSet<FundsAccountCapability> result = EnumSet.noneOf(FundsAccountCapability.class);
-        for (Object item : capabilities) {
+        for (Object item : (List<?>) capabilityValues) {
             AssertUtils.isTrue(item instanceof String, "账户显式能力值必须是文本，value = {}", item);
             result.add(FundsAccountCapability.valueOf((String) item));
         }

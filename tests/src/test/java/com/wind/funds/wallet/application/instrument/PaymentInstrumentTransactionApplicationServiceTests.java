@@ -1,10 +1,9 @@
 package com.wind.funds.wallet.application.instrument;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
+import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -14,7 +13,6 @@ import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
@@ -95,6 +93,7 @@ import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,9 +108,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalTime;
 import java.util.List;
 
+import tools.jackson.databind.JsonNode;
+
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -179,6 +181,9 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
 
     @Autowired
     private LedgerService ledgerService;
+
+    @Autowired
+    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -317,10 +322,10 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
 
         paymentInstrumentTransactionApplicationService.receiveByInstrument(request, WindOperatorFactory.system());
 
-        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(WALLET_RECEIVE_BUSINESS_SN));
-        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
-        assertThat(externalAccountRef.getString("providerCode")).isEqualTo("PAYPAL");
-        assertThat(externalAccountRef.getString("channelCode"))
+        JsonNode routeSnapshot = jsonObject(routeSnapshotJson(WALLET_RECEIVE_BUSINESS_SN));
+        JsonNode externalAccountRef = routeSnapshot.path("externalAccountRef");
+        assertThat(externalAccountRef.path("providerCode").asString()).isEqualTo("PAYPAL");
+        assertThat(externalAccountRef.path("channelCode").asString())
                 .isEqualTo(FundsTransactionChannel.DIGITAL_WALLET.name());
     }
 
@@ -536,10 +541,10 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
-                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    Math.abs(initialBalance))));
         }
     }
 
@@ -725,8 +730,8 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     }
 
     private int routeLegCount(String businessSn) {
-        return JSON.parseObject(routeSnapshotJson(businessSn))
-                .getJSONArray("legs")
+        return jsonObject(routeSnapshotJson(businessSn))
+                .path("legs")
                 .size();
     }
 
@@ -738,43 +743,44 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     }
 
     private void assertReceiveRouteSnapshot(String businessSn) {
-        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(businessSn));
-        JSONObject paymentInstrumentRef = routeSnapshot.getJSONObject("paymentInstrumentRef");
+        JsonNode routeSnapshot = jsonObject(routeSnapshotJson(businessSn));
+        JsonNode paymentInstrumentRef = routeSnapshot.path("paymentInstrumentRef");
         assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
-        assertThat(paymentInstrumentRef.getString("instrumentId")).isEqualTo(RECEIVE_INSTRUMENT_SN);
-        assertThat(paymentInstrumentRef.getString("instrumentType")).isEqualTo("VA");
-        assertThat(paymentInstrumentRef.getString("instrumentNo")).isEqualTo(RECEIVE_INSTRUMENT_NO);
-        assertThat(paymentInstrumentRef.getString("ownerId")).isEqualTo(OWNER_ID);
-        assertThat(paymentInstrumentRef.getString("ownerType")).isEqualTo(FundsAccountOwnerType.USER.name());
-        assertThat(paymentInstrumentRef.getString("currency")).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("instrumentId").asString()).isEqualTo(RECEIVE_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.path("instrumentType").asString()).isEqualTo("VA");
+        assertThat(paymentInstrumentRef.path("instrumentNo").asString()).isEqualTo(RECEIVE_INSTRUMENT_NO);
+        assertThat(paymentInstrumentRef.path("ownerId").asString()).isEqualTo(OWNER_ID);
+        assertThat(paymentInstrumentRef.path("ownerType").asString()).isEqualTo(FundsAccountOwnerType.USER.name());
+        assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
+        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountStatus.ACTIVE.name());
         assertThat(paymentInstrumentRef.toString()).doesNotContain("va_lifecycle_2468");
-        JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
+        JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
-        assertThat(bindingSnapshot.getString("bindingSn")).startsWith("PIB");
-        assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
-        assertThat(bindingSnapshot.getString("bindingRole"))
+        assertThat(bindingSnapshot.path("bindingSn").asString()).startsWith("PIB");
+        assertThat(bindingSnapshot.path("bindingVersion").asInt()).isEqualTo(1);
+        assertThat(bindingSnapshot.path("bindingRole").asString())
                 .isEqualTo(PaymentInstrumentBindingRole.RECEIVE_SUBJECT.name());
-        assertThat(bindingSnapshot.getString("subjectType")).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
-        assertThat(bindingSnapshot.getString("subjectId")).isEqualTo(RECEIVE_ACCOUNT_SN);
-        assertThat(bindingSnapshot.getString("admissionAction")).isEqualTo(PaymentInstrumentAction.RECEIVE.name());
-        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
+        assertThat(bindingSnapshot.path("subjectType").asString()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(bindingSnapshot.path("subjectId").asString()).isEqualTo(RECEIVE_ACCOUNT_SN);
+        assertThat(bindingSnapshot.path("admissionAction").asString())
+                .isEqualTo(PaymentInstrumentAction.RECEIVE.name());
+        JsonNode externalAccountRef = routeSnapshot.path("externalAccountRef");
         assertThat(externalAccountRef).isNotNull().isNotEmpty();
-        assertThat(externalAccountRef.getString("externalAccountId"))
+        assertThat(externalAccountRef.path("externalAccountId").asString())
                 .isEqualTo("external_bank_lifecycle_receive");
-        assertThat(externalAccountRef.getString("externalAccountType"))
+        assertThat(externalAccountRef.path("externalAccountType").asString())
                 .isEqualTo(DefaultFundsAccountType.EXTERNAL_BANK.name());
-        assertThat(externalAccountRef.getString("providerCode")).isEqualTo(PROVIDER_CODE);
-        assertThat(externalAccountRef.getString("channelCode")).isEqualTo(EXTERNAL_RAIL_CODE);
+        assertThat(externalAccountRef.path("providerCode").asString()).isEqualTo(PROVIDER_CODE);
+        assertThat(externalAccountRef.path("channelCode").asString()).isEqualTo(EXTERNAL_RAIL_CODE);
     }
 
     private void assertReceiveFactsKeepDirectContextMinimal(String businessSn) {
         assertThat(queryContextVariables("t_funds_transaction", businessSn))
                 .singleElement()
-                .satisfies(context -> assertThat(JSON.parseObject(context)).isEmpty());
+                .satisfies(context -> assertThat(jsonObject(context)).isEmpty());
         assertThat(queryContextVariables("t_funds_transaction_detail", businessSn))
                 .isNotEmpty()
-                .allSatisfy(context -> assertThat(JSON.parseObject(context).keySet())
+                .allSatisfy(context -> assertThat(jsonObject(context).propertyNames())
                         .doesNotContain("instrumentSn",
                                 "instrumentAction",
                                 "instrumentBindingRole",
@@ -786,7 +792,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                                 "targetAccountType"));
         assertThat(queryContextVariables("t_ledger_transaction", businessSn))
                 .singleElement()
-                .satisfies(context -> assertThat(JSON.parseObject(context)).isEmpty());
+                .satisfies(context -> assertThat(jsonObject(context)).isEmpty());
         assertThat(queryContextVariables("t_ledger_entry", businessSn))
                 .isNotEmpty()
                 .allSatisfy(context -> assertThat(context).doesNotContain("va_lifecycle_2468"));
@@ -796,6 +802,10 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         return jdbcTemplate.queryForList(
                 "SELECT context_variables FROM " + tableName + " WHERE business_scene = ? AND business_sn = ?",
                 String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private static JsonNode jsonObject(String json) {
+        return WindJson.parseObject(json, JsonNode.class);
     }
 
     private void assertNoFundsOrLedgerFacts(String businessSn) {

@@ -1,8 +1,5 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -27,6 +24,7 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -37,10 +35,11 @@ import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.jackson.WindJson;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -49,6 +48,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 final class RouteSnapshotJsonSupport {
 
@@ -60,45 +64,46 @@ final class RouteSnapshotJsonSupport {
     }
 
     static String toRouteSnapshotJson(RouteSnapshotSpec routeSnapshot) {
-        return JSON.toJSONString(routeSummary(routeSnapshot));
+        return WindJson.toJsonString(routeSummary(routeSnapshot));
     }
 
     static RouteSnapshotSpec parseRouteSnapshot(String routeSnapshotJson, LocalDateTime defaultResolvedAt) {
-        JSONObject values = JSON.parseObject(routeSnapshotJson);
+        ObjectNode values = WindJson.parseObject(routeSnapshotJson, ObjectNode.class);
         return ImmutableRouteSnapshotSpec.builder()
-                .tenantId(values.getLong(ImmutableRouteSnapshotSpec.Fields.tenantId))
-                .snapshotId(values.getString(ImmutableRouteSnapshotSpec.Fields.snapshotId))
-                .snapshotSchemaVersion(values.getString(ImmutableRouteSnapshotSpec.Fields.snapshotSchemaVersion))
-                .routeCode(values.getString(ImmutableRouteSnapshotSpec.Fields.routeCode))
-                .routeVersion(values.getString(ImmutableRouteSnapshotSpec.Fields.routeVersion))
-                .businessScene(values.getString(ImmutableRouteSnapshotSpec.Fields.businessScene))
-                .businessSn(values.getString(ImmutableRouteSnapshotSpec.Fields.businessSn))
+                .tenantId(longValue(values, ImmutableRouteSnapshotSpec.Fields.tenantId))
+                .snapshotId(textValue(values, ImmutableRouteSnapshotSpec.Fields.snapshotId))
+                .snapshotSchemaVersion(textValue(values, ImmutableRouteSnapshotSpec.Fields.snapshotSchemaVersion))
+                .routeCode(textValue(values, ImmutableRouteSnapshotSpec.Fields.routeCode))
+                .routeVersion(textValue(values, ImmutableRouteSnapshotSpec.Fields.routeVersion))
+                .businessScene(textValue(values, ImmutableRouteSnapshotSpec.Fields.businessScene))
+                .businessSn(textValue(values, ImmutableRouteSnapshotSpec.Fields.businessSn))
                 .instructionType(FundsInstructionType.valueOf(
-                        values.getString(ImmutableRouteSnapshotSpec.Fields.instructionType)))
+                        textValue(values, ImmutableRouteSnapshotSpec.Fields.instructionType)))
                 .eventType(FundsTransactionEventType.valueOf(
-                        values.getString(ImmutableRouteSnapshotSpec.Fields.eventType)))
+                        textValue(values, ImmutableRouteSnapshotSpec.Fields.eventType)))
                 .transactionType(DefaultFundsTransactionType.valueOf(
-                        values.getString(ImmutableRouteSnapshotSpec.Fields.transactionType)))
-                .participants(parseParticipants(values.getJSONArray(ImmutableRouteSnapshotSpec.Fields.participants)))
-                .legs(parseLegs(values.getJSONArray(ImmutableRouteSnapshotSpec.Fields.legs)))
-                .routingDecision(parseRoutingDecision(values.getJSONObject(
+                        textValue(values, ImmutableRouteSnapshotSpec.Fields.transactionType)))
+                .participants(parseParticipants(arrayValue(values, ImmutableRouteSnapshotSpec.Fields.participants)))
+                .legs(parseLegs(arrayValue(values, ImmutableRouteSnapshotSpec.Fields.legs)))
+                .routingDecision(parseRoutingDecision(objectValue(values,
                         ImmutableRouteSnapshotSpec.Fields.routingDecision)))
-                .paymentInstrumentRef(parsePaymentInstrumentRef(values.getJSONObject(
+                .paymentInstrumentRef(parsePaymentInstrumentRef(objectValue(values,
                         ImmutableRouteSnapshotSpec.Fields.paymentInstrumentRef)))
-                .externalAccountRef(parseExternalAccountRef(values.getJSONObject(
+                .externalAccountRef(parseExternalAccountRef(objectValue(values,
                         ImmutableRouteSnapshotSpec.Fields.externalAccountRef)))
-                .platformAccounts(parsePlatformAccounts(values.getJSONObject(
+                .platformAccounts(parsePlatformAccounts(objectValue(values,
                         ImmutableRouteSnapshotSpec.Fields.platformAccounts)))
-                .resolvedAt(parseLocalDateTime(values.getString(ImmutableRouteSnapshotSpec.Fields.resolvedAt),
+                .resolvedAt(parseLocalDateTime(textValue(values, ImmutableRouteSnapshotSpec.Fields.resolvedAt),
                         defaultResolvedAt))
-                .expiresAt(parseLocalDateTime(values.getString(ImmutableRouteSnapshotSpec.Fields.expiresAt), null))
-                .description(values.getString(ImmutableRouteSnapshotSpec.Fields.description))
-                .contextVariables(parseObjectMap(values.getJSONObject(
+                .expiresAt(parseLocalDateTime(textValue(values, ImmutableRouteSnapshotSpec.Fields.expiresAt), null))
+                .description(textValue(values, ImmutableRouteSnapshotSpec.Fields.description))
+                .contextVariables(parseObjectMap(objectValue(values,
                         ImmutableRouteSnapshotSpec.Fields.contextVariables)))
                 .build();
     }
 
     static Map<String, Object> routeSummary(RouteSnapshotSpec routeSnapshot) {
+        assertNoSensitiveFields(routeSnapshot);
         Map<String, Object> values = new TreeMap<>();
         values.put(ImmutableRouteSnapshotSpec.Fields.tenantId, routeSnapshot.getTenantId());
         values.put(ImmutableRouteSnapshotSpec.Fields.snapshotId, routeSnapshot.getSnapshotId());
@@ -133,6 +138,44 @@ final class RouteSnapshotJsonSupport {
                 platformAccountsSummary(routeSnapshot.getPlatformAccounts()));
         values.put(ImmutableRouteSnapshotSpec.Fields.contextVariables, sortedMap(routeSnapshot.getContextVariables()));
         return values;
+    }
+
+    private static void assertNoSensitiveFields(RouteSnapshotSpec routeSnapshot) {
+        assertNoSensitiveContext(routeSnapshot.getContextVariables(), "routeSnapshot.contextVariables");
+        routeSnapshot.getParticipants().forEach(participant -> assertNoSensitiveContext(
+                participant.getContextVariables(), "routeParticipant.contextVariables"));
+        routeSnapshot.getLegs().forEach(leg -> assertNoSensitiveContext(
+                leg.getContextVariables(), "routeLeg.contextVariables"));
+        RoutingDecisionSpec routingDecision = routeSnapshot.getRoutingDecision();
+        if (routingDecision != null) {
+            assertNoSensitiveContext(routingDecision.getContextVariables(), "routingDecision.contextVariables");
+        }
+        PaymentInstrumentRefSpec instrumentRef = routeSnapshot.getPaymentInstrumentRef();
+        if (instrumentRef != null) {
+            if (PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(
+                    instrumentRef.getInstrumentNo())) {
+                throw new IllegalArgumentException(
+                        "paymentInstrumentRef.instrumentNo must be masked or token reference");
+            }
+            assertNoSensitiveContext(instrumentRef.getBindingSnapshot(), "paymentInstrumentRef.bindingSnapshot");
+        }
+        ExternalAccountRefSpec externalAccountRef = routeSnapshot.getExternalAccountRef();
+        if (externalAccountRef != null) {
+            if (ExternalAccountSensitiveValueValidator.isRawSensitiveExternalAccountNo(
+                    externalAccountRef.getExternalAccountNo())) {
+                throw new IllegalArgumentException(
+                        "externalAccountRef.externalAccountNo must be masked or token reference");
+            }
+            assertNoSensitiveContext(externalAccountRef.getContextVariables(),
+                    "externalAccountRef.contextVariables");
+        }
+    }
+
+    private static void assertNoSensitiveContext(Map<String, Object> contextVariables, String fieldName) {
+        if (PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
+                || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables)) {
+            throw new IllegalArgumentException(fieldName + " must not contain sensitive fields");
+        }
     }
 
     private static Map<String, Object> legSummary(RouteLegSpec leg) {
@@ -308,204 +351,204 @@ final class RouteSnapshotJsonSupport {
         return value == null ? null : value.name();
     }
 
-    private static List<RouteParticipantSpec> parseParticipants(JSONArray participants) {
-        if (CollectionUtils.isEmpty(participants)) {
+    private static List<RouteParticipantSpec> parseParticipants(ArrayNode participants) {
+        if (participants == null || participants.isEmpty()) {
             return List.of();
         }
         List<RouteParticipantSpec> result = new ArrayList<>(participants.size());
-        for (Object item : participants) {
-            JSONObject value = (JSONObject) item;
+        for (JsonNode item : participants) {
+            ObjectNode value = item.asObject();
             result.add(ImmutableRouteParticipantSpec.builder()
                     .participantRole(RouteParticipantRole.valueOf(
-                            value.getString(ImmutableRouteParticipantSpec.Fields.participantRole)))
-                    .subjectRef(parseSubjectRef(value.getJSONObject(
+                            textValue(value, ImmutableRouteParticipantSpec.Fields.participantRole)))
+                    .subjectRef(parseSubjectRef(objectValue(value,
                             ImmutableRouteParticipantSpec.Fields.subjectRef)))
-                    .ledgerProfileCode(value.getString(ImmutableRouteParticipantSpec.Fields.ledgerProfileCode))
-                    .currency(value.getString(ImmutableRouteParticipantSpec.Fields.currency))
-                    .amount(parseMoney(value.getJSONObject(ImmutableRouteParticipantSpec.Fields.amount)))
-                    .description(value.getString(ImmutableRouteParticipantSpec.Fields.description))
-                    .accountHierarchySnapshot(parseAccountHierarchySnapshot(value.getJSONObject(
+                    .ledgerProfileCode(textValue(value, ImmutableRouteParticipantSpec.Fields.ledgerProfileCode))
+                    .currency(textValue(value, ImmutableRouteParticipantSpec.Fields.currency))
+                    .amount(parseMoney(objectValue(value, ImmutableRouteParticipantSpec.Fields.amount)))
+                    .description(textValue(value, ImmutableRouteParticipantSpec.Fields.description))
+                    .accountHierarchySnapshot(parseAccountHierarchySnapshot(objectValue(value,
                             ImmutableRouteParticipantSpec.Fields.accountHierarchySnapshot)))
-                    .contextVariables(parseObjectMap(value.getJSONObject(
+                    .contextVariables(parseObjectMap(objectValue(value,
                             ImmutableRouteParticipantSpec.Fields.contextVariables)))
                     .build());
         }
         return result;
     }
 
-    private static List<RouteLegSpec> parseLegs(JSONArray legs) {
-        if (CollectionUtils.isEmpty(legs)) {
+    private static List<RouteLegSpec> parseLegs(ArrayNode legs) {
+        if (legs == null || legs.isEmpty()) {
             return List.of();
         }
         List<RouteLegSpec> result = new ArrayList<>(legs.size());
-        for (Object item : legs) {
-            JSONObject value = (JSONObject) item;
+        for (JsonNode item : legs) {
+            ObjectNode value = item.asObject();
             result.add(ImmutableRouteLegSpec.builder()
-                    .legId(value.getString(ImmutableRouteLegSpec.Fields.legId))
-                    .sequence(value.getIntValue(ImmutableRouteLegSpec.Fields.sequence))
-                    .legType(RouteLegType.valueOf(value.getString(ImmutableRouteLegSpec.Fields.legType)))
-                    .sourceNode(parseRouteNode(value.getJSONObject(ImmutableRouteLegSpec.Fields.sourceNode)))
-                    .targetNode(parseRouteNode(value.getJSONObject(ImmutableRouteLegSpec.Fields.targetNode)))
-                    .amount(parseMoney(value.getJSONObject(ImmutableRouteLegSpec.Fields.amount)))
-                    .originalAmount(parseMoney(value.getJSONObject(ImmutableRouteLegSpec.Fields.originalAmount)))
-                    .exchangeRate(value.getBigDecimal(ImmutableRouteLegSpec.Fields.exchangeRate))
+                    .legId(textValue(value, ImmutableRouteLegSpec.Fields.legId))
+                    .sequence(intValue(value, ImmutableRouteLegSpec.Fields.sequence))
+                    .legType(RouteLegType.valueOf(textValue(value, ImmutableRouteLegSpec.Fields.legType)))
+                    .sourceNode(parseRouteNode(objectValue(value, ImmutableRouteLegSpec.Fields.sourceNode)))
+                    .targetNode(parseRouteNode(objectValue(value, ImmutableRouteLegSpec.Fields.targetNode)))
+                    .amount(parseMoney(objectValue(value, ImmutableRouteLegSpec.Fields.amount)))
+                    .originalAmount(parseMoney(objectValue(value, ImmutableRouteLegSpec.Fields.originalAmount)))
+                    .exchangeRate(decimalValue(value, ImmutableRouteLegSpec.Fields.exchangeRate))
                     .balanceEffectType(LedgerBalanceEffectType.valueOf(
-                            value.getString(ImmutableRouteLegSpec.Fields.balanceEffectType)))
-                    .phaseCode(LedgerPhaseCode.valueOf(value.getString(ImmutableRouteLegSpec.Fields.phaseCode)))
-                    .periodType(AccountBalancePeriodType.valueOf(value.getString(
+                            textValue(value, ImmutableRouteLegSpec.Fields.balanceEffectType)))
+                    .phaseCode(LedgerPhaseCode.valueOf(textValue(value, ImmutableRouteLegSpec.Fields.phaseCode)))
+                    .periodType(AccountBalancePeriodType.valueOf(textValue(value,
                             ImmutableRouteLegSpec.Fields.periodType)))
-                    .periodId(value.getString(ImmutableRouteLegSpec.Fields.periodId))
-                    .constraintOverrides(parseConstraintOverrides(value.getJSONObject(
+                    .periodId(textValue(value, ImmutableRouteLegSpec.Fields.periodId))
+                    .constraintOverrides(parseConstraintOverrides(objectValue(value,
                             ImmutableRouteLegSpec.Fields.constraintOverrides)))
-                    .replayPolicy(RouteReplayPolicy.valueOf(value.getString(
+                    .replayPolicy(RouteReplayPolicy.valueOf(textValue(value,
                             ImmutableRouteLegSpec.Fields.replayPolicy)))
-                    .replayRefLegId(value.getString(ImmutableRouteLegSpec.Fields.replayRefLegId))
-                    .description(value.getString(ImmutableRouteLegSpec.Fields.description))
-                    .contextVariables(parseObjectMap(value.getJSONObject(
+                    .replayRefLegId(textValue(value, ImmutableRouteLegSpec.Fields.replayRefLegId))
+                    .description(textValue(value, ImmutableRouteLegSpec.Fields.description))
+                    .contextVariables(parseObjectMap(objectValue(value,
                             ImmutableRouteLegSpec.Fields.contextVariables)))
                     .build());
         }
         return result;
     }
 
-    private static RouteNodeSpec parseRouteNode(JSONObject value) {
+    private static RouteNodeSpec parseRouteNode(ObjectNode value) {
         return ImmutableRouteNodeSpec.builder()
-                .nodeType(value.containsKey(ImmutableRouteNodeSpec.Fields.nodeType)
-                        ? RouteNodeType.valueOf(value.getString(ImmutableRouteNodeSpec.Fields.nodeType))
+                .nodeType(value.has(ImmutableRouteNodeSpec.Fields.nodeType)
+                        ? RouteNodeType.valueOf(textValue(value, ImmutableRouteNodeSpec.Fields.nodeType))
                         : RouteNodeType.SUBJECT)
-                .subjectRef(parseSubjectRef(value.getJSONObject(ImmutableRouteNodeSpec.Fields.subjectRef)))
-                .ledgerSubjectCode(LedgerSubjectCode.valueOf(value.getString(
+                .subjectRef(parseSubjectRef(objectValue(value, ImmutableRouteNodeSpec.Fields.subjectRef)))
+                .ledgerSubjectCode(LedgerSubjectCode.valueOf(textValue(value,
                         ImmutableRouteNodeSpec.Fields.ledgerSubjectCode)))
-                .nodeRole(RouteNodeRole.valueOf(value.getString(ImmutableRouteNodeSpec.Fields.nodeRole)))
+                .nodeRole(RouteNodeRole.valueOf(textValue(value, ImmutableRouteNodeSpec.Fields.nodeRole)))
                 .build();
     }
 
-    private static @Nullable SubjectRef parseSubjectRef(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static @Nullable SubjectRef parseSubjectRef(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutableSubjectRef.builder()
-                .tenantId(value.getLong(ImmutableSubjectRef.Fields.tenantId))
-                .subjectId(value.getString(ImmutableSubjectRef.Fields.subjectId))
-                .subjectType(FundsSubjectType.valueOf(value.getString(ImmutableSubjectRef.Fields.subjectType)))
-                .subjectName(value.getString(ImmutableSubjectRef.Fields.subjectName))
-                .currency(value.getString(ImmutableSubjectRef.Fields.currency))
-                .ledgerProfileCode(value.getString(ImmutableSubjectRef.Fields.ledgerProfileCode))
+                .tenantId(longValue(value, ImmutableSubjectRef.Fields.tenantId))
+                .subjectId(textValue(value, ImmutableSubjectRef.Fields.subjectId))
+                .subjectType(FundsSubjectType.valueOf(textValue(value, ImmutableSubjectRef.Fields.subjectType)))
+                .subjectName(textValue(value, ImmutableSubjectRef.Fields.subjectName))
+                .currency(textValue(value, ImmutableSubjectRef.Fields.currency))
+                .ledgerProfileCode(textValue(value, ImmutableSubjectRef.Fields.ledgerProfileCode))
                 .build();
     }
 
-    private static @Nullable Money parseMoney(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static @Nullable Money parseMoney(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
-        return Money.immutable(value.getLongValue(MONEY_AMOUNT),
-                CurrencyIsoCode.valueOf(value.getString(MONEY_CURRENCY)));
+        return Money.immutable(longValue(value, MONEY_AMOUNT),
+                CurrencyIsoCode.valueOf(textValue(value, MONEY_CURRENCY)));
     }
 
-    private static Map<String, LedgerBalanceConstraintType> parseConstraintOverrides(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static Map<String, LedgerBalanceConstraintType> parseConstraintOverrides(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return Map.of();
         }
         Map<String, LedgerBalanceConstraintType> result = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : value.entrySet()) {
-            result.put(entry.getKey(), LedgerBalanceConstraintType.valueOf(String.valueOf(entry.getValue())));
+        for (Map.Entry<String, JsonNode> entry : value.properties()) {
+            result.put(entry.getKey(), LedgerBalanceConstraintType.valueOf(entry.getValue().asString()));
         }
         return Map.copyOf(result);
     }
 
-    private static PaymentInstrumentRefSpec parsePaymentInstrumentRef(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static PaymentInstrumentRefSpec parsePaymentInstrumentRef(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutablePaymentInstrumentRefSpec.builder()
-                .instrumentId(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentId))
-                .instrumentType(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentType))
-                .instrumentNo(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo))
-                .ownerId(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.ownerId))
-                .ownerType(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.ownerType))
-                .tenantId(value.getLong(ImmutablePaymentInstrumentRefSpec.Fields.tenantId))
-                .currency(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.currency))
-                .status(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.status))
-                .bindingSnapshot(parseObjectMap(value.getJSONObject(
+                .instrumentId(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentId))
+                .instrumentType(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentType))
+                .instrumentNo(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo))
+                .ownerId(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerId))
+                .ownerType(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerType))
+                .tenantId(longValue(value, ImmutablePaymentInstrumentRefSpec.Fields.tenantId))
+                .currency(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.currency))
+                .status(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.status))
+                .bindingSnapshot(parseObjectMap(objectValue(value,
                         ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot)))
-                .description(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.description))
+                .description(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.description))
                 .build();
     }
 
-    private static ExternalAccountRefSpec parseExternalAccountRef(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static ExternalAccountRefSpec parseExternalAccountRef(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutableExternalAccountRefSpec.builder()
-                .externalAccountId(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountId))
-                .externalAccountType(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountType))
-                .externalAccountNo(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountNo))
-                .providerCode(value.getString(ImmutableExternalAccountRefSpec.Fields.providerCode))
-                .channelCode(value.getString(ImmutableExternalAccountRefSpec.Fields.channelCode))
-                .currency(value.getString(ImmutableExternalAccountRefSpec.Fields.currency))
-                .countryCode(value.getString(ImmutableExternalAccountRefSpec.Fields.countryCode))
-                .description(value.getString(ImmutableExternalAccountRefSpec.Fields.description))
-                .contextVariables(parseObjectMap(value.getJSONObject(
+                .externalAccountId(textValue(value, ImmutableExternalAccountRefSpec.Fields.externalAccountId))
+                .externalAccountType(textValue(value, ImmutableExternalAccountRefSpec.Fields.externalAccountType))
+                .externalAccountNo(textValue(value, ImmutableExternalAccountRefSpec.Fields.externalAccountNo))
+                .providerCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.providerCode))
+                .channelCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.channelCode))
+                .currency(textValue(value, ImmutableExternalAccountRefSpec.Fields.currency))
+                .countryCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.countryCode))
+                .description(textValue(value, ImmutableExternalAccountRefSpec.Fields.description))
+                .contextVariables(parseObjectMap(objectValue(value,
                         ImmutableExternalAccountRefSpec.Fields.contextVariables)))
                 .build();
     }
 
-    private static RoutingDecisionSpec parseRoutingDecision(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static RoutingDecisionSpec parseRoutingDecision(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutableRoutingDecisionSpec.builder()
-                .policyCode(value.getString(ImmutableRoutingDecisionSpec.Fields.policyCode))
-                .matchedRules(parseStringList(value.getJSONArray(ImmutableRoutingDecisionSpec.Fields.matchedRules)))
-                .selectedProcessor(value.getString(ImmutableRoutingDecisionSpec.Fields.selectedProcessor))
-                .selectedCashFundingAccount(value.getString(
+                .policyCode(textValue(value, ImmutableRoutingDecisionSpec.Fields.policyCode))
+                .matchedRules(parseStringList(arrayValue(value, ImmutableRoutingDecisionSpec.Fields.matchedRules)))
+                .selectedProcessor(textValue(value, ImmutableRoutingDecisionSpec.Fields.selectedProcessor))
+                .selectedCashFundingAccount(textValue(value,
                         ImmutableRoutingDecisionSpec.Fields.selectedCashFundingAccount))
-                .selectedPlatformAccount(value.getString(
+                .selectedPlatformAccount(textValue(value,
                         ImmutableRoutingDecisionSpec.Fields.selectedPlatformAccount))
-                .decisionReason(value.getString(ImmutableRoutingDecisionSpec.Fields.decisionReason))
-                .contextVariables(parseObjectMap(value.getJSONObject(
+                .decisionReason(textValue(value, ImmutableRoutingDecisionSpec.Fields.decisionReason))
+                .contextVariables(parseObjectMap(objectValue(value,
                         ImmutableRoutingDecisionSpec.Fields.contextVariables)))
                 .build();
     }
 
-    private static @Nullable AccountHierarchySnapshotSpec parseAccountHierarchySnapshot(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static @Nullable AccountHierarchySnapshotSpec parseAccountHierarchySnapshot(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutableAccountHierarchySnapshotSpec.builder()
-                .relationSn(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.relationSn))
-                .parentAccountRef(parseSubjectRef(value.getJSONObject(
+                .relationSn(textValue(value, ImmutableAccountHierarchySnapshotSpec.Fields.relationSn))
+                .parentAccountRef(parseSubjectRef(objectValue(value,
                         ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef)))
                 .build();
     }
 
-    private static List<String> parseStringList(JSONArray values) {
-        if (CollectionUtils.isEmpty(values)) {
+    private static List<String> parseStringList(ArrayNode values) {
+        if (values == null || values.isEmpty()) {
             return List.of();
         }
         List<String> result = new ArrayList<>(values.size());
-        for (Object value : values) {
-            result.add(String.valueOf(value));
+        for (JsonNode value : values) {
+            result.add(value.asString());
         }
         return List.copyOf(result);
     }
 
-    private static PlatformAccountsSnapshotSpec parsePlatformAccounts(JSONObject value) {
-        if (CollectionUtils.isEmpty(value)) {
+    private static PlatformAccountsSnapshotSpec parsePlatformAccounts(ObjectNode value) {
+        if (value == null || value.isEmpty()) {
             return null;
         }
         return ImmutablePlatformAccountsSnapshotSpec.builder()
-                .cashFundingAccount(parseSubjectRef(value.getJSONObject(
+                .cashFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.cashFundingAccount)))
-                .prepaymentFundingAccount(parseSubjectRef(value.getJSONObject(
+                .prepaymentFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.prepaymentFundingAccount)))
-                .clearingFundingAccount(parseSubjectRef(value.getJSONObject(
+                .clearingFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.clearingFundingAccount)))
-                .settlementFundingAccount(parseSubjectRef(value.getJSONObject(
+                .settlementFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.settlementFundingAccount)))
-                .feeFundingAccount(parseSubjectRef(value.getJSONObject(
+                .feeFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.feeFundingAccount)))
-                .adjustmentFundingAccount(parseSubjectRef(value.getJSONObject(
+                .adjustmentFundingAccount(parseSubjectRef(objectValue(value,
                         ImmutablePlatformAccountsSnapshotSpec.Fields.adjustmentFundingAccount)))
                 .build();
     }
@@ -514,8 +557,41 @@ final class RouteSnapshotJsonSupport {
         return StringUtils.hasText(value) ? LocalDateTime.parse(value) : defaultValue;
     }
 
-    private static Map<String, Object> parseObjectMap(JSONObject value) {
-        return CollectionUtils.isEmpty(value) ? Map.of() : Map.copyOf(value);
+    private static Map<String, Object> parseObjectMap(ObjectNode value) {
+        return value == null || value.isEmpty()
+                ? Map.of()
+                : Map.copyOf(WindJson.convertValue(value, new TypeReference<Map<String, Object>>() {
+                }));
+    }
+
+    private static @Nullable ObjectNode objectValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value instanceof ObjectNode objectNode ? objectNode : null;
+    }
+
+    private static @Nullable ArrayNode arrayValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value instanceof ArrayNode arrayNode ? arrayNode : null;
+    }
+
+    private static @Nullable String textValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.asString();
+    }
+
+    private static @Nullable Long longValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.longValue();
+    }
+
+    private static int intValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? 0 : value.intValue();
+    }
+
+    private static java.math.BigDecimal decimalValue(ObjectNode values, String field) {
+        JsonNode value = values.get(field);
+        return value == null || value.isNull() ? null : value.decimalValue();
     }
 
 }

@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -18,22 +16,29 @@ import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.ref.ExternalAccountRefSpec;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import tools.jackson.databind.JsonNode;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * RouteSnapshot JSON 摘要契约测试。
@@ -54,14 +59,11 @@ class RouteSnapshotJsonSupportTests {
                 FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST, "sha256:original-benefit-digest"));
 
         String json = RouteSnapshotJsonSupport.toRouteSnapshotJson(snapshot);
-        JSONObject document = JSON.parseObject(json);
+        JsonNode document = WindJson.parseObject(json, JsonNode.class);
         RouteSnapshotSpec parsed = RouteSnapshotJsonSupport.parseRouteSnapshot(json,
                 LocalDateTime.of(2026, 5, 24, 10, 0));
 
-        assertThat(document.getJSONArray("participants")
-                .getJSONObject(0)
-                .getJSONObject("subjectRef"))
-                .doesNotContainKey("description");
+        assertThat(document.path("participants").path(0).path("subjectRef").has("description")).isFalse();
         assertThat(parsed.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-JSON-001")
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
@@ -93,12 +95,9 @@ class RouteSnapshotJsonSupportTests {
         assertThat(json)
                 .contains("accountHierarchySnapshot")
                 .doesNotContain("4111111111111111");
-        JSONObject document = JSON.parseObject(json);
-        JSONObject serializedHierarchy = document.getJSONArray("participants")
-                .getJSONObject(0)
-                .getJSONObject("accountHierarchySnapshot");
-        assertThat(serializedHierarchy.getJSONObject("parentAccountRef"))
-                .doesNotContainKey("description");
+        JsonNode document = WindJson.parseObject(json, JsonNode.class);
+        JsonNode serializedHierarchy = document.path("participants").path(0).path("accountHierarchySnapshot");
+        assertThat(serializedHierarchy.path("parentAccountRef").has("description")).isFalse();
         assertThat(parsed.getParticipants()).singleElement()
                 .satisfies(participant -> {
                     assertThat(participant.getSubjectRef().getSubjectType())
@@ -113,16 +112,146 @@ class RouteSnapshotJsonSupportTests {
                 });
     }
 
+    /**
+     * 场景：公共 RouteResolver 返回没有经过资金域不可变模型构造器的自定义快照组件。
+     * 输入：支付工具原始 PAN、外部账户原始账号或路由决策敏感上下文。
+     * 输出：RouteSnapshot JSON 持久化请求。
+     * 预期：共享持久化边界拒绝写入。
+     * 红线：公共接口实现不能绕过不可变模型构造器的敏感数据校验。
+     */
+    @Test
+    void testRouteSnapshotJsonShouldRejectSensitiveValuesFromCustomRouteComponents() {
+        PaymentInstrumentRefSpec unsafeInstrumentNo = paymentInstrument("4111111111111112", Map.of());
+        PaymentInstrumentRefSpec unsafeInstrumentBinding = paymentInstrument("****1111",
+                Map.of("tokenSecret", "raw-secret"));
+        ExternalAccountRefSpec unsafeExternalAccountNo = externalAccount("1234567890123456", Map.of());
+        ExternalAccountRefSpec unsafeExternalAccountContext = externalAccount("****3456",
+                Map.of("routingNumber", "123456789"));
+        RoutingDecisionSpec unsafeRoutingDecision = new RoutingDecisionSpec() {
+
+            @Override
+            public Map<String, Object> getContextVariables() {
+                return Map.of("accountNumber", "12345678");
+            }
+        };
+
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.toRouteSnapshotJson(
+                routeSnapshot(null, unsafeInstrumentNo, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.toRouteSnapshotJson(
+                routeSnapshot(null, unsafeInstrumentBinding, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.toRouteSnapshotJson(
+                routeSnapshot(null, null, unsafeExternalAccountNo)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.toRouteSnapshotJson(
+                routeSnapshot(null, null, unsafeExternalAccountContext)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.toRouteSnapshotJson(
+                routeSnapshot(unsafeRoutingDecision, null, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void testRouteSnapshotJsonShouldAllowMaskedCustomReferences() {
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                paymentInstrument("****1111", Map.of("instrumentToken", "tok-card-001")),
+                externalAccount("****3456", Map.of("accountToken", "tok-account-001")));
+
+        String json = RouteSnapshotJsonSupport.toRouteSnapshotJson(snapshot);
+        RouteSnapshotSpec parsed = RouteSnapshotJsonSupport.parseRouteSnapshot(json,
+                LocalDateTime.of(2026, 5, 24, 10, 0));
+
+        assertThat(parsed.getPaymentInstrumentRef().getInstrumentNo()).isEqualTo("****1111");
+        assertThat(parsed.getExternalAccountRef().getExternalAccountNo()).isEqualTo("****3456");
+    }
+
+    private PaymentInstrumentRefSpec paymentInstrument(String instrumentNo,
+                                                       Map<String, Object> bindingSnapshot) {
+        return new PaymentInstrumentRefSpec() {
+
+            @Override
+            public String getInstrumentId() {
+                return "PI-CUSTOM-001";
+            }
+
+            @Override
+            public String getInstrumentType() {
+                return "CARD";
+            }
+
+            @Override
+            public String getInstrumentNo() {
+                return instrumentNo;
+            }
+
+            @Override
+            public String getOwnerId() {
+                return "OWNER-001";
+            }
+
+            @Override
+            public String getOwnerType() {
+                return "USER";
+            }
+
+            @Override
+            public Map<String, Object> getBindingSnapshot() {
+                return bindingSnapshot;
+            }
+        };
+    }
+
+    private ExternalAccountRefSpec externalAccount(String externalAccountNo,
+                                                   Map<String, Object> contextVariables) {
+        return new ExternalAccountRefSpec() {
+
+            @Override
+            public String getExternalAccountId() {
+                return "EA-CUSTOM-001";
+            }
+
+            @Override
+            public String getExternalAccountType() {
+                return "BANK_ACCOUNT";
+            }
+
+            @Override
+            public String getExternalAccountNo() {
+                return externalAccountNo;
+            }
+
+            @Override
+            public Map<String, Object> getContextVariables() {
+                return contextVariables;
+            }
+        };
+    }
+
     private RouteSnapshotSpec routeSnapshot(Map<String, Object> contextVariables) {
         return routeSnapshot(contextVariables, null);
     }
 
     private RouteSnapshotSpec routeSnapshot(Map<String, Object> contextVariables,
                                             AccountHierarchySnapshotSpec hierarchySnapshot) {
+        return routeSnapshot(contextVariables, hierarchySnapshot, null, null, null);
+    }
+
+    private RouteSnapshotSpec routeSnapshot(RoutingDecisionSpec routingDecision,
+                                            PaymentInstrumentRefSpec paymentInstrumentRef,
+                                            ExternalAccountRefSpec externalAccountRef) {
+        return routeSnapshot(Map.of(), null, routingDecision, paymentInstrumentRef, externalAccountRef);
+    }
+
+    private RouteSnapshotSpec routeSnapshot(Map<String, Object> contextVariables,
+                                            AccountHierarchySnapshotSpec hierarchySnapshot,
+                                            RoutingDecisionSpec routingDecision,
+                                            PaymentInstrumentRefSpec paymentInstrumentRef,
+                                            ExternalAccountRefSpec externalAccountRef) {
         ImmutableSubjectRef sourceSubjectRef = hierarchySnapshot == null
                 ? subject("PAYER-001")
                 : subject("VCC-CREDIT-SUB-001", FundsSubjectType.CREDIT_ACCOUNT);
-        return ImmutableRouteSnapshotSpec.builder()
+        var builder = ImmutableRouteSnapshotSpec.builder()
                 .tenantId(1L)
                 .snapshotId("ROUTE-SNAPSHOT-BEN-001")
                 .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION)
@@ -144,8 +273,17 @@ class RouteSnapshotJsonSupportTests {
                         .build()))
                 .legs(List.of(routeLeg(sourceSubjectRef)))
                 .resolvedAt(LocalDateTime.of(2026, 5, 24, 10, 0))
-                .contextVariables(contextVariables)
-                .build();
+                .contextVariables(contextVariables);
+        if (routingDecision != null) {
+            builder.routingDecision(routingDecision);
+        }
+        if (paymentInstrumentRef != null) {
+            builder.paymentInstrumentRef(paymentInstrumentRef);
+        }
+        if (externalAccountRef != null) {
+            builder.externalAccountRef(externalAccountRef);
+        }
+        return builder.build();
     }
 
     private RouteLegSpec routeLeg(ImmutableSubjectRef sourceSubjectRef) {

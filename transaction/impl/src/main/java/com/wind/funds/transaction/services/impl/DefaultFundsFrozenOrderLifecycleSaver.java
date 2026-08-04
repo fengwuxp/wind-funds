@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
+import com.wind.jackson.WindJson;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
@@ -31,6 +30,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -165,7 +165,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setContextVariables(toLifecycleContext(instruction,
                 Map.of(
                         FROZEN_ORDER_REQUEST_HASH, computeRequestHash(instruction, routeSnapshot),
-                        FundsInstructionContextKeys.REFERENCE_FREEZE_SN, originalOrder.getSn())));
+                        FundsInstructionContextKeys.REFERENCE_FREEZE_SN, originalOrder.getSn(),
+                        FundsInstructionContextKeys.ROUTE_SNAPSHOT,
+                        RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot))));
         fundsFrozenOrderMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金解冻生命周期记录失败");
         return entity;
@@ -250,8 +252,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private FundsFrozenOrder findReferencedFrozenOrder(String contextVariables) {
         AssertUtils.hasText(contextVariables, "解冻生命周期记录缺少原冻结单引用上下文");
-        JSONObject values = JSON.parseObject(contextVariables);
-        String referenceFreezeSn = values.getString(FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
+        Map<String, Object> values = parseContextVariables(contextVariables);
+        String referenceFreezeSn = stringValue(values, FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
         AssertUtils.hasText(referenceFreezeSn, "解冻生命周期记录缺少原冻结单引用");
         return findFrozenOrderBySn(referenceFreezeSn);
     }
@@ -278,8 +280,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         if (!StringUtils.hasText(order.getContextVariables())) {
             return FundsTransactionEventType.FREEZE;
         }
-        JSONObject values = JSON.parseObject(order.getContextVariables());
-        String eventType = values.getString(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE);
+        Map<String, Object> values = parseContextVariables(order.getContextVariables());
+        String eventType = stringValue(values, FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE);
         return StringUtils.hasText(eventType) ? FundsTransactionEventType.valueOf(eventType)
                 : FundsTransactionEventType.FREEZE;
     }
@@ -296,23 +298,32 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         Map<String, Object> values = new LinkedHashMap<>(instruction.getContextVariables());
         values.put(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE, instruction.getEventType().name());
         values.putAll(extraContext);
-        return JSON.toJSONString(values);
+        return WindJson.toJsonString(values);
     }
 
     private String requestHash(FundsFrozenOrder order) {
         if (!StringUtils.hasText(order.getContextVariables())) {
             return null;
         }
-        JSONObject values = JSON.parseObject(order.getContextVariables());
-        return values.getString(FROZEN_ORDER_REQUEST_HASH);
+        return stringValue(parseContextVariables(order.getContextVariables()), FROZEN_ORDER_REQUEST_HASH);
     }
 
     private String referenceFreezeSn(FundsFrozenOrder order) {
         if (!StringUtils.hasText(order.getContextVariables())) {
             return null;
         }
-        JSONObject values = JSON.parseObject(order.getContextVariables());
-        return values.getString(FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
+        return stringValue(parseContextVariables(order.getContextVariables()),
+                FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
+    }
+
+    private Map<String, Object> parseContextVariables(String value) {
+        return WindJson.parseObject(value, new TypeReference<>() {
+        });
+    }
+
+    private @Nullable String stringValue(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value == null ? null : value.toString();
     }
 
     private String referenceSn(FundsInstructionReferenceSpec reference) {

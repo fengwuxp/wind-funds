@@ -15,6 +15,22 @@ import java.util.List;
  */
 public interface FundsTransactionProjectionReplaySource {
 
+    default @NonNull FundsTransactionProjectionCheckpoint initializeCheckpoint(
+            @NonNull Long tenantId,
+            @NonNull String viewDomain,
+            @NonNull FundsTransactionProjectionReplayRange range) {
+        throw new IllegalStateException("持久投影重放事实来源必须显式实现 tenant 有界 checkpoint 初始化");
+    }
+
+    default @NonNull FundsTransactionProjectionFactBatch loadFactBatch(
+            @NonNull Long tenantId,
+            @NonNull String viewDomain,
+            @NonNull FundsTransactionProjectionReplayRange range,
+            @NonNull FundsTransactionProjectionCheckpoint checkpoint,
+            int maxBatchSize) {
+        throw new IllegalStateException("持久投影重放事实来源必须显式实现 tenant 有界事实读取");
+    }
+
     /**
      * 按指定范围加载交易投影重放所需的来源事实。
      *

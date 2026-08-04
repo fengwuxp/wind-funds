@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
@@ -22,7 +20,6 @@ import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
@@ -38,6 +35,7 @@ import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +47,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import tools.jackson.core.type.TypeReference;
+
 import org.junit.jupiter.api.Test;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -56,6 +56,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBala
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertSubjectBalanceNotInitialized;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -2792,7 +2793,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     private static void assertNoAuthRefundContext(String contextVariables) {
-        JSONObject context = contextVariablesOf(contextVariables);
+        Map<String, Object> context = contextVariablesOf(contextVariables);
 
         assertThat(context)
                 .containsEntry(FundsInstructionContextKeys.REFUND_MODE,
@@ -2862,10 +2863,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setPeriodType(periodType)
                 .setPeriodId(periodId));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
-                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    Math.abs(initialBalance))));
         }
     }
 
@@ -2940,11 +2941,12 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 });
     }
 
-    private static JSONObject contextVariablesOf(String contextVariables) {
+    private static Map<String, Object> contextVariablesOf(String contextVariables) {
         if (contextVariables == null || contextVariables.isBlank()) {
-            return new JSONObject();
+            return Map.of();
         }
-        return JSON.parseObject(contextVariables);
+        return WindJson.parseObject(contextVariables, new TypeReference<>() {
+        });
     }
 
     @FunctionalInterface

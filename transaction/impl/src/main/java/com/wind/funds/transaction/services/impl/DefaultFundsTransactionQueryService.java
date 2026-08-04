@@ -1,8 +1,5 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
@@ -28,11 +25,13 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -230,13 +229,15 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (!StringUtils.hasText(detail.getContextVariables())) {
             return null;
         }
-        JSONObject values = JSON.parseObject(detail.getContextVariables());
-        JSONObject replayConsumedAmounts = values.getJSONObject(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
-        if (replayConsumedAmounts != null && replayConsumedAmounts.containsKey(replayRefLegId)) {
-            return replayConsumedAmounts.getLong(replayRefLegId);
+        Map<String, Object> values = WindJson.parseObject(detail.getContextVariables(), new TypeReference<>() {
+        });
+        Object consumedAmountsValue = values.get(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
+        if (consumedAmountsValue instanceof Map<?, ?> replayConsumedAmounts
+                && replayConsumedAmounts.get(replayRefLegId) instanceof Number amount) {
+            return amount.longValue();
         }
-        JSONArray replayConsumedLegIds = values.getJSONArray(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
-        return replayConsumedLegIds != null && replayConsumedLegIds.contains(replayRefLegId)
+        Object consumedLegIdsValue = values.get(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
+        return consumedLegIdsValue instanceof List<?> replayConsumedLegIds && replayConsumedLegIds.contains(replayRefLegId)
                 ? detail.getAmount() : null;
     }
 
@@ -299,10 +300,10 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (!StringUtils.hasText(order.getContextVariables())) {
             return false;
         }
-        JSONObject values = JSON.parseObject(order.getContextVariables());
-        return Objects.equals(values.getString(FundsInstructionContextKeys.REFERENCE_FREEZE_SN), freezeOrderSn)
+        Map<String, Object> values = parseContextVariables(order.getContextVariables());
+        return Objects.equals(values.get(FundsInstructionContextKeys.REFERENCE_FREEZE_SN), freezeOrderSn)
                 && FundsTransactionEventType.UNFREEZE.name()
-                .equals(values.getString(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE));
+                .equals(values.get(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE));
     }
 
     private long defaultAmount(Long amount) {
@@ -326,11 +327,17 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (!StringUtils.hasText(order.getContextVariables())) {
             return Optional.empty();
         }
-        JSONObject values = JSON.parseObject(order.getContextVariables());
-        String routeSnapshot = values.getString(FundsInstructionContextKeys.ROUTE_SNAPSHOT);
+        Map<String, Object> values = parseContextVariables(order.getContextVariables());
+        Object routeSnapshotValue = values.get(FundsInstructionContextKeys.ROUTE_SNAPSHOT);
+        String routeSnapshot = routeSnapshotValue instanceof String value ? value : null;
         if (!StringUtils.hasText(routeSnapshot)) {
             return Optional.empty();
         }
         return Optional.of(RouteSnapshotJsonSupport.parseRouteSnapshot(routeSnapshot, order.getGmtCreate()));
+    }
+
+    private Map<String, Object> parseContextVariables(String contextVariables) {
+        return WindJson.parseObject(contextVariables, new TypeReference<>() {
+        });
     }
 }

@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.mapstruct;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationRunResult;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
 import org.mapstruct.Mapper;
@@ -23,6 +23,6 @@ public interface ReconciliationRunResultConverter {
     ReconciliationRunResultDTO toDTO(ReconciliationRunResult source);
 
     default List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? List.copyOf(JSON.parseArray(value, String.class)) : List.of();
+        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 }

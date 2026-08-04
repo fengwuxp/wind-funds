@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.projection;
 
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -8,6 +10,7 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 /**
  * 交易投影面向使用者的只读解释摘要。
@@ -20,6 +23,13 @@ import java.util.Map;
 public record FundsTransactionProjectionExplanation(@NonNull String businessScene,
                                                     @NonNull String businessSn,
                                                     @NonNull String fundsTransactionSn,
+                                                    @NonNull Long tenantId,
+                                                    @NonNull FundsTransactionEventType eventType,
+                                                    @NonNull String ownerType,
+                                                    @NonNull String ownerId,
+                                                    long amount,
+                                                    @NonNull CurrencyIsoCode currency,
+                                                    @NonNull LocalDateTime occurredTime,
                                                     @NonNull String routeSnapshotId,
                                                     @NonNull String routeCode,
                                                     @Nullable String ledgerTransactionSn,

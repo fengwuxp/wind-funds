@@ -1,8 +1,8 @@
 package com.wind.funds.wallet.support;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONException;
+import com.wind.jackson.WindJson;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JacksonException;
 
 import java.lang.reflect.Array;
 import java.util.Locale;
@@ -88,8 +88,8 @@ public final class PaymentInstrumentSensitiveValueValidator {
             return false;
         }
         try {
-            return containsSensitiveField(JSON.parse(contextVariables));
-        } catch (JSONException ignored) {
+            return containsSensitiveField(WindJson.parseObject(contextVariables, Object.class));
+        } catch (JacksonException ignored) {
             return containsSensitiveRawContextFragment(contextVariables);
         }
     }

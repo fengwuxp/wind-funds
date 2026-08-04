@@ -118,14 +118,14 @@ test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticip
     @just _run-test-classes "{{tests}}" tests
 
 # Governance projection replay boundary tests.
-test-governance tests='FundsProjectionReplayServiceTests':
+test-governance tests='FundsProjectionReplayServiceTests,FundsHostCompositionContractTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Reconciliation, difference lifecycle, gate consumption, and payout preflight tests.
 test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSplitBatchApplicationServiceTests,ClearingBatchApplicationServiceTests,FundsClearingTransactionFlowTests,SettlementPublicContractTests,FundsSettlementTransactionFlowTests,SettlementOrderApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,PayoutPublicContractTests,PayoutOrderApplicationServiceTests,RecoveryOrderApplicationServiceTests,ReconciliationBatchApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests,ReconciliationMysqlDdlContractTests':
     @just _run-test-classes "{{tests}}" tests
 
-# Migrate the 20 core and 21 reconciliation tables, then run target-MySQL funds and reconciliation tests.
+# Migrate the 20 core, 21 reconciliation, and 3 governance tables, then run target-MySQL tests.
 test-mysql-reconciliation:
     #!/usr/bin/env zsh
     set -euo pipefail

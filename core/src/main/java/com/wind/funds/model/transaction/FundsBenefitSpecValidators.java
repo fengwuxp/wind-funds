@@ -1,10 +1,10 @@
 package com.wind.funds.model.transaction;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONException;
 import com.wind.funds.model.FundsContextVariables;
 import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
+import com.wind.jackson.WindJson;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JacksonException;
 
 import java.lang.reflect.Array;
 import java.util.Locale;
@@ -82,10 +82,10 @@ public final class FundsBenefitSpecValidators {
             return;
         }
         try {
-            Object parsed = JSON.parse(contextVariables);
+            Object parsed = WindJson.parseObject(contextVariables, Object.class);
             rejectReservedInstructionContextKeys(parsed, owner);
             rejectReservedInstructionRouteContextKeys(parsed, owner);
-        } catch (JSONException ignored) {
+        } catch (JacksonException ignored) {
             rejectReservedRawInstructionContextKeys(contextVariables, owner);
         }
     }

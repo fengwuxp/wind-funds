@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
@@ -87,6 +87,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.core.type.TypeReference;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -271,7 +272,8 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .orElseThrow();
 
         assertThat(replay).isEqualTo(transactionSn);
-        assertThat(JSON.parseObject(payeeDetail.getContextVariables()))
+        assertThat(WindJson.parseObject(payeeDetail.getContextVariables(), new TypeReference<Map<String, Object>>() {
+        }))
                 .as("direct transaction details must not persist host revenue context")
                 .isEmpty();
         assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 1, 2);

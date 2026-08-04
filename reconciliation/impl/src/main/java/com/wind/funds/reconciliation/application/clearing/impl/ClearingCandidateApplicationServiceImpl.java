@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.clearing.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -377,7 +377,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
     }
 
     private List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? List.copyOf(JSON.parseArray(value, String.class)) : List.of();
+        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 
     private record CandidateDecision(ClearingCandidateStatus status, String blockReason) {

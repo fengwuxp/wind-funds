@@ -1,8 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
+import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -19,7 +18,6 @@ import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
@@ -137,6 +135,7 @@ import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.Money;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -153,8 +152,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import tools.jackson.core.type.TypeReference;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 
 /**
  * 资金交易流程测试基座。
@@ -203,6 +205,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected LedgerService ledgerService;
+
+    @Autowired
+    protected LedgerBalanceProjectionService ledgerBalanceProjectionService;
 
     @Autowired
     protected CreditAccountService creditAccountService;
@@ -354,10 +359,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
-                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    Math.abs(initialBalance))));
         }
     }
 
@@ -785,13 +790,14 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .as("funds transaction route snapshot must exist before enrichment for transactionSn %s",
                         transactionSn)
                 .isNotBlank();
-        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson);
+        Map<String, Object> routeSnapshot = WindJson.parseObject(routeSnapshotJson, new TypeReference<>() {
+        });
         values.forEach(routeSnapshot::put);
         int updated = jdbcTemplate.update("""
                 UPDATE t_funds_transaction
                 SET route_snapshot = ?
                 WHERE tenant_id = ? AND sn = ?
-                """, JSON.toJSONString(routeSnapshot), TENANT_ID, transactionSn);
+                """, WindJson.toJsonString(routeSnapshot), TENANT_ID, transactionSn);
         assertThat(updated)
                 .as("funds transaction route snapshot enriched for transactionSn %s", transactionSn)
                 .isOne();

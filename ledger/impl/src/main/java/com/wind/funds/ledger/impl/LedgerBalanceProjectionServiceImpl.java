@@ -1,16 +1,23 @@
 package com.wind.funds.ledger.impl;
 
-import com.wind.funds.ledger.dto.LedgerDTO;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
-import com.wind.funds.ledger.service.LedgerService;
+import com.mybatisflex.core.query.QueryColumn;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateWrapper;
+import com.mybatisflex.core.util.UpdateEntity;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
+import com.wind.funds.ledger.dal.entities.Ledger;
+import com.wind.funds.ledger.dal.entities.table.LedgerNameRefs;
+import com.wind.funds.ledger.dal.mapper.LedgerMapper;
+import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
+import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.wallet.FundsAccountId;
@@ -46,6 +53,8 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
 
     private final LedgerService ledgerService;
 
+    private final LedgerMapper ledgerMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void project(@NonNull List<LedgerEntrySpec> entries, @NonNull LedgerPostingAccessType postingAccessType) {
@@ -66,14 +75,78 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         commands.forEach(command -> {
             LedgerDTO ledger = command.ledger();
             ProjectionDelta delta = command.delta();
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledger.getId())
-                    .setDebitAmountDelta(delta.debitAmountDelta())
-                    .setCreditAmountDelta(delta.creditAmountDelta())
-                    .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, command.entries()))
-                    .setPostingAccessType(postingAccessType));
+            applyProjectionDelta(
+                    ledger,
+                    delta,
+                    resolveMinimumNormalBalance(ledger, command.entries()),
+                    postingAccessType);
             publishBalanceChangedEvents(accountId, ledger, command.entries(), command.beforeBalanceAmount(), delta);
         });
+    }
+
+    private void applyProjectionDelta(LedgerDTO ledger,
+                                      ProjectionDelta delta,
+                                      Long minimumNormalBalance,
+                                      LedgerPostingAccessType postingAccessType) {
+        LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), postingAccessType);
+        validateMinimumNormalBalance(ledger, delta, minimumNormalBalance);
+        Ledger entity = UpdateEntity.of(Ledger.class);
+        UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
+        setRawDelta(updateWrapper, LedgerNameRefs.ledger.debitAmount, delta.debitAmountDelta());
+        setRawDelta(updateWrapper, LedgerNameRefs.ledger.creditAmount, delta.creditAmountDelta());
+        setRawDelta(updateWrapper, LedgerNameRefs.ledger.version, 1L);
+        QueryWrapper where = QueryWrapper.create()
+                .where(LedgerNameRefs.ledger.id.eq(ledger.getId()))
+                .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
+                .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()));
+        if (minimumNormalBalance != null) {
+            where.and(normalBalanceAfterDelta(ledger.getNormalBalanceSide(), delta).ge(minimumNormalBalance));
+        }
+        AssertUtils.isTrue(ledgerMapper.updateByQuery(entity, where) > 0, "账本余额更新失败");
+    }
+
+    private void setRawDelta(UpdateWrapper<Ledger> updateWrapper, QueryColumn fieldRef, long delta) {
+        if (delta == 0L) {
+            return;
+        }
+        if (delta > 0) {
+            updateWrapper.setRaw(fieldRef, fieldRef.add(delta));
+            return;
+        }
+        updateWrapper.setRaw(fieldRef, fieldRef.subtract(Math.abs(delta)));
+    }
+
+    private void validateMinimumNormalBalance(LedgerDTO ledger,
+                                              ProjectionDelta delta,
+                                              Long minimumNormalBalance) {
+        if (minimumNormalBalance == null) {
+            return;
+        }
+        long normalBalance = computeNormalBalance(
+                ledger.getDebitAmount() + delta.debitAmountDelta(),
+                ledger.getCreditAmount() + delta.creditAmountDelta(),
+                ledger.getNormalBalanceSide());
+        AssertUtils.isTrue(normalBalance >= minimumNormalBalance, "账本余额不足");
+    }
+
+    private QueryColumn normalBalanceAfterDelta(EntrySide normalBalanceSide, ProjectionDelta delta) {
+        QueryColumn debitAmount = amountAfterDelta(LedgerNameRefs.ledger.debitAmount, delta.debitAmountDelta());
+        QueryColumn creditAmount = amountAfterDelta(LedgerNameRefs.ledger.creditAmount, delta.creditAmountDelta());
+        return normalBalanceSide == EntrySide.DEBIT
+                ? debitAmount.subtract(creditAmount)
+                : creditAmount.subtract(debitAmount);
+    }
+
+    private QueryColumn amountAfterDelta(QueryColumn fieldRef, long delta) {
+        if (delta == 0L) {
+            return fieldRef;
+        }
+        return delta > 0 ? fieldRef.add(delta) : fieldRef.subtract(Math.abs(delta));
+    }
+
+    private long computeNormalBalance(long debitAmount, long creditAmount, EntrySide normalBalanceSide) {
+        long rawBalance = debitAmount - creditAmount;
+        return normalBalanceSide == EntrySide.DEBIT ? rawBalance : -rawBalance;
     }
 
     private ProjectionCommand prepareProjectionCommand(Long ledgerId,

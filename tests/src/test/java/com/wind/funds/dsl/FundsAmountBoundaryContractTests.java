@@ -1,6 +1,6 @@
 package com.wind.funds.dsl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -106,12 +106,12 @@ class FundsAmountBoundaryContractTests {
 
     /**
      * 场景：JSON 框架读取资金金额对象。
-     * 预期：Fastjson 复用 Money 自身的 Jackson 构造注解完成反序列化。
+     * 预期：WindJson 复用 Money 自身的 Jackson 构造注解完成反序列化。
      * 红线：资金 DSL 不重复实现 Money 的 JSON 字段解析。
      */
     @Test
     void testMoneyJsonShouldUseMoneyAnnotatedConstructor() {
-        Money money = JSON.parseObject("""
+        Money money = WindJson.parseObject("""
                 { "amount": 1, "currency": "USD" }
                 """, Money.class);
 
@@ -125,7 +125,7 @@ class FundsAmountBoundaryContractTests {
      */
     @Test
     void testMoneyJsonShouldLeavePositiveAmountRuleToDslBuilder() {
-        Money money = JSON.parseObject("""
+        Money money = WindJson.parseObject("""
                 { "amount": 0, "currency": "USD" }
                 """, Money.class);
 

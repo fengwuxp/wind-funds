@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.mapstruct;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
@@ -24,7 +24,7 @@ import java.util.Map;
  *
  * <p>边界：只做模型转换和确定性默认值填充，不承载交易状态机、路由解析、账本入账或余额计算。</p>
  */
-@Mapper(imports = JSON.class, unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(imports = WindJson.class, unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface FundsTransactionConverter {
 
     FundsTransactionConverter INSTANCE = Mappers.getMapper(FundsTransactionConverter.class);
@@ -45,7 +45,7 @@ public interface FundsTransactionConverter {
     @Mapping(target = "externalFundsEffectType", expression = "java(instruction.getExternalFundsEffectType())")
     @Mapping(target = "externalFundsFactDigest", expression = "java(instruction.getExternalFundsFactDigest())")
     @Mapping(target = "routeSnapshot", ignore = true)
-    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(transactionContext(instruction)))")
+    @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(transactionContext(instruction)))")
     FundsTransaction convertToFundsTransaction(FundsInstructionSpec instruction);
 
     /**
@@ -59,7 +59,7 @@ public interface FundsTransactionConverter {
     @Mapping(target = "sn", ignore = true)
     @Mapping(target = "amount", expression = "java(instruction.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(instruction.getAmount().getCurrency())")
-    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(instruction.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(instruction.getContextVariables()))")
     FundsTransactionDetail convertToFundsTransactionDetail(FundsInstructionSpec instruction);
 
     /**

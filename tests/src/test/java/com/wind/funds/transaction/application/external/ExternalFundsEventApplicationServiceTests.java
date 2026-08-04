@@ -1,12 +1,11 @@
 package com.wind.funds.transaction.application.external;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
+import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -16,7 +15,6 @@ import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
@@ -89,6 +87,7 @@ import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,9 +109,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import tools.jackson.databind.JsonNode;
+
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -163,6 +165,9 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
 
     @Autowired
     private LedgerService ledgerService;
+
+    @Autowired
+    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -557,10 +562,10 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
-                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    Math.abs(initialBalance))));
         }
     }
 
@@ -771,16 +776,16 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     private void assertExternalEventRouteSnapshot() {
-        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson());
-        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
+        JsonNode routeSnapshot = WindJson.parseObject(routeSnapshotJson(), JsonNode.class);
+        JsonNode externalAccountRef = routeSnapshot.path("externalAccountRef");
         assertThat(externalAccountRef).isNotNull().isNotEmpty();
-        assertThat(externalAccountRef.getString("externalAccountId")).isEqualTo(EXTERNAL_SOURCE_ACCOUNT_SN);
-        assertThat(externalAccountRef.getString("externalAccountType"))
+        assertThat(externalAccountRef.path("externalAccountId").asString()).isEqualTo(EXTERNAL_SOURCE_ACCOUNT_SN);
+        assertThat(externalAccountRef.path("externalAccountType").asString())
                 .isEqualTo("EXTERNAL_BANK");
-        assertThat(externalAccountRef.getString("providerCode")).isNull();
-        assertThat(externalAccountRef.getString("channelCode")).isEqualTo("ACH");
-        assertThat(externalAccountRef.getJSONObject("contextVariables")
-                .getString("externalTransactionId")).isEqualTo("bank_event_001");
+        assertThat(externalAccountRef.path("providerCode").asString(null)).isNull();
+        assertThat(externalAccountRef.path("channelCode").asString()).isEqualTo("ACH");
+        assertThat(externalAccountRef.path("contextVariables")
+                .path("externalTransactionId").asString()).isEqualTo("bank_event_001");
     }
 
     private String routeSnapshotJson() {

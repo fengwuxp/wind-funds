@@ -236,6 +236,7 @@ public abstract class AbstractFundsServiceTest {
             "com.wind.funds.ledger.dal.mapper",
             "com.wind.funds.transaction.dal.mapper",
             "com.wind.funds.reconciliation.dal.mapper",
+            "com.wind.funds.governance.dal.mapper",
             "com.wind.funds.wallet.dal.mapper"
     })
     @EnableTransactionManagement

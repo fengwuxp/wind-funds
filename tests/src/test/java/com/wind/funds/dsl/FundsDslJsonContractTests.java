@@ -1,8 +1,7 @@
 package com.wind.funds.dsl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.util.FundsDslJsonContractVerifier;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
 
@@ -14,6 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+
+import tools.jackson.core.type.TypeReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,10 +36,10 @@ class FundsDslJsonContractTests {
 
         assertThat(samples).isNotEmpty();
         for (Path sample : samples) {
-            JSONObject document = JSON.parseObject(Files.readString(sample));
+            Map<String, Object> document = parseObject(Files.readString(sample));
 
             FundsDslJsonContractVerifier.verifyTransactionLayerCase(document);
-            assertThat(document.getString("caseId")).as(sample.getFileName().toString()).isNotBlank();
+            assertThat((String) document.get("caseId")).as(sample.getFileName().toString()).isNotBlank();
             assertThat(document).as(sample.getFileName().toString()).containsKey("instruction");
         }
     }
@@ -186,7 +187,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectLegacyBenefitSnapshotField() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-LEGACY-BENEFIT-SNAPSHOT-001",
                   "instruction": {
@@ -240,7 +241,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPostingEntryWithoutSubjectId() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-SUBJECT-ID-001",
                   "instruction": {
@@ -282,7 +283,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPostingEntryWithoutCurrency() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-CURRENCY-001",
                   "instruction": {
@@ -324,7 +325,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPostingEntryCurrencyMismatch() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-CURRENCY-MISMATCH-001",
                   "instruction": {
@@ -367,7 +368,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPostingEntryInvalidPeriodId() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-PERIOD-001",
                   "instruction": {
@@ -410,7 +411,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectExpectedPostingWithoutPostingPlans() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-EMPTY-PLANS-001",
                   "instruction": {
@@ -438,7 +439,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPostingPlanWithoutEntries() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-EMPTY-ENTRIES-001",
                   "instruction": {
@@ -472,7 +473,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectUnbalancedPostingPlan() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-UNBALANCED-001",
                   "instruction": {
@@ -524,7 +525,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectCrossCurrencyPostingPlan() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-CROSS-CURRENCY-001",
                   "instruction": {
@@ -576,7 +577,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectMultiCurrencyPostingPlan() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-POSTING-MULTI-CURRENCY-001",
                   "instruction": {
@@ -646,7 +647,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectBenefitCoreFieldsInInstructionContextVariables() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-BENEFIT-CONTEXT-001",
                   "instruction": {
@@ -676,7 +677,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectNestedBenefitRecalculationInputs() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-BENEFIT-NESTED-RECALC-001",
                   "instruction": {
@@ -707,7 +708,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldAllowHistoricalBenefitSummaryContextVariables() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-BENEFIT-SUMMARY-CONTEXT-001",
                   "instruction": {
@@ -734,7 +735,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldAcceptParticipantAccountHierarchySnapshot() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-VCC-ROUTE-HIERARCHY-001",
                   "instruction": {
@@ -777,7 +778,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectPaymentInstrumentRouteLegNode() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-ROUTE-PAYMENT-INSTRUMENT-NODE-001",
                   "instruction": {
@@ -825,7 +826,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectSpendControlScopeRouteLegNode() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-BUDGET-GROUP-ROUTE-NODE-001",
                   "instruction": {
@@ -872,7 +873,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectSpendControlScopeRouteParticipantSubjectType() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-ROUTE-BUDGET-PARTICIPANT-001",
                   "instruction": {
@@ -906,7 +907,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectRouteParticipantWithoutSubjectId() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-ROUTE-PARTICIPANT-SUBJECT-ID-001",
                   "instruction": {
@@ -939,7 +940,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectRouteParticipantSensitiveContextVariables() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-ROUTE-PARTICIPANT-SENSITIVE-CONTEXT-001",
                   "instruction": {
@@ -977,7 +978,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectRouteParticipantCoreBenefitContextVariables() {
-        JSONObject document = JSON.parseObject("""
+        Map<String, Object> document = parseObject("""
                 {
                   "caseId": "DSL-INVALID-ROUTE-PARTICIPANT-BENEFIT-CONTEXT-001",
                   "instruction": {
@@ -1014,7 +1015,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectHierarchyWithoutRelationSn() {
-        JSONObject document = hierarchyParticipantDocument("""
+        Map<String, Object> document = hierarchyParticipantDocument("""
                 {
                   "parentAccountRef": {
                     "subjectType": "FUNDING_ACCOUNT",
@@ -1036,7 +1037,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectSpendControlScopeAsHierarchyParent() {
-        JSONObject document = hierarchyParticipantDocument("""
+        Map<String, Object> document = hierarchyParticipantDocument("""
                 {
                   "relationSn": "AHR-VCC-INVALID-001",
                   "parentAccountRef": {
@@ -1059,7 +1060,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectHierarchyParentCurrencyMismatch() {
-        JSONObject document = hierarchyParticipantDocument("""
+        Map<String, Object> document = hierarchyParticipantDocument("""
                 {
                   "relationSn": "AHR-VCC-INVALID-002",
                   "parentAccountRef": {
@@ -1082,7 +1083,7 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testJsonContractVerifierShouldRejectSelfReferencedHierarchyParent() {
-        JSONObject document = hierarchyParticipantDocument("""
+        Map<String, Object> document = hierarchyParticipantDocument("""
                 {
                   "relationSn": "AHR-VCC-INVALID-003",
                   "parentAccountRef": {
@@ -1099,8 +1100,8 @@ class FundsDslJsonContractTests {
                 .hasMessageContaining("parentAccountRef must not reference accountRef itself");
     }
 
-    private JSONObject hierarchyParticipantDocument(String hierarchySnapshot) {
-        return JSON.parseObject("""
+    private Map<String, Object> hierarchyParticipantDocument(String hierarchySnapshot) {
+        return parseObject("""
                 {
                   "caseId": "DSL-VCC-ROUTE-HIERARCHY-VALIDATION",
                   "instruction": {
@@ -1124,6 +1125,11 @@ class FundsDslJsonContractTests {
                   }
                 }
                 """.formatted(hierarchySnapshot));
+    }
+
+    private static Map<String, Object> parseObject(String json) {
+        return WindJson.parseObject(json, new TypeReference<>() {
+        });
     }
 
     private Path transactionLayerDslDir() {

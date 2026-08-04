@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.application.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
@@ -17,12 +15,14 @@ import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.model.dto.LedgerEntryFactDTO;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
 import com.wind.funds.wallet.service.LedgerQueryService;
+import com.wind.jackson.WindJson;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -217,7 +217,8 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
         if (!StringUtils.hasText(contextVariables)) {
             return Map.of();
         }
-        JSONObject values = JSON.parseObject(contextVariables);
+        Map<String, Object> values = WindJson.parseObject(contextVariables, new TypeReference<>() {
+        });
         return values == null ? Map.of() : values;
     }
 

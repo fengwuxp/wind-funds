@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 主资金链与对账 MySQL 生产 DDL 和测试 schema 漂移守卫。
+ * 主资金链、对账与治理 MySQL 生产 DDL 和测试 schema 漂移守卫。
  */
 class ReconciliationMysqlDdlContractTests {
 
@@ -63,6 +63,11 @@ class ReconciliationMysqlDdlContractTests {
             "t_reconciliation_difference",
             "t_reconciliation_difference_action");
 
+    private static final List<String> GOVERNANCE_TABLE_NAMES = List.of(
+            "t_projection_replay_task",
+            "t_projection_replay_difference",
+            "t_funds_transaction_projection");
+
     @Test
     void testCoreForwardDdlShouldMatchTestSchemaWithoutDestructiveStatements() throws IOException {
         String testSchema = Files.readString(workspaceRoot().resolve("tests/src/test/resources/jdbc-schema.sql"));
@@ -97,6 +102,25 @@ class ReconciliationMysqlDdlContractTests {
                     .as("MySQL DDL table %s must match the executable test schema", tableName)
                     .isEqualTo(normalize(extractCreateTable(testSchema, tableName)));
         }
+    }
+
+    @Test
+    void testGovernanceForwardDdlShouldMatchTestSchemaWithoutDestructiveStatements() throws IOException {
+        String testSchema = Files.readString(workspaceRoot().resolve("tests/src/test/resources/jdbc-schema.sql"));
+        String forwardDdl = Files.readString(
+                workspaceRoot().resolve("database/mysql/governance/001_create_governance_tables.sql"));
+
+        assertThat(forwardDdl)
+                .doesNotContain("DROP TABLE")
+                .doesNotContain("CREATE TABLE IF NOT EXISTS");
+        for (String tableName : GOVERNANCE_TABLE_NAMES) {
+            assertThat(normalize(extractCreateTable(forwardDdl, tableName)))
+                    .as("MySQL governance DDL table %s must match the executable test schema", tableName)
+                    .isEqualTo(normalize(extractCreateTable(testSchema, tableName)));
+        }
+        assertThat(workspaceRoot().resolve("database/mysql/governance/001_drop_governance_tables.sql"))
+                .as("production DDL must not publish a destructive table-drop rollback")
+                .doesNotExist();
     }
 
     @Test
@@ -162,8 +186,9 @@ class ReconciliationMysqlDdlContractTests {
                 .contains("WIND_FUNDS_TEST_SQL_INIT_MODE=never")
                 .doesNotContain("WIND_FUNDS_TEST_SQL_INIT_MODE=always");
         assertThat(integrationTest)
-                .contains("database/mysql/core", "001_create_core_tables.sql", "hasSize(41)",
-                        "verifyTargetTables", "verifyCoreTableStructures",
+                .contains("database/mysql/core", "database/mysql/governance",
+                        "001_create_core_tables.sql", "001_create_governance_tables.sql", "hasSize(44)",
+                        "verifyTargetTables", "verifyTableStructures",
                         "information_schema.columns", "information_schema.statistics")
                 .contains("verifyRecoveryConflictRecoveryUsesCurrentRead",
                         "t_recovery_order", "t_recovery_result",
@@ -177,7 +202,8 @@ class ReconciliationMysqlDdlContractTests {
         String readme = readDatabaseFile("README.md");
 
         assertThat(readme)
-                .contains("二十一张表", "just test-mysql-reconciliation", "支付工具授权", "支出控制")
+                .contains("二十一张表", "三张治理", "四十四张表", "just test-mysql-reconciliation",
+                        "支付工具授权", "支出控制")
                 .doesNotContain("十九张表");
     }
 

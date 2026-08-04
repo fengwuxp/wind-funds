@@ -99,8 +99,8 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.alibaba.fastjson2</groupId>
-            <artifactId>fastjson2</artifactId>
+            <groupId>com.wind.middleware</groupId>
+            <artifactId>wind-jackson</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

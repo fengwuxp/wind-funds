@@ -1,7 +1,5 @@
 package com.wind.funds.wallet.application.instrument;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -122,6 +120,7 @@ import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -137,6 +136,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+
+import tools.jackson.databind.JsonNode;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -314,9 +315,9 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
         assertAuthorizationInstrumentSnapshot(AUTHORIZE_BUSINESS_SN);
         assertAuthorizationAdmissionContextSnapshot(AUTHORIZE_BUSINESS_SN);
-        assertThat(JSON.parseObject(transactionContextVariablesJson(AUTHORIZE_BUSINESS_SN))
-                .getJSONObject("spendRuleDecision")
-                .getString("controlScopeId"))
+        assertThat(jsonObject(transactionContextVariablesJson(AUTHORIZE_BUSINESS_SN))
+                .path("spendRuleDecision")
+                .path("controlScopeId").asString())
                 .isEqualTo("budget_without_applicable_rule");
         assertAuthorizationProjectionInstrumentExplanation(authorizationSn);
     }
@@ -1734,31 +1735,32 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     private int routeLegCount(String businessSn) {
-        return JSON.parseObject(routeSnapshotJson(businessSn))
-                .getJSONArray("legs")
+        return jsonObject(routeSnapshotJson(businessSn))
+                .path("legs")
                 .size();
     }
 
     private void assertAuthorizationInstrumentSnapshot(String businessSn) {
-        JSONObject paymentInstrumentRef = JSON.parseObject(routeSnapshotJson(businessSn))
-                .getJSONObject("paymentInstrumentRef");
+        JsonNode paymentInstrumentRef = jsonObject(routeSnapshotJson(businessSn))
+                .path("paymentInstrumentRef");
         assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
-        assertThat(paymentInstrumentRef.getString("instrumentId")).isEqualTo(PAYMENT_INSTRUMENT_SN);
-        assertThat(paymentInstrumentRef.getString("instrumentType")).isEqualTo("CARD");
-        assertThat(paymentInstrumentRef.getString("currency")).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("instrumentId").asString()).isEqualTo(PAYMENT_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.path("instrumentType").asString()).isEqualTo("CARD");
+        assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
+        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountStatus.ACTIVE.name());
 
-        JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
+        JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
-        String bindingSn = bindingSnapshot.getString("bindingSn");
+        String bindingSn = bindingSnapshot.path("bindingSn").asString();
         assertThat(bindingSn).isNotBlank();
-        assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
-        assertThat(bindingSnapshot.getString("bindingRole"))
+        assertThat(bindingSnapshot.path("bindingVersion").asInt()).isEqualTo(1);
+        assertThat(bindingSnapshot.path("bindingRole").asString())
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
-        assertThat(bindingSnapshot.getString("subjectType")).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
-        assertThat(bindingSnapshot.getString("subjectId")).isEqualTo(CREDIT_ACCOUNT_SN);
-        assertThat(bindingSnapshot.getString("admissionAction")).isEqualTo("AUTHORIZE");
-        assertThat(bindingSnapshot.getString("admissionDecision")).isEqualTo("APPROVED");
+        assertThat(bindingSnapshot.path("subjectType").asString())
+                .isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
+        assertThat(bindingSnapshot.path("subjectId").asString()).isEqualTo(CREDIT_ACCOUNT_SN);
+        assertThat(bindingSnapshot.path("admissionAction").asString()).isEqualTo("AUTHORIZE");
+        assertThat(bindingSnapshot.path("admissionDecision").asString()).isEqualTo("APPROVED");
     }
 
     private void assertAuthorizationAdmissionContextSnapshot(String businessSn) {
@@ -1766,29 +1768,30 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     }
 
     private void assertAuthorizationAdmissionContextSnapshot(String businessSn, FundsAccountId targetAccountId) {
-        JSONObject contextVariables = JSON.parseObject(transactionContextVariablesJson(businessSn));
-        String bindingSn = JSON.parseObject(routeSnapshotJson(businessSn))
-                .getJSONObject("paymentInstrumentRef")
-                .getJSONObject("bindingSnapshot")
-                .getString("bindingSn");
+        JsonNode contextVariables = jsonObject(transactionContextVariablesJson(businessSn));
+        String bindingSn = jsonObject(routeSnapshotJson(businessSn))
+                .path("paymentInstrumentRef")
+                .path("bindingSnapshot")
+                .path("bindingSn").asString();
 
         assertThat(contextVariables).isNotNull().isNotEmpty();
-        assertThat(contextVariables.getString("instrumentSn")).isEqualTo(PAYMENT_INSTRUMENT_SN);
-        assertThat(contextVariables.getString("instrumentAction")).isEqualTo("AUTHORIZE");
-        assertThat(contextVariables.getString("instrumentBindingRole"))
+        assertThat(contextVariables.path("instrumentSn").asString()).isEqualTo(PAYMENT_INSTRUMENT_SN);
+        assertThat(contextVariables.path("instrumentAction").asString()).isEqualTo("AUTHORIZE");
+        assertThat(contextVariables.path("instrumentBindingRole").asString())
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
-        assertThat(contextVariables.getString("instrumentBindingSn")).isEqualTo(bindingSn);
-        assertThat(contextVariables.getInteger("instrumentBindingVersion")).isEqualTo(1);
-        assertThat(contextVariables.getString("fundingRelationSn")).isNotBlank();
-        assertThat(contextVariables.getString("fundingRelationType"))
+        assertThat(contextVariables.path("instrumentBindingSn").asString()).isEqualTo(bindingSn);
+        assertThat(contextVariables.path("instrumentBindingVersion").asInt()).isEqualTo(1);
+        assertThat(contextVariables.path("fundingRelationSn").asString()).isNotBlank();
+        assertThat(contextVariables.path("fundingRelationType").asString())
                 .isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE.name());
-        assertThat(contextVariables.getString("targetAccountId")).isEqualTo(targetAccountId.id());
-        assertThat(contextVariables.getString("targetAccountType")).isEqualTo(targetAccountId.type());
-        JSONObject spendRuleDecision = contextVariables.getJSONObject("spendRuleDecision");
+        assertThat(contextVariables.path("targetAccountId").asString()).isEqualTo(targetAccountId.id());
+        assertThat(contextVariables.path("targetAccountType").asString()).isEqualTo(targetAccountId.type());
+        JsonNode spendRuleDecision = contextVariables.path("spendRuleDecision");
         assertThat(spendRuleDecision).isNotNull();
-        assertThat(spendRuleDecision.getString("decisionResult"))
+        assertThat(spendRuleDecision.path("decisionResult").asString())
                 .isEqualTo(SpendControlDecisionResult.NO_APPLICABLE_RULE.name());
-        assertThat(spendRuleDecision).doesNotContainKeys("decisionRecordId", "ruleId", "decisionSn", "decisionDigest");
+        assertThat(spendRuleDecision.propertyNames())
+                .doesNotContain("decisionRecordId", "ruleId", "decisionSn", "decisionDigest");
     }
 
     private String transactionContextVariablesJson(String businessSn) {
@@ -1796,6 +1799,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 SELECT context_variables FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private static JsonNode jsonObject(String json) {
+        return WindJson.parseObject(json, JsonNode.class);
     }
 
     private void assertAuthorizationProjectionInstrumentExplanation(String authorizationSn) {

@@ -1,6 +1,7 @@
 package com.wind.funds.ledger;
 
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -16,7 +17,6 @@ import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
@@ -68,6 +68,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFa
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
@@ -109,6 +110,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     @Autowired
     private LedgerService ledgerService;
+
+    @Autowired
+    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -844,10 +848,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private Long createAvailableLedger(String subjectId, long initialBalance) {
         Long ledgerId = createAvailableLedger(subjectId);
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setDebitAmountDelta(initialBalance)
-                    .setCreditAmountDelta(0L));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    EntrySide.DEBIT,
+                    initialBalance)));
         }
         return ledgerId;
     }
@@ -872,10 +876,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setPeriodType(periodType)
                 .setPeriodId(periodId));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setDebitAmountDelta(initialBalance)
-                    .setCreditAmountDelta(0L));
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledgerService.getLedgerById(ledgerId),
+                    EntrySide.DEBIT,
+                    initialBalance)));
         }
         return ledgerId;
     }

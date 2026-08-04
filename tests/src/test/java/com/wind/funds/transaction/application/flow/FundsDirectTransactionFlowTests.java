@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.OperationActorType;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -39,6 +37,7 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +50,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import tools.jackson.core.type.TypeReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -3944,7 +3945,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private void assertDirectTransactionKeepsContextMinimal(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
-        JSONObject transactionContext = contextVariablesOf(transaction.getContextVariables());
+        Map<String, Object> transactionContext = contextVariablesOf(transaction.getContextVariables());
 
         assertThat(transactionContext.keySet())
                 .as("direct transaction context must not carry request context for %s", businessSn)
@@ -4188,7 +4189,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
         postingPlansOf(ledgerTransaction).forEach(plan -> {
-            JSONObject planContext = contextVariablesOf(plan.getContextVariables());
+            Map<String, Object> planContext = contextVariablesOf(plan.getContextVariables());
             assertThat(planContext)
                     .as("posting plan context must retain route evidence for direct transaction %s", businessSn)
                     .containsEntry("routeLegId", plan.getRouteLegId())
@@ -4211,7 +4212,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private void assertDirectLedgerTransactionKeepsContextMinimal(String businessSn) {
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
-        JSONObject transactionContext = contextVariablesOf(ledgerTransaction.getContextVariables());
+        Map<String, Object> transactionContext = contextVariablesOf(ledgerTransaction.getContextVariables());
 
         assertThat(transactionContext.keySet())
                 .as("direct ledger transaction context must not carry request context for %s", businessSn)
@@ -4221,7 +4222,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     private void assertLedgerEntryContextKeepsPostingEvidenceOnly(String businessSn,
                                                                   LedgerPostingPlan plan,
                                                                   LedgerEntry entry) {
-        JSONObject entryContext = contextVariablesOf(entry.getContextVariables());
+        Map<String, Object> entryContext = contextVariablesOf(entry.getContextVariables());
         assertThat(entryContext)
                 .as("ledger entry context must retain route evidence for direct transaction %s", businessSn)
                 .containsEntry("routeLegId", plan.getRouteLegId())
@@ -4232,11 +4233,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS);
     }
 
-    private JSONObject contextVariablesOf(String contextVariables) {
+    private Map<String, Object> contextVariablesOf(String contextVariables) {
         if (contextVariables == null || contextVariables.isBlank()) {
-            return new JSONObject();
+            return Map.of();
         }
-        return JSON.parseObject(contextVariables);
+        return WindJson.parseObject(contextVariables, new TypeReference<>() {
+        });
     }
 
     private void assertDirectFactsCarryAuditTrail(String businessSn) {

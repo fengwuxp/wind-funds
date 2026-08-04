@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
+import com.wind.jackson.WindJson;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
@@ -49,6 +48,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -678,17 +678,18 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (!StringUtils.hasText(detail.getContextVariables())) {
             return null;
         }
-        JSONObject values = JSON.parseObject(detail.getContextVariables());
-        return values.getBoolean(FundsInstructionContextKeys.APPROVED);
+        Map<String, Object> values = parseContextVariables(detail.getContextVariables());
+        Object approved = values.get(FundsInstructionContextKeys.APPROVED);
+        return approved instanceof Boolean value ? value : null;
     }
 
     private boolean isForceCompletion(FundsTransactionDetail detail) {
         if (!StringUtils.hasText(detail.getContextVariables())) {
             return false;
         }
-        JSONObject values = JSON.parseObject(detail.getContextVariables());
+        Map<String, Object> values = parseContextVariables(detail.getContextVariables());
         return FundsAuthorizationTransactionCompleteRequest.COMPLETION_MODE_FORCE.equalsIgnoreCase(
-                values.getString(FundsInstructionContextKeys.COMPLETION_MODE));
+                Objects.toString(values.get(FundsInstructionContextKeys.COMPLETION_MODE), null));
     }
 
     private boolean isStableTransactionStatus(FundsTransactionStatus status) {
@@ -934,7 +935,12 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private String toJson(Object value) {
-        return JSON.toJSONString(value);
+        return WindJson.toJsonString(value);
+    }
+
+    private Map<String, Object> parseContextVariables(String value) {
+        return WindJson.parseObject(value, new TypeReference<>() {
+        });
     }
 
     private String truncate(String message) {

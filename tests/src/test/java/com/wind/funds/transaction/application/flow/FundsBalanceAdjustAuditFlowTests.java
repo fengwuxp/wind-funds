@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
@@ -18,10 +16,14 @@ import com.wind.funds.transaction.model.query.FundsBalanceAdjustmentAuditQuery;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+
+import tools.jackson.core.type.TypeReference;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -279,24 +281,25 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     private void assertExternalAnomalyAuditContext(FundsTransactionDetail detail) {
-        JSONObject values = JSON.parseObject(detail.getContextVariables());
-        assertThat(values.getString(FundsInstructionContextKeys.SOURCE_TYPE))
+        Map<String, Object> values = WindJson.parseObject(detail.getContextVariables(), new TypeReference<>() {
+        });
+        assertThat(values.get(FundsInstructionContextKeys.SOURCE_TYPE))
                 .isEqualTo(SourceObjectType.EXTERNAL_BALANCE_ANOMALY.name());
-        assertThat(values.getString(FundsInstructionContextKeys.SOURCE_SN))
+        assertThat(values.get(FundsInstructionContextKeys.SOURCE_SN))
                 .isEqualTo("EXT_BALANCE_ANOMALY_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF))
+        assertThat(values.get(FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF))
                 .isEqualTo("ISSUER_FINAL_EVENT_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF))
+        assertThat(values.get(FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF))
                 .isEqualTo("ISSUER_BALANCE_SNAPSHOT_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF))
+        assertThat(values.get(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF))
                 .isEqualTo("RECON_DIFF_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.RECONCILIATION_RERUN_REF))
+        assertThat(values.get(FundsInstructionContextKeys.RECONCILIATION_RERUN_REF))
                 .isEqualTo("RECON_RERUN_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.RESPONSIBILITY_REF))
+        assertThat(values.get(FundsInstructionContextKeys.RESPONSIBILITY_REF))
                 .isEqualTo("RECOVERY_CASE_202606170001");
-        assertThat(values.getString(FundsInstructionContextKeys.REASON_CODE))
+        assertThat(values.get(FundsInstructionContextKeys.REASON_CODE))
                 .isEqualTo("EXTERNAL_TERMINAL_BALANCE_DEFICIT");
-        assertThat(values.getBoolean(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE)).isTrue();
+        assertThat(values.get(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE)).isEqualTo(true);
         assertThat(detail.getContextVariables())
                 .contains(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT)
                 .contains(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT);

@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.time.LocalDateTime;
 
 /**
  * 交易投影解释的稳定事实来源。
@@ -33,6 +34,9 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                                                           @NonNull String businessSn,
                                                           @NonNull String fundsTransactionSn,
                                                           @NonNull RouteSnapshotSpec routeSnapshot,
+                                                          @Nullable String ownerType,
+                                                          @Nullable String ownerId,
+                                                          @Nullable LocalDateTime occurredTime,
                                                           @Nullable String ledgerTransactionSn,
                                                           boolean completed,
                                                           boolean failed,
@@ -261,6 +265,13 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                 .businessScene(businessScene)
                 .businessSn(businessSn)
                 .fundsTransactionSn(fundsTransactionSn)
+                .tenantId(routeSnapshot.getTenantId())
+                .eventType(eventType)
+                .ownerType(resolveOwnerType())
+                .ownerId(resolveOwnerId())
+                .amount(amount.getAmount())
+                .currency(amount.getCurrency())
+                .occurredTime(occurredTime == null ? routeSnapshot.getResolvedAt() : occurredTime)
                 .routeSnapshotId(routeSnapshot.getSnapshotId())
                 .routeCode(routeSnapshot.getRouteCode())
                 .ledgerTransactionSn(ledgerTransactionSn)
@@ -282,6 +293,20 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                 .explanationContext(resolveExplanationContext(transaction))
                 .externalRuleVerificationStatus(NOT_APPLICABLE)
                 .build();
+    }
+
+    private @NonNull String resolveOwnerType() {
+        if (StringUtils.hasText(ownerType)) {
+            return ownerType;
+        }
+        return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectType().name();
+    }
+
+    private @NonNull String resolveOwnerId() {
+        if (StringUtils.hasText(ownerId)) {
+            return ownerId;
+        }
+        return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectId();
     }
 
     private @NonNull String resolveFactStatus() {

@@ -3,7 +3,7 @@ package com.wind.funds.ledger.impl;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
@@ -21,6 +21,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -252,6 +253,66 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：账本挂起后仍收到普通余额投影。
+     * 预期：投影在余额写入前拒绝请求。
+     * 红线：任何调用方都不能绕过账本入账状态门禁。
+     */
+    @Test
+    void testProjectShouldRejectSuspendedLedgerForNormalPosting() {
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(availableLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L))))
+                .hasMessageContaining("账本状态不允许入账");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：业务要关闭仍有余额的账户账本。
+     * 预期：状态变更被拒绝，余额和账本事实保持不变。
+     * 红线：关闭账本不是清零动作，余额归零必须来自前置账务事实。
+     */
+    @Test
+    void testUpdateLedgerStatusShouldRejectClosingNonZeroBalanceLedger() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(availableLedgerId)
+                .setStatus(LedgerStatus.CLOSED)))
+                .hasMessageContaining("非零余额账本不允许关闭");
+
+        assertThat(ledgerService.getLedgerById(availableLedgerId).getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史借贷发生额已经归平后关闭账本。
+     * 预期：账本允许关闭，累计发生额保留。
+     * 红线：关闭账本只校验净余额，不得清零历史发生额。
+     */
+    @Test
+    void testUpdateLedgerStatusShouldCloseZeroNormalBalanceLedgerWithHistoricalAmounts() {
+        projectionService.project(List.of(ledgerEntry(
+                availableLedgerId,
+                LedgerSubjectCode.AVAILABLE,
+                EntrySide.CREDIT,
+                100L)));
+
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(availableLedgerId)
+                .setStatus(LedgerStatus.CLOSED));
+
+        LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
+        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.CLOSED);
+        assertThat(ledger.getDebitAmount()).isEqualTo(100L);
+        assertThat(ledger.getCreditAmount()).isEqualTo(100L);
+        assertThat(ledger.getNormalBalance()).isZero();
+    }
+
     @BeforeEach
     void setUpProjectionServiceTestData() {
         cleanupProjectionServiceTestData();
@@ -304,10 +365,13 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 .setCutOffTime(LocalTime.MIDNIGHT)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
-        ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                .setId(ledgerId)
-                .setDebitAmountDelta(initialBalance)
-                .setCreditAmountDelta(0L));
+        if (initialBalance != 0L) {
+            projectionService.project(List.of(ledgerEntry(
+                    ledgerId,
+                    LedgerSubjectCode.AVAILABLE,
+                    EntrySide.DEBIT,
+                    initialBalance)));
+        }
         return ledgerId;
     }
 
@@ -328,10 +392,11 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         if (initialBalance != 0L) {
-            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
-                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null)
-                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null));
+            projectionService.project(List.of(ledgerEntry(
+                    ledgerId,
+                    LedgerSubjectCode.FROZEN,
+                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    Math.abs(initialBalance))));
         }
         return ledgerId;
     }

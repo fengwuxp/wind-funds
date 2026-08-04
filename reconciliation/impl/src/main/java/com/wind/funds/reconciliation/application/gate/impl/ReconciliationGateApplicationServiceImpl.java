@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.gate.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
@@ -253,7 +253,7 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     }
 
     private List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? List.copyOf(JSON.parseArray(value, String.class)) : List.of();
+        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 
     private ReconciliationGateDecisionDTO blockedForRunResult(CheckReconciliationGateRequest request,

@@ -1,7 +1,5 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -18,11 +16,14 @@ import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.integration.operator.WindOperatorFactory;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+
+import tools.jackson.databind.JsonNode;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -164,10 +165,11 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
         assertBucket(balance(globalAccount), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(globalAccount), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
 
-        JSONObject externalAccountRef = JSON.parseObject(fundsTransaction(creditTransactionSn).getRouteSnapshot())
-                .getJSONObject("externalAccountRef");
-        assertThat(externalAccountRef.getString("externalAccountType")).isEqualTo("EXTERNAL_BANK");
-        assertThat(externalAccountRef.getString("channelCode")).isEqualTo("ACH");
+        JsonNode externalAccountRef = WindJson.parseObject(
+                fundsTransaction(creditTransactionSn).getRouteSnapshot(), JsonNode.class)
+                .path("externalAccountRef");
+        assertThat(externalAccountRef.path("externalAccountType").asString()).isEqualTo("EXTERNAL_BANK");
+        assertThat(externalAccountRef.path("channelCode").asString()).isEqualTo("ACH");
         assertThat(entriesByBusinessSn(CREDIT_BUSINESS_SN).stream().map(LedgerEntry::getSubjectId))
                 .doesNotContain("external_funds_event_source");
     }

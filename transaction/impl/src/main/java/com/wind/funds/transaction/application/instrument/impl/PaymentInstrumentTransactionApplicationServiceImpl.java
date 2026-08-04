@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.application.instrument.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
+import com.wind.jackson.WindJson;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
@@ -52,6 +51,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -324,7 +324,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("completionBusinessScene", request.getBusinessScene());
         values.put("completionBusinessSn", request.getBusinessSn());
-        return JSON.toJSONString(values);
+        return WindJson.toJsonString(values);
     }
 
     private void releaseControlReservation(ReverseAuthorizationByPaymentInstrumentRequest request,
@@ -351,15 +351,19 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
     }
 
     private @Nullable SpendControlMovementDTO findControlReservation(FundsTransactionDTO authorization) {
-        JSONObject context = JSON.parseObject(authorization.getContextVariables());
+        if (!StringUtils.hasText(authorization.getContextVariables())) {
+            return null;
+        }
+        Map<String, Object> context = WindJson.parseObject(authorization.getContextVariables(), new TypeReference<>() {
+        });
         if (context == null) {
             return null;
         }
-        JSONObject spendRuleDecision = context.getJSONObject(FundsInstructionContextKeys.SPEND_RULE_DECISION);
-        if (spendRuleDecision == null) {
+        Object spendRuleDecision = context.get(FundsInstructionContextKeys.SPEND_RULE_DECISION);
+        if (!(spendRuleDecision instanceof Map<?, ?> decision)) {
             return null;
         }
-        String reservationSn = spendRuleDecision.getString("controlReservationSn");
+        String reservationSn = Objects.toString(decision.get("controlReservationSn"), null);
         if (!StringUtils.hasText(reservationSn)) {
             return null;
         }
@@ -397,7 +401,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("reversalBusinessScene", request.getBusinessScene());
         values.put("reversalBusinessSn", request.getBusinessSn());
-        return JSON.toJSONString(values);
+        return WindJson.toJsonString(values);
     }
 
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {

@@ -426,6 +426,7 @@ CREATE TABLE `t_funds_transaction`
     KEY `idx_funds_transaction_tenant` (`tenant_id`),
     KEY `idx_funds_transaction_reference` (`reference_transaction_sn`),
     KEY `idx_funds_transaction_status` (`status`),
+    KEY `idx_funds_transaction_projection_scan` (`tenant_id`, `id`),
     KEY `idx_funds_transaction_gmt_create` (`gmt_create`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '资金交易表';
@@ -507,6 +508,7 @@ CREATE TABLE `t_funds_frozen_order`
     KEY `idx_funds_frozen_order_transaction` (`transaction_sn`),
     KEY `idx_funds_frozen_order_status` (`status`),
     KEY `idx_funds_frozen_order_expire` (`expire_time`, `status`),
+    KEY `idx_funds_frozen_order_projection_scan` (`tenant_id`, `id`),
     KEY `idx_funds_frozen_order_business` (`business_scene`, `business_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '资金冻结订单表';

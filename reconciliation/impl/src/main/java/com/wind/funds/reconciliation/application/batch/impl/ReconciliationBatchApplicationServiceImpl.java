@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.batch.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationBatch;
@@ -589,7 +589,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         result.setSourceType(request.getSourceType());
         result.setSourceDigest(sourceDigest);
         result.setRecordCount(recordCount);
-        result.setEvidenceRefs(JSON.toJSONString(evidenceRefs));
+        result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs));
         result.setCreatedBy(operator.getOperatorAsText());
         return result;
     }
@@ -616,7 +616,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
             List<String> evidenceRefs) {
         AssertUtils.isTrue(existing.getSourceType() == request.getSourceType()
                         && Objects.equals(existing.getSourceDigest(), sourceDigest)
-                        && Objects.equals(existing.getEvidenceRefs(), JSON.toJSONString(evidenceRefs)),
+                        && Objects.equals(existing.getEvidenceRefs(), WindJson.toJsonString(evidenceRefs)),
                 "同一批次和来源角色的快照事实不一致，reconciliationBatchSn = {}, sourceRole = {}",
                 existing.getReconciliationBatchSn(), existing.getSourceRole());
         return toSourceSnapshotDTO(existing);
@@ -680,7 +680,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                 .setSourceDigest(source.getSourceDigest())
                 .setRecordCount(source.getRecordCount())
                 .setSourceItemRefs(sourceItemRefs)
-                .setEvidenceRefs(List.copyOf(JSON.parseArray(source.getEvidenceRefs(), String.class)))
+                .setEvidenceRefs(List.copyOf(WindJson.parseArray(source.getEvidenceRefs(), String.class)))
                 .setCreatedBy(source.getCreatedBy())
                 .setCreatedTime(source.getGmtCreate());
     }

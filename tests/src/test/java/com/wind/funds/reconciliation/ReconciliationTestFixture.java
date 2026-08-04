@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
@@ -144,7 +144,7 @@ public final class ReconciliationTestFixture {
                      source_digest, record_count, evidence_refs, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, 1, ?, 'SYSTEM')
                 """, snapshotSn, tenantId, batchSn, sourceRole.name(), sourceType.name(),
-                sourceDigest, JSON.toJSONString(List.of(evidenceRef)));
+                sourceDigest, WindJson.toJsonString(List.of(evidenceRef)));
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_source_item
                     (sn, tenant_id, source_snapshot_sn, source_item_ref, content_digest, created_by)

@@ -22,4 +22,10 @@ public interface FundsTransactionProjectionExplainApplicationService {
      */
     @NonNull
     FundsTransactionProjectionExplanation explain(@NonNull FundsTransactionProjectionExplainQuery query);
+
+    @NonNull
+    FundsTransactionProjectionScanCursor initializeScanCursor(@NonNull FundsTransactionProjectionScanQuery query);
+
+    @NonNull
+    FundsTransactionProjectionScanBatch scan(@NonNull FundsTransactionProjectionScanQuery query);
 }

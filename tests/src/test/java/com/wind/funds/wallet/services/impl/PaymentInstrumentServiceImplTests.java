@@ -1,7 +1,5 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.PaymentInstrument;
@@ -25,6 +23,7 @@ import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +39,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+
+import tools.jackson.core.type.TypeReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -1281,8 +1283,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         return result;
     }
 
-    private static JSONObject snapshotOf(String snapshot) {
-        return JSON.parseObject(snapshot);
+    private static Map<String, Object> snapshotOf(String snapshot) {
+        return WindJson.parseObject(snapshot, new TypeReference<>() {
+        });
     }
 
     @Configuration

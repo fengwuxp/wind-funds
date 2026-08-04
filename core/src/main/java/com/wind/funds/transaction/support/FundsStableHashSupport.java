@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.support;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -40,7 +40,7 @@ public final class FundsStableHashSupport {
      * @return 64 位十六进制 SHA-256 摘要
      */
     public static @NonNull String sha256Json(@NonNull Object value) {
-        return sha256(JSON.toJSONString(value));
+        return sha256(WindJson.toJsonString(value));
     }
 
     /**

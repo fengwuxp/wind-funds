@@ -1,6 +1,5 @@
 package com.wind.funds.route;
 
-import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -39,6 +38,7 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.support.WindOperatorTestFixture;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
@@ -457,7 +457,7 @@ class DefaultRouteReplayServiceTests {
                 .businessScene("REFUND")
                 .businessSn("REPLAY_MISSING_REFERENCE")
                 .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(contextVariables)
                 .build();
     }

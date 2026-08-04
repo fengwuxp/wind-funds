@@ -307,6 +307,27 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testResultSnapshotShouldReadBlankEvidenceRefsAsEmptyList() {
+        String detailSn = prepareConfirmedSnapshot("043");
+        String snapshotSn = snapshotSn(detailSn);
+        jdbcTemplate.update("UPDATE t_clearing_split_result_snapshot SET reconciliation_evidence_refs = ' ' WHERE sn = ?",
+                snapshotSn);
+
+        ClearingSplitResultSnapshotDTO snapshot = clearingSplitBatchApplicationService.getResultSnapshots(
+                        TENANT_ID,
+                        jdbcTemplate.queryForObject(
+                                "SELECT split_batch_sn FROM t_clearing_split_batch_detail WHERE splittable_detail_sn = ?",
+                                String.class,
+                                detailSn))
+                .stream()
+                .filter(item -> snapshotSn.equals(item.getSn()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(snapshot.getReconciliationEvidenceRefs()).isEmpty();
+    }
+
     /**
      * 场景：批次进入复核后，来源交易发生退款并推进版本。
      * 结果：确认失败关闭，不生成部分快照，批次仍保持 REVIEWING。

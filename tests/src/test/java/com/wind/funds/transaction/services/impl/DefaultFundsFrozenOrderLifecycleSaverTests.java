@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
 import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
@@ -27,15 +27,19 @@ import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import tools.jackson.core.type.TypeReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -96,6 +100,39 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
 
         assertThat(result.getTransactionSn()).isEqualTo(release.getSn());
         assertThat(result.isCompleted()).isTrue();
+    }
+
+    /**
+     * 场景：解冻记录首次创建时需要保留本次释放路径。
+     * 预期：解冻记录的上下文保存本次 UNFREEZE RouteSnapshot，而不是只保存原冻结单引用。
+     * 红线：恢复时不得用原 FREEZE 路径伪装本次 UNFREEZE 路径。
+     */
+    @Test
+    void testUnfreezeShouldPersistCurrentRouteSnapshot() {
+        FundsFrozenOrder original = originalFreezeOrder();
+        FundsInstructionSpec instruction = instruction(FundsTransactionEventType.UNFREEZE,
+                "UNFREEZE-BIZ-ROUTE-001", 20L, original.getSn());
+        RouteSnapshotSpec routeSnapshot = routeSnapshot(instruction);
+        FundsFrozenOrderMapper mapper = mock(FundsFrozenOrderMapper.class);
+        when(mapper.selectOneByQuery(any())).thenReturn(original, null, original);
+        doAnswer(invocation -> {
+            FundsFrozenOrder order = invocation.getArgument(0);
+            order.setId(1L);
+            return 1;
+        }).when(mapper).insertSelective(any());
+
+        new DefaultFundsFrozenOrderLifecycleSaver(mapper)
+                .beforePosting(instruction, mock(ResolvedRouteSpec.class), routeSnapshot);
+
+        ArgumentCaptor<FundsFrozenOrder> captor = ArgumentCaptor.forClass(FundsFrozenOrder.class);
+        verify(mapper).insertSelective(captor.capture());
+        Map<String, Object> context = WindJson.parseObject(
+                captor.getValue().getContextVariables(), new TypeReference<>() {
+                });
+        assertThat(context)
+                .containsEntry(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, original.getSn())
+                .containsEntry(FundsInstructionContextKeys.ROUTE_SNAPSHOT,
+                        RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot));
     }
 
     private FundsInstructionSpec instruction(FundsTransactionEventType eventType,
@@ -177,7 +214,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         result.setReleasedAmount(0L);
         result.setCurrency(instruction.getAmount().getCurrency());
         result.setStatus(FundsFrozenOrderStatus.RELEASED);
-        result.setContextVariables(JSON.toJSONString(context));
+        result.setContextVariables(WindJson.toJsonString(context));
         return result;
     }
 

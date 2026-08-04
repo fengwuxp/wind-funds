@@ -7,7 +7,6 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -21,7 +20,6 @@ import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -62,30 +60,6 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public void updateLedgerBalance(@NonNull UpdateLedgerBalanceRequest request) {
-        Ledger ledger = findLedger(request.getId());
-        LedgerPostingAccessType postingAccessType = request.getPostingAccessType() == null
-                ? LedgerPostingAccessType.NORMAL
-                : request.getPostingAccessType();
-        LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), postingAccessType);
-        validateMinimumNormalBalance(ledger, request);
-        Ledger entity = UpdateEntity.of(Ledger.class);
-        UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
-        setRawDelta(updateWrapper, LedgerNameRefs.ledger.debitAmount, request.getDebitAmountDelta());
-        setRawDelta(updateWrapper, LedgerNameRefs.ledger.creditAmount, request.getCreditAmountDelta());
-        setRawDelta(updateWrapper, LedgerNameRefs.ledger.version, 1L);
-        QueryWrapper where = QueryWrapper.create()
-                .where(LedgerNameRefs.ledger.id.eq(request.getId()))
-                .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
-                .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()));
-        if (request.getMinimumNormalBalance() != null) {
-            where.and(normalBalanceAfterDelta(ledger.getNormalBalanceSide(), request)
-                    .ge(request.getMinimumNormalBalance()));
-        }
-        AssertUtils.isTrue(ledgerMapper.updateByQuery(entity, where) > 0, "账本余额更新失败");
-    }
-
-    @Override
     public void updateLedgerStatus(@NonNull UpdateLedgerStatusRequest request) {
         Ledger ledger = findLedger(request.getId());
         LedgerStatus targetStatus = request.getStatus();
@@ -103,13 +77,6 @@ public class LedgerServiceImpl implements LedgerService {
                         .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
                         .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()))) == 1,
                 "账本状态更新失败");
-    }
-
-    @Override
-    public void deleteLedgerByIds(@NonNull Long... ids) {
-        AssertUtils.notEmpty(ids, "argument ids must not empty");
-        int total = ledgerMapper.deleteBatchByIds(List.of(ids));
-        AssertUtils.isTrue(total == ids.length, "删除账户账本失败");
     }
 
     @Override
@@ -259,44 +226,4 @@ public class LedgerServiceImpl implements LedgerService {
         updateWrapper.setRaw(fieldRef, fieldRef.subtract(Math.abs(delta)));
     }
 
-    private void validateMinimumNormalBalance(Ledger ledger, UpdateLedgerBalanceRequest request) {
-        Long minimumNormalBalance = request.getMinimumNormalBalance();
-        if (minimumNormalBalance == null) {
-            return;
-        }
-        long normalBalance = computeNormalBalance(
-                addDelta(ledger.getDebitAmount(), request.getDebitAmountDelta()),
-                addDelta(ledger.getCreditAmount(), request.getCreditAmountDelta()),
-                ledger.getNormalBalanceSide()
-        );
-        AssertUtils.isTrue(normalBalance >= minimumNormalBalance, "账本余额不足");
-    }
-
-    private QueryColumn normalBalanceAfterDelta(EntrySide normalBalanceSide, UpdateLedgerBalanceRequest request) {
-        QueryColumn debitAmount = amountAfterDelta(LedgerNameRefs.ledger.debitAmount, request.getDebitAmountDelta());
-        QueryColumn creditAmount = amountAfterDelta(LedgerNameRefs.ledger.creditAmount, request.getCreditAmountDelta());
-        if (normalBalanceSide == EntrySide.DEBIT) {
-            return debitAmount.subtract(creditAmount);
-        }
-        return creditAmount.subtract(debitAmount);
-    }
-
-    private QueryColumn amountAfterDelta(QueryColumn fieldRef, Long delta) {
-        if (delta == null || delta == 0L) {
-            return fieldRef;
-        }
-        if (delta > 0) {
-            return fieldRef.add(delta);
-        }
-        return fieldRef.subtract(Math.abs(delta));
-    }
-
-    private long addDelta(Long value, Long delta) {
-        return (value == null ? 0L : value) + (delta == null ? 0L : delta);
-    }
-
-    private long computeNormalBalance(long debitAmount, long creditAmount, EntrySide normalBalanceSide) {
-        long rawBalance = debitAmount - creditAmount;
-        return normalBalanceSide == EntrySide.DEBIT ? rawBalance : -rawBalance;
-    }
 }

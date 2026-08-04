@@ -1,6 +1,6 @@
 package com.wind.funds.ledger.mapstruct;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.funds.ledger.dal.entities.Ledger;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -8,7 +8,6 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -24,6 +23,9 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
+
+import java.util.Map;
 
 /**
  * 账户账本 Converter
@@ -32,7 +34,7 @@ import org.springframework.util.StringUtils;
  * @since 2026-04-14
  */
 @Mapper(imports = {
-        JSON.class,
+        WindJson.class,
         Money.class
 })
 public interface LedgerConverter {
@@ -46,15 +48,6 @@ public interface LedgerConverter {
      * @return Ledger 实例
      */
     Ledger convertToLedger(CreateLedgerRequest request);
-
-    /**
-     * 更新请求 convert to 账户账本实体
-     *
-     * @param request 更新请求
-     * @return Ledger 实例
-     */
-    Ledger convertToLedger(UpdateLedgerBalanceRequest request);
-
 
     /**
      * Ledger convert to LedgerDTO
@@ -85,7 +78,7 @@ public interface LedgerConverter {
     @Mapping(target = "postingScope", expression = "java(enumName(data.getPostingScope()))")
     @Mapping(target = "balanceEffectType", expression = "java(enumName(data.getBalanceEffectType()))")
     @Mapping(target = "phaseCode", expression = "java(enumName(data.getPhaseCode()))")
-    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(data.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(data.getContextVariables()))")
     LedgerEntry convertToLedgerEntry(LedgerEntrySpec data);
 
     /**
@@ -111,7 +104,7 @@ public interface LedgerConverter {
     @Mapping(target = "postingScope", expression = "java(toLedgerPostingScope(data.getPostingScope()))")
     @Mapping(target = "balanceEffectType", expression = "java(toLedgerBalanceEffectType(data.getBalanceEffectType()))")
     @Mapping(target = "phaseCode", expression = "java(toLedgerPhaseCode(data.getPhaseCode()))")
-    @Mapping(target = "contextVariables", expression = "java(JSON.parseObject(data.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(parseContextVariables(data.getContextVariables()))")
     LedgerEntryDTO convertToLedgerEntryDTO(LedgerEntry data);
 
     /**
@@ -134,7 +127,7 @@ public interface LedgerConverter {
             target = "transactionType",
             expression = "java(data.getTransactionType() == null ? null : data.getTransactionType().name())"
     )
-    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(data.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(data.getContextVariables()))")
     LedgerTransaction convertToLedgerTransaction(LedgerTransactionSpec data);
 
     /**
@@ -156,8 +149,16 @@ public interface LedgerConverter {
     )
     @Mapping(target = "debitAmount", expression = "java(new Money(data.getDebitAmount(), data.getCurrency()))")
     @Mapping(target = "creditAmount", expression = "java(new Money(data.getCreditAmount(), data.getCurrency()))")
-    @Mapping(target = "contextVariables", expression = "java(JSON.parseObject(data.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(parseContextVariables(data.getContextVariables()))")
     LedgerTransactionDTO convertToAccountLedgerTransactionDTO(LedgerTransaction data);
+
+    default Map<String, Object> parseContextVariables(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return WindJson.parseObject(value, new TypeReference<>() {
+        });
+    }
 
     /**
      * Enum convert to database value.

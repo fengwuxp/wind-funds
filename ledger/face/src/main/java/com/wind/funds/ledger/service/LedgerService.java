@@ -3,7 +3,6 @@ package com.wind.funds.ledger.service;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -32,34 +31,11 @@ public interface LedgerService {
     @NonNull Long createLedger(@NonNull CreateLedgerRequest request);
 
     /**
-     * 更新 账户账本
-     *
-     * @param request 更新请求对象
-     */
-    void updateLedgerBalance(@NonNull UpdateLedgerBalanceRequest request);
-
-    /**
      * 更新账户账本状态
      *
      * @param request 更新请求对象
      */
     void updateLedgerStatus(@NonNull UpdateLedgerStatusRequest request);
-
-    /**
-     * 删除账户账本
-     *
-     * @param id 账户账本 id
-     */
-    default void deleteLedgerById(@NonNull Long id) {
-        deleteLedgerByIds(id);
-    }
-
-    /**
-     * 批量删除账户账本
-     *
-     * @param ids 账户账本 id
-     */
-    void deleteLedgerByIds(@NonNull Long... ids);
 
     /**
      * 根据 id 查询账户账本

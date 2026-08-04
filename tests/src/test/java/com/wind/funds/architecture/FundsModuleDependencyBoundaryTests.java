@@ -1,5 +1,6 @@
 package com.wind.funds.architecture;
 
+import com.wind.funds.ledger.service.LedgerService;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
 import org.w3c.dom.Document;
@@ -588,6 +589,23 @@ class FundsModuleDependencyBoundaryTests {
         assertThat(violations)
                 .as("outer modules must not bypass ledger application or posting chains")
                 .isEmpty();
+    }
+
+    /**
+     * 场景：公共账本契约只能创建、查询和变更状态，余额由不可变分录投影产生。
+     * 预期：LedgerService 不再暴露余额直改或删除账本能力。
+     * 红线：任何调用方都不能绕过 posting 与 projection 链路改写账本事实。
+     */
+    @Test
+    void testLedgerServiceShouldNotExposeDirectBalanceMutationOrDeletion() {
+        List<String> methodNames = Stream.of(LedgerService.class.getDeclaredMethods())
+                .map(java.lang.reflect.Method::getName)
+                .toList();
+
+        assertThat(methodNames).doesNotContain(
+                "updateLedgerBalance",
+                "deleteLedgerById",
+                "deleteLedgerByIds");
     }
 
     /**

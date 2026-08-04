@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.payout.impl;
 
-import com.alibaba.fastjson2.JSON;
+import com.wind.jackson.WindJson;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
@@ -141,7 +141,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setReconciliationRunResultSn(gateDecision.getReconciliationRunResultSn());
         order.setReconciliationResultDigest(gateDecision.getReconciliationResultDigest());
         order.setAdmissionDecisionDigest(admission.getDecisionDigest());
-        order.setAdmissionEvidenceRefs(JSON.toJSONString(admission.getEvidenceRefs()));
+        order.setAdmissionEvidenceRefs(WindJson.toJsonString(admission.getEvidenceRefs()));
         order.setSubmitDigest(submitDigest);
         order.setSubmittedBy(operator.getOperatorAsText());
         order.setSubmittedTime(LocalDateTime.now());
@@ -520,7 +520,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     }
 
     private List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? JSON.parseArray(value, String.class) : List.of();
+        return StringUtils.hasText(value) ? WindJson.parseArray(value, String.class) : List.of();
     }
 
     private PayoutDisplayStatus displayStatus(PayoutOrderStatus status) {
