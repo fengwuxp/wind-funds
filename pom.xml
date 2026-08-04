@@ -17,7 +17,7 @@
     <version>${revision}</version>
 
     <properties>
-        <revision>1.0.0-jdk21-SNAPSHOT</revision>
+        <revision>1.0.0-SNAPSHOT</revision>
         <test.ignore.failure>false</test.ignore.failure>
     </properties>
 
@@ -136,4 +136,43 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <release>${maven.compiler.source}</release>
+                    <parameters>true</parameters>
+                    <encoding>UTF-8</encoding>
+                    <!--  完整执行所有 annotation processing 阶段 -->
+                    <proc>full</proc>
+                    <annotationProcessorPaths>
+                        <!-- Lombok（需优先于 MapStruct / MyBatis-Flex） -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                        <!-- MapStruct -->
+                        <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                        </path>
+                        <!-- MyBatis-Flex -->
+                        <path>
+                            <groupId>com.mybatis-flex</groupId>
+                            <artifactId>mybatis-flex-processor</artifactId>
+                        </path>
+                        <!-- Spring Boot Configuration Processor -->
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>
