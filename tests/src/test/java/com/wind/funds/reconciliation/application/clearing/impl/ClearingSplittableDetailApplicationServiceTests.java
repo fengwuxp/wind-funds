@@ -257,8 +257,11 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeWhenRouteSnapshotIsMissing() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET route_snapshot = NULL WHERE sn = ?",
-                FUNDS_TRANSACTION_SN);
+        jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET status = ?, refunded_amount = ?, route_snapshot = NULL
+                WHERE sn = ?
+                """, FundsTransactionStatus.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -332,6 +335,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeDirectPayWhenDetailBusinessSnDiffersFromParent() {
+        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ?, refunded_amount = ? WHERE sn = ?",
+                FundsTransactionStatus.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         jdbcTemplate.update("UPDATE t_funds_transaction_detail SET business_sn = ? WHERE sn = ?",
                 OTHER_BUSINESS_SN, FUNDS_TRANSACTION_DETAIL_SN);
         jdbcTemplate.update("UPDATE t_ledger_transaction SET business_sn = ? WHERE sn = ?",
@@ -511,8 +516,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeWhenRefundExists() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET refunded_amount = ? WHERE sn = ?", 100L,
-                FUNDS_TRANSACTION_SN);
+        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ?, refunded_amount = ? WHERE sn = ?",
+                FundsTransactionStatus.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(

@@ -191,7 +191,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
             LedgerEntryDTO entry,
             LedgerTransactionDTO ledgerTransaction,
             ReconciliationGateDecisionDTO reconciliationDecision) {
-        if (transaction.getStatus() != FundsTransactionStatus.CLOSED) {
+        long refundedAmount = defaultAmount(transaction.getRefundedAmount());
+        boolean partiallyRefunded = refundedAmount > 0
+                && transaction.getStatus() == FundsTransactionStatus.OPEN;
+        if (transaction.getStatus() != FundsTransactionStatus.CLOSED && !partiallyRefunded) {
             return ClearingSplittableExclusionReason.TRANSACTION_NOT_ELIGIBLE;
         }
         if (detail.getStatus() != FundsTransactionDetailStatus.SUCCEEDED) {
@@ -212,7 +215,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         if (!isClearingInflowFact(transaction, detail, entry, ledgerTransaction)) {
             return ClearingSplittableExclusionReason.LEDGER_ENTRY_NOT_CLEARING_INFLOW;
         }
-        if (defaultAmount(transaction.getRefundedAmount()) > 0) {
+        if (refundedAmount > 0) {
             return ClearingSplittableExclusionReason.REFUND_EXISTS;
         }
         if (!reconciliationDecision.isPassed()) {
