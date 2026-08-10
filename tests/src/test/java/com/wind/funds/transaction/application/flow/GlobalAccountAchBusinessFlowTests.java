@@ -99,6 +99,7 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -90L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn(CREDIT_BUSINESS_SN, 3, 2, 4);
+        assertLedgerFactsFollowRouteSnapshot(CREDIT_BUSINESS_SN);
 
         String replayTransactionSn = externalFundsEventApplicationService.consume(
                 externalEvent("ACH_EVENT_CONFIRMED_REPLAY_001", CREDIT_FACT_SN, "ACH_CREDIT_CONFIRMED",
@@ -143,6 +144,7 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn(WITHDRAW_BUSINESS_SN, 3, 2, 4);
+        assertLedgerFactsFollowRouteSnapshot(WITHDRAW_BUSINESS_SN);
 
         withdraw(globalAccount, 60L, freezeSn, WITHDRAW_BUSINESS_SN);
         assertOnlyBalanceDeltas(afterWithdraw,

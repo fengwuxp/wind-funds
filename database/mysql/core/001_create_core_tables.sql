@@ -160,7 +160,7 @@ CREATE TABLE `t_payment_instrument_binding`
     `currency`            VARCHAR(10) NOT NULL COMMENT '币种',
     `priority`            INT(11)     NOT NULL DEFAULT 0 COMMENT '路由优先级',
     `is_default`          TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否默认绑定',
-    `state`               VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '绑定生命周期状态',
+    `status`              VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '绑定生命周期状态',
     `version`             INT(11)     NOT NULL DEFAULT 1 COMMENT '绑定版本',
     `valid_from`          DATETIME             DEFAULT NULL COMMENT '生效时间',
     `valid_to`            DATETIME             DEFAULT NULL COMMENT '失效时间',
@@ -171,7 +171,7 @@ CREATE TABLE `t_payment_instrument_binding`
     UNIQUE KEY `uk_payment_instrument_binding_subject` (`tenant_id`, `instrument_sn`, `binding_role`, `subject_type`, `subject_id`, `currency`),
     KEY `idx_payment_instrument_binding_instrument` (`instrument_sn`),
     KEY `idx_payment_instrument_binding_subject` (`subject_type`, `subject_id`),
-    KEY `idx_payment_instrument_binding_state` (`state`)
+    KEY `idx_payment_instrument_binding_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '支付工具绑定表';
 

@@ -18,6 +18,8 @@ import com.wind.core.WritableContextVariables;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -1365,6 +1367,14 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                             .map(LedgerPostingPlan::getSn)
                             .toList();
                     assertThat(transaction.getFundsTransactionSn()).isEqualTo(transactionSn);
+                    assertThat(ledgerTransactionsByFundsTransactionSn(sourceTransactionSn)).singleElement().satisfies(
+                            sourceLedgerTransaction -> {
+                                assertThat(transaction.getReferenceLedgerTransactionSn())
+                                        .isEqualTo(sourceLedgerTransaction.getSn());
+                                assertThat(details).allSatisfy(detail ->
+                                        assertThat(detail.getReferenceLedgerTransactionSn())
+                                                .isEqualTo(sourceLedgerTransaction.getSn()));
+                            });
                     assertThat(transaction.getEventType())
                             .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
                     assertThat(routeSnapshot.getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
@@ -1414,6 +1424,8 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                 assertThat(plan.getBalanceEffectType())
                                         .isEqualTo(replayLeg.getBalanceEffectType().name());
                                 assertThat(plan.getPhaseCode()).isEqualTo(replayLeg.getPhaseCode().name());
+                                assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.FEE_REFUND.name());
+                                assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.FEE.name());
                             });
                     assertThat(postingPlans.stream()
                             .map(LedgerPostingPlan::getPhaseCode)
@@ -1430,8 +1442,14 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                 assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
                                 assertThat(entry.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
                                 assertThat(entry.getPostingPlanSn()).isIn(postingPlanSns);
+                                assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.FEE_REFUND.name());
+                                assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.FEE.name());
                             });
                     RouteLegSpec replayLeg = replayLegs.getFirst();
+                    assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(sourceTransactionSn,
+                            FundsTransactionEventType.FEE_REFUND, replayLeg.getReplayRefLegId(),
+                            replayLeg.getAmount().getCurrency()).getAmount())
+                            .isEqualTo(replayLeg.getAmount().getAmount());
                     assertThat(entries.stream()
                             .map(entry -> new FeeRefundRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
                                     entry.getLedgerSubjectCode(), entry.getEntrySide()))

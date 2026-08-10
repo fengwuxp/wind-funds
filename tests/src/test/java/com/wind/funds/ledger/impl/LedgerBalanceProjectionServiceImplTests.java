@@ -25,7 +25,7 @@ import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.Money;

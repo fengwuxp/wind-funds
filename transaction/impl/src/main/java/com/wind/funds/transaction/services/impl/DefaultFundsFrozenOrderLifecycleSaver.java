@@ -11,16 +11,16 @@ import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableRouteSnapshotSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.sequence.WindSequenceType;
@@ -48,6 +48,8 @@ import java.util.TreeMap;
 @Service
 @AllArgsConstructor
 public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLifecycleRecorder {
+
+    private static final String FROZEN_ORDER_DIGEST_DOMAIN = "transaction.frozen-order.request";
 
     private static final WindSequenceType FUNDS_FROZEN_ORDER_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_FROZEN_ORDER", "FO", 6);
@@ -217,7 +219,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                                    RouteSnapshotSpec routeSnapshot) {
         String requestHash = requestHash(order);
         if (StringUtils.hasText(requestHash)) {
-            AssertUtils.isTrue(Objects.equals(requestHash, computeRequestHash(instruction, routeSnapshot)),
+            Map<String, Object> facts = requestHashFacts(instruction, routeSnapshot);
+            AssertUtils.isTrue(FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                            requestHash, FROZEN_ORDER_DIGEST_DOMAIN, facts, facts),
                     "资金冻结单请求参数不一致，sn = {}", order.getSn());
             return;
         }
@@ -345,6 +349,12 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private String computeRequestHash(FundsInstructionSpec instruction, @Nullable RouteSnapshotSpec routeSnapshot) {
+        return FundsStableHashSupport.sha256CanonicalJson(
+                FROZEN_ORDER_DIGEST_DOMAIN, requestHashFacts(instruction, routeSnapshot));
+    }
+
+    private Map<String, Object> requestHashFacts(FundsInstructionSpec instruction,
+                                                 @Nullable RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> values = new TreeMap<>();
         values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
         values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
@@ -360,7 +370,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableSubjectRef.Fields.subjectType, subjectType(instruction, routeSnapshot));
         values.put(HASH_FIELD_FREEZE_TYPE, resolveFreezeType(instruction));
         values.put(HASH_FIELD_ROUTE, routeHashSummary(routeSnapshot));
-        return FundsStableHashSupport.sha256Json(values);
+        return values;
     }
 
     private Map<String, Object> routeHashSummary(@Nullable RouteSnapshotSpec routeSnapshot) {

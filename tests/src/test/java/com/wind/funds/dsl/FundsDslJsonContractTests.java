@@ -1,6 +1,5 @@
 package com.wind.funds.dsl;
 
-import com.wind.funds.util.FundsDslJsonContractVerifier;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;

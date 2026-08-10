@@ -10,10 +10,10 @@ import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRef
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;

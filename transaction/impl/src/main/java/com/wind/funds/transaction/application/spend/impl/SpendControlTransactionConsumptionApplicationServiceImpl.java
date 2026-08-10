@@ -43,6 +43,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private static final String SHA256_PREFIX = "sha256:";
 
+    private static final String REFUND_COMPENSATION_DIGEST_DOMAIN = "wallet.spend-control.refund-compensation";
+
     private final SpendControlMovementService spendControlMovementService;
 
     private final PaymentInstrumentCapabilityApplicationService paymentInstrumentCapabilityApplicationService;
@@ -624,7 +626,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         digestValues.put("spendRuleVersion", request.getSpendRuleVersion());
         digestValues.put("targetAccountId", targetAccountDigest(request));
         digestValues.put("tenantId", request.getTenantId());
-        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(digestValues);
+        return SHA256_PREFIX + FundsStableHashSupport.sha256CanonicalJson(
+                REFUND_COMPENSATION_DIGEST_DOMAIN, digestValues);
     }
 
     private String targetAccountDigest(SpendControlBusinessConfirmedRefundCompensationRequest request) {

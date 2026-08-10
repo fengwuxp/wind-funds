@@ -6,7 +6,7 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.transaction.core.Money;
 
 import java.math.BigDecimal;

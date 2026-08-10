@@ -3,7 +3,7 @@ package com.wind.funds.route;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;

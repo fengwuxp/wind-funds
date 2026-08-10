@@ -7,6 +7,7 @@ import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
@@ -35,7 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /**
  * 控制额度变动流水服务实现。
@@ -46,6 +49,16 @@ import java.util.Objects;
 @Service
 @AllArgsConstructor
 public class SpendControlMovementServiceImpl implements SpendControlMovementService {
+
+    private static final String SHA256_PREFIX = "sha256:";
+
+    private static final String RESERVATION_DIGEST_DOMAIN = "wallet.spend-control.reservation";
+
+    private static final String CONSUMPTION_DIGEST_DOMAIN = "wallet.spend-control.consumption";
+
+    private static final String RELEASE_DIGEST_DOMAIN = "wallet.spend-control.release";
+
+    private static final String REFUND_COMPENSATION_DIGEST_DOMAIN = "wallet.spend-control.refund-compensation";
 
     private static final int CONTROL_MOVEMENT_QUERY_PAGE_SIZE = 500;
 
@@ -314,9 +327,82 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private void assertSameMovementDigest(RecordSpendControlMovementRequest request,
                                           SpendControlMovementDTO existing) {
-        AssertUtils.isTrue(Objects.equals(existing.getMovementDigest(), request.getMovementDigest()),
+        if (Objects.equals(existing.getMovementDigest(), request.getMovementDigest())) {
+            return;
+        }
+        DigestMigration migration = digestMigration(request);
+        AssertUtils.isTrue(migration != null
+                        && request.getMovementDigest().equals(SHA256_PREFIX
+                        + FundsStableHashSupport.sha256CanonicalJson(migration.domain(), migration.facts()))
+                        && existing.getMovementDigest().equals(SHA256_PREFIX
+                        + FundsStableHashSupport.sha256Json(migration.facts())),
                 "控制额度变动流水已存在但摘要不一致，movementSn = {}",
                 request.getMovementSn());
+    }
+
+    private @Nullable DigestMigration digestMigration(RecordSpendControlMovementRequest request) {
+        return switch (request.getMovementType()) {
+            case RESERVED -> new DigestMigration(RESERVATION_DIGEST_DOMAIN, reservationDigestFacts(request));
+            case CONSUMED -> new DigestMigration(CONSUMPTION_DIGEST_DOMAIN, transactionDigestFacts(request));
+            case RELEASED -> new DigestMigration(RELEASE_DIGEST_DOMAIN, transactionDigestFacts(request));
+            case REFUND_COMPENSATED -> new DigestMigration(
+                    REFUND_COMPENSATION_DIGEST_DOMAIN, refundCompensationDigestFacts(request));
+            default -> null;
+        };
+    }
+
+    private Map<String, Object> reservationDigestFacts(RecordSpendControlMovementRequest request) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("controlScopeId", request.getControlScopeId());
+        values.put("currency", request.getCurrency().name());
+        values.put("instrumentSn", request.getInstrumentSn());
+        values.put("movementSn", request.getMovementSn());
+        values.put("periodId", request.getPeriodId());
+        values.put("spendDecisionSn", request.getSpendDecisionSn());
+        values.put("spendRuleId", request.getSpendRuleId());
+        values.put("spendRuleVersion", request.getSpendRuleVersion());
+        values.put("targetAccountId", targetAccountDigest(request));
+        values.put("tenantId", request.getTenantId());
+        values.put("transactionSn", request.getTransactionSn());
+        return values;
+    }
+
+    private Map<String, Object> transactionDigestFacts(RecordSpendControlMovementRequest request) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("authorizationTransactionSn", request.getTransactionSn());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("currency", request.getCurrency().name());
+        values.put("movementSn", request.getMovementSn());
+        values.put("originalMovementSn", request.getOriginalMovementSn());
+        values.put("tenantId", request.getTenantId());
+        return values;
+    }
+
+    private Map<String, Object> refundCompensationDigestFacts(RecordSpendControlMovementRequest request) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("auditReferenceSn", request.getAuditReferenceSn());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("controlScopeId", request.getControlScopeId());
+        values.put("currency", request.getCurrency().name());
+        values.put("instrumentSn", request.getInstrumentSn());
+        values.put("periodId", request.getPeriodId());
+        values.put("reasonCode", request.getReasonCode());
+        values.put("spendRuleId", request.getSpendRuleId());
+        values.put("spendRuleVersion", request.getSpendRuleVersion());
+        values.put("targetAccountId", targetAccountDigest(request));
+        values.put("tenantId", request.getTenantId());
+        return values;
+    }
+
+    private String targetAccountDigest(RecordSpendControlMovementRequest request) {
+        return request.getTargetAccountId().type() + ":" + request.getTargetAccountId().id();
     }
 
     private Integer lockTargetAccountVersion(RecordSpendControlMovementRequest request,
@@ -615,5 +701,8 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 || FundsSubjectType.CREDIT_ACCOUNT.name().equals(accountId.type());
         AssertUtils.isTrue(supported, "控制额度变动目标只能是资金账户或信用账户，targetAccountId = {}", accountId);
         return FundsSubjectType.valueOf(accountId.type());
+    }
+
+    private record DigestMigration(String domain, Map<String, Object> facts) {
     }
 }

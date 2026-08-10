@@ -1,7 +1,7 @@
 package com.wind.funds.route;
 
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import org.jspecify.annotations.NonNull;

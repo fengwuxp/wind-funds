@@ -6,7 +6,7 @@ import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;

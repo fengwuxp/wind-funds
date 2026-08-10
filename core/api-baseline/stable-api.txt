@@ -1,0 +1,1049 @@
+com.wind.funds.fx.FxAmountConversionRequest	public boolean equals(java.lang.Object);
+com.wind.funds.fx.FxAmountConversionRequest	public class com.wind.funds.fx.FxAmountConversionRequest {
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest setAppliedRate(com.wind.funds.fx.FxAppliedRate);
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest setPriceType(com.wind.funds.fx.FxPriceType);
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest setRoundingMode(java.math.RoundingMode);
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest setSourceAmount(com.wind.transaction.core.Money);
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest setTargetCurrency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAmountConversionRequest();
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxAppliedRate getAppliedRate();
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.funds.fx.FxPriceType getPriceType();
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.transaction.core.Money getSourceAmount();
+com.wind.funds.fx.FxAmountConversionRequest	public com.wind.transaction.core.enums.CurrencyIsoCode getTargetCurrency();
+com.wind.funds.fx.FxAmountConversionRequest	public int hashCode();
+com.wind.funds.fx.FxAmountConversionRequest	public java.lang.String toString();
+com.wind.funds.fx.FxAmountConversionRequest	public java.math.RoundingMode getRoundingMode();
+com.wind.funds.fx.FxAmountConversionResult	public com.wind.funds.fx.FxAmountConversionResult(com.wind.transaction.core.Money, com.wind.transaction.core.Money, com.wind.funds.fx.FxAppliedRate);
+com.wind.funds.fx.FxAmountConversionResult	public com.wind.funds.fx.FxAppliedRate appliedRate();
+com.wind.funds.fx.FxAmountConversionResult	public com.wind.transaction.core.Money sourceAmount();
+com.wind.funds.fx.FxAmountConversionResult	public com.wind.transaction.core.Money targetAmount();
+com.wind.funds.fx.FxAmountConversionResult	public final boolean equals(java.lang.Object);
+com.wind.funds.fx.FxAmountConversionResult	public final class com.wind.funds.fx.FxAmountConversionResult extends java.lang.Record {
+com.wind.funds.fx.FxAmountConversionResult	public final int hashCode();
+com.wind.funds.fx.FxAmountConversionResult	public final java.lang.String toString();
+com.wind.funds.fx.FxAmountConversionService	public abstract com.wind.funds.fx.FxAmountConversionResult calculate(com.wind.funds.fx.FxAmountConversionRequest);
+com.wind.funds.fx.FxAmountConversionService	public interface com.wind.funds.fx.FxAmountConversionService {
+com.wind.funds.fx.FxAppliedRate	public com.wind.funds.fx.FxAppliedRate(java.lang.String, com.wind.transaction.core.enums.CurrencyIsoCode, com.wind.transaction.core.enums.CurrencyIsoCode, java.math.BigDecimal);
+com.wind.funds.fx.FxAppliedRate	public com.wind.transaction.core.enums.CurrencyIsoCode sourceCurrency();
+com.wind.funds.fx.FxAppliedRate	public com.wind.transaction.core.enums.CurrencyIsoCode targetCurrency();
+com.wind.funds.fx.FxAppliedRate	public final boolean equals(java.lang.Object);
+com.wind.funds.fx.FxAppliedRate	public final class com.wind.funds.fx.FxAppliedRate extends java.lang.Record {
+com.wind.funds.fx.FxAppliedRate	public final int hashCode();
+com.wind.funds.fx.FxAppliedRate	public final java.lang.String toString();
+com.wind.funds.fx.FxAppliedRate	public java.lang.String rateId();
+com.wind.funds.fx.FxAppliedRate	public java.math.BigDecimal rate();
+com.wind.funds.fx.FxAppliedRate	public static com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder builder();
+com.wind.funds.fx.FxAppliedRate	public static void validateSupportedPrecision(java.math.BigDecimal);
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public class com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder {
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public com.wind.funds.fx.FxAppliedRate build();
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder rate(java.math.BigDecimal);
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder rateId(java.lang.String);
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder sourceCurrency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder targetCurrency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxAppliedRate$FxAppliedRateBuilder	public java.lang.String toString();
+com.wind.funds.fx.FxPriceType	public final class com.wind.funds.fx.FxPriceType extends java.lang.Enum<com.wind.funds.fx.FxPriceType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.fx.FxPriceType	public java.lang.String getDesc();
+com.wind.funds.fx.FxPriceType	public static com.wind.funds.fx.FxPriceType valueOf(java.lang.String);
+com.wind.funds.fx.FxPriceType	public static com.wind.funds.fx.FxPriceType[] values();
+com.wind.funds.fx.FxPriceType	public static final com.wind.funds.fx.FxPriceType ASK;
+com.wind.funds.fx.FxPriceType	public static final com.wind.funds.fx.FxPriceType BID;
+com.wind.funds.fx.FxPriceType	public static final com.wind.funds.fx.FxPriceType MID;
+com.wind.funds.fx.FxRateProvider	public abstract com.wind.funds.fx.FxRateSnapshot getRateSnapshot(com.wind.transaction.core.enums.CurrencyIsoCode, com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxRateProvider	public interface com.wind.funds.fx.FxRateProvider {
+com.wind.funds.fx.FxRateSnapshot	public com.wind.funds.fx.FxRateSnapshot(java.lang.String, com.wind.transaction.core.enums.CurrencyIsoCode, com.wind.transaction.core.enums.CurrencyIsoCode, java.math.BigDecimal, java.math.BigDecimal, java.math.BigDecimal, java.time.Instant);
+com.wind.funds.fx.FxRateSnapshot	public com.wind.transaction.core.enums.CurrencyIsoCode sourceCurrency();
+com.wind.funds.fx.FxRateSnapshot	public com.wind.transaction.core.enums.CurrencyIsoCode targetCurrency();
+com.wind.funds.fx.FxRateSnapshot	public final boolean equals(java.lang.Object);
+com.wind.funds.fx.FxRateSnapshot	public final class com.wind.funds.fx.FxRateSnapshot extends java.lang.Record {
+com.wind.funds.fx.FxRateSnapshot	public final int hashCode();
+com.wind.funds.fx.FxRateSnapshot	public final java.lang.String toString();
+com.wind.funds.fx.FxRateSnapshot	public java.lang.String snapshotId();
+com.wind.funds.fx.FxRateSnapshot	public java.math.BigDecimal ask();
+com.wind.funds.fx.FxRateSnapshot	public java.math.BigDecimal bid();
+com.wind.funds.fx.FxRateSnapshot	public java.math.BigDecimal mid();
+com.wind.funds.fx.FxRateSnapshot	public java.time.Instant observedAt();
+com.wind.funds.fx.FxRateSnapshot	public static com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder builder();
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public class com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder {
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot build();
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder ask(java.math.BigDecimal);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder bid(java.math.BigDecimal);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder mid(java.math.BigDecimal);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder observedAt(java.time.Instant);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder snapshotId(java.lang.String);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder sourceCurrency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder targetCurrency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.fx.FxRateSnapshot$FxRateSnapshotBuilder	public java.lang.String toString();
+com.wind.funds.ledger.LedgerBalanceBucket	public com.wind.funds.ledger.enums.AccountBalancePeriodType periodType();
+com.wind.funds.ledger.LedgerBalanceBucket	public com.wind.funds.ledger.enums.LedgerSubjectCode accountCode();
+com.wind.funds.ledger.LedgerBalanceBucket	public com.wind.transaction.core.Money balance();
+com.wind.funds.ledger.LedgerBalanceBucket	public final boolean equals(java.lang.Object);
+com.wind.funds.ledger.LedgerBalanceBucket	public final class com.wind.funds.ledger.LedgerBalanceBucket extends java.lang.Record {
+com.wind.funds.ledger.LedgerBalanceBucket	public final int hashCode();
+com.wind.funds.ledger.LedgerBalanceBucket	public final java.lang.String toString();
+com.wind.funds.ledger.LedgerBalanceBucket	public java.lang.String periodId();
+com.wind.funds.ledger.LedgerBalanceBucket	public static com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder builder();
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public class com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder {
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket build();
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder accountCode(com.wind.funds.ledger.enums.LedgerSubjectCode);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder activeTime(java.time.LocalDateTime);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder balance(com.wind.transaction.core.Money);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder expireTime(java.time.LocalDateTime);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder periodId(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder periodType(com.wind.funds.ledger.enums.AccountBalancePeriodType);
+com.wind.funds.ledger.LedgerBalanceBucket$LedgerBalanceBucketBuilder	public java.lang.String toString();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public class com.wind.funds.ledger.LedgerBalanceChangedEvent {
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.Long getBalance();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.Long getBalanceDelta();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.Long getBeforeBalance();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.Long getLedgerId();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getBusinessScene();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getBusinessSn();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getLedgerEntryDigest();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getLedgerEntrySn();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getLedgerTransactionSn();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getSubjectId();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.lang.String getSubjectType();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.ledger.LedgerBalanceChangedEvent	public static com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder builder();
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public class com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder {
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent build();
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder balance(java.lang.Long);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder balanceDelta(java.lang.Long);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder beforeBalance(java.lang.Long);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder businessScene(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder businessSn(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder contextVariables(java.util.Map<java.lang.String, java.lang.Object>);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder currency(com.wind.transaction.core.enums.CurrencyIsoCode);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder ledgerEntryDigest(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder ledgerEntrySn(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder ledgerId(java.lang.Long);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder ledgerSubjectCode(com.wind.funds.ledger.enums.LedgerSubjectCode);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder ledgerTransactionSn(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder subjectId(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder subjectType(java.lang.String);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder transactionTime(java.time.LocalDateTime);
+com.wind.funds.ledger.LedgerBalanceChangedEvent$LedgerBalanceChangedEventBuilder	public java.lang.String toString();
+com.wind.funds.ledger.LedgerBalanceProjectionService	public abstract boolean supports(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.ledger.LedgerBalanceProjectionService	public abstract void project(java.util.List<com.wind.funds.ledger.spec.LedgerEntrySpec>, com.wind.funds.ledger.enums.LedgerPostingAccessType);
+com.wind.funds.ledger.LedgerBalanceProjectionService	public default void project(java.util.List<com.wind.funds.ledger.spec.LedgerEntrySpec>);
+com.wind.funds.ledger.LedgerBalanceProjectionService	public interface com.wind.funds.ledger.LedgerBalanceProjectionService {
+com.wind.funds.ledger.LedgerBalanceView	public abstract com.wind.funds.wallet.FundsAccountId getAccountId();
+com.wind.funds.ledger.LedgerBalanceView	public abstract com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
+com.wind.funds.ledger.LedgerBalanceView	public abstract java.util.Map<com.wind.funds.ledger.enums.LedgerSubjectCode, com.wind.funds.ledger.LedgerBalanceBucket> getBalanceBuckets();
+com.wind.funds.ledger.LedgerBalanceView	public default com.wind.funds.ledger.LedgerBalanceBucket getBalanceBucket(com.wind.funds.ledger.enums.LedgerSubjectCode);
+com.wind.funds.ledger.LedgerBalanceView	public default com.wind.funds.ledger.LedgerBalanceBucket getBalanceBucketNullable(com.wind.funds.ledger.enums.LedgerSubjectCode);
+com.wind.funds.ledger.LedgerBalanceView	public default com.wind.transaction.core.Money getBalance(com.wind.funds.ledger.enums.LedgerSubjectCode);
+com.wind.funds.ledger.LedgerBalanceView	public interface com.wind.funds.ledger.LedgerBalanceView {
+com.wind.funds.ledger.LedgerPostingAssembler	public interface com.wind.funds.ledger.LedgerPostingAssembler<R extends com.wind.funds.route.spec.ResolvedRouteSpec> {
+com.wind.funds.ledger.LedgerPostingRejectedException	public class com.wind.funds.ledger.LedgerPostingRejectedException extends java.lang.RuntimeException {
+com.wind.funds.ledger.LedgerPostingRejectedException	public com.wind.funds.ledger.LedgerPostingRejectedException(java.lang.String, java.lang.String);
+com.wind.funds.ledger.LedgerPostingRejectedException	public java.lang.String getFundsTransactionSn();
+com.wind.funds.ledger.LedgerTransactionPostingService	public interface com.wind.funds.ledger.LedgerTransactionPostingService {
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public final class com.wind.funds.ledger.enums.AccountBalancePeriodType extends java.lang.Enum<com.wind.funds.ledger.enums.AccountBalancePeriodType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static com.wind.funds.ledger.enums.AccountBalancePeriodType valueOf(java.lang.String);
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static com.wind.funds.ledger.enums.AccountBalancePeriodType[] values();
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType CUSTOM_CYCLE;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType DAYS;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType HOURLY;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType LIFETIME;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType MONTHLY;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType QUARTERLY;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType WEEKLY;
+com.wind.funds.ledger.enums.AccountBalancePeriodType	public static final com.wind.funds.ledger.enums.AccountBalancePeriodType YEARLY;
+com.wind.funds.ledger.enums.EntrySide	public com.wind.funds.ledger.enums.EntrySide reverse();
+com.wind.funds.ledger.enums.EntrySide	public final class com.wind.funds.ledger.enums.EntrySide extends java.lang.Enum<com.wind.funds.ledger.enums.EntrySide> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.EntrySide	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.EntrySide	public java.lang.String getSymbol();
+com.wind.funds.ledger.enums.EntrySide	public static com.wind.funds.ledger.enums.EntrySide valueOf(java.lang.String);
+com.wind.funds.ledger.enums.EntrySide	public static com.wind.funds.ledger.enums.EntrySide[] values();
+com.wind.funds.ledger.enums.EntrySide	public static final com.wind.funds.ledger.enums.EntrySide CREDIT;
+com.wind.funds.ledger.enums.EntrySide	public static final com.wind.funds.ledger.enums.EntrySide DEBIT;
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public final class com.wind.funds.ledger.enums.LedgerBalanceConstraintType extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerBalanceConstraintType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public static com.wind.funds.ledger.enums.LedgerBalanceConstraintType valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public static com.wind.funds.ledger.enums.LedgerBalanceConstraintType[] values();
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public static final com.wind.funds.ledger.enums.LedgerBalanceConstraintType ALLOW_NEGATIVE;
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public static final com.wind.funds.ledger.enums.LedgerBalanceConstraintType MUST_NOT_BE_NEGATIVE;
+com.wind.funds.ledger.enums.LedgerBalanceConstraintType	public static final com.wind.funds.ledger.enums.LedgerBalanceConstraintType PROFILE_DEFAULT;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public final class com.wind.funds.ledger.enums.LedgerBalanceEffectType extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerBalanceEffectType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static com.wind.funds.ledger.enums.LedgerBalanceEffectType valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static com.wind.funds.ledger.enums.LedgerBalanceEffectType[] values();
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType CONSUME;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType DECREASE;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType HOLD;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType INCREASE;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType RELEASE;
+com.wind.funds.ledger.enums.LedgerBalanceEffectType	public static final com.wind.funds.ledger.enums.LedgerBalanceEffectType RESTORE;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public final class com.wind.funds.ledger.enums.LedgerPhaseCode extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerPhaseCode> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerPhaseCode	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static com.wind.funds.ledger.enums.LedgerPhaseCode valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static com.wind.funds.ledger.enums.LedgerPhaseCode[] values();
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode ADJUSTMENT;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode AUTHORIZATION;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode COMPLETION;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode FEE;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode FREEZE;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode FUND_IN;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode FUND_OUT;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode REFUND;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode REVERSAL;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode SETTLEMENT;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode TRANSFER;
+com.wind.funds.ledger.enums.LedgerPhaseCode	public static final com.wind.funds.ledger.enums.LedgerPhaseCode UNFREEZE;
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public final class com.wind.funds.ledger.enums.LedgerPostingAccessType extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerPostingAccessType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public static com.wind.funds.ledger.enums.LedgerPostingAccessType fromIntent(com.wind.funds.ledger.enums.LedgerPostingIntentType);
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public static com.wind.funds.ledger.enums.LedgerPostingAccessType valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public static com.wind.funds.ledger.enums.LedgerPostingAccessType[] values();
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public static final com.wind.funds.ledger.enums.LedgerPostingAccessType CLOSING;
+com.wind.funds.ledger.enums.LedgerPostingAccessType	public static final com.wind.funds.ledger.enums.LedgerPostingAccessType NORMAL;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public final class com.wind.funds.ledger.enums.LedgerPostingIntentType extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerPostingIntentType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static com.wind.funds.ledger.enums.LedgerPostingIntentType valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static com.wind.funds.ledger.enums.LedgerPostingIntentType[] values();
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType ADJUSTMENT;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType AUTHORIZATION;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType AUTHORIZATION_COMPLETION;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType AUTHORIZATION_REVERSAL;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType FEE;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType FEE_REFUND;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType FEE_REVERSAL;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType HOLD;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType REFUND;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType RELEASE;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType REVERSAL;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType SETTLEMENT;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType TOPUP;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType TRANSFER;
+com.wind.funds.ledger.enums.LedgerPostingIntentType	public static final com.wind.funds.ledger.enums.LedgerPostingIntentType WITHDRAWAL;
+com.wind.funds.ledger.enums.LedgerPostingRole	public final class com.wind.funds.ledger.enums.LedgerPostingRole extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerPostingRole> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerPostingRole	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerPostingRole	public static com.wind.funds.ledger.enums.LedgerPostingRole valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerPostingRole	public static com.wind.funds.ledger.enums.LedgerPostingRole[] values();
+com.wind.funds.ledger.enums.LedgerPostingRole	public static final com.wind.funds.ledger.enums.LedgerPostingRole AGGREGATE_VIEW;
+com.wind.funds.ledger.enums.LedgerPostingRole	public static final com.wind.funds.ledger.enums.LedgerPostingRole DETAIL;
+com.wind.funds.ledger.enums.LedgerPostingRole	public static final com.wind.funds.ledger.enums.LedgerPostingRole PARENT_CONTROL;
+com.wind.funds.ledger.enums.LedgerPostingRole	public static final com.wind.funds.ledger.enums.LedgerPostingRole TRANSFER_IN;
+com.wind.funds.ledger.enums.LedgerPostingRole	public static final com.wind.funds.ledger.enums.LedgerPostingRole TRANSFER_OUT;
+com.wind.funds.ledger.enums.LedgerPostingScope	public final class com.wind.funds.ledger.enums.LedgerPostingScope extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerPostingScope> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerPostingScope	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerPostingScope	public static com.wind.funds.ledger.enums.LedgerPostingScope valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerPostingScope	public static com.wind.funds.ledger.enums.LedgerPostingScope[] values();
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope ADJUSTMENT;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope BETWEEN_SUBJECTS;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope CONTROL_CONSUME;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope CONTROL_HOLD;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope CONTROL_RELEASE;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope FEE;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope PLATFORM_EXTERNAL;
+com.wind.funds.ledger.enums.LedgerPostingScope	public static final com.wind.funds.ledger.enums.LedgerPostingScope WITHIN_SUBJECT;
+com.wind.funds.ledger.enums.LedgerProfileCode	public final class com.wind.funds.ledger.enums.LedgerProfileCode extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerProfileCode> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerProfileCode	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerProfileCode	public static com.wind.funds.ledger.enums.LedgerProfileCode valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerProfileCode	public static com.wind.funds.ledger.enums.LedgerProfileCode[] values();
+com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode BUDGET_BASIC;
+com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode CREDIT_BASIC;
+com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_BASIC;
+com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_MERCHANT;
+com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_PLATFORM;
+com.wind.funds.ledger.enums.LedgerStatus	public boolean isOpenForClosingPosting();
+com.wind.funds.ledger.enums.LedgerStatus	public boolean isOpenForNewPosting();
+com.wind.funds.ledger.enums.LedgerStatus	public final class com.wind.funds.ledger.enums.LedgerStatus extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerStatus	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerStatus	public static com.wind.funds.ledger.enums.LedgerStatus valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerStatus	public static com.wind.funds.ledger.enums.LedgerStatus[] values();
+com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus ACTIVE;
+com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus CLOSED;
+com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus SUSPENDED;
+com.wind.funds.ledger.enums.LedgerStatus	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus);
+com.wind.funds.ledger.enums.LedgerStatus	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus, com.wind.funds.ledger.enums.LedgerPostingAccessType);
+com.wind.funds.ledger.enums.LedgerStatus	public static void assertTransitionAllowed(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus, com.wind.funds.ledger.enums.LedgerStatus);
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public com.wind.funds.ledger.enums.EntrySide getNormalBalance();
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public final class com.wind.funds.ledger.enums.LedgerSubjectCategory extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerSubjectCategory> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static com.wind.funds.ledger.enums.LedgerSubjectCategory valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static com.wind.funds.ledger.enums.LedgerSubjectCategory[] values();
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory ASSET;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory CLEARING;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory CONTROL;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory EQUITY;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory EXPENSE;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory LIABILITY;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory MEMO;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory REVENUE;
+com.wind.funds.ledger.enums.LedgerSubjectCategory	public static final com.wind.funds.ledger.enums.LedgerSubjectCategory SUSPENSE;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public final class com.wind.funds.ledger.enums.LedgerSubjectCode extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerSubjectCode> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerSubjectCode	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static com.wind.funds.ledger.enums.LedgerSubjectCode valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static com.wind.funds.ledger.enums.LedgerSubjectCode[] values();
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode ADJUSTMENT;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode AUTHORIZATION;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode AVAILABLE;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode CASH;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode CLEARING;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode DEFERRED_REVENUE;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode FEE;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode FROZEN;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode IN_TRANSIT;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode LIMIT;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode OUTSTANDING;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode PREPAYMENT;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode RISK_RESERVE;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode SETTLEMENT;
+com.wind.funds.ledger.enums.LedgerSubjectCode	public static final com.wind.funds.ledger.enums.LedgerSubjectCode SUSPENSE;
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.funds.ledger.enums.EntrySide getEntryType();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.funds.ledger.enums.LedgerPostingRole getPostingRole();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCategory getLedgerSubjectCategory();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.transaction.core.Money getAmount();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract com.wind.transaction.core.Money getOriginalAmount();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getDescription();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getLedgerTransactionSn();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getSubjectId();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.lang.String getSubjectType();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.math.BigDecimal getExchangeRate();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.AccountBalancePeriodType getPeriodType();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.EntrySide getEntrySide();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.LedgerBalanceConstraintType getBalanceConstraintType();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.LedgerBalanceEffectType getBalanceEffectType();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.LedgerPhaseCode getPhaseCode();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.LedgerPostingIntentType getIntent();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.funds.ledger.enums.LedgerPostingScope getPostingScope();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default java.lang.Long getLedgerId();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default java.lang.String getPeriodId();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default java.lang.String getPostingPlanSn();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public default java.lang.String getSha256();
+com.wind.funds.ledger.spec.LedgerEntrySpec	public interface com.wind.funds.ledger.spec.LedgerEntrySpec {
+com.wind.funds.ledger.spec.LedgerPostingPhaseSpec	public abstract com.wind.funds.ledger.enums.LedgerPhaseCode getPhaseCode();
+com.wind.funds.ledger.spec.LedgerPostingPhaseSpec	public abstract java.util.List<com.wind.funds.ledger.spec.LedgerEntrySpec> getEntries();
+com.wind.funds.ledger.spec.LedgerPostingPhaseSpec	public interface com.wind.funds.ledger.spec.LedgerPostingPhaseSpec {
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public abstract com.wind.funds.ledger.enums.LedgerPostingIntentType getIntent();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public abstract java.lang.String getLedgerTransactionSn();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public abstract java.lang.String getPlanId();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public abstract java.util.List<com.wind.funds.ledger.spec.LedgerPostingPhaseSpec> getPostingPhases();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default boolean isBalanced();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default boolean isPhased();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.funds.ledger.enums.LedgerBalanceEffectType getBalanceEffectType();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.funds.ledger.enums.LedgerPostingAccessType getPostingAccessType();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.funds.ledger.enums.LedgerPostingScope getPostingScope();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.transaction.core.Money getAmount();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.transaction.core.Money getTotalCreditAmount();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default com.wind.transaction.core.Money getTotalDebitAmount();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.lang.String getDescription();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.lang.String getRouteLegId();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.util.List<com.wind.funds.ledger.spec.LedgerEntrySpec> getEntries();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public interface com.wind.funds.ledger.spec.LedgerPostingPlanSpec {
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.AccountBalancePeriodType getPeriodType();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.EntrySide getNormalBalanceSide();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCategory getLedgerSubjectCategory();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.Boolean getAllowNegative();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.Boolean getRequired();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.String getDescription();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.String getSettlementPolicy();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.time.LocalTime getCutOffTime();
+com.wind.funds.ledger.spec.LedgerProfileItemSpec	public interface com.wind.funds.ledger.spec.LedgerProfileItemSpec {
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getProfileCode();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract com.wind.funds.route.enums.FundsSubjectType getSubjectType();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.Integer getProfileVersion();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getDescription();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getProfileName();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getStatus();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.util.List<? extends com.wind.funds.ledger.spec.LedgerProfileItemSpec> getItems();
+com.wind.funds.ledger.spec.LedgerProfileSpec	public interface com.wind.funds.ledger.spec.LedgerProfileSpec {
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract com.wind.transaction.core.Money getAmount();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.Long getTenantId();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.String getDescription();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.String getReferenceLedgerTransactionSn();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.String getSn();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.util.List<com.wind.funds.ledger.spec.LedgerPostingPlanSpec> getPostingPlans();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default boolean isBalanced();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.funds.transaction.enums.DefaultFundsTransactionType getTransactionType();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.funds.transaction.enums.FundsInstructionType getInstructionType();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.transaction.core.Money getOriginalAmount();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.transaction.core.Money getTotalCreditAmount();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.transaction.core.Money getTotalDebitAmount();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default java.lang.String getFundsTransactionSn();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public default java.math.BigDecimal getExchangeRate();
+com.wind.funds.ledger.spec.LedgerTransactionSpec	public interface com.wind.funds.ledger.spec.LedgerTransactionSpec {
+com.wind.funds.ledger.spec.SettlementPolicySpec	public com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode getSettlementMode();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public final class com.wind.funds.ledger.spec.SettlementPolicySpec {
+com.wind.funds.ledger.spec.SettlementPolicySpec	public int getInterval();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public java.lang.Integer getEndParam();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public java.lang.Integer getParam();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public java.lang.String getRangeId();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public java.lang.String getRaw();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public java.lang.String toString();
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static com.wind.funds.ledger.spec.SettlementPolicySpec parse(java.lang.String);
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec BILLING_CYCLE_5_4;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec D1;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec MONTHLY_END;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec MONTHLY_FIRST_DAY;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec MONTHLY_MID;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec QUARTERLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec QUARTERLY_END;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec RT;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec T1;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec T2;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec T3;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec T7;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec WEEKLY_FRIDAY;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec WEEKLY_MONDAY;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec YEARLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec	public static final com.wind.funds.ledger.spec.SettlementPolicySpec YEARLY_JAN1;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementHolidayCalendar	public abstract boolean isHoliday(java.time.LocalDate);
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementHolidayCalendar	public interface com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementHolidayCalendar {
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public final class com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode extends java.lang.Enum<com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode> {
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public java.lang.String getPrefix();
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode valueOf(java.lang.String);
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode[] values();
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode CUSTOM_CYCLE;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode CUSTOM_RANGE;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode DAILY_AT;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode DELAY_DAYS;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode DELAY_NATURAL_DAYS;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode HOURLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode MONTHLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode QUARTERLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode REALTIME;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode WEEKLY;
+com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode	public static final com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementMode YEARLY;
+com.wind.funds.route.RouteResolver	public abstract boolean supports(com.wind.funds.transaction.spec.FundsInstructionSpec);
+com.wind.funds.route.RouteResolver	public abstract com.wind.funds.route.spec.ResolvedRouteSpec resolve(com.wind.funds.transaction.spec.FundsInstructionSpec);
+com.wind.funds.route.RouteResolver	public interface com.wind.funds.route.RouteResolver {
+com.wind.funds.route.RouteSnapshotFactory	public abstract com.wind.funds.route.spec.RouteSnapshotSpec createSnapshot(com.wind.funds.route.spec.ResolvedRouteSpec);
+com.wind.funds.route.RouteSnapshotFactory	public interface com.wind.funds.route.RouteSnapshotFactory {
+com.wind.funds.route.enums.FundsSubjectType	public boolean isLedgerPostable();
+com.wind.funds.route.enums.FundsSubjectType	public final class com.wind.funds.route.enums.FundsSubjectType extends java.lang.Enum<com.wind.funds.route.enums.FundsSubjectType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.FundsSubjectType	public java.lang.String getDesc();
+com.wind.funds.route.enums.FundsSubjectType	public static boolean isLedgerPostableName(java.lang.String);
+com.wind.funds.route.enums.FundsSubjectType	public static com.wind.funds.route.enums.FundsSubjectType valueOf(java.lang.String);
+com.wind.funds.route.enums.FundsSubjectType	public static com.wind.funds.route.enums.FundsSubjectType[] values();
+com.wind.funds.route.enums.FundsSubjectType	public static final com.wind.funds.route.enums.FundsSubjectType CREDIT_ACCOUNT;
+com.wind.funds.route.enums.FundsSubjectType	public static final com.wind.funds.route.enums.FundsSubjectType FUNDING_ACCOUNT;
+com.wind.funds.route.enums.RouteLegType	public final class com.wind.funds.route.enums.RouteLegType extends java.lang.Enum<com.wind.funds.route.enums.RouteLegType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteLegType	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteLegType	public static com.wind.funds.route.enums.RouteLegType valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteLegType	public static com.wind.funds.route.enums.RouteLegType[] values();
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType ADJUST;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType CONSUME;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType EXTERNAL_IN;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType EXTERNAL_OUT;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType HOLD;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType INTERNAL_TRANSFER;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType RELEASE;
+com.wind.funds.route.enums.RouteLegType	public static final com.wind.funds.route.enums.RouteLegType RESTORE;
+com.wind.funds.route.enums.RouteNodeRole	public final class com.wind.funds.route.enums.RouteNodeRole extends java.lang.Enum<com.wind.funds.route.enums.RouteNodeRole> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteNodeRole	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteNodeRole	public static com.wind.funds.route.enums.RouteNodeRole valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteNodeRole	public static com.wind.funds.route.enums.RouteNodeRole[] values();
+com.wind.funds.route.enums.RouteNodeRole	public static final com.wind.funds.route.enums.RouteNodeRole SOURCE;
+com.wind.funds.route.enums.RouteNodeRole	public static final com.wind.funds.route.enums.RouteNodeRole TARGET;
+com.wind.funds.route.enums.RouteNodeType	public final class com.wind.funds.route.enums.RouteNodeType extends java.lang.Enum<com.wind.funds.route.enums.RouteNodeType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteNodeType	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteNodeType	public static com.wind.funds.route.enums.RouteNodeType valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteNodeType	public static com.wind.funds.route.enums.RouteNodeType[] values();
+com.wind.funds.route.enums.RouteNodeType	public static final com.wind.funds.route.enums.RouteNodeType EXTERNAL_ACCOUNT;
+com.wind.funds.route.enums.RouteNodeType	public static final com.wind.funds.route.enums.RouteNodeType PAYMENT_INSTRUMENT;
+com.wind.funds.route.enums.RouteNodeType	public static final com.wind.funds.route.enums.RouteNodeType PLATFORM_FUNDING_ACCOUNT;
+com.wind.funds.route.enums.RouteNodeType	public static final com.wind.funds.route.enums.RouteNodeType SUBJECT;
+com.wind.funds.route.enums.RouteParticipantRole	public final class com.wind.funds.route.enums.RouteParticipantRole extends java.lang.Enum<com.wind.funds.route.enums.RouteParticipantRole> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteParticipantRole	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteParticipantRole	public static com.wind.funds.route.enums.RouteParticipantRole valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteParticipantRole	public static com.wind.funds.route.enums.RouteParticipantRole[] values();
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole AUTH_HOLDER;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole BUDGET_CONTROLLER;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole EXTERNAL_COUNTERPARTY;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole FEE_RECEIVER;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole PAYEE;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole PAYER;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole PLATFORM_FUNDING_ACCOUNT;
+com.wind.funds.route.enums.RouteParticipantRole	public static final com.wind.funds.route.enums.RouteParticipantRole REAL_FUNDING_SOURCE;
+com.wind.funds.route.enums.RouteReplayPolicy	public final class com.wind.funds.route.enums.RouteReplayPolicy extends java.lang.Enum<com.wind.funds.route.enums.RouteReplayPolicy> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteReplayPolicy	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteReplayPolicy	public static com.wind.funds.route.enums.RouteReplayPolicy valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteReplayPolicy	public static com.wind.funds.route.enums.RouteReplayPolicy[] values();
+com.wind.funds.route.enums.RouteReplayPolicy	public static final com.wind.funds.route.enums.RouteReplayPolicy FULL_ONLY;
+com.wind.funds.route.enums.RouteReplayPolicy	public static final com.wind.funds.route.enums.RouteReplayPolicy NON_REPLAYABLE;
+com.wind.funds.route.enums.RouteReplayPolicy	public static final com.wind.funds.route.enums.RouteReplayPolicy PARTIAL_ALLOWED;
+com.wind.funds.route.enums.RouteReplayPolicy	public static final com.wind.funds.route.enums.RouteReplayPolicy REPLAY_ONCE;
+com.wind.funds.route.enums.RouteReplayType	public final class com.wind.funds.route.enums.RouteReplayType extends java.lang.Enum<com.wind.funds.route.enums.RouteReplayType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.route.enums.RouteReplayType	public java.lang.String getDesc();
+com.wind.funds.route.enums.RouteReplayType	public static com.wind.funds.route.enums.RouteReplayType valueOf(java.lang.String);
+com.wind.funds.route.enums.RouteReplayType	public static com.wind.funds.route.enums.RouteReplayType[] values();
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType AUTHORIZATION_COMPLETION;
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType AUTHORIZATION_REFUND;
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType FEE_REFUND;
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType REFUND;
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType RELEASE_HOLD;
+com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType UNFREEZE;
+com.wind.funds.route.ref.ExternalAccountRefSpec	public abstract java.lang.String getExternalAccountId();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public abstract java.lang.String getExternalAccountType();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getChannelCode();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getCountryCode();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getCurrency();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getDescription();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getExternalAccountNo();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getProviderCode();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public interface com.wind.funds.route.ref.ExternalAccountRefSpec {
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getInstrumentId();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getInstrumentNo();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getInstrumentType();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getOwnerId();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getOwnerType();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.Long getTenantId();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getCurrency();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getDescription();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getStatus();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.util.Map<java.lang.String, java.lang.Object> getBindingSnapshot();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public interface com.wind.funds.route.ref.PaymentInstrumentRefSpec {
+com.wind.funds.route.ref.SubjectRef	public abstract com.wind.funds.route.enums.FundsSubjectType getSubjectType();
+com.wind.funds.route.ref.SubjectRef	public abstract java.lang.Long getTenantId();
+com.wind.funds.route.ref.SubjectRef	public abstract java.lang.String getSubjectId();
+com.wind.funds.route.ref.SubjectRef	public default java.lang.String getCurrency();
+com.wind.funds.route.ref.SubjectRef	public default java.lang.String getLedgerProfileCode();
+com.wind.funds.route.ref.SubjectRef	public default java.lang.String getSubjectName();
+com.wind.funds.route.ref.SubjectRef	public interface com.wind.funds.route.ref.SubjectRef {
+com.wind.funds.route.spec.AccountHierarchySnapshotSpec	public abstract com.wind.funds.route.ref.SubjectRef getParentAccountRef();
+com.wind.funds.route.spec.AccountHierarchySnapshotSpec	public abstract java.lang.String getRelationSn();
+com.wind.funds.route.spec.AccountHierarchySnapshotSpec	public interface com.wind.funds.route.spec.AccountHierarchySnapshotSpec {
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getAdjustmentFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getCashFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getClearingFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getFeeFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getPrepaymentFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public default com.wind.funds.route.ref.SubjectRef getSettlementFundingAccount();
+com.wind.funds.route.spec.PlatformAccountsSnapshotSpec	public interface com.wind.funds.route.spec.PlatformAccountsSnapshotSpec {
+com.wind.funds.route.spec.ReplayRequestSpec	public abstract com.wind.funds.route.enums.RouteReplayType getReplayType();
+com.wind.funds.route.spec.ReplayRequestSpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.route.spec.ReplayRequestSpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.route.spec.ReplayRequestSpec	public default com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
+com.wind.funds.route.spec.ReplayRequestSpec	public default com.wind.integration.operator.WindOperator getOperator();
+com.wind.funds.route.spec.ReplayRequestSpec	public default com.wind.transaction.core.Money getAmount();
+com.wind.funds.route.spec.ReplayRequestSpec	public default com.wind.transaction.core.Money getOriginalAmount();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.lang.String getDescription();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.lang.String getReferenceBusinessSn();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.lang.String getReferenceSnapshotId();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.math.BigDecimal getExchangeRate();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.util.List<java.lang.String> getReplayLegIds();
+com.wind.funds.route.spec.ReplayRequestSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.ReplayRequestSpec	public interface com.wind.funds.route.spec.ReplayRequestSpec {
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract com.wind.funds.transaction.enums.DefaultFundsTransactionType getTransactionType();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract com.wind.funds.transaction.enums.FundsInstructionType getInstructionType();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.lang.Long getTenantId();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.lang.String getRouteCode();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.lang.String getRouteVersion();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.util.List<com.wind.funds.route.spec.RouteLegSpec> getLegs();
+com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.util.List<com.wind.funds.route.spec.RouteParticipantSpec> getParticipants();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default com.wind.funds.route.ref.ExternalAccountRefSpec getExternalAccountRef();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default com.wind.funds.route.ref.PaymentInstrumentRefSpec getPaymentInstrumentRef();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default com.wind.funds.route.spec.PlatformAccountsSnapshotSpec getPlatformAccounts();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default com.wind.funds.route.spec.RoutingDecisionSpec getRoutingDecision();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default java.lang.String getDescription();
+com.wind.funds.route.spec.ResolvedRouteSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.ResolvedRouteSpec	public interface com.wind.funds.route.spec.ResolvedRouteSpec {
+com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.funds.route.enums.RouteLegType getLegType();
+com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.funds.route.spec.RouteNodeSpec getSourceNode();
+com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.funds.route.spec.RouteNodeSpec getTargetNode();
+com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.transaction.core.Money getAmount();
+com.wind.funds.route.spec.RouteLegSpec	public abstract java.lang.String getLegId();
+com.wind.funds.route.spec.RouteLegSpec	public default com.wind.funds.route.enums.RouteReplayPolicy getReplayPolicy();
+com.wind.funds.route.spec.RouteLegSpec	public default com.wind.transaction.core.Money getOriginalAmount();
+com.wind.funds.route.spec.RouteLegSpec	public default int getSequence();
+com.wind.funds.route.spec.RouteLegSpec	public default java.lang.String getDescription();
+com.wind.funds.route.spec.RouteLegSpec	public default java.lang.String getReplayRefLegId();
+com.wind.funds.route.spec.RouteLegSpec	public default java.math.BigDecimal getExchangeRate();
+com.wind.funds.route.spec.RouteLegSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.RouteLegSpec	public interface com.wind.funds.route.spec.RouteLegSpec {
+com.wind.funds.route.spec.RouteNodeSpec	public abstract com.wind.funds.route.enums.RouteNodeRole getNodeRole();
+com.wind.funds.route.spec.RouteNodeSpec	public abstract com.wind.funds.route.enums.RouteNodeType getNodeType();
+com.wind.funds.route.spec.RouteNodeSpec	public abstract com.wind.funds.route.ref.SubjectRef getSubjectRef();
+com.wind.funds.route.spec.RouteNodeSpec	public interface com.wind.funds.route.spec.RouteNodeSpec {
+com.wind.funds.route.spec.RouteParticipantSpec	public abstract com.wind.funds.route.enums.RouteParticipantRole getParticipantRole();
+com.wind.funds.route.spec.RouteParticipantSpec	public abstract com.wind.funds.route.ref.SubjectRef getSubjectRef();
+com.wind.funds.route.spec.RouteParticipantSpec	public default com.wind.funds.route.spec.AccountHierarchySnapshotSpec getAccountHierarchySnapshot();
+com.wind.funds.route.spec.RouteParticipantSpec	public default com.wind.transaction.core.Money getAmount();
+com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getCurrency();
+com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getDescription();
+com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getLedgerProfileCode();
+com.wind.funds.route.spec.RouteParticipantSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.RouteParticipantSpec	public interface com.wind.funds.route.spec.RouteParticipantSpec {
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract com.wind.funds.transaction.enums.DefaultFundsTransactionType getTransactionType();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract com.wind.funds.transaction.enums.FundsInstructionType getInstructionType();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.Long getTenantId();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getRouteCode();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getRouteVersion();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getSnapshotId();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.lang.String getSnapshotSchemaVersion();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.util.List<com.wind.funds.route.spec.RouteLegSpec> getLegs();
+com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.util.List<com.wind.funds.route.spec.RouteParticipantSpec> getParticipants();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default com.wind.funds.route.ref.ExternalAccountRefSpec getExternalAccountRef();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default com.wind.funds.route.ref.PaymentInstrumentRefSpec getPaymentInstrumentRef();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default com.wind.funds.route.spec.PlatformAccountsSnapshotSpec getPlatformAccounts();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default com.wind.funds.route.spec.RoutingDecisionSpec getRoutingDecision();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default java.lang.String getDescription();
+com.wind.funds.route.spec.RouteSnapshotSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.RouteSnapshotSpec	public interface com.wind.funds.route.spec.RouteSnapshotSpec {
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.lang.String getDecisionReason();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.lang.String getPolicyCode();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.lang.String getSelectedCashFundingAccount();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.lang.String getSelectedPlatformAccount();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.lang.String getSelectedProcessor();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.util.List<java.lang.String> getMatchedRules();
+com.wind.funds.route.spec.RoutingDecisionSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.route.spec.RoutingDecisionSpec	public interface com.wind.funds.route.spec.RoutingDecisionSpec {
+com.wind.funds.route.support.ExternalAccountSensitiveValueValidator	public final class com.wind.funds.route.support.ExternalAccountSensitiveValueValidator {
+com.wind.funds.route.support.ExternalAccountSensitiveValueValidator	public static boolean containsSensitiveContextField(java.util.Map<java.lang.String, java.lang.Object>);
+com.wind.funds.route.support.ExternalAccountSensitiveValueValidator	public static boolean containsSensitiveContextVariables(java.lang.String);
+com.wind.funds.route.support.ExternalAccountSensitiveValueValidator	public static boolean isRawSensitiveExternalAccountNo(java.lang.String);
+com.wind.funds.transaction.FundsInstructionOrchestrator	public abstract boolean supports(java.lang.Class<E>);
+com.wind.funds.transaction.FundsInstructionOrchestrator	public abstract java.lang.String execute(E);
+com.wind.funds.transaction.FundsInstructionOrchestrator	public interface com.wind.funds.transaction.FundsInstructionOrchestrator<E extends com.wind.funds.transaction.spec.FundsInstructionSpec> {
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public final class com.wind.funds.transaction.enums.DefaultFundsTransactionType extends java.lang.Enum<com.wind.funds.transaction.enums.DefaultFundsTransactionType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public java.lang.String asEventType();
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static boolean isValidInstructionCombination(com.wind.funds.transaction.enums.FundsInstructionType, com.wind.funds.transaction.enums.FundsTransactionEventType, com.wind.funds.transaction.enums.DefaultFundsTransactionType);
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static com.wind.funds.transaction.enums.DefaultFundsTransactionType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static com.wind.funds.transaction.enums.DefaultFundsTransactionType[] values();
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType ADJUSTMENT;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType BALANCE_CONTROL;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType CLEARING;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType FEE;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType PAY;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType PAYOUT;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType REFUND;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType SETTLEMENT;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType TOPUP;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType TRANSFER;
+com.wind.funds.transaction.enums.DefaultFundsTransactionType	public static final com.wind.funds.transaction.enums.DefaultFundsTransactionType WITHDRAW;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public final class com.wind.funds.transaction.enums.FundsBenefitFundingNature extends java.lang.Enum<com.wind.funds.transaction.enums.FundsBenefitFundingNature> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static com.wind.funds.transaction.enums.FundsBenefitFundingNature valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static com.wind.funds.transaction.enums.FundsBenefitFundingNature[] values();
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature MERCHANT_BORNE;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature NO_FUNDS_TRANSFER;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature PARTNER_FUNDED;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature PLATFORM_OWN_FUNDS;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature PREPAID_LIABILITY;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature UNKNOWN_PENDING_CONFIRMATION;
+com.wind.funds.transaction.enums.FundsBenefitFundingNature	public static final com.wind.funds.transaction.enums.FundsBenefitFundingNature USER_BENEFIT_BALANCE;
+com.wind.funds.transaction.enums.FundsEffectType	public final class com.wind.funds.transaction.enums.FundsEffectType extends java.lang.Enum<com.wind.funds.transaction.enums.FundsEffectType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsEffectType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsEffectType	public static com.wind.funds.transaction.enums.FundsEffectType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsEffectType	public static com.wind.funds.transaction.enums.FundsEffectType[] values();
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType ADJUST;
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType CONSUME;
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType DIRECT;
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType HOLD;
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType RELEASE;
+com.wind.funds.transaction.enums.FundsEffectType	public static final com.wind.funds.transaction.enums.FundsEffectType RETURN;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public final class com.wind.funds.transaction.enums.FundsInstructionReferenceType extends java.lang.Enum<com.wind.funds.transaction.enums.FundsInstructionReferenceType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static com.wind.funds.transaction.enums.FundsInstructionReferenceType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static com.wind.funds.transaction.enums.FundsInstructionReferenceType[] values();
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType AUTHORIZATION;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType EXTERNAL_TRANSACTION;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType FEE;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType FREEZE_ORDER;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType ORIGINAL_TRANSACTION;
+com.wind.funds.transaction.enums.FundsInstructionReferenceType	public static final com.wind.funds.transaction.enums.FundsInstructionReferenceType REFUND;
+com.wind.funds.transaction.enums.FundsInstructionType	public final class com.wind.funds.transaction.enums.FundsInstructionType extends java.lang.Enum<com.wind.funds.transaction.enums.FundsInstructionType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsInstructionType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsInstructionType	public static com.wind.funds.transaction.enums.FundsInstructionType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsInstructionType	public static com.wind.funds.transaction.enums.FundsInstructionType[] values();
+com.wind.funds.transaction.enums.FundsInstructionType	public static final com.wind.funds.transaction.enums.FundsInstructionType AUTHORIZATION_TRANSACTION;
+com.wind.funds.transaction.enums.FundsInstructionType	public static final com.wind.funds.transaction.enums.FundsInstructionType BALANCE_CONTROL;
+com.wind.funds.transaction.enums.FundsInstructionType	public static final com.wind.funds.transaction.enums.FundsInstructionType DIRECT_TRANSACTION;
+com.wind.funds.transaction.enums.FundsTransactionChannel	public final class com.wind.funds.transaction.enums.FundsTransactionChannel extends java.lang.Enum<com.wind.funds.transaction.enums.FundsTransactionChannel> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsTransactionChannel	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsTransactionChannel	public static com.wind.funds.transaction.enums.FundsTransactionChannel valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsTransactionChannel	public static com.wind.funds.transaction.enums.FundsTransactionChannel[] values();
+com.wind.funds.transaction.enums.FundsTransactionChannel	public static final com.wind.funds.transaction.enums.FundsTransactionChannel BANK_TRANSFER;
+com.wind.funds.transaction.enums.FundsTransactionChannel	public static final com.wind.funds.transaction.enums.FundsTransactionChannel DIGITAL_WALLET;
+com.wind.funds.transaction.enums.FundsTransactionChannel	public static final com.wind.funds.transaction.enums.FundsTransactionChannel INTERNAL;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public final class com.wind.funds.transaction.enums.FundsTransactionEventType extends java.lang.Enum<com.wind.funds.transaction.enums.FundsTransactionEventType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.FundsTransactionEventType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.FundsTransactionEventType	public java.lang.String getEventName();
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static com.wind.funds.transaction.enums.FundsTransactionEventType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static com.wind.funds.transaction.enums.FundsTransactionEventType[] values();
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType AUTHORIZE;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType AUTH_REFUND;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType BALANCE_ADJUST;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType CLEARING_CONFIRM;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType COMPLETE;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType FEE_CHARGE;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType FEE_REFUND;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType FREEZE;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType LIMIT_ADJUST;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType PAY;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType PAYOUT_FAILED;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType PAYOUT_SUCCEEDED;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType REFUND;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType REVERSAL;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType SETTLEMENT_LOCK;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType TOPUP;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType TRANSFER;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType UNFREEZE;
+com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType WITHDRAW;
+com.wind.funds.transaction.enums.SourceObjectType	public final class com.wind.funds.transaction.enums.SourceObjectType extends java.lang.Enum<com.wind.funds.transaction.enums.SourceObjectType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.transaction.enums.SourceObjectType	public java.lang.String getDesc();
+com.wind.funds.transaction.enums.SourceObjectType	public static com.wind.funds.transaction.enums.SourceObjectType valueOf(java.lang.String);
+com.wind.funds.transaction.enums.SourceObjectType	public static com.wind.funds.transaction.enums.SourceObjectType[] values();
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType BALANCE_ADJUSTMENT;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType BUDGET_ADJUSTMENT;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType DISPUTE_CASE;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType EXTERNAL_BALANCE_ANOMALY;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType FROZEN_ORDER;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType FUNDS_TRANSACTION;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType RECONCILIATION_ADJUSTMENT;
+com.wind.funds.transaction.enums.SourceObjectType	public static final com.wind.funds.transaction.enums.SourceObjectType SETTLEMENT_ORDER;
+com.wind.funds.transaction.spec.FeeSpec	public com.wind.transaction.core.Money calculateFee(com.wind.transaction.core.Money);
+com.wind.funds.transaction.spec.FeeSpec	public final class com.wind.funds.transaction.spec.FeeSpec {
+com.wind.funds.transaction.spec.FeeSpec	public java.lang.Integer getFixedFee();
+com.wind.funds.transaction.spec.FeeSpec	public java.lang.Integer getMaxAmountWithRate();
+com.wind.funds.transaction.spec.FeeSpec	public java.lang.Integer getMinAmountWithRate();
+com.wind.funds.transaction.spec.FeeSpec	public java.lang.String getFeeType();
+com.wind.funds.transaction.spec.FeeSpec	public java.math.BigDecimal getFeeRate();
+com.wind.funds.transaction.spec.FeeSpec	public static com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder builder();
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public class com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder {
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec build();
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder feeRate(java.math.BigDecimal);
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder feeType(java.lang.String);
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder fixedFee(java.lang.Integer);
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder maxAmountWithRate(java.lang.Integer);
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder minAmountWithRate(java.lang.Integer);
+com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public java.lang.String toString();
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public final class com.wind.funds.transaction.spec.FundsInstructionFieldKeys {
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String ACCOUNT_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LINKED_FUNDING_ACCOUNT_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_ACCOUNT_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_ACCOUNT_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_ID;
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract com.wind.funds.transaction.enums.FundsInstructionReferenceType getReferenceType();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getAuthCode();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getExternalTransactionId();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getReferenceBusinessSn();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getReferenceLedgerTransactionSn();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getReferenceSn();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public interface com.wind.funds.transaction.spec.FundsInstructionReferenceSpec {
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.route.ref.ExternalAccountRefSpec getExternalAccountRef();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.route.ref.PaymentInstrumentRefSpec getInstrumentRef();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.transaction.enums.DefaultFundsTransactionType getTransactionType();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.transaction.enums.FundsInstructionType getInstructionType();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.funds.transaction.spec.FundsInstructionReferenceSpec getReference();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.integration.operator.WindOperator getOperator();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.transaction.core.Money getAmount();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract com.wind.transaction.core.Money getOriginalAmount();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.Long getTenantId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.String getBusinessScene();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.String getBusinessSn();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.String getDescription();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.math.BigDecimal getExchangeRate();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.transaction.enums.FundsEffectType getExternalFundsEffectType();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getAccountId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getLinkedFundingAccountId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getPayeeAccountId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getPayeeId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getPayerAccountId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getPayerId();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalFundsFactDigest();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalFundsFactSn();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalSourceCode();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public interface com.wind.funds.transaction.spec.FundsInstructionSpec {
+com.wind.funds.transaction.support.FundsContextVariables	public final class com.wind.funds.transaction.support.FundsContextVariables {
+com.wind.funds.transaction.support.FundsContextVariables	public static java.util.Map<java.lang.String, java.lang.Object> immutableCopy(java.util.Map<java.lang.String, java.lang.Object>);
+com.wind.funds.transaction.support.FundsInstructionContextValidator	public final class com.wind.funds.transaction.support.FundsInstructionContextValidator {
+com.wind.funds.transaction.support.FundsInstructionContextValidator	public static java.util.Map<java.lang.String, java.lang.Object> immutableInstructionContext(java.util.Map<java.lang.String, java.lang.Object>, java.lang.String);
+com.wind.funds.transaction.support.FundsInstructionContextValidator	public static void rejectInstructionContextVariables(java.lang.String, java.lang.String);
+com.wind.funds.transaction.support.FundsStableHashSupport	public final class com.wind.funds.transaction.support.FundsStableHashSupport {
+com.wind.funds.transaction.support.FundsStableHashSupport	public static boolean matchesCanonicalOrLegacyJson(java.lang.String, java.lang.String, java.lang.Object, java.lang.Object);
+com.wind.funds.transaction.support.FundsStableHashSupport	public static java.lang.String sha256(java.lang.String);
+com.wind.funds.transaction.support.FundsStableHashSupport	public static java.lang.String sha256CanonicalJson(java.lang.String, java.lang.Object);
+com.wind.funds.transaction.support.FundsStableHashSupport	public static java.util.Map<java.lang.String, java.lang.Object> stableHashMap(java.util.Map<?, ?>);
+com.wind.funds.wallet.FundsAccount	public abstract boolean isAvailable();
+com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.FundsAccountId getAccountId();
+com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.FundsAccountOwner getOwner();
+com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.enums.FundsAccountStatus getStatus();
+com.wind.funds.wallet.FundsAccount	public abstract com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
+com.wind.funds.wallet.FundsAccount	public abstract java.lang.Integer getVersion();
+com.wind.funds.wallet.FundsAccount	public abstract java.lang.String getCapabilitySource();
+com.wind.funds.wallet.FundsAccount	public abstract java.util.Set<com.wind.funds.wallet.enums.FundsAccountCapability> getCapabilities();
+com.wind.funds.wallet.FundsAccount	public default boolean canOverdraft();
+com.wind.funds.wallet.FundsAccount	public default boolean canPay();
+com.wind.funds.wallet.FundsAccount	public default boolean canReceive();
+com.wind.funds.wallet.FundsAccount	public default boolean canWithdraw();
+com.wind.funds.wallet.FundsAccount	public default java.lang.String getDesc();
+com.wind.funds.wallet.FundsAccount	public interface com.wind.funds.wallet.FundsAccount extends com.wind.integration.core.model.TenantIsolationObject<java.lang.Long> {
+com.wind.funds.wallet.FundsAccountBalanceView	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getLedgerProfileCode();
+com.wind.funds.wallet.FundsAccountBalanceView	public abstract com.wind.transaction.core.Money getAvailableBalance();
+com.wind.funds.wallet.FundsAccountBalanceView	public abstract com.wind.transaction.core.Money getFrozenBalance();
+com.wind.funds.wallet.FundsAccountBalanceView	public abstract com.wind.transaction.core.Money getTotalBalance();
+com.wind.funds.wallet.FundsAccountBalanceView	public default com.wind.transaction.core.Money getAuthorizationBalance();
+com.wind.funds.wallet.FundsAccountBalanceView	public interface com.wind.funds.wallet.FundsAccountBalanceView extends com.wind.integration.core.model.TenantIsolationObject<java.lang.Long>, com.wind.funds.ledger.LedgerBalanceView {
+com.wind.funds.wallet.FundsAccountId	public abstract java.lang.String id();
+com.wind.funds.wallet.FundsAccountId	public abstract java.lang.String type();
+com.wind.funds.wallet.FundsAccountId	public interface com.wind.funds.wallet.FundsAccountId extends java.io.Serializable {
+com.wind.funds.wallet.FundsAccountId	public static com.wind.funds.wallet.FundsAccountId immutable(java.lang.String, com.wind.common.enums.DescriptiveEnum);
+com.wind.funds.wallet.FundsAccountId	public static com.wind.funds.wallet.FundsAccountId immutable(java.lang.String, java.lang.String);
+com.wind.funds.wallet.FundsAccountOwner	public <T> T asOwnerId();
+com.wind.funds.wallet.FundsAccountOwner	public com.wind.funds.wallet.FundsAccountOwner(java.io.Serializable, com.wind.funds.wallet.enums.FundsAccountOwnerType);
+com.wind.funds.wallet.FundsAccountOwner	public com.wind.funds.wallet.enums.FundsAccountOwnerType ownerType();
+com.wind.funds.wallet.FundsAccountOwner	public final boolean equals(java.lang.Object);
+com.wind.funds.wallet.FundsAccountOwner	public final class com.wind.funds.wallet.FundsAccountOwner extends java.lang.Record implements java.io.Serializable {
+com.wind.funds.wallet.FundsAccountOwner	public final int hashCode();
+com.wind.funds.wallet.FundsAccountOwner	public final java.lang.String toString();
+com.wind.funds.wallet.FundsAccountOwner	public java.io.Serializable ownerId();
+com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner merchant(java.io.Serializable);
+com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner of(java.io.Serializable, com.wind.funds.wallet.enums.FundsAccountOwnerType);
+com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner user(java.io.Serializable);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract boolean supports(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getLedgerProfileCode(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccount getAccount(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccountBalanceView getBalance(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public interface com.wind.funds.wallet.FundsAccountQueryService {
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public com.wind.funds.ledger.enums.LedgerSubjectCategory getAccountCategory();
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public final class com.wind.funds.wallet.enums.DefaultFundsAccountType extends java.lang.Enum<com.wind.funds.wallet.enums.DefaultFundsAccountType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isCreditCard(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isCreditCard(com.wind.funds.wallet.enums.DefaultFundsAccountType);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isCreditCard(java.lang.String);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isExternalAccount(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isExternalAccount(com.wind.funds.wallet.enums.DefaultFundsAccountType);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isExternalAccount(java.lang.String);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isFundingAccountType(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isFundingAccountType(com.wind.funds.wallet.enums.DefaultFundsAccountType);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isFundingAccountType(java.lang.String);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isUserWalletType(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isUserWalletType(com.wind.funds.wallet.enums.DefaultFundsAccountType);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static boolean isUserWalletType(java.lang.String);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static com.wind.funds.wallet.enums.DefaultFundsAccountType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static com.wind.funds.wallet.enums.DefaultFundsAccountType[] values();
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType ACCOUNT_PAYABLE;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType ACCOUNT_RECEIVABLE;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType CASH_MAPPING;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType CHANNEL_SETTLEMENT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType CLEARING;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType CREDIT_CARD;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType EXTERNAL_BANK;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType EXTERNAL_MERCHANT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType EXTERNAL_VA;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType EXTERNAL_WALLET;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType FROZEN;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType GLOBAL_ACCOUNT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_COST;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_EQUITY;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_LIABILITY;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_MASTER;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_MERCHANT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_REVENUE;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PLATFORM_SUSPENSE;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType PREPAID_CARD;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType REBATE_ACCOUNT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType SETTLEMENT;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType SHARED_CARD;
+com.wind.funds.wallet.enums.DefaultFundsAccountType	public static final com.wind.funds.wallet.enums.DefaultFundsAccountType USER_WALLET;
+com.wind.funds.wallet.enums.FundsAccountCapability	public final class com.wind.funds.wallet.enums.FundsAccountCapability extends java.lang.Enum<com.wind.funds.wallet.enums.FundsAccountCapability> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.FundsAccountCapability	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.FundsAccountCapability	public static com.wind.funds.wallet.enums.FundsAccountCapability valueOf(java.lang.String);
+com.wind.funds.wallet.enums.FundsAccountCapability	public static com.wind.funds.wallet.enums.FundsAccountCapability[] values();
+com.wind.funds.wallet.enums.FundsAccountCapability	public static final com.wind.funds.wallet.enums.FundsAccountCapability PAY;
+com.wind.funds.wallet.enums.FundsAccountCapability	public static final com.wind.funds.wallet.enums.FundsAccountCapability RECEIVE;
+com.wind.funds.wallet.enums.FundsAccountCapability	public static final com.wind.funds.wallet.enums.FundsAccountCapability WITHDRAW;
+com.wind.funds.wallet.enums.FundsAccountCapability	public static java.util.Set<com.wind.funds.wallet.enums.FundsAccountCapability> allValues();
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public final class com.wind.funds.wallet.enums.FundsAccountOwnerType extends java.lang.Enum<com.wind.funds.wallet.enums.FundsAccountOwnerType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static com.wind.funds.wallet.enums.FundsAccountOwnerType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static com.wind.funds.wallet.enums.FundsAccountOwnerType[] values();
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType MERCHANT;
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType PLATFORM;
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType TENANT;
+com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType USER;
+com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canAcceptRefund();
+com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canCredit();
+com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canDebit();
+com.wind.funds.wallet.enums.FundsAccountStatus	public final class com.wind.funds.wallet.enums.FundsAccountStatus extends java.lang.Enum<com.wind.funds.wallet.enums.FundsAccountStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.FundsAccountStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.FundsAccountStatus	public static com.wind.funds.wallet.enums.FundsAccountStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.FundsAccountStatus	public static com.wind.funds.wallet.enums.FundsAccountStatus[] values();
+com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus ACTIVE;
+com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus CLOSED;
+com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus FROZEN;
+com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus SUSPENDED;
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public final class com.wind.funds.wallet.enums.PaymentInstrumentAction extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentAction> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static com.wind.funds.wallet.enums.PaymentInstrumentAction valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static com.wind.funds.wallet.enums.PaymentInstrumentAction[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static final com.wind.funds.wallet.enums.PaymentInstrumentAction AUTHORIZE;
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static final com.wind.funds.wallet.enums.PaymentInstrumentAction PAY;
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static final com.wind.funds.wallet.enums.PaymentInstrumentAction RECEIVE;
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static final com.wind.funds.wallet.enums.PaymentInstrumentAction REFUND;
+com.wind.funds.wallet.enums.PaymentInstrumentAction	public static final com.wind.funds.wallet.enums.PaymentInstrumentAction WITHDRAW;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public final class com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType CREATE;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType UNBIND;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType UPDATE;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public final class com.wind.funds.wallet.enums.PaymentInstrumentBindingRole extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentBindingRole> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingRole valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingRole[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole BUDGET_SUBJECT;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole CREDIT_SUBJECT;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole FUNDING_SUBJECT;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole PAYMENT_SUBJECT;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole RECEIVE_SUBJECT;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public final class com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus ACTIVE;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus SUSPENDED;
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public final class com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static final com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection BIDIRECTIONAL;
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static final com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection INBOUND;
+com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static final com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection OUTBOUND;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public com.wind.funds.ledger.enums.LedgerProfileCode getLedgerProfileCode();
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public final class com.wind.funds.wallet.enums.PlatformFundingAccountRole extends java.lang.Enum<com.wind.funds.wallet.enums.PlatformFundingAccountRole> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static com.wind.funds.wallet.enums.PlatformFundingAccountRole valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static com.wind.funds.wallet.enums.PlatformFundingAccountRole[] values();
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole ADJUSTMENT;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole CASH_MAPPING;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole CLEARING;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole FEE;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole PREPAYMENT;
+com.wind.funds.wallet.enums.PlatformFundingAccountRole	public static final com.wind.funds.wallet.enums.PlatformFundingAccountRole SETTLEMENT;
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public final class com.wind.funds.wallet.enums.SpendControlDecisionResult extends java.lang.Enum<com.wind.funds.wallet.enums.SpendControlDecisionResult> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public static com.wind.funds.wallet.enums.SpendControlDecisionResult valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public static com.wind.funds.wallet.enums.SpendControlDecisionResult[] values();
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public static final com.wind.funds.wallet.enums.SpendControlDecisionResult NO_APPLICABLE_RULE;
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public static final com.wind.funds.wallet.enums.SpendControlDecisionResult PASSED;
+com.wind.funds.wallet.enums.SpendControlDecisionResult	public static final com.wind.funds.wallet.enums.SpendControlDecisionResult REJECTED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public boolean isBudgetProjectionMovement();
+com.wind.funds.wallet.enums.SpendControlMovementType	public boolean isControlMovement();
+com.wind.funds.wallet.enums.SpendControlMovementType	public boolean isLimitAdjustmentMovement();
+com.wind.funds.wallet.enums.SpendControlMovementType	public boolean isReleaseMovement();
+com.wind.funds.wallet.enums.SpendControlMovementType	public final class com.wind.funds.wallet.enums.SpendControlMovementType extends java.lang.Enum<com.wind.funds.wallet.enums.SpendControlMovementType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendControlMovementType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendControlMovementType	public static com.wind.funds.wallet.enums.SpendControlMovementType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendControlMovementType	public static com.wind.funds.wallet.enums.SpendControlMovementType[] values();
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType CONSUMED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType LIMIT_DECREASED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType LIMIT_INCREASED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType REFUND_COMPENSATED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType RELEASED;
+com.wind.funds.wallet.enums.SpendControlMovementType	public static final com.wind.funds.wallet.enums.SpendControlMovementType RESERVED;
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public final class com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus[] values();
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus EFFECTIVE;
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus EXPIRED;
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus NOT_YET_EFFECTIVE;
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus RETIRED;
+com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus SUSPENDED;
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public final class com.wind.funds.wallet.enums.SpendRuleBindingStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleBindingStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingStatus[] values();
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus ACTIVE;
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus RETIRED;
+com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus SUSPENDED;
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public final class com.wind.funds.wallet.enums.SpendRuleConflictPolicy extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleConflictPolicy> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static com.wind.funds.wallet.enums.SpendRuleConflictPolicy valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static com.wind.funds.wallet.enums.SpendRuleConflictPolicy[] values();
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy DENY_OVERRIDES;
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy FIRST_MATCH;
+com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy MOST_RESTRICTIVE;
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public final class com.wind.funds.wallet.enums.SpendRuleDefinitionStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleDefinitionStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static com.wind.funds.wallet.enums.SpendRuleDefinitionStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static com.wind.funds.wallet.enums.SpendRuleDefinitionStatus[] values();
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionStatus ACTIVE;
+com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionStatus DISABLED;
+com.wind.funds.wallet.enums.SpendRuleDomain	public final class com.wind.funds.wallet.enums.SpendRuleDomain extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleDomain> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleDomain	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleDomain	public static com.wind.funds.wallet.enums.SpendRuleDomain valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleDomain	public static com.wind.funds.wallet.enums.SpendRuleDomain[] values();
+com.wind.funds.wallet.enums.SpendRuleDomain	public static final com.wind.funds.wallet.enums.SpendRuleDomain ACCOUNT;
+com.wind.funds.wallet.enums.SpendRuleDomain	public static final com.wind.funds.wallet.enums.SpendRuleDomain BUDGET_CONTROL;
+com.wind.funds.wallet.enums.SpendRuleDomain	public static final com.wind.funds.wallet.enums.SpendRuleDomain BUSINESS_SCENE;
+com.wind.funds.wallet.enums.SpendRuleDomain	public static final com.wind.funds.wallet.enums.SpendRuleDomain PAYMENT_INSTRUMENT;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public final class com.wind.funds.wallet.enums.SpendRuleScopeType extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleScopeType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleScopeType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static com.wind.funds.wallet.enums.SpendRuleScopeType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static com.wind.funds.wallet.enums.SpendRuleScopeType[] values();
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType ACCOUNT_HIERARCHY;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType BUSINESS_SCENE;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType CREDIT_ACCOUNT;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType FUNDING_ACCOUNT;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType PAYMENT_INSTRUMENT;
+com.wind.funds.wallet.enums.SpendRuleScopeType	public static final com.wind.funds.wallet.enums.SpendRuleScopeType SPEND_CONTROL_SCOPE;
+com.wind.funds.wallet.enums.SpendRuleType	public final class com.wind.funds.wallet.enums.SpendRuleType extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleType	public static com.wind.funds.wallet.enums.SpendRuleType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleType	public static com.wind.funds.wallet.enums.SpendRuleType[] values();
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType AMOUNT_LIMIT;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType CARD_DATA_INPUT_CAPABILITY;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType CARD_TRANSACTION_PROCESSING_TYPE;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType COMPOSITE;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType COUNTRY;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType COUNT_LIMIT;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType CURRENCY;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType CVV_REQUIRED;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType MERCHANT_CATEGORY;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType MERCHANT_ID;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType PAN_ENTRY_MODE;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType POINT_OF_SERVICE_CATEGORY;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType POSTAL_CODE_VERIFICATION;
+com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType TIME_WINDOW;
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public final class com.wind.funds.wallet.enums.SpendRuleVersionStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleVersionStatus> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static com.wind.funds.wallet.enums.SpendRuleVersionStatus valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static com.wind.funds.wallet.enums.SpendRuleVersionStatus[] values();
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static final com.wind.funds.wallet.enums.SpendRuleVersionStatus PUBLISHED;
+com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static final com.wind.funds.wallet.enums.SpendRuleVersionStatus RETIRED;
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public final class com.wind.funds.wallet.enums.SpendSubjectFundingRelationType extends java.lang.Enum<com.wind.funds.wallet.enums.SpendSubjectFundingRelationType> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public static com.wind.funds.wallet.enums.SpendSubjectFundingRelationType valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public static com.wind.funds.wallet.enums.SpendSubjectFundingRelationType[] values();
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public static final com.wind.funds.wallet.enums.SpendSubjectFundingRelationType FUNDING_SOURCE;
+com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public static final com.wind.funds.wallet.enums.SpendSubjectFundingRelationType SETTLEMENT_TARGET;
+com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator	public final class com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator {
+com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator	public static boolean containsSensitiveBindingSnapshotField(java.util.Map<java.lang.String, java.lang.Object>);
+com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator	public static boolean containsSensitiveContextVariables(java.lang.String);
+com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator	public static boolean containsSensitiveField(java.lang.Object);
+com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator	public static boolean isRawSensitiveInstrumentNo(java.lang.String);

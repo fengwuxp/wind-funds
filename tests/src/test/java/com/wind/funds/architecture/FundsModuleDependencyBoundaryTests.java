@@ -185,6 +185,13 @@ class FundsModuleDependencyBoundaryTests {
 
     private static final Pattern PACKAGE_DECLARATION = Pattern.compile("(?m)^package\\s+([^;]+);");
 
+    private static final List<String> CORE_OWNERLESS_PACKAGE_PREFIXES = List.of(
+            "com.wind.funds.spec",
+            "com.wind.funds.model");
+
+    private static final Pattern CORE_PUBLIC_IMMUTABLE_TYPE_DECLARATION = Pattern.compile(
+            "(?m)^public\\s+(?:final\\s+)?(?:class|record)\\s+Immutable");
+
     private static final List<String> TRANSACTION_SOURCE_SCAN_PATHS = List.of(
             "transaction/face/src/main/java",
             "transaction/impl/src/main/java");
@@ -338,6 +345,33 @@ class FundsModuleDependencyBoundaryTests {
 
         assertThat(violations)
                 .as("core must keep Spring runtime dependencies outside core")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：core 作为跨能力资金契约内核持续演进。
+     * 预期：契约按 transaction、route、ledger、wallet、fx 能力归属，默认实现留在实现模块。
+     * 红线：不得恢复无归属的顶层 spec/model 包，也不得把 public Immutable 实现重新暴露到 core。
+     */
+    @Test
+    void testCoreDslTypesShouldStayCapabilityOwnedAndImplementationFree() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : javaSourceFiles(List.of("core/src/main/java"))) {
+            String content = Files.readString(javaFile);
+            Matcher packageMatcher = PACKAGE_DECLARATION.matcher(content);
+            if (packageMatcher.find() && CORE_OWNERLESS_PACKAGE_PREFIXES.stream()
+                    .anyMatch(packageMatcher.group(1)::startsWith)) {
+                violations.add(workspaceRoot().relativize(javaFile)
+                        + " uses ownerless package " + packageMatcher.group(1));
+            }
+            if (CORE_PUBLIC_IMMUTABLE_TYPE_DECLARATION.matcher(content).find()) {
+                violations.add(workspaceRoot().relativize(javaFile)
+                        + " exposes a default Immutable implementation from core");
+            }
+        }
+
+        assertThat(violations)
+                .as("core DSL contracts must stay capability-owned and implementation-free")
                 .isEmpty();
     }
 

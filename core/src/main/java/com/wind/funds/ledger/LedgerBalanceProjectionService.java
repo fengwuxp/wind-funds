@@ -2,7 +2,7 @@ package com.wind.funds.ledger;
 
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;

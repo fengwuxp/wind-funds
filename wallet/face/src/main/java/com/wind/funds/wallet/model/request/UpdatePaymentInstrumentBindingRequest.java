@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,7 +52,7 @@ public class UpdatePaymentInstrumentBindingRequest {
     private Boolean defaultBinding;
 
     @Schema(description = "绑定生命周期状态")
-    private PaymentInstrumentBindingState state;
+    private PaymentInstrumentBindingStatus status;
 
     @Schema(description = "生效时间")
     private LocalDateTime validFrom;

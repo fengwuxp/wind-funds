@@ -20,6 +20,8 @@ import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.core.WritableContextVariables;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
@@ -28,7 +30,7 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
@@ -54,7 +56,12 @@ import java.util.concurrent.TimeoutException;
 import tools.jackson.core.type.TypeReference;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertSubjectBalanceNotInitialized;
@@ -68,6 +75,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
+    private static final String CORE1B_BUSINESS_SN = "DIRECT_CORE1B_LEGACY_TOPUP";
+
+    private static final Map<String, String> CORE1B_CANONICAL_DETAIL_DIGESTS = Map.of(
+            "funding_user", "6fdd065744256b25bce7dac276a30695400eafe1ce10a520abb3052fd876aa34",
+            "platform_cash_mapping", "22cb79f6b8fff071b09d7ff9c987544e5ac9d4bd4e771921e1e244f4d49a8c1d",
+            "platform_prepayment", "0ef2b0f6e431f6abe4dc085215d7f95b003171f3676dcdf102e19ecb352a229d");
+
+    private static final Map<String, String> CORE1B_LEGACY_DETAIL_DIGESTS = Map.of(
+            "funding_user", "868c7b3858bb95b4ce98345f737b547e2b9165272d58553f43d7d9386085fc91",
+            "platform_cash_mapping", "d24d56e8f0eb2a3dfdfee0d76e481c3e574651bb4ad1851573b566c68998291f",
+            "platform_prepayment", "ce86ddc28cd3e34e818f375cda7fcbfcede955187b7f1620c85d092f8af24f84");
+
     private static final Set<String> DIRECT_LEDGER_CONTEXT_KEYS = Set.of(
             "routeLegId", "replayRefLegId", "replayPolicy");
 
@@ -75,6 +94,63 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             "channelCode",
             "externalTransactionId",
             "feeChargeSpec");
+
+    @Autowired
+    private JdbcTemplate core1bJdbcTemplate;
+
+    /**
+     * 场景：历史直接充值的三条参与方明细已保存 legacy 摘要，当前版本收到相同请求和金额冲突请求。
+     * 输入：先由当前 writer 写入 canonical v1，再按参与方把 request_hash 替换为基线旧 writer 的固定 golden。
+     * 输出：同请求复用原资金交易，冲突金额被拒绝，route、资金/账务事实和逐桶余额均保持不变。
+     * 红线：兼容读取不得重写历史摘要、重复入账或让冲突请求产生任何资金副作用。
+     */
+    @Test
+    void testPersistedLegacyDetailDigestsShouldReplayAndRejectConflictWithoutChangingFacts() {
+        FundsAccountId account = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+
+        String firstTransactionSn = directTransactionService.topup(
+                core1bTopupRequest(40L), WindOperatorFactory.system());
+
+        BalanceSnapshot afterFirst = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFirst,
+                delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(detailRequestHashes(CORE1B_BUSINESS_SN))
+                .isEqualTo(CORE1B_CANONICAL_DETAIL_DIGESTS)
+                .isNotEqualTo(CORE1B_LEGACY_DETAIL_DIGESTS);
+        assertSingleFundsAndLedgerFactsForBusinessSn(CORE1B_BUSINESS_SN, 3, 2, 4);
+        replaceDetailDigest("funding_user", RouteParticipantRole.PAYEE);
+        replaceDetailDigest("platform_cash_mapping", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
+        replaceDetailDigest("platform_prepayment", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
+        assertThat(detailRequestHashes(CORE1B_BUSINESS_SN)).isEqualTo(CORE1B_LEGACY_DETAIL_DIGESTS);
+        PersistedTopupFacts persistedLegacyFacts = persistedTopupFacts();
+        LedgerFactSnapshot persistedLegacyLedgerFacts = ledgerFactSnapshot();
+        RouteSnapshotSpec persistedLegacyRoute = routeSnapshot(CORE1B_BUSINESS_SN);
+
+        String replayTransactionSn = directTransactionService.topup(
+                core1bTopupRequest(40L), WindOperatorFactory.system());
+
+        assertThat(replayTransactionSn).isEqualTo(firstTransactionSn);
+        assertThat(detailRequestHashes(CORE1B_BUSINESS_SN)).isEqualTo(CORE1B_LEGACY_DETAIL_DIGESTS);
+        assertThat(persistedTopupFacts()).isEqualTo(persistedLegacyFacts);
+        assertDirectRouteSnapshotUnchanged(CORE1B_BUSINESS_SN, persistedLegacyRoute);
+        assertLedgerFactsUnchanged(core1bJdbcTemplate, persistedLegacyLedgerFacts);
+        assertThat(snapshot(balances(account, cashMappingAccount(), prepaymentAccount()))).isEqualTo(afterFirst);
+
+        assertThatThrownBy(() -> directTransactionService.topup(
+                core1bTopupRequest(41L), WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertThat(detailRequestHashes(CORE1B_BUSINESS_SN)).isEqualTo(CORE1B_LEGACY_DETAIL_DIGESTS);
+        assertThat(persistedTopupFacts()).isEqualTo(persistedLegacyFacts);
+        assertDirectRouteSnapshotUnchanged(CORE1B_BUSINESS_SN, persistedLegacyRoute);
+        assertLedgerFactsUnchanged(core1bJdbcTemplate, persistedLegacyLedgerFacts);
+        assertThat(snapshot(balances(account, cashMappingAccount(), prepaymentAccount()))).isEqualTo(afterFirst);
+        assertSingleFundsAndLedgerFactsForBusinessSn(CORE1B_BUSINESS_SN, 3, 2, 4);
+    }
 
     @Test
     void testConvertedTopupShouldPropagateOriginalAmountAndExchangeRateToLedgerFacts() {
@@ -690,6 +766,63 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_PAY", 2, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND");
+    }
+
+    /**
+     * 场景：原支付交易存在，但其账本流水缺失或不唯一。
+     * 输入：完成充值和付款后，测试边界将原支付账本流水调整为 0 条或 2 条，再发起关联退款。
+     * 输出：退款在账本来源唯一性校验处失败，余额和既有账务事实保持不变。
+     * 红线：退款不得猜测账本来源，也不得在来源不唯一时写入任何资金或账务事实。
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReferencedRefundWithoutUniqueLedgerTransactionShouldRejectWithoutSideEffects(boolean duplicate) {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_source_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "DIRECT_REFUND_LEDGER_SOURCE_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_LEDGER_SOURCE_PAY");
+
+        if (duplicate) {
+            int inserted = core1bJdbcTemplate.update("""
+                    INSERT INTO t_ledger_transaction (
+                        sn, tenant_id, funds_transaction_sn, reference_ledger_transaction_sn,
+                        instruction_type, event_type, transaction_type, business_scene, business_sn,
+                        amount, currency, original_amount, original_currency, exchange_rate,
+                        debit_amount, credit_amount, transaction_time, description, context_variables, sha256)
+                    SELECT ?, tenant_id, funds_transaction_sn, reference_ledger_transaction_sn,
+                        instruction_type, event_type, transaction_type, business_scene, business_sn,
+                        amount, currency, original_amount, original_currency, exchange_rate,
+                        debit_amount, credit_amount, transaction_time, description, context_variables, sha256
+                    FROM t_ledger_transaction
+                    WHERE tenant_id = ? AND funds_transaction_sn = ?
+                    """, "LE_DUPLICATE_DIRECT_REFUND_SOURCE", TenantContextHolder.requireTenantId(),
+                    payTransactionSn);
+            assertThat(inserted).isOne();
+        } else {
+            clearLedgerFactsForFundsTransaction(payTransactionSn);
+        }
+        assertThat(ledgerTransactionsByFundsTransactionSn(payTransactionSn)).hasSize(duplicate ? 2 : 0);
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+        String refundBusinessSn = duplicate
+                ? "DIRECT_REFUND_DUPLICATE_LEDGER_SOURCE"
+                : "DIRECT_REFUND_MISSING_LEDGER_SOURCE";
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn(refundBusinessSn)
+                .setDescription("refund without unique ledger source"), WindOperatorFactory.system()))
+                .hasMessageContaining("原资金交易账本流水不存在或不唯一");
+
+        assertThat(snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount())))
+                .isEqualTo(beforeFailure);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+        assertNoPersistedTransactionFactsForBusinessSn(refundBusinessSn);
     }
 
     /**
@@ -3985,8 +4118,112 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount())
                 .as("original direct pay refunded amount")
                 .isEqualTo(refundAmount);
-        assertThat(routeSnapshot(businessSn).getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
-        assertThat(ledgerTransactionByBusinessSn(businessSn).getFundsTransactionSn()).isEqualTo(refundTransactionSn);
+        RouteSnapshotSpec payRouteSnapshot = fundsTransactionQueryService
+                .findRouteSnapshotByTransactionSn(payTransactionSn)
+                .orElseThrow();
+        assertThat(payRouteSnapshot.getLegs()).singleElement();
+        RouteSnapshotSpec refundRouteSnapshot = routeSnapshot(businessSn);
+        assertThat(refundRouteSnapshot.getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
+        assertThat(refundRouteSnapshot.getLegs()).singleElement().satisfies(refundLeg -> {
+            String sourceLegId = payRouteSnapshot.getLegs().getFirst().getLegId();
+            assertThat(refundLeg.getReplayRefLegId()).isEqualTo(sourceLegId);
+            assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(payTransactionSn,
+                    FundsTransactionEventType.REFUND, sourceLegId, refundLeg.getAmount().getCurrency()).getAmount())
+                    .isEqualTo(refundAmount);
+        });
+        LedgerTransaction refundLedgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        assertThat(ledgerTransactionsByFundsTransactionSn(payTransactionSn)).singleElement().satisfies(
+                payLedgerTransaction -> {
+                    assertThat(refundLedgerTransaction.getReferenceLedgerTransactionSn())
+                            .isEqualTo(payLedgerTransaction.getSn());
+                    assertThat(fundsTransactionDetailsByBusinessSn(businessSn)).allSatisfy(detail ->
+                            assertThat(detail.getReferenceLedgerTransactionSn())
+                                    .isEqualTo(payLedgerTransaction.getSn()));
+                });
+        assertThat(refundLedgerTransaction.getFundsTransactionSn()).isEqualTo(refundTransactionSn);
+        assertThat(postingPlansOf(refundLedgerTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getRouteLegId()).isEqualTo(refundRouteSnapshot.getLegs().getFirst().getLegId());
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.REFUND.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+        });
+        assertThat(entriesOf(refundLedgerTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.REFUND.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+        });
+        assertLedgerFactsFollowRouteSnapshot(businessSn);
+    }
+
+    private FundsTransactionTopupRequest core1bTopupRequest(long amount) {
+        return new FundsTransactionTopupRequest()
+                .setAccountId(fundingAccount("funding_user"))
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_core1b_legacy",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
+                .setChannelTransactionSn("DIRECT_CORE1B_LEGACY_TOPUP_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn(CORE1B_BUSINESS_SN)
+                .setDescription("core1b legacy topup");
+    }
+
+    private void replaceDetailDigest(String subjectId, RouteParticipantRole participantRole) {
+        assertThat(core1bJdbcTemplate.update("""
+                        UPDATE t_funds_transaction_detail
+                        SET request_hash = ?
+                        WHERE tenant_id = ?
+                          AND business_sn = ?
+                          AND subject_id = ?
+                          AND participant_role = ?
+                        """,
+                CORE1B_LEGACY_DETAIL_DIGESTS.get(subjectId),
+                TENANT_ID,
+                CORE1B_BUSINESS_SN,
+                subjectId,
+                participantRole.name())).isEqualTo(1);
+    }
+
+    private Map<String, String> detailRequestHashes(String businessSn) {
+        Map<String, String> result = new LinkedHashMap<>();
+        core1bJdbcTemplate.queryForList("""
+                        SELECT subject_id, request_hash
+                        FROM t_funds_transaction_detail
+                        WHERE tenant_id = ? AND business_sn = ?
+                        ORDER BY id ASC
+                        """, TENANT_ID, businessSn)
+                .forEach(row -> result.put((String) row.get("SUBJECT_ID"), (String) row.get("REQUEST_HASH")));
+        return Map.copyOf(result);
+    }
+
+    private PersistedTopupFacts persistedTopupFacts() {
+        List<Map<String, Object>> transactions = core1bJdbcTemplate.queryForList("""
+                SELECT *
+                FROM t_funds_transaction
+                WHERE tenant_id = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, TENANT_ID, CORE1B_BUSINESS_SN);
+        List<Map<String, Object>> details = core1bJdbcTemplate.queryForList("""
+                SELECT *
+                FROM t_funds_transaction_detail
+                WHERE tenant_id = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, TENANT_ID, CORE1B_BUSINESS_SN);
+        String routeSnapshotJson = core1bJdbcTemplate.queryForObject("""
+                SELECT route_snapshot
+                FROM t_funds_transaction
+                WHERE tenant_id = ? AND business_sn = ?
+                """, String.class, TENANT_ID, CORE1B_BUSINESS_SN);
+        return new PersistedTopupFacts(transactions, details, routeSnapshotJson);
+    }
+
+    private record PersistedTopupFacts(List<Map<String, Object>> transactions,
+                                       List<Map<String, Object>> details,
+                                       String routeSnapshotJson) {
+
+        private PersistedTopupFacts {
+            transactions = List.copyOf(transactions);
+            details = List.copyOf(details);
+        }
     }
 
     private Map<String, Object> paymentInstrumentSnapshot(String instrumentId,

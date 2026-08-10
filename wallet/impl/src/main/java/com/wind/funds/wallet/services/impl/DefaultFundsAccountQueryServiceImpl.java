@@ -100,6 +100,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .tenantId(subject.tenantId())
                 .accountId(accountId)
                 .currency(subject.currency())
+                .ledgerProfileCode(subject.ledgerProfileCode())
                 .balanceBuckets(toBalanceBuckets(ledgers, subject.currency()))
                 .build();
     }

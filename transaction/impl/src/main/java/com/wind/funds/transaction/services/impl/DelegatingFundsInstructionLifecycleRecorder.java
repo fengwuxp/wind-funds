@@ -5,7 +5,7 @@ import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;

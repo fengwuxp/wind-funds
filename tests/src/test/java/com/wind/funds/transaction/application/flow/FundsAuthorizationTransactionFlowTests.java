@@ -9,6 +9,8 @@ import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -25,6 +27,7 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
+import com.wind.funds.transaction.model.request.MerchantInfoRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -33,6 +36,7 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountBalanceView;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
@@ -64,6 +68,41 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 授权交易业务流测试。
  */
 class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSupport {
+
+    /**
+     * 场景：普通资金账户把可用资金转入授权占用，随后完成扣款。
+     * 输入：充值 100、授权 60、完成 60。
+     * 输出：授权期间 FUNDING_BASIC 总余额保持 100，完成后减少为 40。
+     * 红线：该总余额口径不能把授权占用误写成清算或结算 pending。
+     */
+    @Test
+    void testFundingBasicTotalBalanceShouldRemainStableWhileAuthorizationIsHeld() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "OWNED_FUNDS_BALANCE_TOPUP");
+
+        String authorizationSn = authorize(user, 60L, true, "OWNED_FUNDS_BALANCE_AUTHORIZE");
+
+        FundsAccountBalanceView afterAuthorize = fundsAccountQueryService.getBalance(user);
+        assertThat(afterAuthorize.getAuthorizationBalance()).isEqualTo(Money.immutable(60L, CURRENCY));
+        assertThat(afterAuthorize.getTotalBalance()).isEqualTo(Money.immutable(100L, CURRENCY));
+
+        completeAuthorization(user, 60L, authorizationSn, "OWNED_FUNDS_BALANCE_COMPLETE");
+
+        assertThat(fundsAccountQueryService.getBalance(user).getTotalBalance())
+                .isEqualTo(Money.immutable(40L, CURRENCY));
+    }
+
+    /**
+     * 场景：平台结算账户请求尚未定义口径的总余额。
+     * 输入：FUNDING_PLATFORM / SETTLEMENT 账户。
+     * 输出：拒绝不适用的汇总请求。
+     * 红线：平台资产、负债、清算和结算责任不能套用 FUNDING_BASIC 汇总公式。
+     */
+    @Test
+    void testTotalBalanceShouldRejectUndefinedProfile() {
+        assertThatThrownBy(() -> fundsAccountQueryService.getBalance(settlementAccount()).getTotalBalance())
+                .hasMessageContaining("口径尚未定义");
+    }
 
     @Test
     void testPartialFxAuthorizationRefundShouldReuseSnapshotRate() {
@@ -598,6 +637,11 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_PARTIAL_REVERSAL_COMPLETE_AUTHORIZE");
+        String authorizationLegId = "AUTHORIZATION_1";
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+                .hasValueSatisfying(snapshot -> assertThat(snapshot.getLegs())
+                        .singleElement()
+                        .satisfies(leg -> assertThat(leg.getLegId()).isEqualTo(authorizationLegId)));
         BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
                 delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
@@ -652,10 +696,16 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCode.AVAILABLE);
-        assertThat(postingPlansOf(reversalTransaction).stream()
-                .map(LedgerPostingPlan::getPhaseCode)
-                .toList())
-                .containsOnly(LedgerPhaseCode.REVERSAL.name());
+        assertThat(postingPlansOf(reversalTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.REVERSAL.name());
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.AUTHORIZATION_REVERSAL.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_HOLD.name());
+            assertThat(plan.getRouteLegId()).isEqualTo("RELEASE_" + authorizationLegId);
+        });
+        assertThat(entriesOf(reversalTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.AUTHORIZATION_REVERSAL.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_HOLD.name());
+        });
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_CANCEL").stream()
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
@@ -664,6 +714,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+                FundsTransactionEventType.REVERSAL, authorizationLegId, CURRENCY).getAmount()).isEqualTo(30L);
 
         LedgerTransaction completeTransaction = ledgerTransactionByBusinessSn(
                 "AUTH_PARTIAL_REVERSAL_COMPLETE_CAPTURE");
@@ -672,10 +724,16 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCode.SETTLEMENT);
-        assertThat(postingPlansOf(completeTransaction).stream()
-                .map(LedgerPostingPlan::getPhaseCode)
-                .toList())
-                .containsOnly(LedgerPhaseCode.COMPLETION.name());
+        assertThat(postingPlansOf(completeTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.COMPLETION.name());
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.AUTHORIZATION_COMPLETION.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_CONSUME.name());
+            assertThat(plan.getRouteLegId()).isEqualTo("CONSUME_" + authorizationLegId);
+        });
+        assertThat(entriesOf(completeTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.AUTHORIZATION_COMPLETION.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_CONSUME.name());
+        });
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_CAPTURE").stream()
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
@@ -684,6 +742,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+                FundsTransactionEventType.COMPLETE, authorizationLegId, CURRENCY).getAmount()).isEqualTo(50L);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_CANCEL", 0, 1, 1, 2);
@@ -1506,15 +1566,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REFUND_AUTHORIZE");
         LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REFUND_RETURN");
+        String authorizationLegId = "AUTHORIZATION_1";
         assertThat(refundTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(entriesOf(refundTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
-        assertThat(postingPlansOf(refundTransaction).stream()
-                .map(LedgerPostingPlan::getPhaseCode)
-                .toList())
-                .containsOnly(LedgerPhaseCode.REFUND.name());
+        assertThat(postingPlansOf(refundTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.REFUND.name());
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.REFUND.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+            assertThat(plan.getRouteLegId()).isEqualTo("RESTORE_" + authorizationLegId);
+        });
+        assertThat(entriesOf(refundTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.REFUND.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+        });
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_REFUND_RETURN").stream()
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
@@ -1523,6 +1590,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+                FundsTransactionEventType.AUTH_REFUND, authorizationLegId, CURRENCY).getAmount()).isEqualTo(60L);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_CAPTURE", 0, 2, 1, 2);
@@ -2346,6 +2415,47 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_AUTHORIZE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_AUTHORIZE", 1, 2);
+    }
+
+    @Test
+    void testAuthorizeWithMerchantInfoShouldReplayOnlyTheSameCanonicalFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_MERCHANT_INFO_TOPUP");
+        MerchantInfoRequest merchantInfo = new MerchantInfoRequest()
+                .setMerchantId("merchant_001")
+                .setMerchantName("Example Store")
+                .setMccCode("5411");
+        FundsAuthorizationTransactionAuthorizeRequest request = new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(user)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setApproved(true)
+                .setMerchantInfo(merchantInfo)
+                .setBusinessScene("AUTHORIZATION")
+                .setBusinessSn("AUTH_MERCHANT_INFO_AUTHORIZE");
+
+        String authorizationSn = authorizationTransactionService.authorize(request, WindOperatorFactory.system());
+        String replaySn = authorizationTransactionService.authorize(request, WindOperatorFactory.system());
+
+        assertThat(replaySn).isEqualTo(authorizationSn);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_MERCHANT_INFO_AUTHORIZE"))
+                .singleElement()
+                .satisfies(detail -> assertThat(contextVariablesOf(detail.getContextVariables()))
+                        .containsEntry(FundsInstructionContextKeys.MERCHANT_INFO, Map.of(
+                                "merchantId", "merchant_001",
+                                "merchantName", "Example Store",
+                                "mccCode", "5411")));
+
+        request.setMerchantInfo(new MerchantInfoRequest()
+                .setMerchantId("merchant_001")
+                .setMerchantName("Example Store")
+                .setMccCode("5999"));
+        assertThatThrownBy(() -> authorizationTransactionService.authorize(request, WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_MERCHANT_INFO_AUTHORIZE", 1, 2);
     }
 
     /**

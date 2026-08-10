@@ -63,8 +63,8 @@ class FundsBenefitContributionTransactionServiceContractTests {
                         "getBusinessSn",
                         "getOriginalOrderSn",
                         "getReferenceTransactionSn",
-                        "getCostBearerSubjectRef",
-                        "getBenefitReceiverSubjectRef",
+                        "getCostBearerAccountId",
+                        "getBenefitReceiverAccountId",
                         "getBenefitReceiverLedgerSubjectCode",
                         "getAmount",
                         "getFundingNature")

@@ -10,7 +10,7 @@ import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -145,7 +145,7 @@ public class LedgerEntryDTO {
     private String sha256;
 
     public LedgerEntryDTO setContextVariables(Map<String, Object> contextVariables) {
-        this.contextVariables = FundsBenefitSpecValidators.immutableInstructionContext(
+        this.contextVariables = FundsInstructionContextValidator.immutableInstructionContext(
                 contextVariables, "ledgerEntryDto");
         return this;
     }

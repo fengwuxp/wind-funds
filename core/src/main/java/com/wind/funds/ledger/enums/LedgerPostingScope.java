@@ -20,6 +20,8 @@ public enum LedgerPostingScope implements DescriptiveEnum {
 
     CONTROL_HOLD("控制主体占用"),
 
+    CONTROL_RELEASE("控制主体释放"),
+
     CONTROL_CONSUME("控制主体消耗"),
 
     PLATFORM_EXTERNAL("平台对外资金路径"),

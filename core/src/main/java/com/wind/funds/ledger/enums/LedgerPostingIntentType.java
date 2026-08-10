@@ -39,6 +39,11 @@ public enum LedgerPostingIntentType implements DescriptiveEnum {
      */
     HOLD("占用"),
 
+    /**
+     * 余额控制释放
+     */
+    RELEASE("释放"),
+
 
     // =========================
     // 2. 支付类（核心）

@@ -3,7 +3,7 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.SourceObjectType;
+import com.wind.funds.transaction.enums.SourceObjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.FundsBalanceAdjustmentAuditApplicationService;

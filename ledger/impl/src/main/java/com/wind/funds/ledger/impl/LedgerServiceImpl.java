@@ -23,7 +23,7 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.ledger.SettlementPolicySpec;
+import com.wind.funds.ledger.spec.SettlementPolicySpec;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

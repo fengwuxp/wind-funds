@@ -5,7 +5,7 @@ import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;

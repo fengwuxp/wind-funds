@@ -7,7 +7,12 @@ import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import org.junit.jupiter.api.Test;
@@ -50,6 +55,10 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        Long frozenLedgerId = findLedger(user, LedgerSubjectCode.FROZEN).orElseThrow().getId();
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(frozenLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
 
         unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");
         BalanceSnapshot afterRejected = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -82,6 +91,14 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.FREEZE.name());
+        assertThat(postingPlansOf(freezeTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.HOLD.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.WITHIN_SUBJECT.name());
+        });
+        assertThat(entriesOf(freezeTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.HOLD.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.WITHIN_SUBJECT.name());
+        });
 
         LedgerTransaction releaseTransaction = ledgerTransactionByBusinessSn("WITHDRAW_REJECTED_UNFREEZE");
         assertThat(entriesOf(releaseTransaction).stream()
@@ -96,12 +113,36 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.UNFREEZE.name());
+        assertThat(postingPlansOf(releaseTransaction)).singleElement().satisfies(plan -> {
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.RELEASE.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_RELEASE.name());
+        });
+        assertThat(entriesOf(releaseTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.RELEASE.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_RELEASE.name());
+        });
+
+        RouteSnapshotSpec freezeSnapshot = fundsTransactionQueryService
+                .findRouteSnapshotByFreezeOrderSn(freezeSn)
+                .orElseThrow();
+        assertThat(freezeSnapshot.getLegs()).singleElement();
+        String releaseSn = frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getSn();
+        RouteSnapshotSpec releaseSnapshot = fundsTransactionQueryService
+                .findRouteSnapshotByFreezeOrderSn(releaseSn)
+                .orElseThrow();
+        assertThat(releaseSnapshot.getLegs()).singleElement().satisfies(releaseLeg ->
+                assertThat(releaseLeg.getReplayRefLegId()).isEqualTo(freezeSnapshot.getLegs().getFirst().getLegId()));
+        assertThat(postingPlansOf(freezeTransaction)).singleElement().satisfies(plan ->
+                assertThat(plan.getRouteLegId()).isEqualTo(freezeSnapshot.getLegs().getFirst().getLegId()));
+        assertThat(postingPlansOf(releaseTransaction)).singleElement().satisfies(plan ->
+                assertThat(plan.getRouteLegId()).isEqualTo(releaseSnapshot.getLegs().getFirst().getLegId()));
 
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getReleasedAmount()).isEqualTo(60L);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(ledgerService.getLedgerById(frozenLedgerId).getStatus()).isEqualTo(LedgerStatus.SUSPENDED);
         LedgerFactSnapshot afterRejectedFacts = ledgerFactSnapshot();
 
         unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");

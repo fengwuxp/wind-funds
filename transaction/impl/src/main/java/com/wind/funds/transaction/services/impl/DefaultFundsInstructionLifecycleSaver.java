@@ -17,23 +17,26 @@ import com.wind.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.wind.funds.transaction.model.FundsTransactionParticipant;
 import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
+import com.wind.funds.transaction.model.request.MerchantInfoRequest;
 import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
+import com.wind.funds.transaction.support.ExternalFundsFactDigestSupport;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
-import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
+import com.wind.funds.route.model.ImmutableRouteSnapshotSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -66,6 +69,8 @@ import java.util.TreeMap;
 @Service
 @AllArgsConstructor
 public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleRecorder {
+
+    private static final String TRANSACTION_DETAIL_DIGEST_DOMAIN = "transaction.detail.request";
 
     private static final WindSequenceType FUNDS_TRANSACTION_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_TRANSACTION", "FT", 6);
@@ -142,7 +147,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (transaction == null) {
             return null;
         }
-        AssertUtils.equals(transaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest(),
+        AssertUtils.isTrue(ExternalFundsFactDigestSupport.matches(
+                        transaction.getExternalFundsFactDigest(), instruction),
                 "外部资金事实请求参数不一致，transactionSn = {}", transaction.getSn());
         AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
                 "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
@@ -251,7 +257,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         AssertUtils.isTrue(Objects.equals(transaction.getExternalSourceCode(), instruction.getExternalSourceCode())
                         && Objects.equals(transaction.getExternalFundsFactSn(), instruction.getExternalFundsFactSn())
                         && transaction.getExternalFundsEffectType() == instruction.getExternalFundsEffectType()
-                        && Objects.equals(transaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest()),
+                        && ExternalFundsFactDigestSupport.matches(
+                                transaction.getExternalFundsFactDigest(), instruction),
                 "资金交易业务键已关联其他外部资金事实，transactionSn = {}，businessSn = {}",
                 transaction.getSn(), instruction.getBusinessSn());
 
@@ -330,7 +337,6 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         }
         List<FundsTransactionDetail> result = new ArrayList<>(participants.size());
         for (RouteParticipantSpec participant : participants) {
-            String requestHash = computeDetailRequestHash(instruction, routeSnapshot, participant);
             FundsTransactionDetail detail = findDetailByBusinessEventAndParticipant(instruction, transactionSn,
                     participant);
             if (detail == null) {
@@ -339,7 +345,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                         transactionSn, instruction.getBusinessSn());
                 return List.of();
             }
-            AssertUtils.isTrue(Objects.equals(detail.getRequestHash(), requestHash),
+            AssertUtils.isTrue(matchesDetailRequestHash(
+                            detail.getRequestHash(), instruction, routeSnapshot, participant),
                     "资金交易明细请求参数不一致，sn = {}", detail.getSn());
             result.add(detail);
         }
@@ -369,7 +376,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                         transactionSn, instruction.getBusinessSn());
                 detail = createTransactionDetail(instruction, routeSnapshot, transactionSn, participant, requestHash);
             } else {
-                AssertUtils.isTrue(Objects.equals(detail.getRequestHash(), requestHash),
+                AssertUtils.isTrue(matchesDetailRequestHash(
+                                detail.getRequestHash(), instruction, routeSnapshot, participant),
                         "资金交易明细请求参数不一致，sn = {}", detail.getSn());
             }
             result.add(detail);
@@ -754,6 +762,26 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private String computeDetailRequestHash(FundsInstructionSpec instruction,
                                             RouteSnapshotSpec routeSnapshot,
                                             RouteParticipantSpec participant) {
+        return FundsStableHashSupport.sha256CanonicalJson(
+                TRANSACTION_DETAIL_DIGEST_DOMAIN,
+                detailRequestHashFacts(instruction, routeSnapshot, participant, true));
+    }
+
+    private boolean matchesDetailRequestHash(String storedHash,
+                                             FundsInstructionSpec instruction,
+                                             RouteSnapshotSpec routeSnapshot,
+                                             RouteParticipantSpec participant) {
+        return FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                storedHash,
+                TRANSACTION_DETAIL_DIGEST_DOMAIN,
+                detailRequestHashFacts(instruction, routeSnapshot, participant, true),
+                detailRequestHashFacts(instruction, routeSnapshot, participant, false));
+    }
+
+    private Map<String, Object> detailRequestHashFacts(FundsInstructionSpec instruction,
+                                                       RouteSnapshotSpec routeSnapshot,
+                                                       RouteParticipantSpec participant,
+                                                       boolean canonical) {
         Map<String, Object> values = new TreeMap<>();
         values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
         values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
@@ -769,10 +797,42 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableFundsInstructionSpec.Fields.accountId, accountIdSummary(instruction.getAccountId()));
         values.put(ImmutableFundsInstructionSpec.Fields.reference, referenceSummary(instruction.getReference()));
         values.put(HASH_FIELD_CONTEXT_VARIABLES,
-                FundsStableHashSupport.stableHashMap(instruction.getContextVariables()));
+                instructionContextSummary(instruction.getContextVariables(), canonical));
         values.put(HASH_FIELD_ROUTE, routeRequestHashSummary(routeSnapshot));
         values.put(HASH_FIELD_PARTICIPANT, participantSummary(participant));
-        return FundsStableHashSupport.sha256Json(values);
+        return values;
+    }
+
+    private Map<String, Object> instructionContextSummary(Map<String, Object> contextVariables, boolean canonical) {
+        Map<String, Object> values = FundsStableHashSupport.stableHashMap(contextVariables);
+        if (!canonical) {
+            return values;
+        }
+        if (values.get(FundsInstructionContextKeys.FEE_CHARGE_SPEC) instanceof FeeSpec feeSpec) {
+            values.put(FundsInstructionContextKeys.FEE_CHARGE_SPEC, feeSpecSummary(feeSpec));
+        }
+        if (values.get(FundsInstructionContextKeys.MERCHANT_INFO) instanceof MerchantInfoRequest merchantInfo) {
+            values.put(FundsInstructionContextKeys.MERCHANT_INFO, merchantInfoSummary(merchantInfo));
+        }
+        return values;
+    }
+
+    private Map<String, Object> feeSpecSummary(FeeSpec feeSpec) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("feeType", feeSpec.getFeeType());
+        values.put("fixedFee", feeSpec.getFixedFee());
+        values.put("feeRate", feeSpec.getFeeRate());
+        values.put("maxAmountWithRate", feeSpec.getMaxAmountWithRate());
+        values.put("minAmountWithRate", feeSpec.getMinAmountWithRate());
+        return values;
+    }
+
+    private Map<String, Object> merchantInfoSummary(MerchantInfoRequest merchantInfo) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("merchantId", merchantInfo.getMerchantId());
+        values.put("merchantName", merchantInfo.getMerchantName());
+        values.put("mccCode", merchantInfo.getMccCode());
+        return values;
     }
 
     private Map<String, Object> accountIdSummary(@Nullable FundsAccountId accountId) {

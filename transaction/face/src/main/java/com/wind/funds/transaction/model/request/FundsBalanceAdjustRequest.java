@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.spec.SourceObjectType;
+import com.wind.funds.transaction.enums.SourceObjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;

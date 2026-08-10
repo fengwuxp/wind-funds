@@ -6,6 +6,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -54,6 +55,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -155,6 +158,26 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(activityCount(RESERVED_ACTIVITY_SN)).isOne();
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testRecordMovementShouldReplayLegacyDigestWithCanonicalV1Request() {
+        prepareSpendControlMovementData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        RecordSpendControlMovementRequest request = recordRequest(
+                decision, RESERVED_ACTIVITY_SN, SpendControlMovementType.RESERVED, "unused");
+        Map<String, Object> facts = reservedDigestFacts(request);
+        request.setMovementDigest("sha256:" + FundsStableHashSupport.sha256Json(facts));
+        SpendControlMovementDTO legacy = spendControlMovementService.recordMovement(request);
+
+        request.setMovementDigest("sha256:" + FundsStableHashSupport.sha256CanonicalJson(
+                "wallet.spend-control.reservation", facts));
+        SpendControlMovementDTO replayed = spendControlMovementService.recordMovement(request);
+
+        assertThat(replayed.getId()).isEqualTo(legacy.getId());
+        assertThat(replayed.getMovementDigest()).isEqualTo(legacy.getMovementDigest());
+        assertThat(activityCount(RESERVED_ACTIVITY_SN)).isOne();
+        assertNoTransactionFacts(BUSINESS_SN);
     }
 
     /**
@@ -698,6 +721,25 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setPeriodId(PERIOD_ID)
                 .setRejectReason(decision.getRejectReason())
                 .setMovementDigest(movementDigest);
+    }
+
+    private Map<String, Object> reservedDigestFacts(RecordSpendControlMovementRequest request) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("amount", request.getAmount());
+        values.put("businessScene", request.getBusinessScene());
+        values.put("businessSn", request.getBusinessSn());
+        values.put("controlScopeId", request.getControlScopeId());
+        values.put("currency", request.getCurrency().name());
+        values.put("instrumentSn", request.getInstrumentSn());
+        values.put("movementSn", request.getMovementSn());
+        values.put("periodId", request.getPeriodId());
+        values.put("spendDecisionSn", request.getSpendDecisionSn());
+        values.put("spendRuleId", request.getSpendRuleId());
+        values.put("spendRuleVersion", request.getSpendRuleVersion());
+        values.put("targetAccountId", request.getTargetAccountId().type() + ":" + request.getTargetAccountId().id());
+        values.put("tenantId", request.getTenantId());
+        values.put("transactionSn", request.getTransactionSn());
+        return values;
     }
 
     private RecordSpendControlMovementRequest limitIncreaseRequest(String movementSn,

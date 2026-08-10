@@ -1,7 +1,7 @@
 package com.wind.funds.architecture;
 
 import com.wind.funds.route.spec.ReplayRequestSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.integration.operator.WindOperator;
 import org.junit.jupiter.api.Test;
 

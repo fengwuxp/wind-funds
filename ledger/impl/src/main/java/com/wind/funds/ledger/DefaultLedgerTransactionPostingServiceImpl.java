@@ -3,7 +3,6 @@ package com.wind.funds.ledger;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.service.LedgerService;
-import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -11,9 +10,9 @@ import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +44,7 @@ import java.util.stream.Collectors;
 @Component
 public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransactionPostingService {
 
-    private final LedgerTransactionServiceImpl ledgerTransactionService;
+    private final LedgerTransactionCommandService ledgerTransactionCommandService;
 
     private final LedgerService ledgerService;
 
@@ -72,7 +71,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 .stream()
                 .map(ProjectionGroupKey::accountId)
                 .collect(Collectors.toCollection(LinkedHashSet::new)));
-        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(transaction);
+        LedgerTransactionPostResult postResult = ledgerTransactionCommandService.postLedgerTransaction(transaction);
         if (!postResult.isNewlyPosted()) {
             log.info("账本交易已存在，跳过重复入账和余额投影，ledgerTransactionSn={}, fundsTransactionSn={}, "
                             + "businessScene={}, businessSn={}",

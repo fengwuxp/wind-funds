@@ -9,11 +9,11 @@ import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.spec.SourceObjectType;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.enums.SourceObjectType;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -76,6 +76,21 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToFreezeInstruction(@NonNull FundsBalanceFreezeRequest request,
                                                                     @NonNull WindOperator operator) {
+        return convertToFreezeInstruction(request, null, operator);
+    }
+
+    public @NonNull FundsInstructionSpec convertToReferencedFreezeInstruction(
+            @NonNull FundsBalanceFreezeRequest request,
+            @NonNull FundsInstructionReferenceType referenceType,
+            @NonNull String referenceSn,
+            @NonNull WindOperator operator) {
+        return convertToFreezeInstruction(request, reference(referenceType, referenceSn), operator);
+    }
+
+    private @NonNull FundsInstructionSpec convertToFreezeInstruction(
+            @NonNull FundsBalanceFreezeRequest request,
+            @Nullable FundsInstructionReferenceSpec reference,
+            @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
@@ -86,6 +101,7 @@ public class FundsBalanceControlInstructionConverter {
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
+                .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())

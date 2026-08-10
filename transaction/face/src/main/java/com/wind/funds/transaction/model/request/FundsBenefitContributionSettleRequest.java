@@ -2,8 +2,8 @@ package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -46,13 +46,13 @@ public class FundsBenefitContributionSettleRequest {
     @Schema(description = "关联原资金交易流水号，可用于伴随支付、争议或对账回放")
     private String referenceTransactionSn;
 
-    @Schema(description = "平台、商户或合作方让利责任承担账务主体")
+    @Schema(description = "平台、商户或合作方让利责任承担资金账户")
     @NotNull
-    private SubjectRef costBearerSubjectRef;
+    private FundsAccountId costBearerAccountId;
 
-    @Schema(description = "让利账务承接主体，目标态语义等同 benefitSettlementSubjectRef，例如用户或订单让利归集账目、商户清结算账户或等价被补足账户")
+    @Schema(description = "让利账务承接资金账户，例如用户或订单让利归集账户、商户清结算账户或等价被补足账户")
     @NotNull
-    private SubjectRef benefitReceiverSubjectRef;
+    private FundsAccountId benefitReceiverAccountId;
 
     @Schema(description = "让利承接目标账目；平台补足商户使用 CLEARING，用户或订单归集使用 SETTLEMENT")
     @NotNull

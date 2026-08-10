@@ -5,9 +5,6 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
@@ -176,6 +173,41 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     }
 
     /**
+     * 场景：调用方把非账务主体或缺失类型的账户标识传入让利结算。
+     * 输入：承担方类型为 EXTERNAL_BANK；承接方类型为 SPEND_CONTROL_SCOPE。
+     * 输出：服务在进入直接交易链路前拒绝，且不生成资金或账务事实。
+     * 红线：字符串账户类型必须在信任边界按可入账主体白名单校验。
+     */
+    @Test
+    void testSettleWithInvalidAccountTypesShouldFailWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_invalid_type_cost");
+        FundsAccountId receiver = fundingAccount("ben_invalid_type_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        var before = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(
+                FundsAccountId.immutable("ben_external_cost", "EXTERNAL_BANK"),
+                receiver,
+                20L,
+                "BENEFIT_INVALID_COST_TYPE_001"), WindOperatorFactory.system()))
+                .hasMessageContaining("权益让利承担方必须是资金账户或信用账户");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(
+                costBearer,
+                FundsAccountId.immutable("ben_control_receiver", "SPEND_CONTROL_SCOPE"),
+                20L,
+                "BENEFIT_INVALID_RECEIVER_TYPE_001"), WindOperatorFactory.system()))
+                .hasMessageContaining("权益让利承接账务主体必须是资金账户或信用账户");
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(costBearer, receiver)),
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_INVALID_COST_TYPE_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_INVALID_RECEIVER_TYPE_001");
+    }
+
+    /**
      * 场景：商户承担优惠券或支付立减，资金底座记录商户让利的出资责任账目。
      * 输入：资金性质为 MERCHANT_BORNE。
      * 输出：生成一笔从商户让利责任账户到用户让利账目的标准资金交易和账务分录。
@@ -208,25 +240,30 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
     /**
      * 场景：优惠券模块使用同一让利出资业务流水重复提交，随后同流水变更金额再次提交。
-     * 输入：平台出资 30，重复同摘要提交，再把同一业务流水金额改成 31。
+     * 输入：平台出资 30，重复同摘要提交，再分别变更金额、承担账户、承接账户类型、承接账目和资金性质。
      * 输出：同摘要重试返回原交易流水；摘要冲突失败；余额和账务事实保持首次结算后的状态。
      * 红线：优惠券核销重试不能重复入账，同一出资方流水也不能被不同金额、主体或资金性质复用。
      */
     @Test
     void testSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId costBearer = fundingAccount("ben_idempotent_cost");
+        FundsAccountId alternateCostBearer = fundingAccount("ben_idempotent_alt_cost");
         FundsAccountId receiver = fundingAccount("ben_idempotent_recv");
+        FundsAccountId receiverAsCreditAccount = creditAccount(receiver.id());
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(alternateCostBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(receiver, LedgerSubjectCode.CLEARING);
+        ensureLedger(receiverAsCreditAccount, LedgerSubjectCode.SETTLEMENT);
 
         topup(costBearer, 100L, "BENEFIT_IDEMPOTENT_TOPUP");
-        var afterTopup = snapshot(balances(costBearer, receiver));
+        topup(alternateCostBearer, 100L, "BENEFIT_IDEMPOTENT_ALT_TOPUP");
+        var afterTopup = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
 
         String businessSn = "BENEFIT_IDEMPOTENT_SETTLE_001";
         String transactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 30L,
                 businessSn), WindOperatorFactory.system());
-        var afterSettle = snapshot(balances(costBearer, receiver));
+        var afterSettle = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
         assertOnlyBalanceDeltas(afterTopup, afterSettle,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
@@ -237,7 +274,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 businessSn), WindOperatorFactory.system());
 
         assertThat(retryTransactionSn).isEqualTo(transactionSn);
-        var afterRetry = snapshot(balances(costBearer, receiver));
+        var afterRetry = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
         assertOnlyBalanceDeltas(afterSettle, afterRetry,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -247,7 +284,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 businessSn), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
-        var afterConflict = snapshot(balances(costBearer, receiver));
+        var afterConflict = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
         assertOnlyBalanceDeltas(afterRetry, afterConflict,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -259,7 +296,24 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
-        assertOnlyBalanceDeltas(afterConflict, snapshot(balances(costBearer, receiver)),
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(alternateCostBearer, receiver, 30L, businessSn),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiverAsCreditAccount, 30L, businessSn),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiver, 30L, businessSn)
+                        .setFundingNature(FundsBenefitFundingNature.MERCHANT_BORNE),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertOnlyBalanceDeltas(afterConflict,
+                snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount)),
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.CLEARING, 0L, CURRENCY));
@@ -475,8 +529,8 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     }
 
     /**
-     * 场景：调用方试图把让利承接目标账目藏入嵌套上下文、列表或点号别名。
-     * 输入：contextVariables 包含嵌套或列表中的 benefitReceiverLedgerSubjectCode，或点号分隔别名。
+     * 场景：调用方试图把让利账户或承接目标账目藏入嵌套上下文、列表或点号别名。
+     * 输入：contextVariables 包含 costBearerAccountId、benefitReceiverLedgerSubjectCode 或其嵌套别名。
      * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
      * 红线：contextVariables 只能放轻量关联信息，不能成为核心金额、分摊或规则事实旁路。
      */
@@ -491,10 +545,10 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_CONTEXT_NESTED_CORE_FIELD_001")
                 .setContextVariables(ReadonlyContextVariables.of(Map.of(
-                        "payload", Map.of("benefitReceiverLedgerSubjectCode", "CLEARING")))),
+                        "payload", Map.of("costBearerAccountId", "OTHER_ACCOUNT")))),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
-                .hasMessageContaining("benefitReceiverLedgerSubjectCode");
+                .hasMessageContaining("costBearerAccountId");
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_CONTEXT_DOTTED_CORE_FIELD_001")
@@ -624,20 +678,11 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessSn(businessSn)
                 .setOriginalOrderSn("ORDER_001")
                 .setReferenceTransactionSn("PAY_ORDER_001")
-                .setCostBearerSubjectRef(subjectRef(costBearer))
-                .setBenefitReceiverSubjectRef(subjectRef(receiver))
+                .setCostBearerAccountId(costBearer)
+                .setBenefitReceiverAccountId(receiver)
                 .setBenefitReceiverLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setAmount(Money.immutable(amount, CURRENCY))
                 .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS);
-    }
-
-    private SubjectRef subjectRef(FundsAccountId accountId) {
-        return ImmutableSubjectRef.builder()
-                .tenantId(TENANT_ID)
-                .subjectId(accountId.id())
-                .subjectType(FundsSubjectType.valueOf(accountId.type()))
-                .currency(CURRENCY.name())
-                .build();
     }
 
     private void assertLedgerEventAndBuckets(String businessSn,

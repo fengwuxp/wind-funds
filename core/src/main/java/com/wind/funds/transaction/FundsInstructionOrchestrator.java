@@ -1,8 +1,8 @@
 package com.wind.funds.transaction;
 
 
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import org.jspecify.annotations.NonNull;
 
 /**

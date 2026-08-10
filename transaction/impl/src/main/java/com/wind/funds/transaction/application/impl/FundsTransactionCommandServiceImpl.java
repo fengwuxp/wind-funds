@@ -9,7 +9,7 @@ import com.wind.common.locks.LockFactory;
 import com.wind.common.locks.WindLock;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.FundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsBalanceControlService;
@@ -40,6 +40,7 @@ import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.wind.funds.transaction.support.ExternalFundsFactDigestSupport;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -96,7 +97,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         if (existingTransaction == null || isSameBusinessRequest(existingTransaction, instruction)) {
             return execute(instruction);
         }
-        AssertUtils.equals(existingTransaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest(),
+        AssertUtils.isTrue(ExternalFundsFactDigestSupport.matches(
+                        existingTransaction.getExternalFundsFactDigest(), instruction),
                 "外部资金事实请求参数不一致，transactionSn = {}", existingTransaction.getSn());
         AssertUtils.isTrue(existingTransaction.getStatus() == FundsTransactionStatus.CLOSED,
                 "外部资金事实尚未成功完成，transactionSn = {}，status = {}",

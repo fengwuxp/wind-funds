@@ -57,7 +57,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
@@ -644,7 +644,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         paymentInstrumentService.changePaymentInstrumentBinding(new ChangePaymentInstrumentBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setBindingSn(bindingSn)
-                .setState(PaymentInstrumentBindingState.SUSPENDED)
+                .setStatus(PaymentInstrumentBindingStatus.SUSPENDED)
                 .setOperatorId("TEST")
                 .setChangeReason("verify established receive replay"));
     }

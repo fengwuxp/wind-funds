@@ -113,6 +113,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
                                     .isEqualTo(LedgerSubjectCode.AVAILABLE);
                         }));
         assertThat(entriesByFundsTransactionSn(first)).hasSize(2);
+        assertLedgerFactsFollowRouteSnapshot("CLEARING_BATCH_001");
 
         assertThatThrownBy(() -> clearingTransactionService.confirm(new FundsClearingConfirmRequest()
                 .setAccountId(accountId)

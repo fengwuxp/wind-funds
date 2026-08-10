@@ -1,8 +1,8 @@
 package com.wind.funds.ledger;
 
 import com.wind.funds.route.spec.ResolvedRouteSpec;
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Primary;

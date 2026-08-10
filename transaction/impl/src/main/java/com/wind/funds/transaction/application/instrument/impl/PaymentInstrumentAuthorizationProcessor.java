@@ -5,7 +5,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.funds.route.model.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -65,6 +65,8 @@ public class PaymentInstrumentAuthorizationProcessor {
     private static final String SHA256_PREFIX = "sha256:";
 
     private static final String CONTROL_RESERVATION_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_RESERVE";
+
+    private static final String CONTROL_RESERVATION_DIGEST_DOMAIN = "wallet.spend-control.reservation";
 
     private static final String CONTROL_RESERVATION_MOVEMENT_PREFIX = "SCR";
 
@@ -464,7 +466,8 @@ public class PaymentInstrumentAuthorizationProcessor {
                 decision.getTargetAccountId().type() + ":" + decision.getTargetAccountId().id());
         values.put("tenantId", request.getTenantId());
         values.put("transactionSn", authorizationSn);
-        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
+        return SHA256_PREFIX + FundsStableHashSupport.sha256CanonicalJson(
+                CONTROL_RESERVATION_DIGEST_DOMAIN, values);
     }
 
     private PaymentInstrumentRefSpec paymentInstrumentRef(AuthorizeByPaymentInstrumentRequest request,

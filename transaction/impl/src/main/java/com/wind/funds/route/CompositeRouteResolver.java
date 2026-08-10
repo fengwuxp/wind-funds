@@ -2,7 +2,7 @@ package com.wind.funds.route;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;

@@ -1,6 +1,6 @@
 package com.wind.funds.route;
 
-import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.funds.route.model.ImmutableRouteSnapshotSpec;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;

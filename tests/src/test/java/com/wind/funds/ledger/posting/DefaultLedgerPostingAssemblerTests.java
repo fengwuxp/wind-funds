@@ -21,10 +21,10 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
-import com.wind.funds.model.route.ImmutableRouteNodeSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
+import com.wind.funds.route.model.ImmutableRouteNodeSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
@@ -33,10 +33,10 @@ import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -135,6 +135,98 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
             assertThat(query.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
             assertThat(query.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        });
+    }
+
+    /**
+     * 场景：当前 hybrid route 同时携带路径和会计字段。
+     * 预期：assembler 把科目、余额效果、阶段、期间、约束和 routeLegId 完整投影到 posting 事实。
+     * 红线：后续 route/posting 解耦必须以相同账务结果为兼容基线，不能静默改变既有入账语义。
+     */
+    @Test
+    void testAssembleShouldPreserveCurrentHybridRouteAccountingFacts() {
+        RouteLegSpec leg = new TestRouteLegSpec(
+                "LEG-POSTING-HYBRID-001",
+                routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT,
+                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.SOURCE),
+                routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT,
+                        LedgerSubjectCode.FROZEN, RouteNodeRole.TARGET),
+                AccountBalancePeriodType.MONTHLY,
+                MONTHLY_PERIOD_ID,
+                LedgerBalanceEffectType.RESTORE,
+                LedgerPhaseCode.SETTLEMENT,
+                Map.of(
+                        "FUNDING_ACCOUNT:source_account:AVAILABLE", LedgerBalanceConstraintType.ALLOW_NEGATIVE,
+                        "target_account:FROZEN", LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE),
+                Map.of());
+
+        LedgerTransactionSpec transaction = assembler.assemble(
+                instruction(), "FUNDS_TX_HYBRID_001", resolvedRoute(leg));
+
+        LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThat(plan.isBalanced()).isTrue();
+        assertThat(plan.getRouteLegId()).isEqualTo(leg.getLegId());
+        assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
+        assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
+        assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
+        assertThat(plan.getContextVariables()).containsEntry("routeLegId", leg.getLegId());
+        assertThat(plan.getEntries()).hasSize(2).allSatisfy(entry -> {
+            assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+            assertThat(entry.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+            assertThat(entry.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
+            assertThat(entry.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
+            assertThat(entry.getContextVariables()).containsEntry("routeLegId", leg.getLegId());
+        });
+        assertThat(plan.getEntries())
+                .extracting(LedgerEntrySpec::getLedgerSubjectCode,
+                        LedgerEntrySpec::getEntryType,
+                        LedgerEntrySpec::getBalanceConstraintType)
+                .containsExactly(
+                        tuple(LedgerSubjectCode.AVAILABLE,
+                                EntrySide.DEBIT,
+                                LedgerBalanceConstraintType.ALLOW_NEGATIVE),
+                        tuple(LedgerSubjectCode.FROZEN,
+                                EntrySide.CREDIT,
+                                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE));
+    }
+
+    /**
+     * 场景：所有公开资金事件进入默认 route -> posting 翻译器。
+     * 预期：每个事件都映射到当前明确的 posting intent/scope，并保留 route phase/effect。
+     * 红线：新增事件或边界迁移不能遗漏账务映射，也不能借默认分支静默改变既有事件语义。
+     */
+    @Test
+    void testAssembleShouldPreserveEventToPostingMatrix() {
+        List<PostingCase> cases = postingCases();
+        assertThat(cases)
+                .extracting(PostingCase::eventType)
+                .containsExactlyInAnyOrder(FundsTransactionEventType.values());
+
+        cases.forEach(postingCase -> {
+            RouteLegSpec leg = postingCaseLeg(postingCase);
+            LedgerTransactionSpec transaction = assembler.assemble(
+                    instruction(postingCase),
+                    "FUNDS_TX_MATRIX_" + postingCase.eventType().name(),
+                    resolvedRoute(postingCase, leg));
+
+            LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
+            assertThat(plan.isBalanced()).as("%s plan balance", postingCase.eventType()).isTrue();
+            assertThat(plan.getIntent()).as("%s intent", postingCase.eventType())
+                    .isEqualTo(postingCase.expectedIntent());
+            assertThat(plan.getPostingScope()).as("%s scope", postingCase.eventType())
+                    .isEqualTo(postingCase.expectedScope());
+            assertThat(plan.getBalanceEffectType()).as("%s effect", postingCase.eventType())
+                    .isEqualTo(postingCase.balanceEffectType());
+            assertThat(plan.getEntries()).allSatisfy(entry -> {
+                assertThat(entry.getIntent()).isEqualTo(postingCase.expectedIntent());
+                assertThat(entry.getPostingScope()).isEqualTo(postingCase.expectedScope());
+                assertThat(entry.getBalanceEffectType()).isEqualTo(postingCase.balanceEffectType());
+                assertThat(entry.getPhaseCode()).isEqualTo(postingCase.phaseCode());
+            });
         });
     }
 
@@ -308,6 +400,23 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .build();
     }
 
+    private FundsInstructionSpec instruction(PostingCase postingCase) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(TENANT_ID)
+                .instructionType(postingCase.instructionType())
+                .eventType(postingCase.eventType())
+                .transactionType(postingCase.transactionType())
+                .amount(AMOUNT)
+                .originalAmount(AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .businessScene("POSTING_MATRIX")
+                .businessSn("BIZ-POSTING-MATRIX-" + postingCase.eventType().name())
+                .eventTime(EVENT_TIME)
+                .operator(WindOperatorFactory.system())
+                .contextVariables(Map.of())
+                .build();
+    }
+
     private FundsInstructionSpec limitAdjustInstruction() {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TENANT_ID)
@@ -343,6 +452,23 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .legs(List.of(leg))
                 .resolvedAt(EVENT_TIME)
                 .contextVariables(contextVariables)
+                .build();
+    }
+
+    private ResolvedRouteSpec resolvedRoute(PostingCase postingCase, RouteLegSpec leg) {
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("POSTING_MATRIX_ROUTE")
+                .routeVersion("v1")
+                .businessScene("POSTING_MATRIX")
+                .businessSn("BIZ-POSTING-MATRIX-" + postingCase.eventType().name())
+                .instructionType(postingCase.instructionType())
+                .eventType(postingCase.eventType())
+                .transactionType(postingCase.transactionType())
+                .participants(List.of())
+                .legs(List.of(leg))
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
                 .build();
     }
 
@@ -383,6 +509,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 periodId,
                 LedgerBalanceEffectType.CONSUME,
                 LedgerPhaseCode.TRANSFER,
+                Map.of(),
                 contextVariables
         );
     }
@@ -404,7 +531,106 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 null,
                 increase ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE,
                 LedgerPhaseCode.ADJUSTMENT,
+                Map.of(),
                 Map.of()
+        );
+    }
+
+    private RouteLegSpec postingCaseLeg(PostingCase postingCase) {
+        if (postingCase.eventType() == FundsTransactionEventType.LIMIT_ADJUST) {
+            return limitAdjustLeg(true);
+        }
+        return new TestRouteLegSpec(
+                "LEG-POSTING-MATRIX-" + postingCase.eventType().name(),
+                routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
+                routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
+                AccountBalancePeriodType.LIFETIME,
+                null,
+                postingCase.balanceEffectType(),
+                postingCase.phaseCode(),
+                Map.of(),
+                Map.of()
+        );
+    }
+
+    private List<PostingCase> postingCases() {
+        return List.of(
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.TOPUP,
+                        DefaultFundsTransactionType.TOPUP, LedgerPhaseCode.FUND_IN,
+                        LedgerBalanceEffectType.INCREASE, LedgerPostingIntentType.TOPUP,
+                        LedgerPostingScope.PLATFORM_EXTERNAL),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.TRANSFER,
+                        DefaultFundsTransactionType.TRANSFER, LedgerPhaseCode.TRANSFER,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.TRANSFER,
+                        LedgerPostingScope.BETWEEN_SUBJECTS),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAY,
+                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.TRANSFER,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.TRANSFER,
+                        LedgerPostingScope.BETWEEN_SUBJECTS),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.REFUND,
+                        DefaultFundsTransactionType.REFUND, LedgerPhaseCode.REFUND,
+                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.REFUND,
+                        LedgerPostingScope.BETWEEN_SUBJECTS),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.WITHDRAW,
+                        DefaultFundsTransactionType.WITHDRAW, LedgerPhaseCode.FUND_OUT,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.WITHDRAWAL,
+                        LedgerPostingScope.PLATFORM_EXTERNAL),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_CHARGE,
+                        DefaultFundsTransactionType.FEE, LedgerPhaseCode.FEE,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.FEE,
+                        LedgerPostingScope.FEE),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_REFUND,
+                        DefaultFundsTransactionType.REFUND, LedgerPhaseCode.FEE,
+                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.FEE_REFUND,
+                        LedgerPostingScope.FEE),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.CLEARING_CONFIRM,
+                        DefaultFundsTransactionType.CLEARING, LedgerPhaseCode.SETTLEMENT,
+                        LedgerBalanceEffectType.RELEASE, LedgerPostingIntentType.SETTLEMENT,
+                        LedgerPostingScope.WITHIN_SUBJECT),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.SETTLEMENT_LOCK,
+                        DefaultFundsTransactionType.SETTLEMENT, LedgerPhaseCode.SETTLEMENT,
+                        LedgerBalanceEffectType.HOLD, LedgerPostingIntentType.SETTLEMENT,
+                        LedgerPostingScope.WITHIN_SUBJECT),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_SUCCEEDED,
+                        DefaultFundsTransactionType.PAYOUT, LedgerPhaseCode.FUND_OUT,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.WITHDRAWAL,
+                        LedgerPostingScope.PLATFORM_EXTERNAL),
+                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_FAILED,
+                        DefaultFundsTransactionType.PAYOUT, LedgerPhaseCode.REFUND,
+                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.REFUND,
+                        LedgerPostingScope.BETWEEN_SUBJECTS),
+                new PostingCase(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.AUTHORIZE,
+                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.AUTHORIZATION,
+                        LedgerBalanceEffectType.HOLD, LedgerPostingIntentType.AUTHORIZATION,
+                        LedgerPostingScope.CONTROL_HOLD),
+                new PostingCase(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.REVERSAL,
+                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.REVERSAL,
+                        LedgerBalanceEffectType.RELEASE, LedgerPostingIntentType.AUTHORIZATION_REVERSAL,
+                        LedgerPostingScope.CONTROL_HOLD),
+                new PostingCase(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.COMPLETE,
+                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.COMPLETION,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.AUTHORIZATION_COMPLETION,
+                        LedgerPostingScope.CONTROL_CONSUME),
+                new PostingCase(FundsInstructionType.AUTHORIZATION_TRANSACTION, FundsTransactionEventType.AUTH_REFUND,
+                        DefaultFundsTransactionType.REFUND, LedgerPhaseCode.REFUND,
+                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.REFUND,
+                        LedgerPostingScope.BETWEEN_SUBJECTS),
+                new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.FREEZE,
+                        DefaultFundsTransactionType.BALANCE_CONTROL, LedgerPhaseCode.FREEZE,
+                        LedgerBalanceEffectType.HOLD, LedgerPostingIntentType.HOLD,
+                        LedgerPostingScope.WITHIN_SUBJECT),
+                new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.UNFREEZE,
+                        DefaultFundsTransactionType.BALANCE_CONTROL, LedgerPhaseCode.UNFREEZE,
+                        LedgerBalanceEffectType.RELEASE, LedgerPostingIntentType.RELEASE,
+                        LedgerPostingScope.CONTROL_RELEASE),
+                new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.BALANCE_ADJUST,
+                        DefaultFundsTransactionType.ADJUSTMENT, LedgerPhaseCode.ADJUSTMENT,
+                        LedgerBalanceEffectType.INCREASE, LedgerPostingIntentType.ADJUSTMENT,
+                        LedgerPostingScope.ADJUSTMENT),
+                new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.LIMIT_ADJUST,
+                        DefaultFundsTransactionType.ADJUSTMENT, LedgerPhaseCode.ADJUSTMENT,
+                        LedgerBalanceEffectType.INCREASE, LedgerPostingIntentType.ADJUSTMENT,
+                        LedgerPostingScope.ADJUSTMENT)
         );
     }
 
@@ -439,6 +665,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                                     String periodId,
                                     LedgerBalanceEffectType balanceEffectType,
                                     LedgerPhaseCode phaseCode,
+                                    Map<String, LedgerBalanceConstraintType> constraintOverrides,
                                     Map<String, Object> contextVariables) implements RouteLegSpec {
 
         @Override
@@ -488,13 +715,22 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
         @Override
         public Map<String, LedgerBalanceConstraintType> getConstraintOverrides() {
-            return Map.of();
+            return constraintOverrides;
         }
 
         @Override
         public Map<String, Object> getContextVariables() {
             return contextVariables;
         }
+    }
+
+    private record PostingCase(FundsInstructionType instructionType,
+                               FundsTransactionEventType eventType,
+                               DefaultFundsTransactionType transactionType,
+                               LedgerPhaseCode phaseCode,
+                               LedgerBalanceEffectType balanceEffectType,
+                               LedgerPostingIntentType expectedIntent,
+                               LedgerPostingScope expectedScope) {
     }
 
     private static final class RecordingLedgerService implements LedgerService {

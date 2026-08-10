@@ -1,0 +1,53 @@
+# D-CS-006/D-CS-007: public top-level type exceptions; public nested types inherit the outer type classification.
+EXPERIMENTAL	com.wind.funds.transaction.enums.DefaultFeeType
+EXPERIMENTAL	com.wind.funds.wallet.enums.CreditFundsAccountType
+EXPERIMENTAL	com.wind.funds.wallet.enums.ExternalFundsAccountType
+EXPERIMENTAL	com.wind.funds.wallet.enums.FundingAccountType
+INTERNAL	com.wind.funds.ledger.support.LedgerNormalBalanceUtils
+INTERNAL	com.wind.funds.transaction.spec.MerchantInfoSpec
+INTERNAL	com.wind.funds.transaction.enums.FundsBenefitLedgerEffect
+INTERNAL	com.wind.funds.wallet.enums.UserWalletFundsAccountType
+
+# Settlement lifecycle is an independent dirty-worktree slice and needs its own Owner approval.
+
+# D-CS-003 legacy JSON digest entry point.
+EXCLUDED_MEMBER	com.wind.funds.transaction.support.FundsStableHashSupport	public static java.lang.String sha256Json(java.lang.Object);
+
+# D-CS-004 unresolved time and host-clock contract members.
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerBalanceBucket	public com.wind.funds.ledger.LedgerBalanceBucket(com.wind.funds.ledger.enums.LedgerSubjectCode, com.wind.transaction.core.Money, com.wind.funds.ledger.enums.AccountBalancePeriodType, java.lang.String, java.time.LocalDateTime, java.time.LocalDateTime);
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerBalanceBucket	public boolean isActive();
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerBalanceBucket	public java.time.LocalDateTime activeTime();
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerBalanceBucket	public java.time.LocalDateTime expireTime();
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerBalanceChangedEvent	public java.time.LocalDateTime getTransactionTime();
+EXCLUDED_MEMBER	com.wind.funds.ledger.enums.AccountBalancePeriodType	public java.lang.String formatPeriodId();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.ReplayRequestSpec	public abstract java.time.LocalDateTime getEventTime();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.ResolvedRouteSpec	public abstract java.time.LocalDateTime getResolvedAt();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.ResolvedRouteSpec	public default java.time.LocalDateTime getExpiresAt();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteSnapshotSpec	public abstract java.time.LocalDateTime getResolvedAt();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteSnapshotSpec	public default java.time.LocalDateTime getExpiresAt();
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.LedgerEntrySpec	public abstract java.time.LocalDateTime getTransactionTime();
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.time.LocalDateTime getTransactionTime();
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.SettlementPolicySpec	public static void configureDefaultHolidayCalendar(com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementHolidayCalendar);
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.SettlementPolicySpec	public static void resetDefaultHolidayCalendar();
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.SettlementPolicySpec	public java.time.LocalDateTime nextSettlementTime(java.time.LocalDateTime);
+EXCLUDED_MEMBER	com.wind.funds.ledger.spec.SettlementPolicySpec	public java.time.LocalDateTime nextSettlementTime(java.time.LocalDateTime, com.wind.funds.ledger.spec.SettlementPolicySpec$SettlementHolidayCalendar);
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.time.LocalDateTime getEventTime();
+
+# D-CS-005 unresolved route and posting ownership members.
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerPostingAssembler	public abstract boolean supports(com.wind.funds.route.spec.ResolvedRouteSpec);
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerPostingAssembler	public abstract com.wind.funds.ledger.spec.LedgerTransactionSpec assemble(com.wind.funds.transaction.spec.FundsInstructionSpec, java.lang.String, R);
+EXCLUDED_MEMBER	com.wind.funds.ledger.LedgerTransactionPostingService	public abstract void post(com.wind.funds.ledger.spec.LedgerTransactionSpec);
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.funds.ledger.enums.LedgerBalanceEffectType getBalanceEffectType();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteLegSpec	public abstract com.wind.funds.ledger.enums.LedgerPhaseCode getPhaseCode();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteLegSpec	public default com.wind.funds.ledger.enums.AccountBalancePeriodType getPeriodType();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteLegSpec	public default java.lang.String getPeriodId();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteLegSpec	public default java.util.Map<java.lang.String, com.wind.funds.ledger.enums.LedgerBalanceConstraintType> getConstraintOverrides();
+EXCLUDED_MEMBER	com.wind.funds.route.spec.RouteNodeSpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LEDGER_PERIOD_ID;
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LEDGER_PERIOD_TYPE;
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_LEDGER_SUBJECT_CODE;
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_LEDGER_SUBJECT_CODE;
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.AccountBalancePeriodType getLedgerPeriodType();
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.LedgerSubjectCode getPayeeLedgerSubjectCode();
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.LedgerSubjectCode getPayerLedgerSubjectCode();
+EXCLUDED_MEMBER	com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getLedgerPeriodId();

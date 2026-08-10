@@ -1,8 +1,8 @@
 package com.wind.funds.route.support;
 
 import com.wind.integration.core.context.TenantContextHolder;
-import com.wind.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
+import com.wind.funds.route.model.ImmutablePlatformAccountsSnapshotSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;

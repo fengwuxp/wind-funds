@@ -14,24 +14,26 @@ import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableExternalAccountRefSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
-import com.wind.funds.spec.transaction.FeeSpec;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.funds.transaction.support.ExternalFundsFactDigestSupport;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
+import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
+import com.wind.funds.wallet.service.LedgerQueryService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -41,8 +43,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * 资金直接交易指令转换器。
@@ -58,11 +60,15 @@ public class FundsDirectTransactionInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
+    private final LedgerQueryService ledgerQueryService;
+
     @Autowired
     public FundsDirectTransactionInstructionConverter(@NonNull PlatformFundingAccountService platformFundingAccountService,
-                                                     @NonNull FundsAccountQueryService fundsAccountQueryService) {
+                                                     @NonNull FundsAccountQueryService fundsAccountQueryService,
+                                                     @NonNull LedgerQueryService ledgerQueryService) {
         this.platformFundingAccountService = platformFundingAccountService;
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
+        this.ledgerQueryService = ledgerQueryService;
     }
 
     public @NonNull FundsInstructionSpec convertToTopupInstruction(@NonNull FundsTransactionTopupRequest request,
@@ -113,15 +119,8 @@ public class FundsDirectTransactionInstructionConverter {
     }
 
     private String externalFundsFactDigest(FundsTransactionTopupRequest request, ConvertedAmount amount) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put("targetAccountId", request.getAccountId().id());
-        values.put("targetAccountType", request.getAccountId().type());
-        values.put("amount", amount.amount().getAmount());
-        values.put("currency", amount.amount().getCurrency().name());
-        values.put("originalAmount", amount.originalAmount().getAmount());
-        values.put("originalCurrency", amount.originalAmount().getCurrency().name());
-        values.put("exchangeRate", amount.exchangeRate());
-        return FundsStableHashSupport.sha256Json(values);
+        return ExternalFundsFactDigestSupport.canonicalDigest(
+                request.getAccountId(), amount.amount(), amount.originalAmount(), amount.exchangeRate());
     }
 
     public @NonNull FundsInstructionSpec convertToTransferInstruction(@NonNull FundsTransactionTransferRequest request,
@@ -250,12 +249,13 @@ public class FundsDirectTransactionInstructionConverter {
     private @Nullable FundsInstructionReferenceSpec refundReference(@NonNull FundsTransactionRefundRequest request) {
         if (StringUtils.hasText(request.getReferenceTransactionSn())) {
             return reference(FundsInstructionReferenceType.ORIGINAL_TRANSACTION, request.getReferenceTransactionSn(),
-                    null);
+                    referenceLedgerTransactionSn(request.getReferenceTransactionSn()), null);
         }
         if (request.getChannelTransactionSn() == null) {
             return null;
         }
-        return reference(FundsInstructionReferenceType.EXTERNAL_TRANSACTION, null, request.getChannelTransactionSn());
+        return reference(FundsInstructionReferenceType.EXTERNAL_TRANSACTION, null, null,
+                request.getChannelTransactionSn());
     }
 
     public @NonNull FundsInstructionSpec convertToWithdrawInstruction(@NonNull FundsTransactionWithdrawRequest request,
@@ -283,7 +283,8 @@ public class FundsDirectTransactionInstructionConverter {
                 .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getPayeeId(), null, null, null,
                         request.getDescription()))
-                .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn(), null))
+                .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn(), null,
+                        null))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -338,7 +339,8 @@ public class FundsDirectTransactionInstructionConverter {
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
-                .reference(reference(FundsInstructionReferenceType.FEE, request.getFeeSourceTransactionSn(), null))
+                .reference(reference(FundsInstructionReferenceType.FEE, request.getFeeSourceTransactionSn(),
+                        referenceLedgerTransactionSn(request.getFeeSourceTransactionSn()), null))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -374,13 +376,23 @@ public class FundsDirectTransactionInstructionConverter {
 
     private @NonNull FundsInstructionReferenceSpec reference(@NonNull FundsInstructionReferenceType referenceType,
                                                              @Nullable String referenceSn,
+                                                             @Nullable String referenceLedgerTransactionSn,
                                                              @Nullable String externalTransactionId) {
         return ImmutableFundsInstructionReferenceSpec.builder()
                 .referenceType(referenceType)
                 .referenceSn(referenceSn)
+                .referenceLedgerTransactionSn(referenceLedgerTransactionSn)
                 .externalTransactionId(externalTransactionId)
                 .contextVariables(Map.of())
                 .build();
+    }
+
+    private @NonNull String referenceLedgerTransactionSn(@NonNull String referenceTransactionSn) {
+        List<LedgerTransactionFactDTO> records = ledgerQueryService.queryLedgerTransactions(
+                TenantContextHolder.requireTenantId(), referenceTransactionSn, null, 2);
+        AssertUtils.isTrue(records.size() == 1,
+                "原资金交易账本流水不存在或不唯一，referenceTransactionSn = {}", referenceTransactionSn);
+        return records.getFirst().getSn();
     }
 
     private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,

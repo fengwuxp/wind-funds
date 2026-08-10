@@ -1,6 +1,6 @@
 package com.wind.funds.route.support;
 
-import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.RouteParticipantSpec;

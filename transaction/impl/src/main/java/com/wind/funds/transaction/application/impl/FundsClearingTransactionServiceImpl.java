@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.impl;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.FundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsClearingTransactionService;
 import com.wind.funds.transaction.converter.FundsClearingInstructionConverter;

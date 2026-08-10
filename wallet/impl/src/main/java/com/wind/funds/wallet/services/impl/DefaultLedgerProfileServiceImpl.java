@@ -10,7 +10,7 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.ledger.SettlementPolicySpec;
+import com.wind.funds.ledger.spec.SettlementPolicySpec;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 

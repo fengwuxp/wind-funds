@@ -5,7 +5,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.funds.route.model.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -75,6 +75,10 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
     private static final String CONTROL_CONSUME_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_CONSUME";
 
     private static final String CONTROL_RELEASE_MOVEMENT_DOMAIN = "SPEND_CONTROL_AUTHORIZATION_RELEASE";
+
+    private static final String CONTROL_CONSUME_DIGEST_DOMAIN = "wallet.spend-control.consumption";
+
+    private static final String CONTROL_RELEASE_DIGEST_DOMAIN = "wallet.spend-control.release";
 
     private final PaymentInstrumentAuthorizationProcessor authorizationProcessor;
 
@@ -317,7 +321,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         values.put("movementSn", movementSn);
         values.put("originalMovementSn", reservation.getMovementSn());
         values.put("tenantId", request.getTenantId());
-        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
+        return SHA256_PREFIX + FundsStableHashSupport.sha256CanonicalJson(CONTROL_CONSUME_DIGEST_DOMAIN, values);
     }
 
     private String completionContext(CompleteAuthorizationByPaymentInstrumentRequest request) {
@@ -394,7 +398,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         values.put("movementSn", movementSn);
         values.put("originalMovementSn", reservation.getMovementSn());
         values.put("tenantId", request.getTenantId());
-        return SHA256_PREFIX + FundsStableHashSupport.sha256Json(values);
+        return SHA256_PREFIX + FundsStableHashSupport.sha256CanonicalJson(CONTROL_RELEASE_DIGEST_DOMAIN, values);
     }
 
     private String reversalContext(ReverseAuthorizationByPaymentInstrumentRequest request) {

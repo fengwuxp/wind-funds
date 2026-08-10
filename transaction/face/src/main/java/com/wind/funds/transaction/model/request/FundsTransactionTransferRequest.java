@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

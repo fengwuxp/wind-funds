@@ -18,8 +18,8 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.service.LedgerService;
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
@@ -203,7 +203,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
     }
 
     private void assertNoCoreBenefitContextVariables(List<LedgerEntrySpec> entries) {
-        entries.forEach(entry -> FundsBenefitSpecValidators.immutableInstructionContext(
+        entries.forEach(entry -> FundsInstructionContextValidator.immutableInstructionContext(
                 entry.getContextVariables(),
                 "ledgerBalanceProjection.entry"));
     }

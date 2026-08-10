@@ -1,0 +1,166 @@
+package com.wind.funds.transaction.support;
+
+import com.wind.funds.transaction.spec.FundsInstructionFieldKeys;
+import com.wind.jackson.WindJson;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.core.JacksonException;
+
+import java.lang.reflect.Array;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * 权益资金上下文校验工具。
+ */
+public final class FundsInstructionContextValidator {
+
+    private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
+
+    private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile(
+            "(?:\"([^\"]+)\"|(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9_ -]*))\\s*:");
+
+    private static final Set<String> RESERVED_INSTRUCTION_CONTEXT_KEYS = Set.of(
+            "benefitSnapshot",
+            "benefitGroupSn",
+            "orderAmount",
+            "userPayAmount",
+            "merchantReceivableAmount",
+            "authorizationExpireTime",
+            "amount",
+            "ledgerEffect",
+            "fundingNature",
+            "refundPolicy",
+            "partialRefundStrategy",
+            "dispositions",
+            "refundDisposition",
+            "refundableAmount",
+            "nonRefundableAmount",
+            "userCouponId",
+            "lockNo",
+            "redemptionNo",
+            "releaseNo",
+            "returnNo",
+            "ruleVersionId",
+            "currentMarketingRule",
+            "couponEligibility",
+            "couponAvailable",
+            "recalculatedDiscount",
+            "bestCoupon",
+            "activityRules",
+            "userCouponBag");
+
+    private static final Set<String> RESERVED_INSTRUCTION_ROUTE_CONTEXT_KEYS = Set.of(
+            FundsInstructionFieldKeys.ACCOUNT_ID,
+            FundsInstructionFieldKeys.PAYER_ACCOUNT_ID,
+            FundsInstructionFieldKeys.PAYEE_ACCOUNT_ID,
+            FundsInstructionFieldKeys.PAYER_ID,
+            FundsInstructionFieldKeys.PAYEE_ID,
+            FundsInstructionFieldKeys.PAYER_LEDGER_SUBJECT_CODE,
+            FundsInstructionFieldKeys.PAYEE_LEDGER_SUBJECT_CODE,
+            FundsInstructionFieldKeys.LINKED_FUNDING_ACCOUNT_ID,
+            FundsInstructionFieldKeys.LEDGER_PERIOD_TYPE,
+            FundsInstructionFieldKeys.LEDGER_PERIOD_ID);
+
+    private static final Set<String> MONEY_VALUE_OBJECT_KEYS = Set.of("amount", "currency");
+
+    private FundsInstructionContextValidator() {
+    }
+
+    public static Map<String, Object> immutableInstructionContext(Map<String, Object> contextVariables, String owner) {
+        Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
+        rejectReservedInstructionContextKeys(copied, owner);
+        rejectReservedInstructionRouteContextKeys(copied, owner);
+        return copied;
+    }
+
+    public static void rejectInstructionContextVariables(@Nullable String contextVariables, String owner) {
+        if (contextVariables == null || contextVariables.isBlank()) {
+            return;
+        }
+        try {
+            Object parsed = WindJson.parseObject(contextVariables, Object.class);
+            rejectReservedInstructionContextKeys(parsed, owner);
+            rejectReservedInstructionRouteContextKeys(parsed, owner);
+        } catch (JacksonException ignored) {
+            rejectReservedRawInstructionContextKeys(contextVariables, owner);
+        }
+    }
+
+    private static void rejectReservedInstructionContextKeys(@Nullable Object value, String owner) {
+        rejectReservedContextKeys(value, owner, RESERVED_INSTRUCTION_CONTEXT_KEYS, "core benefit field");
+    }
+
+    private static void rejectReservedInstructionRouteContextKeys(@Nullable Object value, String owner) {
+        rejectReservedContextKeys(value, owner, RESERVED_INSTRUCTION_ROUTE_CONTEXT_KEYS, "core instruction field");
+    }
+
+    private static void rejectReservedContextKeys(@Nullable Object value,
+                                                  String owner,
+                                                  Set<String> reservedKeys,
+                                                  String fieldKind) {
+        if (value instanceof Map<?, ?> values) {
+            if (isMoneyValueObject(values)) {
+                return;
+            }
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (entry.getKey() instanceof String key && reservedKeys.contains(key)) {
+                    throw new IllegalArgumentException(
+                            owner + ".contextVariables must not contain " + fieldKind + ": " + key);
+                }
+                rejectReservedContextKeys(entry.getValue(), owner, reservedKeys, fieldKind);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                rejectReservedContextKeys(item, owner, reservedKeys, fieldKind);
+            }
+            return;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                rejectReservedContextKeys(Array.get(value, index), owner, reservedKeys, fieldKind);
+            }
+        }
+    }
+
+    private static boolean isMoneyValueObject(Map<?, ?> values) {
+        return values.size() == MONEY_VALUE_OBJECT_KEYS.size()
+                && values.keySet().stream()
+                .allMatch(key -> key instanceof String stringKey
+                        && MONEY_VALUE_OBJECT_KEYS.contains(stringKey));
+    }
+
+    private static void rejectReservedRawInstructionContextKeys(String contextVariables, String owner) {
+        Matcher matcher = RAW_FIELD_NAME_PATTERN.matcher(contextVariables);
+        while (matcher.find()) {
+            String fieldName = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
+            if (isReservedContextKey(fieldName, RESERVED_INSTRUCTION_CONTEXT_KEYS)) {
+                throw new IllegalArgumentException(
+                        owner + ".contextVariables must not contain core benefit field: " + fieldName);
+            }
+            if (isReservedContextKey(fieldName, RESERVED_INSTRUCTION_ROUTE_CONTEXT_KEYS)) {
+                throw new IllegalArgumentException(
+                        owner + ".contextVariables must not contain core instruction field: " + fieldName);
+            }
+        }
+    }
+
+    private static boolean isReservedContextKey(String fieldName, Set<String> reservedKeys) {
+        if (fieldName == null || fieldName.isBlank()) {
+            return false;
+        }
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
+        for (String reservedKey : reservedKeys) {
+            if (reservedKey.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "")
+                    .equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+}

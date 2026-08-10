@@ -1,8 +1,8 @@
 package com.wind.funds.dsl;
 
-import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
-import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
+import com.wind.funds.route.model.ImmutableAccountHierarchySnapshotSpec;
+import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;

@@ -13,6 +13,7 @@ import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
+import com.wind.funds.ledger.LedgerTransactionCommandService;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
@@ -27,12 +28,12 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
-import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.funds.ledger.spec.LedgerEntrySpec;
+import com.wind.funds.ledger.spec.LedgerPostingPhaseSpec;
+import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
@@ -49,7 +50,6 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -62,7 +62,9 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @AllArgsConstructor
-public class LedgerTransactionServiceImpl implements LedgerTransactionService {
+public class LedgerTransactionServiceImpl implements LedgerTransactionService, LedgerTransactionCommandService {
+
+    private static final String LEDGER_TRANSACTION_DIGEST_DOMAIN = "ledger.transaction.request";
 
     private static final WindSequenceType LEDGER_ENTRY_SEQUENCE_TYPE = WindSequenceType.immutable(
             "LEDGER_ENTRY", "LGE", 6);
@@ -135,6 +137,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     private final LedgerEntryMapper ledgerEntryMapper;
 
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
         assertNoSensitiveContextVariables(transaction);
@@ -142,15 +145,16 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
         entity.setContextVariables(WindJson.toJsonString(transaction.getContextVariables()));
-        entity.setSha256(resolveLedgerTransactionSha256(entity, transaction));
-        LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity);
+        entity.setSha256(FundsStableHashSupport.sha256CanonicalJson(
+                LEDGER_TRANSACTION_DIGEST_DOMAIN, canonicalLedgerTransactionDigestFacts(entity, transaction)));
+        LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity, transaction);
         if (existingResult != null) {
             return existingResult;
         }
         try {
             ledgerTransactionMapper.insertSelective(entity);
         } catch (DuplicateKeyException exception) {
-            LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(entity);
+            LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(entity, transaction);
             if (retryResult != null) {
                 return retryResult;
             }
@@ -168,18 +172,47 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         return toPostResult(entity.getId(), true);
     }
 
-    private String resolveLedgerTransactionSha256(LedgerTransaction entity, LedgerTransactionSpec transaction) {
+    private Map<String, Object> legacyLedgerTransactionDigestFacts(LedgerTransaction entity,
+                                                                   LedgerTransactionSpec transaction) {
         Map<String, Object> facts = new TreeMap<>();
         facts.put("transaction",
                 WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
         facts.put("postingPlans", transaction.getPostingPlans()
                 .stream()
-                .map(this::postingPlanDigestFacts)
+                .map(plan -> postingPlanDigestFacts(plan, false))
                 .toList());
-        return FundsStableHashSupport.sha256Json(facts);
+        return facts;
     }
 
-    private Map<String, Object> postingPlanDigestFacts(LedgerPostingPlanSpec plan) {
+    private Map<String, Object> canonicalLedgerTransactionDigestFacts(LedgerTransaction entity,
+                                                                      LedgerTransactionSpec transaction) {
+        Map<String, Object> transactionFacts = new TreeMap<>();
+        transactionFacts.put("tenantId", entity.getTenantId());
+        transactionFacts.put("instructionType", entity.getInstructionType());
+        transactionFacts.put("eventType", entity.getEventType());
+        transactionFacts.put("fundsTransactionSn", entity.getFundsTransactionSn());
+        transactionFacts.put("transactionType", entity.getTransactionType());
+        transactionFacts.put("businessScene", entity.getBusinessScene());
+        transactionFacts.put("businessSn", entity.getBusinessSn());
+        transactionFacts.put("amount", entity.getAmount());
+        transactionFacts.put("currency", entity.getCurrency());
+        transactionFacts.put("originalAmount", entity.getOriginalAmount());
+        transactionFacts.put("originalCurrency", entity.getOriginalCurrency());
+        transactionFacts.put("exchangeRate", entity.getExchangeRate());
+        transactionFacts.put("debitAmount", entity.getDebitAmount());
+        transactionFacts.put("creditAmount", entity.getCreditAmount());
+        transactionFacts.put("transactionTime", entity.getTransactionTime().toString());
+        transactionFacts.put("referenceLedgerTransactionSn", entity.getReferenceLedgerTransactionSn());
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("transaction", transactionFacts);
+        facts.put("postingPlans", transaction.getPostingPlans()
+                .stream()
+                .map(plan -> postingPlanDigestFacts(plan, true))
+                .toList());
+        return facts;
+    }
+
+    private Map<String, Object> postingPlanDigestFacts(LedgerPostingPlanSpec plan, boolean canonical) {
         String phaseCode = resolvePhaseCode(plan);
         Map<String, Object> facts = new TreeMap<>();
         facts.put("sn", plan.getPlanId());
@@ -195,24 +228,27 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         facts.put("creditAmount", plan.getTotalCreditAmount().getAmount());
         facts.put("postingPhases", plan.getPostingPhases()
                 .stream()
-                .map(phase -> postingPhaseDigestFacts(plan, phase))
+                .map(phase -> postingPhaseDigestFacts(plan, phase, canonical))
                 .toList());
         return facts;
     }
 
-    private Map<String, Object> postingPhaseDigestFacts(LedgerPostingPlanSpec plan, LedgerPostingPhaseSpec phase) {
+    private Map<String, Object> postingPhaseDigestFacts(LedgerPostingPlanSpec plan,
+                                                        LedgerPostingPhaseSpec phase,
+                                                        boolean canonical) {
         Map<String, Object> facts = new TreeMap<>();
         facts.put("phaseCode", phase.getPhaseCode().name());
         facts.put("entries", phase.getEntries()
                 .stream()
-                .map(entry -> ledgerEntryDigestFacts(plan, phase, entry))
+                .map(entry -> ledgerEntryDigestFacts(plan, phase, entry, canonical))
                 .toList());
         return facts;
     }
 
     private Map<String, Object> ledgerEntryDigestFacts(LedgerPostingPlanSpec plan,
                                                        LedgerPostingPhaseSpec phase,
-                                                       LedgerEntrySpec entry) {
+                                                       LedgerEntrySpec entry,
+                                                       boolean canonical) {
         String phaseCode = phase.getPhaseCode().name();
         Map<String, Object> facts = new TreeMap<>();
         facts.put("ledgerTransactionSn", entry.getLedgerTransactionSn());
@@ -240,18 +276,23 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         facts.put("originalAmount", entry.getOriginalAmount().getAmount());
         facts.put("originalCurrency", entry.getOriginalAmount().getCurrency());
         facts.put("exchangeRate", entry.getExchangeRate());
-        facts.put("transactionTime", entry.getTransactionTime());
+        facts.put("transactionTime", canonical ? entry.getTransactionTime().toString() : entry.getTransactionTime());
         return facts;
     }
 
-    private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
+    private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity,
+                                                                          LedgerTransactionSpec transaction) {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(entity.getSn()));
         LedgerTransaction existing = ledgerTransactionMapper.selectOneByQuery(wrapper);
         if (existing == null) {
             return null;
         }
-        AssertUtils.isTrue(Objects.equals(existing.getSha256(), entity.getSha256()),
+        AssertUtils.isTrue(FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                        existing.getSha256(),
+                        LEDGER_TRANSACTION_DIGEST_DOMAIN,
+                        canonicalLedgerTransactionDigestFacts(entity, transaction),
+                        legacyLedgerTransactionDigestFacts(entity, transaction)),
                 "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", entity.getSn());
         return toPostResult(existing.getId(), false);
     }
@@ -346,7 +387,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
     }
 
     private void assertNoCoreBenefitContextVariables(Map<String, Object> contextVariables, String owner) {
-        FundsBenefitSpecValidators.immutableInstructionContext(contextVariables, owner);
+        FundsInstructionContextValidator.immutableInstructionContext(contextVariables, owner);
     }
 
 
@@ -415,6 +456,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             case FEE, FEE_REFUND, FEE_REVERSAL -> LedgerPostingScope.FEE;
             case ADJUSTMENT -> LedgerPostingScope.ADJUSTMENT;
             case HOLD -> resolveHoldPostingScope(phaseCode);
+            case RELEASE -> LedgerPostingScope.CONTROL_RELEASE;
             case AUTHORIZATION, AUTHORIZATION_REVERSAL -> LedgerPostingScope.CONTROL_HOLD;
             case AUTHORIZATION_COMPLETION -> LedgerPostingScope.CONTROL_CONSUME;
             default -> LedgerPostingScope.BETWEEN_SUBJECTS;
@@ -438,6 +480,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             case FEE -> LedgerBalanceEffectType.CONSUME;
             case FEE_REFUND -> LedgerBalanceEffectType.RESTORE;
             case FEE_REVERSAL, REVERSAL, AUTHORIZATION_REVERSAL -> LedgerBalanceEffectType.RELEASE;
+            case RELEASE -> LedgerBalanceEffectType.RELEASE;
             case ADJUSTMENT -> LedgerBalanceEffectType.INCREASE;
             case HOLD -> resolveHoldBalanceEffectType(phaseCode);
             case AUTHORIZATION -> LedgerBalanceEffectType.HOLD;

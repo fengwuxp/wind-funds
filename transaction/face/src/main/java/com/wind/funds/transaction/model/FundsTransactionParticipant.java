@@ -2,7 +2,7 @@ package com.wind.funds.transaction.model;
 
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
@@ -73,7 +73,7 @@ public class FundsTransactionParticipant implements Serializable {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
                 "fundsTransactionParticipant.contextVariables must not contain sensitive fields");
-        this.contextVariables = FundsBenefitSpecValidators.immutableInstructionContext(contextVariables,
+        this.contextVariables = FundsInstructionContextValidator.immutableInstructionContext(contextVariables,
                 "fundsTransactionParticipant");
         return this;
     }

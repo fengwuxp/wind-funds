@@ -103,6 +103,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
@@ -125,7 +126,7 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFeeType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
@@ -213,6 +214,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected CreditAccountService creditAccountService;
 
     @Autowired
+    protected FundsAccountQueryService fundsAccountQueryService;
+
+    @Autowired
     protected AccountHierarchyRelationService accountHierarchyRelationService;
 
     @Autowired
@@ -290,6 +294,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         account.setDescription("flow test funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
+    }
+
+    protected void ensureFundingAccount(FundsAccountId accountId, LedgerProfileCode profileCode) {
+        ensureFundingAccount(accountId);
+        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
+        FundingAccount account = fundingAccountMapper.selectOneByQuery(QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.sn.eq(accountId.id())));
+        account.setLedgerProfileCode(profileCode);
+        assertThat(fundingAccountMapper.update(account)).isEqualTo(1);
     }
 
     private void ensurePlatformFundingAccount(PlatformFundingAccountRole role) {

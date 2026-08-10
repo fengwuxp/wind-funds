@@ -1,15 +1,15 @@
 package com.wind.funds.dsl;
 
 import com.wind.jackson.WindJson;
-import com.wind.integration.operator.WindOperatorFactory;
+import com.wind.funds.support.WindOperatorTestFixture;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.model.route.ImmutableRouteLegSpec;
-import com.wind.funds.model.route.ImmutableRouteNodeSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableRouteLegSpec;
+import com.wind.funds.route.model.ImmutableRouteNodeSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
@@ -153,7 +153,7 @@ class FundsAmountBoundaryContractTests {
                 .businessScene("AMOUNT_BOUNDARY_DSL")
                 .businessSn("BIZ-AMOUNT-001")
                 .eventTime(EVENT_TIME)
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(Map.of())
                 .build();
     }

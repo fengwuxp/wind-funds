@@ -1,6 +1,8 @@
 package com.wind.funds.wallet;
 
+import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.LedgerBalanceBucket;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -28,6 +30,9 @@ public class ImmutableFundsBalanceView implements FundsAccountBalanceView {
 
     private final CurrencyIsoCode currency;
 
+    @lombok.NonNull
+    private final LedgerProfileCode ledgerProfileCode;
+
     private final Map<LedgerSubjectCode, LedgerBalanceBucket> balanceBuckets;
 
     @Override
@@ -41,7 +46,12 @@ public class ImmutableFundsBalanceView implements FundsAccountBalanceView {
     }
 
     @Override
-    public @NonNull Money getPendingBalance() {
-        return getBalance(LedgerSubjectCode.AUTHORIZATION);
+    public @NonNull Money getTotalBalance() {
+        AssertUtils.isTrue(ledgerProfileCode == LedgerProfileCode.FUNDING_BASIC,
+                "总余额口径尚未定义，accountId = {}, ledgerProfileCode = {}",
+                accountId,
+                ledgerProfileCode);
+        return getAvailableBalance().add(getFrozenBalance()).add(getAuthorizationBalance());
     }
+
 }

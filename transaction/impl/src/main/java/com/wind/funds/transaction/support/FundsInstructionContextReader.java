@@ -2,8 +2,8 @@ package com.wind.funds.transaction.support;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionFieldKeys;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;

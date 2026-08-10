@@ -32,15 +32,15 @@ import java.time.LocalTime;
 @Accessors(chain = true)
 public class LedgerDTO implements Serializable {
 
-    @Schema(description = "")
+    @Schema(description = "账本主键")
     @NotNull
     private Long id;
 
-    @Schema(description = "")
+    @Schema(description = "创建时间")
     @NotNull
     private LocalDateTime gmtCreate;
 
-    @Schema(description = "")
+    @Schema(description = "最后修改时间")
     @NotNull
     private LocalDateTime gmtModified;
 

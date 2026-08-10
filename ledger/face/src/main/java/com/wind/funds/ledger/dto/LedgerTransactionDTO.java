@@ -1,6 +1,6 @@
 package com.wind.funds.ledger.dto;
 
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -32,15 +32,15 @@ import java.util.Map;
 @Accessors(chain = true)
 public class LedgerTransactionDTO {
 
-    @Schema(description = "")
+    @Schema(description = "账本交易主键")
     @NotNull
     private Long id;
 
-    @Schema(description = "")
+    @Schema(description = "创建时间")
     @NotNull
     private LocalDateTime gmtCreate;
 
-    @Schema(description = "")
+    @Schema(description = "最后修改时间")
     @NotNull
     private LocalDateTime gmtModified;
 
@@ -110,10 +110,11 @@ public class LedgerTransactionDTO {
     @NotNull
     private String sha256;
 
+    @Schema(description = "账本交易分录")
     private List<LedgerEntryDTO> entries;
 
     public LedgerTransactionDTO setContextVariables(Map<String, Object> contextVariables) {
-        this.contextVariables = FundsBenefitSpecValidators.immutableInstructionContext(
+        this.contextVariables = FundsInstructionContextValidator.immutableInstructionContext(
                 contextVariables, "ledgerTransactionDto");
         return this;
     }

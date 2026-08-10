@@ -1,18 +1,18 @@
 package com.wind.funds.dsl;
 
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.support.WindOperatorTestFixture;
 import com.wind.integration.operator.WindOperator;
-import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -154,7 +154,7 @@ class FundsInstructionDslContractTests {
      */
     @Test
     void testFundsInstructionShouldReuseWindOperator() {
-        WindOperator operator = WindOperatorFactory.system();
+        WindOperator operator = WindOperatorTestFixture.system();
 
         FundsInstructionSpec instruction = validInstruction(externalTransactionReference(), Map.of(), operator);
 
@@ -197,7 +197,7 @@ class FundsInstructionDslContractTests {
                 .businessScene("FUNDS_INSTRUCTION_DSL")
                 .businessSn("BIZ-FI-ROUTE-INPUT-001")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(Map.of("evidenceRef", "EV-001"))
                 .build();
 
@@ -368,7 +368,7 @@ class FundsInstructionDslContractTests {
                 .businessScene("FUNDS_INSTRUCTION_DSL")
                 .businessSn("BIZ-FI-SENSITIVE-001")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(Map.of("processorPayload", Map.of("cardSecurityCode", "123")))
                 .build())
                 .hasMessageContaining("fundsInstruction.contextVariables must not contain sensitive fields");
@@ -385,7 +385,7 @@ class FundsInstructionDslContractTests {
                 .businessScene("FUNDS_INSTRUCTION_DSL")
                 .businessSn("BIZ-FI-SENSITIVE-002")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(Map.of("processorPayload", Map.of("networkReference", "GB82WEST12345698765432")))
                 .build())
                 .hasMessageContaining("fundsInstruction.contextVariables must not contain sensitive fields");
@@ -493,7 +493,7 @@ class FundsInstructionDslContractTests {
 
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference,
                                                   Map<String, Object> contextVariables) {
-        return validInstruction(reference, contextVariables, WindOperatorFactory.system());
+        return validInstruction(reference, contextVariables, WindOperatorTestFixture.system());
     }
 
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference,
@@ -528,7 +528,7 @@ class FundsInstructionDslContractTests {
                 .businessScene("FUNDS_INSTRUCTION_SEMANTIC_CONTRACT")
                 .businessSn("BIZ-FI-SEMANTIC-001")
                 .eventTime(LocalDateTime.of(2026, 7, 30, 16, 0))
-                .operator(WindOperatorFactory.system())
+                .operator(WindOperatorTestFixture.system())
                 .contextVariables(Map.of())
                 .build();
     }

@@ -2,6 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
@@ -35,7 +36,7 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
 
     private void assertSuccessfulSettlementLock() {
         FundsAccountId accountId = fundingAccount("settlement_merchant");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 1_000L, "SETTLEMENT_TOPUP_001");
@@ -68,6 +69,7 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
                                     .isEqualTo(LedgerSubjectCode.SETTLEMENT);
                         }));
         assertSingleFundsAndLedgerFactsForBusinessSn("SETTLEMENT_ORDER_001", 1, 1, 2);
+        assertLedgerFactsFollowRouteSnapshot("SETTLEMENT_ORDER_001");
 
         assertThatThrownBy(() -> settlementTransactionService.lock(
                 request(accountId, 500L, "SETTLEMENT_ORDER_001"), WindOperatorFactory.system()))
@@ -77,7 +79,7 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
     @Test
     void testLockShouldRejectInsufficientAvailableBalanceWithoutLedgerFacts() {
         FundsAccountId accountId = fundingAccount("settlement_insufficient");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 1L, "SETTLEMENT_TOPUP_INSUFFICIENT");

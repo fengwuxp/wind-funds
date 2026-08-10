@@ -1,7 +1,7 @@
 package com.wind.funds.route;
 
 import com.wind.funds.route.spec.ResolvedRouteSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import org.jspecify.annotations.NonNull;
 
 /**

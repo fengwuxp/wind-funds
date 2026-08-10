@@ -27,7 +27,7 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -241,7 +241,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     private boolean sameBindingState(PaymentInstrumentBindingDTO left, PaymentInstrumentBindingDTO right) {
         return Objects.equals(left.getPriority(), right.getPriority())
                 && Objects.equals(left.getDefaultBinding(), right.getDefaultBinding())
-                && left.getState() == right.getState()
+                && left.getStatus() == right.getStatus()
                 && Objects.equals(left.getValidFrom(), right.getValidFrom())
                 && Objects.equals(left.getValidTo(), right.getValidTo())
                 && Objects.equals(left.getDescription(), right.getDescription())
@@ -425,8 +425,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         if (request.getDefaultBinding() != null) {
             entity.setDefaultBinding(request.getDefaultBinding());
         }
-        if (request.getState() != null) {
-            entity.setState(request.getState());
+        if (request.getStatus() != null) {
+            entity.setStatus(request.getStatus());
         }
         if (request.getValidFrom() != null) {
             entity.setValidFrom(request.getValidFrom());
@@ -453,7 +453,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .setNextVersion(after.getVersion())
                 .setPriority(request.getPriority() == null ? null : after.getPriority())
                 .setDefaultBinding(request.getDefaultBinding() == null ? null : after.getDefaultBinding())
-                .setState(request.getState() == null ? null : after.getState())
+                .setStatus(request.getStatus() == null ? null : after.getStatus())
                 .setValidFrom(request.getValidFrom() == null ? null : after.getValidFrom())
                 .setValidTo(request.getValidTo() == null ? null : after.getValidTo())
                 .setDescription(request.getDescription() == null ? null : after.getDescription())
@@ -494,7 +494,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         values.put(PaymentInstrumentBinding.Fields.currency, binding.getCurrency());
         values.put(PaymentInstrumentBinding.Fields.priority, binding.getPriority());
         values.put(PaymentInstrumentBinding.Fields.defaultBinding, binding.getDefaultBinding());
-        values.put(PaymentInstrumentBinding.Fields.state, binding.getState());
+        values.put(PaymentInstrumentBinding.Fields.status, binding.getStatus());
         values.put(PaymentInstrumentBinding.Fields.version, binding.getVersion());
         values.put(PaymentInstrumentBinding.Fields.validFrom, binding.getValidFrom());
         values.put(PaymentInstrumentBinding.Fields.validTo, binding.getValidTo());
@@ -517,7 +517,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         result.setCurrency(source.getCurrency());
         result.setPriority(source.getPriority());
         result.setDefaultBinding(source.getDefaultBinding());
-        result.setState(source.getState());
+        result.setStatus(source.getStatus());
         result.setVersion(source.getVersion());
         result.setValidFrom(source.getValidFrom());
         result.setValidTo(source.getValidTo());
@@ -560,7 +560,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
                 "contextVariables must not contain sensitive payment instrument fields");
-        FundsBenefitSpecValidators.rejectInstructionContextVariables(contextVariables, "paymentInstrument");
+        FundsInstructionContextValidator.rejectInstructionContextVariables(contextVariables, "paymentInstrument");
     }
 
 }

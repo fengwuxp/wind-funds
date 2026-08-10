@@ -8,6 +8,13 @@ import lombok.experimental.Accessors;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * 结算单资金金额项。
+ *
+ * @author wuxp
+ * @since 2026-07-30
+ */
+@Schema(description = "结算单资金金额项")
 @Data
 @Accessors(chain = true)
 public class SettlementOrderItemDTO implements Serializable {

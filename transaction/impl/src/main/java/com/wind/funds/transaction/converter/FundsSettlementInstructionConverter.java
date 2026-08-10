@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.converter;
 
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;

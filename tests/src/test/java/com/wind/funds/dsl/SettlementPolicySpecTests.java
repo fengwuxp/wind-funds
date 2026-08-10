@@ -1,6 +1,6 @@
 package com.wind.funds.dsl;
 
-import com.wind.funds.spec.ledger.SettlementPolicySpec;
+import com.wind.funds.ledger.spec.SettlementPolicySpec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceLock;
 

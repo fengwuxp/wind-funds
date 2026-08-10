@@ -1,17 +1,17 @@
 package com.wind.funds.transaction.services.impl;
 
 import com.wind.jackson.WindJson;
-import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
-import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
+import com.wind.funds.route.model.ImmutableRouteSnapshotSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.mapper.FundsFrozenOrderMapper;

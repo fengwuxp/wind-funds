@@ -6,7 +6,6 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
@@ -42,9 +41,9 @@ import java.util.Set;
 public class FundsBenefitContributionTransactionServiceImpl implements FundsBenefitContributionTransactionService {
 
     // 该上下文 key 参与资金交易幂等摘要，已落库名称保持稳定。
-    private static final String BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER = "benefitFunding";
+    private static final String BENEFIT_CONTRIBUTION_MARKER = "benefitFunding";
 
-    private static final String BENEFIT_CONTRIBUTION_FUNDING_NATURE_COMPATIBILITY_CODE = "benefitFundingNatureCode";
+    private static final String BENEFIT_CONTRIBUTION_FUNDING_NATURE_CODE = "benefitFundingNatureCode";
 
     private static final String BENEFIT_ORIGINAL_ORDER_SN = "benefitOriginalOrderSn";
 
@@ -54,7 +53,9 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private static final Set<String> FORBIDDEN_BENEFIT_CONTEXT_KEYS = Set.of(
             "amount",
+            "costbeareraccountid",
             "costbearersubjectref",
+            "benefitreceiveraccountid",
             "benefitreceiversubjectref",
             "benefitreceiverledgersubjectcode",
             "benefitsettlementsubjectref",
@@ -85,8 +86,8 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                                   @NonNull WindOperator operator) {
         assertSettleRequest(request);
         assertLightweightContext(request.getContextVariables());
-        FundsAccountId costBearer = toAccountId(request.getCostBearerSubjectRef(), "权益让利承担方");
-        FundsAccountId receiver = toAccountId(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体");
+        FundsAccountId costBearer = requireAccountId(request.getCostBearerAccountId(), "权益让利承担方");
+        FundsAccountId receiver = requireAccountId(request.getBenefitReceiverAccountId(), "权益让利承接账务主体");
         return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(costBearer)
                 .setPayeeId(receiver)
@@ -120,8 +121,8 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         AssertUtils.hasText(request.getBusinessScene(), "权益让利业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "权益让利业务流水不能为空");
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利原始订单号不能为空");
-        AssertUtils.notNull(request.getCostBearerSubjectRef(), "权益让利承担方不能为空");
-        AssertUtils.notNull(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体不能为空");
+        AssertUtils.notNull(request.getCostBearerAccountId(), "权益让利承担方不能为空");
+        AssertUtils.notNull(request.getBenefitReceiverAccountId(), "权益让利承接账务主体不能为空");
         AssertUtils.notNull(request.getBenefitReceiverLedgerSubjectCode(), "权益让利承接目标账目不能为空");
         AssertUtils.isTrue(SUPPORTED_RECEIVER_LEDGER_SUBJECT_CODES
                         .contains(request.getBenefitReceiverLedgerSubjectCode()),
@@ -147,19 +148,18 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利退款原始订单号不能为空");
     }
 
-    private FundsAccountId toAccountId(@NonNull SubjectRef subjectRef, @NonNull String roleName) {
-        AssertUtils.hasText(subjectRef.getSubjectId(), "{}主体 ID 不能为空", roleName);
-        AssertUtils.notNull(subjectRef.getSubjectType(), "{}主体类型不能为空", roleName);
-        AssertUtils.isTrue(subjectRef.getSubjectType() == FundsSubjectType.FUNDING_ACCOUNT
-                        || subjectRef.getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT,
-                "{}必须是资金账户或信用账户，subjectType = {}", roleName, subjectRef.getSubjectType());
-        return FundsAccountId.immutable(subjectRef.getSubjectId(), subjectRef.getSubjectType().name());
+    private FundsAccountId requireAccountId(@NonNull FundsAccountId accountId, @NonNull String roleName) {
+        AssertUtils.hasText(accountId.id(), "{}账户 ID 不能为空", roleName);
+        AssertUtils.hasText(accountId.type(), "{}账户类型不能为空", roleName);
+        AssertUtils.isTrue(FundsSubjectType.isLedgerPostableName(accountId.type()),
+                "{}必须是资金账户或信用账户，accountType = {}", roleName, accountId.type());
+        return accountId;
     }
 
     private Map<String, Object> settleContext(@NonNull FundsBenefitContributionSettleRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
-        result.put(BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER, Boolean.TRUE);
-        result.put(BENEFIT_CONTRIBUTION_FUNDING_NATURE_COMPATIBILITY_CODE, request.getFundingNature().name());
+        result.put(BENEFIT_CONTRIBUTION_MARKER, Boolean.TRUE);
+        result.put(BENEFIT_CONTRIBUTION_FUNDING_NATURE_CODE, request.getFundingNature().name());
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
         if (request.getReferenceTransactionSn() != null) {
             result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());
@@ -169,7 +169,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private Map<String, Object> refundContext(@NonNull FundsBenefitContributionRefundRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
-        result.put(BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER, Boolean.TRUE);
+        result.put(BENEFIT_CONTRIBUTION_MARKER, Boolean.TRUE);
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
         if (request.getReferenceTransactionSn() != null) {
             result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());

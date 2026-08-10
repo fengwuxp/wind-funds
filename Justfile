@@ -59,13 +59,21 @@ verify-codegen:
         exit 1
     fi
 
+# Verify the approved core public API classification and stable signatures.
+verify-core-api: clean-compile
+    @scripts/verify-core-api-baseline.sh
+
+# Verify face model documentation and public enum conventions.
+verify-public-contracts:
+    @bash scripts/verify-public-contract-conventions.sh
+
 # Run PMD checks.
 pmd:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -DskipTests package pmd:check
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -DskipTests package pmd:check
 
 # Run PMD checks and force Maven to refresh snapshots.
 pmd-update:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -U -DskipTests package pmd:check
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -U -DskipTests package pmd:check
 
 # Run one test class in a Maven module. Defaults to the tests module.
 test-one tests module='tests':
@@ -90,7 +98,7 @@ test-module module='tests':
     @mkdir -p target/reports/css; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test {{test_flags}} && just verify-classfiles
 
 # Core DSL and contract tests.
-test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
+test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests,FundsStableHashSupportTests,FundsAccountBalanceContractTests':
     @just _run-test-classes "{{tests}}" tests
 
 # FX source-price selection and amount-conversion tests.
@@ -102,7 +110,7 @@ test-ledger tests='DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPo
     @just _run-test-classes "{{tests}}" tests
 
 # Transaction orchestration and lifecycle tests.
-test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests,FundsStableHashSupportTests,RouteSnapshotJsonSupportTests':
+test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests,FundsStableHashSupportTests,ExternalFundsFactDigestSupportTests,RouteSnapshotJsonSupportTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Frozen order and balance-control route tests.
@@ -147,7 +155,7 @@ test-mysql-reconciliation:
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version clean-compile test-module pmd verify-classfiles verify-codegen
+verify-cad: mvn-version verify-core-api verify-public-contracts test-module pmd verify-classfiles verify-codegen
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:

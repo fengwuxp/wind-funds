@@ -6,7 +6,7 @@ import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
@@ -95,7 +95,7 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
                         .setBindingRole(request.getBindingRole())
                         .setCurrency(request.getCurrency())
                         .setDefaultBinding(Boolean.TRUE)
-                        .setState(PaymentInstrumentBindingState.ACTIVE),
+                        .setStatus(PaymentInstrumentBindingStatus.ACTIVE),
                 DefaultPageQueryOptions.defaults(2)).getRecords();
         AssertUtils.isFalse(records.isEmpty(),
                 "默认支付工具绑定不存在，instrumentSn = {}, bindingRole = {}, currency = {}",
