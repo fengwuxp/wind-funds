@@ -12,9 +12,6 @@ import com.wind.funds.transaction.support.FundsRouteLegIds;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
@@ -44,7 +41,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
 import static com.wind.funds.route.support.RouteSpecSupport.sourceNode;
 import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
@@ -112,19 +108,12 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         SubjectRef accountSubject = routeSubjectSupport.createSubjectRef(accountId);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.FUND_IN, 1, RouteLegType.EXTERNAL_IN, instruction)
-                .sourceNode(sourceNode(cashMappingSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.CASH_MAPPING)))
-                .targetNode(targetNode(prepaymentSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
-                .balanceEffectType(LedgerBalanceEffectType.INCREASE)
-                .phaseCode(LedgerPhaseCode.FUND_IN)
+                .sourceNode(sourceNode(cashMappingSubject))
+                .targetNode(targetNode(prepaymentSubject))
                 .build());
         legs.add(routeLeg(FundsRouteLegIds.TOPUP_SETTLEMENT, 2, RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(prepaymentSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
-                .targetNode(targetNode(accountSubject, LedgerSubjectCode.AVAILABLE))
-                .balanceEffectType(LedgerBalanceEffectType.INCREASE)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .sourceNode(sourceNode(prepaymentSubject))
+                .targetNode(targetNode(accountSubject))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, cashMappingAccount,
@@ -147,13 +136,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         AssertUtils.isFalse(payerAccountId.equals(payeeAccountId), SAME_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.TRANSFER, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId),
-                        LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeAccountId),
-                        LedgerSubjectCode.AVAILABLE))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.TRANSFER)
-                .constraintOverrides(mustNotBeNegative(payerAccountId, LedgerSubjectCode.AVAILABLE))
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId)))
+                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeAccountId)))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payerAccountId, true),
@@ -168,17 +152,12 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         FundsAccountId payeeId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.PAYEE_ID);
-        LedgerSubjectCode payeeLedgerSubjectCode = FundsInstructionContextReader.requireLedgerSubjectCode(instruction,
-                FundsInstructionFieldKeys.PAYEE_LEDGER_SUBJECT_CODE);
         AssertUtils.isFalse(accountId.equals(payeeId), SAME_PAY_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.PAY, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeId), payeeLedgerSubjectCode))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
+                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeId)))
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
@@ -191,17 +170,13 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private ResolvedRouteSpec resolveRefund(FundsInstructionSpec instruction) {
         FundsAccountId payerId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.PAYER_ID);
-        LedgerSubjectCode payerLedgerSubjectCode = FundsInstructionContextReader.requireLedgerSubjectCode(instruction,
-                FundsInstructionFieldKeys.PAYER_LEDGER_SUBJECT_CODE);
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         AssertUtils.isFalse(accountId.equals(payerId), SAME_REFUND_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.REFUND, 1, RouteLegType.RESTORE, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerId), payerLedgerSubjectCode))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .balanceEffectType(LedgerBalanceEffectType.RESTORE)
-                .phaseCode(LedgerPhaseCode.REFUND)
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerId)))
+                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId)))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payerId, true), payerId,
@@ -224,20 +199,12 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         SubjectRef prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.WITHDRAW_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
-                .sourceNode(sourceNode(accountSubject, LedgerSubjectCode.FROZEN))
-                .targetNode(targetNode(prepaymentSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.FROZEN))
+                .sourceNode(sourceNode(accountSubject))
+                .targetNode(targetNode(prepaymentSubject))
                 .build());
         legs.add(routeLeg(FundsRouteLegIds.FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
-                .sourceNode(sourceNode(prepaymentSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
-                .targetNode(targetNode(cashMappingSubject,
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.CASH_MAPPING)))
-                .balanceEffectType(LedgerBalanceEffectType.DECREASE)
-                .phaseCode(LedgerPhaseCode.FUND_OUT)
+                .sourceNode(sourceNode(prepaymentSubject))
+                .targetNode(targetNode(cashMappingSubject))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
@@ -345,12 +312,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.FEE);
         List<RouteLegSpec> legs = List.of(routeLeg(FundsRouteLegIds.FEE, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.FEE)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
+                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount)))
                 .build());
         List<RouteParticipantSpec> participants = routeParticipantFactory.distinct(List.of(
                 subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,

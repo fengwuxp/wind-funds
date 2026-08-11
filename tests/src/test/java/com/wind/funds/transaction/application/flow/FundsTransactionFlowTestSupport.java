@@ -983,8 +983,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
                         assertThat(plan.getAmount()).isEqualTo(routeLeg.getAmount().getAmount());
                         assertThat(plan.getCurrency()).isEqualTo(routeLeg.getAmount().getCurrency());
-                        assertThat(plan.getBalanceEffectType()).isEqualTo(routeLeg.getBalanceEffectType().name());
-                        assertThat(plan.getPhaseCode()).isEqualTo(routeLeg.getPhaseCode().name());
                         assertThat(planEntries.stream()
                                 .map(RouteNodeLedgerEntryKey::from)
                                 .toList())
@@ -1324,17 +1322,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private record RouteNodeLedgerEntryKey(String subjectId,
                                            String subjectType,
-                                           LedgerSubjectCode ledgerSubjectCode,
                                            EntrySide entrySide) {
 
         private static RouteNodeLedgerEntryKey from(RouteNodeSpec node, EntrySide entrySide) {
             return new RouteNodeLedgerEntryKey(node.getSubjectRef().getSubjectId(),
-                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode(), entrySide);
+                    node.getSubjectRef().getSubjectType().name(), entrySide);
         }
 
         private static RouteNodeLedgerEntryKey from(LedgerEntry entry) {
             return new RouteNodeLedgerEntryKey(entry.getSubjectId(), entry.getSubjectType(),
-                    entry.getLedgerSubjectCode(), entry.getEntrySide());
+                    entry.getEntrySide());
         }
     }
 

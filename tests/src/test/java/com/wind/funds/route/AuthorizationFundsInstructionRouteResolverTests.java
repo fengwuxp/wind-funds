@@ -96,10 +96,6 @@ class AuthorizationFundsInstructionRouteResolverTests {
         assertThat(route.getLegs()).singleElement()
                 .satisfies(leg -> {
                     assertThat(leg.getLegType()).isEqualTo(RouteLegType.RESTORE);
-                    assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
-                    assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.REFUND);
-                    assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.SETTLEMENT);
-                    assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
                     assertThat(leg.getAmount()).isEqualTo(Money.immutable(40L, CurrencyIsoCode.USD));
                 });
     }

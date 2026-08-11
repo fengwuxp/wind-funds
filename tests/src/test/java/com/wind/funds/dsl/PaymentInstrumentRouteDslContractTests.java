@@ -164,11 +164,8 @@ class PaymentInstrumentRouteDslContractTests {
                 .sourceNode(originalLeg.getTargetNode())
                 .targetNode(originalLeg.getSourceNode())
                 .amount(originalLeg.getAmount())
-                .balanceEffectType(LedgerBalanceEffectType.RESTORE)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
                 .replayRefLegId(originalLeg.getLegId())
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
 
@@ -382,10 +379,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .sourceNode(routeNode(payer, RouteNodeRole.SOURCE))
                 .targetNode(routeNode(payee, RouteNodeRole.TARGET))
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
     }
@@ -405,7 +399,6 @@ class PaymentInstrumentRouteDslContractTests {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .nodeRole(nodeRole)
                 .build();
     }

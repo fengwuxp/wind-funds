@@ -62,21 +62,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_platform_adjust_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_platform_adjust_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 2500
         },
-        "balanceEffectType": "CONSUME",
-        "phaseCode": "TRANSFER",
         "replayPolicy": "PARTIAL_ALLOWED"
       }
     ]

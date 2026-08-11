@@ -3,6 +3,11 @@ package com.wind.funds.ledger.posting;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.dal.entities.LedgerEntry;
+import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
+import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
+import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
+import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
@@ -22,13 +27,17 @@ import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
+import com.wind.funds.route.model.ImmutableRouteLegSpec;
 import com.wind.funds.route.model.ImmutableRouteNodeSpec;
 import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.enums.RouteNodeType;
+import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -39,6 +48,7 @@ import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -65,6 +75,10 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 
 /**
  * 默认账务计划装配器契约测试。
@@ -90,21 +104,28 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Autowired
     private RecordingLedgerService ledgerService;
 
+    @Autowired
+    private LedgerPostingPlanMapper ledgerPostingPlanMapper;
+
+    @Autowired
+    private LedgerEntryMapper ledgerEntryMapper;
+
     @BeforeEach
     void setUpAssemblerTestData() {
         ledgerService.clear();
+        reset(ledgerPostingPlanMapper, ledgerEntryMapper);
     }
 
     /**
-     * 场景：自定义 RouteLegSpec 绕过 DSL 不可变模型，携带 periodType=MONTHLY 但缺 periodId。
-     * 预期：posting 装配阶段明确失败，且不继续查账本。
-     * 红线：assembler 不能用当前月份为非 LIFETIME 账本周期静默补齐 periodId。
+     * 场景：资金指令指定 MONTHLY 账期但缺少 periodId。
+     * 预期：指令构造阶段明确失败，且不进入账本查询。
+     * 红线：route 不再承载账期，资金指令也不能静默补齐非 LIFETIME periodId。
      */
     @Test
-    void testAssembleShouldRejectNonLifetimeLegWithoutPeriodId() {
-        assertThatThrownBy(() -> assembler.assemble(
-                instruction(), "FUNDS_TX_PERIOD_001", resolvedRoute(routeLeg(AccountBalancePeriodType.MONTHLY, null))))
-                .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
+    void testInstructionShouldRejectNonLifetimePeriodWithoutPeriodId() {
+        assertThatThrownBy(() -> instruction(AccountBalancePeriodType.MONTHLY, null,
+                LedgerSubjectCode.AVAILABLE))
+                .hasMessageContaining("ledgerPeriodId must not be blank");
 
         assertThat(ledgerService.queries).isEmpty();
     }
@@ -112,8 +133,9 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Test
     void testAssembleShouldUseExplicitNonLifetimePeriodId() {
         LedgerTransactionSpec transaction = assembler.assemble(
-                instruction(), "FUNDS_TX_PERIOD_002", resolvedRoute(routeLeg(AccountBalancePeriodType.MONTHLY,
-                        MONTHLY_PERIOD_ID)));
+                instruction(AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID, LedgerSubjectCode.AVAILABLE),
+                "FUNDS_TX_PERIOD_002",
+                resolvedRoute(routeLeg()));
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
         assertTransferPostingFacts(transaction, AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID);
@@ -126,8 +148,9 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Test
     void testAssembleShouldUseLifetimePeriodIdByDefault() {
         LedgerTransactionSpec transaction = assembler.assemble(
-                instruction(), "FUNDS_TX_PERIOD_003", resolvedRoute(routeLeg(AccountBalancePeriodType.LIFETIME,
-                        null)));
+                instruction(AccountBalancePeriodType.LIFETIME, null, LedgerSubjectCode.AVAILABLE),
+                "FUNDS_TX_PERIOD_003",
+                resolvedRoute(routeLeg()));
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
         assertTransferPostingFacts(transaction, AccountBalancePeriodType.LIFETIME,
@@ -139,29 +162,23 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：当前 hybrid route 同时携带路径和会计字段。
-     * 预期：assembler 把科目、余额效果、阶段、期间、约束和 routeLegId 完整投影到 posting 事实。
-     * 红线：后续 route/posting 解耦必须以相同账务结果为兼容基线，不能静默改变既有入账语义。
+     * 场景：route 只携带资金路径，资金指令指定收款科目与账期。
+     * 预期：assembler 独立派生科目、余额效果、阶段、期间和约束，并保留 routeLegId 追溯。
+     * 红线：route 不得重新承载账务语义，posting 仍必须完整且平衡。
      */
     @Test
-    void testAssembleShouldPreserveCurrentHybridRouteAccountingFacts() {
+    void testAssembleShouldDeriveAccountingFactsOutsideRoute() {
         RouteLegSpec leg = new TestRouteLegSpec(
                 "LEG-POSTING-HYBRID-001",
-                routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT,
-                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.SOURCE),
-                routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT,
-                        LedgerSubjectCode.FROZEN, RouteNodeRole.TARGET),
-                AccountBalancePeriodType.MONTHLY,
-                MONTHLY_PERIOD_ID,
-                LedgerBalanceEffectType.RESTORE,
-                LedgerPhaseCode.SETTLEMENT,
-                Map.of(
-                        "FUNDING_ACCOUNT:source_account:AVAILABLE", LedgerBalanceConstraintType.ALLOW_NEGATIVE,
-                        "target_account:FROZEN", LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE),
+                RouteLegType.INTERNAL_TRANSFER,
+                routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
+                routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
                 Map.of());
 
         LedgerTransactionSpec transaction = assembler.assemble(
-                instruction(), "FUNDS_TX_HYBRID_001", resolvedRoute(leg));
+                instruction(AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID, LedgerSubjectCode.FROZEN),
+                "FUNDS_TX_HYBRID_001",
+                resolvedRoute(leg));
 
         LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
         assertThat(transaction.isBalanced()).isTrue();
@@ -169,7 +186,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         assertThat(plan.getRouteLegId()).isEqualTo(leg.getLegId());
         assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
         assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
-        assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
+        assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
         assertThat(plan.getContextVariables()).containsEntry("routeLegId", leg.getLegId());
         assertThat(plan.getEntries()).hasSize(2).allSatisfy(entry -> {
             assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
@@ -177,7 +194,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             assertThat(entry.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
             assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
             assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
-            assertThat(entry.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
+            assertThat(entry.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
             assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
             assertThat(entry.getContextVariables()).containsEntry("routeLegId", leg.getLegId());
         });
@@ -188,10 +205,10 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .containsExactly(
                         tuple(LedgerSubjectCode.AVAILABLE,
                                 EntrySide.DEBIT,
-                                LedgerBalanceConstraintType.ALLOW_NEGATIVE),
+                                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE),
                         tuple(LedgerSubjectCode.FROZEN,
                                 EntrySide.CREDIT,
-                                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE));
+                                LedgerBalanceConstraintType.PROFILE_DEFAULT));
     }
 
     /**
@@ -202,10 +219,6 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Test
     void testAssembleShouldPreserveEventToPostingMatrix() {
         List<PostingCase> cases = postingCases();
-        assertThat(cases)
-                .extracting(PostingCase::eventType)
-                .containsExactlyInAnyOrder(FundsTransactionEventType.values());
-
         cases.forEach(postingCase -> {
             RouteLegSpec leg = postingCaseLeg(postingCase);
             LedgerTransactionSpec transaction = assembler.assemble(
@@ -233,7 +246,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Test
     void testAssembleLimitAdjustIncreaseShouldBalanceControlLedgerEntries() {
         LedgerTransactionSpec transaction = assembler.assemble(
-                limitAdjustInstruction(), "FUNDS_TX_LIMIT_INC", limitAdjustRoute(true));
+                limitAdjustInstruction(true), "FUNDS_TX_LIMIT_INC", limitAdjustRoute());
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
         assertThat(transaction.getPostingPlans().getFirst().isBalanced()).isTrue();
@@ -248,7 +261,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     @Test
     void testAssembleLimitAdjustDecreaseShouldBalanceControlLedgerEntries() {
         LedgerTransactionSpec transaction = assembler.assemble(
-                limitAdjustInstruction(), "FUNDS_TX_LIMIT_DEC", limitAdjustRoute(false));
+                limitAdjustInstruction(false), "FUNDS_TX_LIMIT_DEC", limitAdjustRoute());
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
         assertThat(transaction.getPostingPlans().getFirst().isBalanced()).isTrue();
@@ -268,7 +281,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
      */
     @Test
     void testAssembleShouldTruncateLongPlanIdWithoutLosingPostingFacts() {
-        RouteLegSpec leg = routeLeg(AccountBalancePeriodType.LIFETIME, null, "LEG-"
+        RouteLegSpec leg = routeLeg("LEG-"
                 + "POSTING-PERIOD-WITH-A-VERY-LONG-ROUTE-LEG-ID-001");
         LedgerTransactionSpec transaction = assembler.assemble(
                 instruction(), "FUNDS_TX_WITH_A_LONG_LEDGER_TRANSACTION_SN_001", resolvedRoute(leg));
@@ -292,7 +305,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         assertThat(plan.getEntries()).hasSize(2).allSatisfy(entry -> {
             assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
             assertThat(entry.getAmount()).isEqualTo(AMOUNT);
-            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER);
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
         });
         assertThat(plan.getEntries())
                 .extracting(LedgerEntrySpec::getSubjectId, LedgerEntrySpec::getLedgerSubjectCode,
@@ -313,9 +326,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         routeProcessorPayload.put("routeTraceId", "ROUTE-TRACE-202605270001");
         Map<String, Object> legProcessorPayload = new HashMap<>();
         legProcessorPayload.put("legTraceId", "LEG-TRACE-202605270001");
-        RouteLegSpec leg = routeLeg(AccountBalancePeriodType.LIFETIME,
-                null,
-                "LEG-POSTING-CONTEXT-001",
+        RouteLegSpec leg = routeLeg("LEG-POSTING-CONTEXT-001",
                 Map.of("legProcessorPayload", legProcessorPayload));
         LedgerTransactionSpec transaction = assembler.assemble(
                 instruction(),
@@ -332,6 +343,81 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             assertRoutePayloadSafe(entry.getContextVariables());
             assertLegPayloadSafe(entry.getContextVariables());
         });
+    }
+
+    /**
+     * 场景：退款引用的账本交易实际属于另一笔资金交易。
+     * 预期：组装器在读取原 posting 前拒绝不一致的 provenance。
+     * 红线：不得跨原资金交易复用账本事实。
+     */
+    @Test
+    void testReplayShouldRejectLedgerTransactionOwnedByDifferentFundsTransaction() {
+        LedgerPostingPlan originalPlan = new LedgerPostingPlan();
+        originalPlan.setSn("POSTING_PLAN_ORIGINAL");
+        when(ledgerPostingPlanMapper.selectListByQuery(any())).thenReturn(List.of(originalPlan));
+        when(ledgerEntryMapper.selectListByQuery(any())).thenReturn(List.of(
+                originalEntry("target_account", LedgerSubjectCode.SETTLEMENT),
+                originalEntry("source_account", LedgerSubjectCode.AVAILABLE)));
+        FundsInstructionSpec instruction = ImmutableFundsInstructionSpec.builder()
+                .tenantId(TENANT_ID)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.REFUND)
+                .transactionType(DefaultFundsTransactionType.REFUND)
+                .amount(AMOUNT)
+                .originalAmount(AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .reference(ImmutableFundsInstructionReferenceSpec.builder()
+                        .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
+                        .referenceSn("FUNDS_TRANSACTION_A")
+                        .referenceLedgerTransactionSn("LEDGER_TRANSACTION_B")
+                        .contextVariables(Map.of())
+                        .build())
+                .businessScene("POSTING_REPLAY_PROVENANCE")
+                .businessSn("BIZ-POSTING-REPLAY-PROVENANCE-001")
+                .eventTime(EVENT_TIME)
+                .operator(WindOperatorFactory.system())
+                .contextVariables(Map.of())
+                .build();
+        RouteLegSpec replayLeg = ImmutableRouteLegSpec.builder()
+                .legId("REFUND_LEG")
+                .sequence(1)
+                .legType(RouteLegType.RESTORE)
+                .sourceNode(routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE))
+                .targetNode(routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET))
+                .amount(AMOUNT)
+                .originalAmount(AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                .replayRefLegId("ORIGINAL_LEG")
+                .contextVariables(Map.of())
+                .build();
+        ResolvedRouteSpec route = ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("POSTING_REPLAY_PROVENANCE_ROUTE")
+                .routeVersion("v1")
+                .businessScene(instruction.getBusinessScene())
+                .businessSn(instruction.getBusinessSn())
+                .instructionType(instruction.getInstructionType())
+                .eventType(instruction.getEventType())
+                .transactionType(instruction.getTransactionType())
+                .participants(List.of())
+                .legs(List.of(replayLeg))
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
+
+        assertThatThrownBy(() -> assembler.assemble(instruction, "FUNDS_TRANSACTION_REFUND", route))
+                .hasMessageContaining("原账本交易与引用资金交易不一致");
+    }
+
+    private LedgerEntry originalEntry(String subjectId, LedgerSubjectCode subjectCode) {
+        LedgerEntry result = new LedgerEntry();
+        result.setSubjectId(subjectId);
+        result.setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name());
+        result.setLedgerSubjectCode(subjectCode);
+        result.setPeriodType(AccountBalancePeriodType.LIFETIME);
+        result.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
+        return result;
     }
 
     private void assertRoutePayloadSafe(Map<String, Object> contextVariables) {
@@ -364,7 +450,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
             assertThat(entry.getAmount()).isEqualTo(AMOUNT);
             assertThat(entry.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
-            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER);
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
         });
         assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
             assertThat(query.getPeriodType()).isEqualTo(periodType);
@@ -384,6 +470,12 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     private FundsInstructionSpec instruction() {
+        return instruction(null, null, LedgerSubjectCode.AVAILABLE);
+    }
+
+    private FundsInstructionSpec instruction(AccountBalancePeriodType periodType,
+                                              String periodId,
+                                              LedgerSubjectCode payeeLedgerSubjectCode) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TENANT_ID)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -396,6 +488,9 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .businessSn("BIZ-POSTING-PERIOD-001")
                 .eventTime(EVENT_TIME)
                 .operator(WindOperatorFactory.system())
+                .payeeLedgerSubjectCode(payeeLedgerSubjectCode)
+                .ledgerPeriodType(periodType)
+                .ledgerPeriodId(periodId)
                 .contextVariables(Map.of())
                 .build();
     }
@@ -413,11 +508,14 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .businessSn("BIZ-POSTING-MATRIX-" + postingCase.eventType().name())
                 .eventTime(EVENT_TIME)
                 .operator(WindOperatorFactory.system())
-                .contextVariables(Map.of())
+                .payeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .contextVariables(postingCase.eventType() == FundsTransactionEventType.LIMIT_ADJUST
+                        || postingCase.eventType() == FundsTransactionEventType.BALANCE_ADJUST
+                        ? Map.of(FundsInstructionContextKeys.INCREASE, true) : Map.of())
                 .build();
     }
 
-    private FundsInstructionSpec limitAdjustInstruction() {
+    private FundsInstructionSpec limitAdjustInstruction(boolean increase) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TENANT_ID)
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
@@ -430,7 +528,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .businessSn("BIZ-LIMIT-ADJUST-001")
                 .eventTime(EVENT_TIME)
                 .operator(WindOperatorFactory.system())
-                .contextVariables(Map.of())
+                .contextVariables(Map.of(FundsInstructionContextKeys.INCREASE, increase))
                 .build();
     }
 
@@ -472,7 +570,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .build();
     }
 
-    private ResolvedRouteSpec limitAdjustRoute(boolean increase) {
+    private ResolvedRouteSpec limitAdjustRoute() {
         return ImmutableResolvedRouteSpec.builder()
                 .tenantId(TENANT_ID)
                 .routeCode("LIMIT_ADJUST_ROUTE")
@@ -483,72 +581,54 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .eventType(FundsTransactionEventType.LIMIT_ADJUST)
                 .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
                 .participants(List.of())
-                .legs(List.of(limitAdjustLeg(increase)))
+                .legs(List.of(limitAdjustLeg()))
                 .resolvedAt(EVENT_TIME)
                 .contextVariables(Map.of())
                 .build();
     }
 
-    private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId) {
-        return routeLeg(periodType, periodId, "LEG-POSTING-PERIOD-001");
+    private RouteLegSpec routeLeg() {
+        return routeLeg("LEG-POSTING-PERIOD-001");
     }
 
-    private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId, String legId) {
-        return routeLeg(periodType, periodId, legId, Map.of());
+    private RouteLegSpec routeLeg(String legId) {
+        return routeLeg(legId, Map.of());
     }
 
-    private RouteLegSpec routeLeg(AccountBalancePeriodType periodType,
-                                  String periodId,
-                                  String legId,
+    private RouteLegSpec routeLeg(String legId,
                                   Map<String, Object> contextVariables) {
         return new TestRouteLegSpec(
                 legId,
+                RouteLegType.INTERNAL_TRANSFER,
                 routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
                 routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
-                periodType,
-                periodId,
-                LedgerBalanceEffectType.CONSUME,
-                LedgerPhaseCode.TRANSFER,
-                Map.of(),
                 contextVariables
         );
     }
 
-    private RouteLegSpec limitAdjustLeg(boolean increase) {
+    private RouteLegSpec limitAdjustLeg() {
         return new TestRouteLegSpec(
                 "LEG-POSTING-PERIOD-001",
-                increase
-                        ? routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
-                        LedgerSubjectCode.LIMIT, RouteNodeRole.SOURCE)
-                        : routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
-                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.SOURCE),
-                increase
-                        ? routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
-                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.TARGET)
-                        : routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
-                        LedgerSubjectCode.LIMIT, RouteNodeRole.TARGET),
-                AccountBalancePeriodType.LIFETIME,
-                null,
-                increase ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE,
-                LedgerPhaseCode.ADJUSTMENT,
-                Map.of(),
+                RouteLegType.INTERNAL_TRANSFER,
+                routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT, RouteNodeRole.SOURCE),
+                routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT, RouteNodeRole.TARGET),
                 Map.of()
         );
     }
 
     private RouteLegSpec postingCaseLeg(PostingCase postingCase) {
         if (postingCase.eventType() == FundsTransactionEventType.LIMIT_ADJUST) {
-            return limitAdjustLeg(true);
+            return limitAdjustLeg();
         }
         return new TestRouteLegSpec(
                 "LEG-POSTING-MATRIX-" + postingCase.eventType().name(),
+                switch (postingCase.eventType()) {
+                    case TOPUP -> RouteLegType.EXTERNAL_IN;
+                    case WITHDRAW, PAYOUT_SUCCEEDED -> RouteLegType.EXTERNAL_OUT;
+                    default -> RouteLegType.INTERNAL_TRANSFER;
+                },
                 routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
                 routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
-                AccountBalancePeriodType.LIFETIME,
-                null,
-                postingCase.balanceEffectType(),
-                postingCase.phaseCode(),
-                Map.of(),
                 Map.of()
         );
     }
@@ -564,24 +644,16 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.TRANSFER,
                         LedgerPostingScope.BETWEEN_SUBJECTS),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAY,
-                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.TRANSFER,
+                        DefaultFundsTransactionType.PAY, LedgerPhaseCode.SETTLEMENT,
                         LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.TRANSFER,
-                        LedgerPostingScope.BETWEEN_SUBJECTS),
-                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.REFUND,
-                        DefaultFundsTransactionType.REFUND, LedgerPhaseCode.REFUND,
-                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.REFUND,
                         LedgerPostingScope.BETWEEN_SUBJECTS),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.WITHDRAW,
                         DefaultFundsTransactionType.WITHDRAW, LedgerPhaseCode.FUND_OUT,
-                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.WITHDRAWAL,
+                        LedgerBalanceEffectType.DECREASE, LedgerPostingIntentType.WITHDRAWAL,
                         LedgerPostingScope.PLATFORM_EXTERNAL),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_CHARGE,
                         DefaultFundsTransactionType.FEE, LedgerPhaseCode.FEE,
                         LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.FEE,
-                        LedgerPostingScope.FEE),
-                new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.FEE_REFUND,
-                        DefaultFundsTransactionType.REFUND, LedgerPhaseCode.FEE,
-                        LedgerBalanceEffectType.RESTORE, LedgerPostingIntentType.FEE_REFUND,
                         LedgerPostingScope.FEE),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.CLEARING_CONFIRM,
                         DefaultFundsTransactionType.CLEARING, LedgerPhaseCode.SETTLEMENT,
@@ -589,11 +661,11 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         LedgerPostingScope.WITHIN_SUBJECT),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.SETTLEMENT_LOCK,
                         DefaultFundsTransactionType.SETTLEMENT, LedgerPhaseCode.SETTLEMENT,
-                        LedgerBalanceEffectType.HOLD, LedgerPostingIntentType.SETTLEMENT,
+                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.SETTLEMENT,
                         LedgerPostingScope.WITHIN_SUBJECT),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_SUCCEEDED,
                         DefaultFundsTransactionType.PAYOUT, LedgerPhaseCode.FUND_OUT,
-                        LedgerBalanceEffectType.CONSUME, LedgerPostingIntentType.WITHDRAWAL,
+                        LedgerBalanceEffectType.DECREASE, LedgerPostingIntentType.WITHDRAWAL,
                         LedgerPostingScope.PLATFORM_EXTERNAL),
                 new PostingCase(FundsInstructionType.DIRECT_TRANSACTION, FundsTransactionEventType.PAYOUT_FAILED,
                         DefaultFundsTransactionType.PAYOUT, LedgerPhaseCode.REFUND,
@@ -637,13 +709,6 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     private RouteNodeSpec routeNode(String subjectId,
                                     FundsSubjectType subjectType,
                                     RouteNodeRole nodeRole) {
-        return routeNode(subjectId, subjectType, LedgerSubjectCode.AVAILABLE, nodeRole);
-    }
-
-    private RouteNodeSpec routeNode(String subjectId,
-                                    FundsSubjectType subjectType,
-                                    LedgerSubjectCode ledgerSubjectCode,
-                                    RouteNodeRole nodeRole) {
         SubjectRef subjectRef = ImmutableSubjectRef.builder()
                 .tenantId(TENANT_ID)
                 .subjectId(subjectId)
@@ -653,19 +718,14 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }
 
     private record TestRouteLegSpec(String legId,
+                                    RouteLegType legType,
                                     RouteNodeSpec sourceNode,
                                     RouteNodeSpec targetNode,
-                                    AccountBalancePeriodType periodType,
-                                    String periodId,
-                                    LedgerBalanceEffectType balanceEffectType,
-                                    LedgerPhaseCode phaseCode,
-                                    Map<String, LedgerBalanceConstraintType> constraintOverrides,
                                     Map<String, Object> contextVariables) implements RouteLegSpec {
 
         @Override
@@ -675,7 +735,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
         @Override
         public RouteLegType getLegType() {
-            return RouteLegType.INTERNAL_TRANSFER;
+            return legType;
         }
 
         @Override
@@ -691,31 +751,6 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         @Override
         public Money getAmount() {
             return AMOUNT;
-        }
-
-        @Override
-        public LedgerBalanceEffectType getBalanceEffectType() {
-            return balanceEffectType;
-        }
-
-        @Override
-        public LedgerPhaseCode getPhaseCode() {
-            return phaseCode;
-        }
-
-        @Override
-        public AccountBalancePeriodType getPeriodType() {
-            return periodType;
-        }
-
-        @Override
-        public String getPeriodId() {
-            return periodId;
-        }
-
-        @Override
-        public Map<String, LedgerBalanceConstraintType> getConstraintOverrides() {
-            return constraintOverrides;
         }
 
         @Override
@@ -785,7 +820,11 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             }
             return List.of(LedgerSubjectCode.AVAILABLE,
                     LedgerSubjectCode.FROZEN,
-                    LedgerSubjectCode.AUTHORIZATION);
+                    LedgerSubjectCode.AUTHORIZATION,
+                    LedgerSubjectCode.CLEARING,
+                    LedgerSubjectCode.SETTLEMENT,
+                    LedgerSubjectCode.FEE,
+                    LedgerSubjectCode.PREPAYMENT);
         }
 
         private LedgerDTO ledger(LedgerQuery query, LedgerSubjectCode subjectCode) {
@@ -832,6 +871,21 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         @Bean
         RecordingLedgerService ledgerService() {
             return new RecordingLedgerService();
+        }
+
+        @Bean
+        LedgerPostingPlanMapper ledgerPostingPlanMapper() {
+            return mock(LedgerPostingPlanMapper.class);
+        }
+
+        @Bean
+        LedgerEntryMapper ledgerEntryMapper() {
+            return mock(LedgerEntryMapper.class);
+        }
+
+        @Bean
+        LedgerTransactionMapper ledgerTransactionMapper() {
+            return mock(LedgerTransactionMapper.class);
         }
     }
 }

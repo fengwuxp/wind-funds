@@ -8,13 +8,10 @@ import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
 import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
+import com.wind.funds.transaction.support.FundsRouteLegIds;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsInstructionContextReader;
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeType;
@@ -163,7 +160,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .instructionType(resolveInstructionType(snapshot, replayRequest))
                 .eventType(resolveEventType(replayRequest))
                 .transactionType(resolveTransactionType(snapshot, replayRequest))
-                .participants(resolveParticipants(snapshot, replayLegs))
+                .participants(resolveParticipants(snapshot, replayLegs, replayRequest))
                 .legs(replayLegs)
                 .routingDecision(snapshot.getRoutingDecision())
                 .paymentInstrumentRef(snapshot.getPaymentInstrumentRef())
@@ -223,7 +220,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         Optional<SubjectRef> originalSubject = routeSnapshot.getLegs().stream()
-                .filter(leg -> leg.getPhaseCode() == LedgerPhaseCode.AUTHORIZATION)
+                .filter(leg -> leg.getLegType() == RouteLegType.HOLD)
                 .map(leg -> leg.getSourceNode().getSubjectRef())
                 .findFirst();
         AssertUtils.isTrue(originalSubject.isPresent(), REPLAY_LEG_REQUIRED_MESSAGE);
@@ -393,10 +390,12 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         return REPLAY_LEG_REQUIRED_MESSAGE;
     }
 
-    private boolean shouldReplayLeg(RouteLegSpec leg, ReplayRequestSpec replayRequest) {
+    private boolean shouldReplayLeg(RouteLegSpec leg,
+                                    ReplayRequestSpec replayRequest) {
+        boolean feeLeg = FundsRouteLegIds.FEE.equals(leg.getLegId());
         return switch (replayRequest.getReplayType()) {
-            case AUTHORIZATION_REFUND, REFUND -> leg.getPhaseCode() != LedgerPhaseCode.FEE;
-            case FEE_REFUND -> leg.getPhaseCode() == LedgerPhaseCode.FEE;
+            case AUTHORIZATION_REFUND, REFUND -> !feeLeg;
+            case FEE_REFUND -> feeLeg;
             default -> true;
         };
     }
@@ -406,27 +405,19 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                                    ReplayRequestSpec replayRequest,
                                    int sequence) {
         return switch (replayRequest.getReplayType()) {
-            case RELEASE_HOLD -> buildReleaseLeg(sourceLeg, replayRequest, sequence, RouteLegType.RELEASE,
-                    LedgerPhaseCode.REVERSAL);
-            case UNFREEZE -> buildReleaseLeg(sourceLeg, replayRequest, sequence, RouteLegType.RELEASE,
-                    LedgerPhaseCode.UNFREEZE);
+            case RELEASE_HOLD, UNFREEZE -> buildReleaseLeg(sourceLeg, replayRequest, sequence);
             case AUTHORIZATION_COMPLETION -> buildAuthorizationCompletionLeg(snapshot, sourceLeg, replayRequest, sequence);
             case AUTHORIZATION_REFUND, REFUND, FEE_REFUND -> buildRefundLeg(snapshot, sourceLeg, replayRequest,
-                    sequence, RouteLegType.RESTORE, LedgerPhaseCode.REFUND);
+                    sequence);
         };
     }
 
     private RouteLegSpec buildReleaseLeg(RouteLegSpec sourceLeg,
                                          ReplayRequestSpec replayRequest,
-                                         int sequence,
-                                         RouteLegType legType,
-                                         LedgerPhaseCode phaseCode) {
-        RouteNodeSpec sourceNode = copyNode(sourceLeg.getTargetNode(), RouteNodeRole.SOURCE,
-                sourceLeg.getTargetNode().getLedgerSubjectCode());
-        RouteNodeSpec targetNode = copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET,
-                sourceLeg.getSourceNode().getLedgerSubjectCode());
-        return buildReplayLeg(sourceLeg, replayRequest, sequence, legType, sourceNode, targetNode,
-                LedgerBalanceEffectType.RELEASE, phaseCode, mustNotBeNegative(sourceNode),
+                                         int sequence) {
+        RouteNodeSpec sourceNode = copyNode(sourceLeg.getTargetNode(), RouteNodeRole.SOURCE);
+        RouteNodeSpec targetNode = copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET);
+        return buildReplayLeg(sourceLeg, replayRequest, sequence, RouteLegType.RELEASE, sourceNode, targetNode,
                 replayRequest.getDescription());
     }
 
@@ -434,29 +425,21 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                                                          RouteLegSpec sourceLeg,
                                                          ReplayRequestSpec replayRequest,
                                                          int sequence) {
-        RouteNodeSpec sourceNode = copyNode(sourceLeg.getTargetNode(), RouteNodeRole.SOURCE,
-                sourceLeg.getTargetNode().getLedgerSubjectCode());
+        RouteNodeSpec sourceNode = copyNode(sourceLeg.getTargetNode(), RouteNodeRole.SOURCE);
         RouteNodeSpec targetNode = resolveCaptureTargetNode(snapshot, sourceLeg);
         return buildReplayLeg(sourceLeg, replayRequest, sequence, RouteLegType.CONSUME, sourceNode, targetNode,
-                LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.COMPLETION, mustNotBeNegative(sourceNode),
                 replayRequest.getDescription());
     }
 
     private RouteLegSpec buildRefundLeg(RouteSnapshotSpec snapshot,
                                         RouteLegSpec sourceLeg,
                                         ReplayRequestSpec replayRequest,
-                                        int sequence,
-                                        RouteLegType legType,
-                                        LedgerPhaseCode phaseCode) {
-        RouteNodeSpec capturedTargetNode = sourceLeg.getPhaseCode() == LedgerPhaseCode.AUTHORIZATION
+                                        int sequence) {
+        RouteNodeSpec capturedTargetNode = sourceLeg.getLegType() == RouteLegType.HOLD
                 ? resolveCaptureTargetNode(snapshot, sourceLeg) : sourceLeg.getTargetNode();
-        RouteNodeSpec sourceNode = copyNode(capturedTargetNode, RouteNodeRole.SOURCE,
-                capturedTargetNode.getLedgerSubjectCode());
-        LedgerSubjectCode targetSubjectCode = sourceLeg.getSourceNode().getLedgerSubjectCode() == LedgerSubjectCode.AUTHORIZATION
-                ? LedgerSubjectCode.AVAILABLE : sourceLeg.getSourceNode().getLedgerSubjectCode();
-        RouteNodeSpec targetNode = copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET, targetSubjectCode);
-        return buildReplayLeg(sourceLeg, replayRequest, sequence, legType, sourceNode, targetNode,
-                LedgerBalanceEffectType.RESTORE, phaseCode, Map.of(),
+        RouteNodeSpec sourceNode = copyNode(capturedTargetNode, RouteNodeRole.SOURCE);
+        RouteNodeSpec targetNode = copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET);
+        return buildReplayLeg(sourceLeg, replayRequest, sequence, RouteLegType.RESTORE, sourceNode, targetNode,
                 replayRequest.getDescription());
     }
 
@@ -469,18 +452,17 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private RouteNodeSpec resolveCaptureTargetNode(RouteSnapshotSpec snapshot, RouteLegSpec sourceLeg) {
         if (sourceLeg.getSourceNode().getSubjectRef().getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT) {
-            return copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET, LedgerSubjectCode.OUTSTANDING);
+            return copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET);
         }
         SubjectRef settlementAccount = resolveSettlementAccount(snapshot.getPlatformAccounts());
         if (settlementAccount != null) {
             return ImmutableRouteNodeSpec.builder()
                     .nodeType(RouteNodeType.PLATFORM_FUNDING_ACCOUNT)
                     .subjectRef(settlementAccount)
-                    .ledgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                     .nodeRole(RouteNodeRole.TARGET)
                     .build();
         }
-        return copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET, sourceLeg.getSourceNode().getLedgerSubjectCode());
+        return copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET);
     }
 
     private @Nullable SubjectRef resolveSettlementAccount(@Nullable PlatformAccountsSnapshotSpec platformAccounts) {
@@ -493,9 +475,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                                         RouteLegType legType,
                                         RouteNodeSpec sourceNode,
                                         RouteNodeSpec targetNode,
-                                        LedgerBalanceEffectType balanceEffectType,
-                                        LedgerPhaseCode phaseCode,
-                                        Map<String, LedgerBalanceConstraintType> constraints,
                                         @Nullable String description) {
         Money amount = resolveReplayAmount(sourceLeg, replayRequest);
         Money originalAmount = replayRequest.getOriginalAmount();
@@ -527,13 +506,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .amount(amount)
                 .originalAmount(originalAmount)
                 .exchangeRate(exchangeRate)
-                .balanceEffectType(balanceEffectType)
-                .phaseCode(phaseCode)
-                .periodType(sourceLeg.getPeriodType())
-                .periodId(sourceLeg.getPeriodId())
                 .replayPolicy(sourceLeg.getReplayPolicy())
                 .replayRefLegId(sourceLeg.getLegId())
-                .constraintOverrides(constraints)
                 .description(description == null ? sourceLeg.getDescription() : description)
                 .contextVariables(sourceLeg.getContextVariables())
                 .build();
@@ -562,35 +536,24 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         return amount;
     }
 
-    private RouteNodeSpec copyNode(RouteNodeSpec node, RouteNodeRole nodeRole, LedgerSubjectCode subjectCode) {
+    private RouteNodeSpec copyNode(RouteNodeSpec node, RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(node.getNodeType())
                 .subjectRef(node.getSubjectRef())
-                .ledgerSubjectCode(subjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }
 
-    private Map<String, LedgerBalanceConstraintType> mustNotBeNegative(RouteNodeSpec sourceNode) {
-        SubjectRef subjectRef = sourceNode.getSubjectRef();
-        String fullKey = subjectRef.getSubjectType().name()
-                + CONSTRAINT_KEY_SEPARATOR
-                + subjectRef.getSubjectId()
-                + CONSTRAINT_KEY_SEPARATOR
-                + sourceNode.getLedgerSubjectCode().name();
-        String subjectKey = subjectRef.getSubjectId()
-                + CONSTRAINT_KEY_SEPARATOR
-                + sourceNode.getLedgerSubjectCode().name();
-        return Map.of(fullKey, LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE,
-                subjectKey, LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
-    }
-
     private List<RouteParticipantSpec> resolveParticipants(RouteSnapshotSpec snapshot,
-                                                           List<RouteLegSpec> replayLegs) {
+                                                           List<RouteLegSpec> replayLegs,
+                                                           ReplayRequestSpec replayRequest) {
         Map<String, RouteParticipantSpec> participants = new LinkedHashMap<>();
         Set<String> participantSubjects = new HashSet<>();
         Set<String> replaySubjects = replaySubjectKeys(replayLegs);
         for (RouteParticipantSpec participant : snapshot.getParticipants()) {
+            if (!shouldReplayParticipant(participant, replayRequest)) {
+                continue;
+            }
             String participantSubject = subjectKey(participant.getSubjectRef());
             if (!replaySubjects.contains(participantSubject)) {
                 continue;
@@ -606,6 +569,15 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                     leg.getAmount(), leg.getDescription());
         }
         return List.copyOf(participants.values());
+    }
+
+    private boolean shouldReplayParticipant(RouteParticipantSpec participant,
+                                            ReplayRequestSpec replayRequest) {
+        return switch (replayRequest.getReplayType()) {
+            case FEE_REFUND -> participant.getParticipantRole() != RouteParticipantRole.PAYEE;
+            case REFUND, AUTHORIZATION_REFUND -> participant.getParticipantRole() != RouteParticipantRole.FEE_RECEIVER;
+            default -> true;
+        };
     }
 
     private RouteParticipantSpec replayParticipant(RouteParticipantSpec participant, Money amount) {

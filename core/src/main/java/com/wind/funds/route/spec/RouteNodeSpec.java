@@ -1,6 +1,5 @@
 package com.wind.funds.route.spec;
 
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.ref.SubjectRef;
@@ -16,9 +15,6 @@ public interface RouteNodeSpec {
 
     @NonNull
     SubjectRef getSubjectRef();
-
-    @NonNull
-    LedgerSubjectCode getLedgerSubjectCode();
 
     @NonNull
     RouteNodeRole getNodeRole();

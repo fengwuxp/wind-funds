@@ -7,7 +7,6 @@ import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.route.model.ImmutableExternalAccountRefSpec;
 import com.wind.funds.route.model.ImmutablePaymentInstrumentRefSpec;
@@ -361,10 +360,7 @@ class DefaultRouteReplayServiceTests {
                 .amount(Money.immutable(325L, CurrencyIsoCode.USD))
                 .originalAmount(Money.immutable(1_000L, CurrencyIsoCode.KWD))
                 .exchangeRate(new BigDecimal("3.25"))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
         RouteSnapshotSpec snapshot = routeSnapshot(null,
@@ -501,13 +497,10 @@ class DefaultRouteReplayServiceTests {
                         .legId("FREEZE")
                         .sequence(1)
                         .legType(RouteLegType.HOLD)
-                        .sourceNode(routeNode(account, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
-                        .targetNode(routeNode(account, RouteNodeRole.TARGET, LedgerSubjectCode.FROZEN))
+                        .sourceNode(routeNode(account, RouteNodeRole.SOURCE))
+                        .targetNode(routeNode(account, RouteNodeRole.TARGET))
                         .amount(Money.immutable(10L, CurrencyIsoCode.USD))
-                        .balanceEffectType(LedgerBalanceEffectType.HOLD)
-                        .phaseCode(LedgerPhaseCode.FREEZE)
                         .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                        .constraintOverrides(Map.of())
                         .contextVariables(Map.of())
                         .build()))
                 .resolvedAt(LocalDateTime.of(2026, 7, 29, 16, 30))
@@ -524,13 +517,10 @@ class DefaultRouteReplayServiceTests {
                 .legId(legId)
                 .sequence(1)
                 .legType(RouteLegType.HOLD)
-                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
-                .targetNode(routeNode(payer, RouteNodeRole.TARGET, LedgerSubjectCode.AUTHORIZATION))
+                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE))
+                .targetNode(routeNode(payer, RouteNodeRole.TARGET))
                 .amount(Money.immutable(amount, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.HOLD)
-                .phaseCode(LedgerPhaseCode.AUTHORIZATION)
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
     }
@@ -672,25 +662,15 @@ class DefaultRouteReplayServiceTests {
                 .sourceNode(routeNode(payer, RouteNodeRole.SOURCE))
                 .targetNode(routeNode(payee, RouteNodeRole.TARGET))
                 .amount(Money.immutable(10L, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
     }
 
     private ImmutableRouteNodeSpec routeNode(SubjectRef subjectRef, RouteNodeRole nodeRole) {
-        return routeNode(subjectRef, nodeRole, LedgerSubjectCode.AVAILABLE);
-    }
-
-    private ImmutableRouteNodeSpec routeNode(SubjectRef subjectRef,
-                                             RouteNodeRole nodeRole,
-                                             LedgerSubjectCode ledgerSubjectCode) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }

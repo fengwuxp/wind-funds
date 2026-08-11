@@ -1,9 +1,6 @@
 package com.wind.funds.route;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
@@ -31,7 +28,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
 import static com.wind.funds.route.support.RouteSpecSupport.sourceNode;
 import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
@@ -63,12 +59,9 @@ public class ClearingFundsInstructionRouteResolver implements RouteResolver, Ord
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         RouteLegSpec leg = routeLeg(FundsRouteLegIds.CLEARING_CONFIRM, 1,
                 RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.CLEARING))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .balanceEffectType(LedgerBalanceEffectType.RELEASE)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
+                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId)))
                 .replayPolicy(RouteReplayPolicy.NON_REPLAYABLE)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.CLEARING))
                 .build();
         RouteParticipantSpec participant = routeParticipantFactory.createParticipant(
                 RouteParticipantRole.PAYEE,

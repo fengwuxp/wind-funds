@@ -1,10 +1,20 @@
 package com.wind.funds.ledger.posting;
 
 import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.dal.entities.LedgerEntry;
+import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
+import com.wind.funds.ledger.dal.entities.LedgerTransaction;
+import com.wind.funds.ledger.dal.entities.table.LedgerEntryNameRefs;
+import com.wind.funds.ledger.dal.entities.table.LedgerPostingPlanNameRefs;
+import com.wind.funds.ledger.dal.entities.table.LedgerTransactionNameRefs;
+import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
+import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
+import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.exception.AssertUtils;
+import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.LedgerPostingAssembler;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -19,7 +29,9 @@ import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.support.FundsContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
@@ -76,11 +88,19 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
     private static final String PLAN_ID_SEPARATOR = "_";
 
+    private static final String FEE_ROUTE_LEG_ID = "FEE";
+
     private static final int POSTING_PLAN_ID_MAX_LENGTH = 64;
 
     private static final int POSTING_PLAN_ID_DIGEST_LENGTH = 16;
 
     private final LedgerService ledgerService;
+
+    private final LedgerPostingPlanMapper ledgerPostingPlanMapper;
+
+    private final LedgerEntryMapper ledgerEntryMapper;
+
+    private final LedgerTransactionMapper ledgerTransactionMapper;
 
     /**
      * 生成完整账本交易。
@@ -98,7 +118,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                                    @NonNull String fundsTransactionSn,
                                                    @NonNull ResolvedRouteSpec resolvedRoute) {
         return LedgerTransactionSpecFactory.createLedgerTransaction(instruction, fundsTransactionSn,
-                ledgerTransactionSn -> assemblePlans(ledgerTransactionSn, resolvedRoute));
+                ledgerTransactionSn -> assemblePlans(instruction, ledgerTransactionSn, resolvedRoute));
     }
 
     /**
@@ -114,12 +134,14 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         return !resolvedRoute.getLegs().isEmpty();
     }
 
-    private List<LedgerPostingPlanSpec> assemblePlans(String ledgerTransactionSn,
+    private List<LedgerPostingPlanSpec> assemblePlans(FundsInstructionSpec instruction,
+                                                      String ledgerTransactionSn,
                                                       ResolvedRouteSpec resolvedRoute) {
         List<LedgerPostingPlanSpec> result = new ArrayList<>();
         Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots = new HashMap<>();
         for (RouteLegSpec leg : resolvedRoute.getLegs()) {
-            LedgerPostingPlanSpec plan = assembleLeg(ledgerTransactionSn, resolvedRoute, leg, ledgerSnapshots);
+            LedgerPostingPlanSpec plan = assembleLeg(instruction, ledgerTransactionSn, resolvedRoute, leg,
+                    ledgerSnapshots);
             AssertUtils.isTrue(plan.isBalanced(),
                     "RouteLeg 生成的账务计划不平衡，legId = {}", leg.getLegId());
             result.add(plan);
@@ -127,65 +149,75 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         return result;
     }
 
-    private LedgerPostingPlanSpec assembleLeg(String ledgerTransactionSn,
+    private LedgerPostingPlanSpec assembleLeg(FundsInstructionSpec instruction,
+                                              String ledgerTransactionSn,
                                               ResolvedRouteSpec resolvedRoute,
                                               RouteLegSpec leg,
                                               Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
-        LedgerPostingIntentType intent = resolveIntent(resolvedRoute);
-        LedgerPostingScope postingScope = resolvePostingScope(intent, leg.getPhaseCode());
+        OriginalPosting originalPosting = resolveOriginalPosting(instruction, leg);
+        PostingSemantics semantics = resolvePostingSemantics(instruction, resolvedRoute, leg, originalPosting);
+        LedgerPostingIntentType intent = resolveIntent(resolvedRoute, leg);
+        LedgerPostingScope postingScope = resolvePostingScope(intent, semantics.phaseCode());
         List<LedgerEntrySpec> entries = List.of(
                 toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(),
-                        resolveSourceDirection(resolvedRoute, leg),
-                        intent, postingScope, ledgerSnapshots),
+                        semantics.sourceSubjectCode(), semantics.sourceDirection(), semantics.sourceConstraint(),
+                        semantics, intent, postingScope, ledgerSnapshots),
                 toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(),
-                        resolveTargetDirection(resolvedRoute, leg),
-                        intent, postingScope, ledgerSnapshots)
+                        semantics.targetSubjectCode(), semantics.targetDirection(),
+                        LedgerBalanceConstraintType.PROFILE_DEFAULT,
+                        semantics, intent, postingScope, ledgerSnapshots)
         );
-        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(leg.getPhaseCode(), entries);
+        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(semantics.phaseCode(), entries);
         return DefaultLedgerPostingPlanSpec.builder()
                 .planId(buildPlanId(intent, ledgerTransactionSn, leg))
                 .ledgerTransactionSn(ledgerTransactionSn)
                 .routeLegId(leg.getLegId())
                 .intent(intent)
                 .postingScope(postingScope)
-                .balanceEffectType(leg.getBalanceEffectType())
+                .balanceEffectType(semantics.balanceEffectType())
                 .postingPhases(List.of(phase))
                 .description(leg.getDescription())
                 .contextVariables(mergedContext(resolvedRoute, leg))
                 .build();
     }
 
-    private MovementDirection resolveSourceDirection(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
-        if (resolvedRoute.getEventType() == FundsTransactionEventType.LIMIT_ADJUST) {
-            return resolveLimitAdjustDirection(leg);
-        }
-        return MovementDirection.DECREASE;
-    }
-
-    private MovementDirection resolveTargetDirection(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
-        if (resolvedRoute.getEventType() == FundsTransactionEventType.LIMIT_ADJUST) {
-            return resolveLimitAdjustDirection(leg);
-        }
-        return MovementDirection.INCREASE;
-    }
-
-    private MovementDirection resolveLimitAdjustDirection(RouteLegSpec leg) {
-        return switch (leg.getBalanceEffectType()) {
-            case INCREASE -> MovementDirection.INCREASE;
-            case DECREASE -> MovementDirection.DECREASE;
-            default -> throw new IllegalArgumentException("LIMIT_ADJUST only supports INCREASE or DECREASE effect");
-        };
+    private PostingSemantics resolvePostingSemantics(FundsInstructionSpec instruction,
+                                                      ResolvedRouteSpec route,
+                                                      RouteLegSpec leg,
+                                                      @Nullable OriginalPosting originalPosting) {
+        LedgerBalanceEffectType balanceEffectType = resolveBalanceEffectType(instruction, route, leg);
+        AccountBalancePeriodType periodType = originalPosting == null
+                ? resolveInstructionPeriodType(instruction) : originalPosting.periodType();
+        String periodId = originalPosting == null
+                ? resolveInstructionPeriodId(instruction, periodType) : originalPosting.periodId();
+        MovementDirection sourceDirection = route.getEventType() == FundsTransactionEventType.LIMIT_ADJUST
+                ? limitAdjustDirection(balanceEffectType) : MovementDirection.DECREASE;
+        MovementDirection targetDirection = route.getEventType() == FundsTransactionEventType.LIMIT_ADJUST
+                ? limitAdjustDirection(balanceEffectType) : MovementDirection.INCREASE;
+        return new PostingSemantics(
+                resolveSubjectCode(instruction, route, leg, leg.getSourceNode(), true, originalPosting),
+                resolveSubjectCode(instruction, route, leg, leg.getTargetNode(), false, originalPosting),
+                periodType,
+                periodId,
+                balanceEffectType,
+                resolvePhaseCode(route, leg),
+                resolveSourceConstraint(instruction, route, leg, balanceEffectType),
+                sourceDirection,
+                targetDirection);
     }
 
     private LedgerEntrySpec toEntry(String ledgerTransactionSn,
-                                    ResolvedRouteSpec resolvedRoute,
+                                    ResolvedRouteSpec route,
                                     RouteLegSpec leg,
                                     RouteNodeSpec node,
+                                    LedgerSubjectCode subjectCode,
                                     MovementDirection direction,
+                                    LedgerBalanceConstraintType balanceConstraint,
+                                    PostingSemantics semantics,
                                     LedgerPostingIntentType intent,
                                     LedgerPostingScope postingScope,
                                     Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
-        LedgerDTO ledger = requireLedger(resolvedRoute, leg, node, ledgerSnapshots);
+        LedgerDTO ledger = requireLedger(route, leg, node, subjectCode, semantics, ledgerSnapshots);
         EntrySide entrySide = resolveEntrySide(ledger.getNormalBalanceSide(), direction);
         SubjectRef subjectRef = node.getSubjectRef();
         return DefaultLedgerEntrySpec.builder()
@@ -194,51 +226,49 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .periodId(ledger.getPeriodId())
                 .subjectId(subjectRef.getSubjectId())
                 .subjectType(subjectRef.getSubjectType().name())
-                .ledgerSubjectCode(node.getLedgerSubjectCode())
+                .ledgerSubjectCode(subjectCode)
                 .ledgerSubjectCategory(ledger.getLedgerSubjectCategory())
                 .entryType(entrySide)
                 .ledgerTransactionSn(ledgerTransactionSn)
                 .amount(leg.getAmount())
                 .originalAmount(leg.getOriginalAmount())
                 .exchangeRate(leg.getExchangeRate())
-                .businessScene(resolvedRoute.getBusinessScene())
-                .businessSn(resolvedRoute.getBusinessSn())
-                .transactionTime(resolvedRoute.getResolvedAt())
+                .businessScene(route.getBusinessScene())
+                .businessSn(route.getBusinessSn())
+                .transactionTime(route.getResolvedAt())
                 .description(leg.getDescription())
-                .balanceConstraintType(resolveBalanceConstraintType(leg, node))
+                .balanceConstraintType(balanceConstraint)
                 .intent(intent)
                 .postingScope(postingScope)
                 .postingRole(LedgerPostingRole.DETAIL)
-                .balanceEffectType(leg.getBalanceEffectType())
-                .phaseCode(leg.getPhaseCode())
-                .contextVariables(mergedContext(resolvedRoute, leg))
+                .balanceEffectType(semantics.balanceEffectType())
+                .phaseCode(semantics.phaseCode())
+                .contextVariables(mergedContext(route, leg))
                 .build();
     }
 
-    private LedgerDTO requireLedger(ResolvedRouteSpec resolvedRoute,
+    private LedgerDTO requireLedger(ResolvedRouteSpec route,
                                     RouteLegSpec leg,
                                     RouteNodeSpec node,
+                                    LedgerSubjectCode subjectCode,
+                                    PostingSemantics semantics,
                                     Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
         SubjectRef subjectRef = node.getSubjectRef();
         LedgerBucketGroupKey key = new LedgerBucketGroupKey(
-                resolvedRoute.getTenantId(),
+                route.getTenantId(),
                 subjectRef.getSubjectId(),
                 subjectRef.getSubjectType(),
                 leg.getAmount().getCurrency(),
-                leg.getPeriodType(),
-                resolvePeriodId(leg));
+                semantics.periodType(),
+                semantics.periodId());
         Map<LedgerSubjectCode, LedgerDTO> ledgers = ledgerSnapshots.computeIfAbsent(key, this::loadLedgers);
-        LedgerDTO ledger = ledgers.get(node.getLedgerSubjectCode());
+        LedgerDTO ledger = ledgers.get(subjectCode);
         AssertUtils.notNull(ledger,
                 "账本不存在或不唯一，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, periodType = {}, periodId = {}",
-                subjectRef.getSubjectId(),
-                subjectRef.getSubjectType(),
-                node.getLedgerSubjectCode(),
-                key.periodType(),
-                key.periodId());
+                subjectRef.getSubjectId(), subjectRef.getSubjectType(), subjectCode, key.periodType(), key.periodId());
         AssertUtils.equals(ledger.getCurrency(), leg.getAmount().getCurrency(),
                 "账本币种与路径金额币种不一致，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
-                subjectRef.getSubjectId(), subjectRef.getSubjectType(), node.getLedgerSubjectCode());
+                subjectRef.getSubjectId(), subjectRef.getSubjectType(), subjectCode);
         return ledger;
     }
 
@@ -255,13 +285,17 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, Function.identity()));
     }
 
-    private String resolvePeriodId(RouteLegSpec leg) {
-        AccountBalancePeriodType periodType = leg.getPeriodType();
-        AssertUtils.notNull(periodType, "账本周期类型不能为空");
+    private AccountBalancePeriodType resolveInstructionPeriodType(FundsInstructionSpec instruction) {
+        AccountBalancePeriodType periodType = instruction.getLedgerPeriodType();
+        return periodType == null ? AccountBalancePeriodType.LIFETIME : periodType;
+    }
+
+    private String resolveInstructionPeriodId(FundsInstructionSpec instruction,
+                                              AccountBalancePeriodType periodType) {
         if (periodType == AccountBalancePeriodType.LIFETIME) {
             return AccountBalancePeriodType.LIFETIME.name();
         }
-        String periodId = leg.getPeriodId();
+        String periodId = instruction.getLedgerPeriodId();
         AssertUtils.hasText(periodId, "非生命周期账本周期 periodId 不能为空");
         return periodId;
     }
@@ -282,34 +316,261 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         return normalBalanceSide == EntrySide.DEBIT ? EntrySide.CREDIT : EntrySide.DEBIT;
     }
 
-    private LedgerBalanceConstraintType resolveBalanceConstraintType(RouteLegSpec leg, RouteNodeSpec node) {
-        Map<String, LedgerBalanceConstraintType> overrides = leg.getConstraintOverrides();
-        SubjectRef subjectRef = node.getSubjectRef();
-        LedgerSubjectCode subjectCode = node.getLedgerSubjectCode();
-        LedgerBalanceConstraintType result = overrides.get(fullConstraintKey(subjectRef, subjectCode));
-        if (result != null) {
-            return result;
+    private @Nullable OriginalPosting resolveOriginalPosting(FundsInstructionSpec instruction, RouteLegSpec leg) {
+        if (!StringUtils.hasText(leg.getReplayRefLegId())) {
+            return null;
         }
-        result = overrides.get(subjectConstraintKey(subjectRef, subjectCode));
-        if (result != null) {
-            return result;
+        var reference = instruction.getReference();
+        AssertUtils.notNull(reference, "回放账务事实必须引用原资金交易");
+        AssertUtils.hasText(reference.getReferenceSn(), "回放账务事实必须引用原资金交易");
+        Long tenantId = instruction.getTenantId();
+        AssertUtils.notNull(tenantId, "回放账务事实 tenantId 不能为空");
+        String ledgerTransactionSn = reference.getReferenceLedgerTransactionSn();
+        LedgerTransactionNameRefs transaction = LedgerTransactionNameRefs.ledgerTransaction;
+        if (StringUtils.hasText(ledgerTransactionSn)) {
+            LedgerTransaction originalTransaction = ledgerTransactionMapper.selectOneByQuery(QueryWrapper.create()
+                    .from(transaction)
+                    .where(transaction.tenantId.eq(tenantId))
+                    .and(transaction.sn.eq(ledgerTransactionSn))
+                    .and(transaction.fundsTransactionSn.eq(reference.getReferenceSn())));
+            AssertUtils.notNull(originalTransaction,
+                    "原账本交易与引用资金交易不一致，ledgerTransactionSn = {}, fundsTransactionSn = {}",
+                    ledgerTransactionSn, reference.getReferenceSn());
+        } else {
+            List<LedgerTransaction> originalTransactions = ledgerTransactionMapper.selectListByQuery(
+                    QueryWrapper.create()
+                            .from(transaction)
+                            .where(transaction.tenantId.eq(tenantId))
+                            .and(transaction.fundsTransactionSn.eq(reference.getReferenceSn())));
+            AssertUtils.isTrue(originalTransactions.size() == 1,
+                    "原资金交易对应账本交易不存在或不唯一，fundsTransactionSn = {}",
+                    reference.getReferenceSn());
+            ledgerTransactionSn = originalTransactions.getFirst().getSn();
         }
-        return overrides.getOrDefault(subjectCode.name(), LedgerBalanceConstraintType.PROFILE_DEFAULT);
+        LedgerPostingPlanNameRefs plan = LedgerPostingPlanNameRefs.ledgerPostingPlan;
+        List<LedgerPostingPlan> plans = ledgerPostingPlanMapper.selectListByQuery(QueryWrapper.create()
+                .from(plan)
+                .where(plan.tenantId.eq(tenantId))
+                .and(plan.ledgerTransactionSn.eq(ledgerTransactionSn))
+                .and(plan.routeLegId.eq(leg.getReplayRefLegId())));
+        AssertUtils.isTrue(plans.size() == 1,
+                "原记账计划不存在或不唯一，ledgerTransactionSn = {}, routeLegId = {}",
+                ledgerTransactionSn, leg.getReplayRefLegId());
+        LedgerPostingPlan originalPlan = plans.getFirst();
+        LedgerEntryNameRefs entry = LedgerEntryNameRefs.ledgerEntry;
+        List<LedgerEntry> entries = ledgerEntryMapper.selectListByQuery(QueryWrapper.create()
+                .from(entry)
+                .where(entry.tenantId.eq(tenantId))
+                .and(entry.ledgerTransactionSn.eq(ledgerTransactionSn))
+                .and(entry.postingPlanSn.eq(originalPlan.getSn())));
+        AssertUtils.isTrue(entries.size() == 2,
+                "原记账计划分录不完整，ledgerTransactionSn = {}, routeLegId = {}, count = {}",
+                ledgerTransactionSn, leg.getReplayRefLegId(), entries.size());
+        List<LedgerPeriod> periods = entries.stream()
+                .map(item -> new LedgerPeriod(item.getPeriodType(), item.getPeriodId()))
+                .distinct()
+                .toList();
+        AssertUtils.isTrue(periods.size() == 1,
+                "原记账计划账期不唯一，ledgerTransactionSn = {}, routeLegId = {}",
+                ledgerTransactionSn, leg.getReplayRefLegId());
+        return new OriginalPosting(entries, periods.getFirst().periodType(), periods.getFirst().periodId());
     }
 
-    private String fullConstraintKey(SubjectRef subjectRef, LedgerSubjectCode subjectCode) {
-        return subjectRef.getSubjectType().name()
-                + KEY_SEPARATOR
-                + subjectRef.getSubjectId()
-                + KEY_SEPARATOR
-                + subjectCode.name();
+    private LedgerSubjectCode resolveSubjectCode(FundsInstructionSpec instruction,
+                                                 ResolvedRouteSpec route,
+                                                 RouteLegSpec leg,
+                                                 RouteNodeSpec node,
+                                                 boolean source,
+                                                 @Nullable OriginalPosting originalPosting) {
+        if (isFeeChargeLeg(route, leg)) {
+            return source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.FEE;
+        }
+        LedgerSubjectCode platformSubjectCode = resolvePlatformSubjectCode(route.getPlatformAccounts(),
+                node.getSubjectRef());
+        if (platformSubjectCode != null) {
+            return platformSubjectCode;
+        }
+        return switch (route.getEventType()) {
+            case TOPUP, TRANSFER -> LedgerSubjectCode.AVAILABLE;
+            case PAY -> source ? LedgerSubjectCode.AVAILABLE
+                    : requireSubjectCode(instruction.getPayeeLedgerSubjectCode(), "收款账本科目不能为空");
+            case REFUND -> originalPosting == null
+                    ? source
+                    ? requireSubjectCode(instruction.getPayerLedgerSubjectCode(), "退款出资账本科目不能为空")
+                    : LedgerSubjectCode.AVAILABLE
+                    : resolveOriginalSubjectCode(originalPosting, node.getSubjectRef());
+            case FEE_REFUND -> resolveOriginalSubjectCode(originalPosting, node.getSubjectRef());
+            case WITHDRAW -> LedgerSubjectCode.FROZEN;
+            case FEE_CHARGE -> source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.FEE;
+            case AUTHORIZE -> source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.AUTHORIZATION;
+            case REVERSAL -> source ? LedgerSubjectCode.AUTHORIZATION : LedgerSubjectCode.AVAILABLE;
+            case COMPLETE -> resolveCompletionSubjectCode(leg, node, source);
+            case AUTH_REFUND -> source && node.getSubjectRef().getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT
+                    ? LedgerSubjectCode.OUTSTANDING : LedgerSubjectCode.AVAILABLE;
+            case FREEZE -> source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.FROZEN;
+            case UNFREEZE -> source ? LedgerSubjectCode.FROZEN : LedgerSubjectCode.AVAILABLE;
+            case BALANCE_ADJUST -> LedgerSubjectCode.AVAILABLE;
+            case LIMIT_ADJUST -> resolveLimitAdjustSubjectCode(instruction, source);
+            case CLEARING_CONFIRM -> source ? LedgerSubjectCode.CLEARING : LedgerSubjectCode.AVAILABLE;
+            case SETTLEMENT_LOCK -> source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.SETTLEMENT;
+            case PAYOUT_SUCCEEDED -> source ? LedgerSubjectCode.SETTLEMENT : LedgerSubjectCode.PREPAYMENT;
+            case PAYOUT_FAILED -> source ? LedgerSubjectCode.SETTLEMENT : LedgerSubjectCode.AVAILABLE;
+        };
     }
 
-    private String subjectConstraintKey(SubjectRef subjectRef, LedgerSubjectCode subjectCode) {
-        return subjectRef.getSubjectId() + KEY_SEPARATOR + subjectCode.name();
+    private LedgerSubjectCode resolveCompletionSubjectCode(RouteLegSpec leg, RouteNodeSpec node, boolean source) {
+        if (source) {
+            return StringUtils.hasText(leg.getReplayRefLegId())
+                    ? LedgerSubjectCode.AUTHORIZATION : LedgerSubjectCode.AVAILABLE;
+        }
+        return node.getSubjectRef().getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT
+                ? LedgerSubjectCode.OUTSTANDING : LedgerSubjectCode.SETTLEMENT;
     }
 
-    private LedgerPostingIntentType resolveIntent(ResolvedRouteSpec resolvedRoute) {
+    private LedgerSubjectCode resolveLimitAdjustSubjectCode(FundsInstructionSpec instruction, boolean source) {
+        boolean increase = Boolean.TRUE.equals(instruction.getContextVariables().get(FundsContextVariables.INCREASE));
+        return increase == source ? LedgerSubjectCode.LIMIT : LedgerSubjectCode.AVAILABLE;
+    }
+
+    private LedgerSubjectCode resolveOriginalSubjectCode(@Nullable OriginalPosting originalPosting,
+                                                         SubjectRef subjectRef) {
+        AssertUtils.notNull(originalPosting, "回放账务缺少原记账事实");
+        List<LedgerSubjectCode> subjectCodes = originalPosting.entries().stream()
+                .filter(entry -> entry.getSubjectId().equals(subjectRef.getSubjectId())
+                        && entry.getSubjectType().equals(subjectRef.getSubjectType().name()))
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .distinct()
+                .toList();
+        AssertUtils.isTrue(subjectCodes.size() == 1,
+                "原记账主体科目不存在或不唯一，subjectId = {}, subjectType = {}",
+                subjectRef.getSubjectId(), subjectRef.getSubjectType());
+        return subjectCodes.getFirst();
+    }
+
+    private @Nullable LedgerSubjectCode resolvePlatformSubjectCode(
+            @Nullable PlatformAccountsSnapshotSpec platformAccounts,
+            SubjectRef subjectRef) {
+        if (platformAccounts == null) {
+            return null;
+        }
+        if (sameSubject(platformAccounts.getCashFundingAccount(), subjectRef)) {
+            return LedgerSubjectCode.CASH;
+        }
+        if (sameSubject(platformAccounts.getPrepaymentFundingAccount(), subjectRef)) {
+            return LedgerSubjectCode.PREPAYMENT;
+        }
+        if (sameSubject(platformAccounts.getClearingFundingAccount(), subjectRef)) {
+            return LedgerSubjectCode.CLEARING;
+        }
+        if (sameSubject(platformAccounts.getSettlementFundingAccount(), subjectRef)) {
+            return LedgerSubjectCode.SETTLEMENT;
+        }
+        if (sameSubject(platformAccounts.getFeeFundingAccount(), subjectRef)) {
+            return LedgerSubjectCode.FEE;
+        }
+        return sameSubject(platformAccounts.getAdjustmentFundingAccount(), subjectRef)
+                ? LedgerSubjectCode.ADJUSTMENT : null;
+    }
+
+    private boolean sameSubject(@Nullable SubjectRef expected, SubjectRef actual) {
+        return expected != null
+                && expected.getSubjectId().equals(actual.getSubjectId())
+                && expected.getSubjectType() == actual.getSubjectType();
+    }
+
+    private LedgerSubjectCode requireSubjectCode(@Nullable LedgerSubjectCode subjectCode, String message) {
+        AssertUtils.notNull(subjectCode, message);
+        return subjectCode;
+    }
+
+    private LedgerBalanceEffectType resolveBalanceEffectType(FundsInstructionSpec instruction,
+                                                             ResolvedRouteSpec route,
+                                                             RouteLegSpec leg) {
+        if (isFeeChargeLeg(route, leg)) {
+            return LedgerBalanceEffectType.CONSUME;
+        }
+        return switch (route.getEventType()) {
+            case TOPUP, BALANCE_ADJUST, LIMIT_ADJUST -> resolveAdjustmentEffect(instruction, route.getEventType());
+            case TRANSFER, PAY, FEE_CHARGE, COMPLETE -> LedgerBalanceEffectType.CONSUME;
+            case REFUND, FEE_REFUND, AUTH_REFUND, PAYOUT_FAILED -> LedgerBalanceEffectType.RESTORE;
+            case WITHDRAW, PAYOUT_SUCCEEDED -> leg.getLegType() == RouteLegType.EXTERNAL_OUT
+                    ? LedgerBalanceEffectType.DECREASE : LedgerBalanceEffectType.CONSUME;
+            case AUTHORIZE, FREEZE -> LedgerBalanceEffectType.HOLD;
+            case REVERSAL, UNFREEZE, CLEARING_CONFIRM -> LedgerBalanceEffectType.RELEASE;
+            case SETTLEMENT_LOCK -> LedgerBalanceEffectType.CONSUME;
+        };
+    }
+
+    private LedgerBalanceEffectType resolveAdjustmentEffect(FundsInstructionSpec instruction,
+                                                            FundsTransactionEventType eventType) {
+        if (eventType == FundsTransactionEventType.TOPUP) {
+            return LedgerBalanceEffectType.INCREASE;
+        }
+        Object increase = instruction.getContextVariables().get(FundsContextVariables.INCREASE);
+        AssertUtils.isTrue(increase instanceof Boolean, "调账方向 increase 不能为空");
+        return Boolean.TRUE.equals(increase)
+                ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE;
+    }
+
+    private LedgerPhaseCode resolvePhaseCode(ResolvedRouteSpec route, RouteLegSpec leg) {
+        if (isFeeChargeLeg(route, leg)) {
+            return LedgerPhaseCode.FEE;
+        }
+        return switch (route.getEventType()) {
+            case TOPUP -> leg.getLegType() == RouteLegType.EXTERNAL_IN
+                    ? LedgerPhaseCode.FUND_IN : LedgerPhaseCode.SETTLEMENT;
+            case TRANSFER -> LedgerPhaseCode.TRANSFER;
+            case PAY -> LedgerPhaseCode.SETTLEMENT;
+            case REFUND, FEE_REFUND, AUTH_REFUND, PAYOUT_FAILED -> LedgerPhaseCode.REFUND;
+            case WITHDRAW, PAYOUT_SUCCEEDED -> leg.getLegType() == RouteLegType.EXTERNAL_OUT
+                    ? LedgerPhaseCode.FUND_OUT : LedgerPhaseCode.SETTLEMENT;
+            case FEE_CHARGE -> LedgerPhaseCode.FEE;
+            case AUTHORIZE -> LedgerPhaseCode.AUTHORIZATION;
+            case REVERSAL -> LedgerPhaseCode.REVERSAL;
+            case COMPLETE -> LedgerPhaseCode.COMPLETION;
+            case FREEZE -> LedgerPhaseCode.FREEZE;
+            case UNFREEZE -> LedgerPhaseCode.UNFREEZE;
+            case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPhaseCode.ADJUSTMENT;
+            case CLEARING_CONFIRM, SETTLEMENT_LOCK -> LedgerPhaseCode.SETTLEMENT;
+        };
+    }
+
+    private LedgerBalanceConstraintType resolveSourceConstraint(FundsInstructionSpec instruction,
+                                                                ResolvedRouteSpec route,
+                                                                RouteLegSpec leg,
+                                                                LedgerBalanceEffectType balanceEffectType) {
+        if (isFeeChargeLeg(route, leg)) {
+            return LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
+        }
+        return switch (route.getEventType()) {
+            case TOPUP, REFUND, FEE_REFUND, AUTH_REFUND -> LedgerBalanceConstraintType.PROFILE_DEFAULT;
+            case WITHDRAW, PAYOUT_SUCCEEDED -> leg.getLegType() == RouteLegType.EXTERNAL_OUT
+                    ? LedgerBalanceConstraintType.PROFILE_DEFAULT
+                    : LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
+            case BALANCE_ADJUST, LIMIT_ADJUST -> balanceEffectType == LedgerBalanceEffectType.DECREASE
+                    ? adjustmentConstraint(instruction) : LedgerBalanceConstraintType.PROFILE_DEFAULT;
+            default -> LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
+        };
+    }
+
+    private LedgerBalanceConstraintType adjustmentConstraint(FundsInstructionSpec instruction) {
+        return Boolean.TRUE.equals(instruction.getContextVariables().get(FundsContextVariables.ALLOW_NEGATIVE_BALANCE))
+                ? LedgerBalanceConstraintType.ALLOW_NEGATIVE
+                : LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
+    }
+
+    private MovementDirection limitAdjustDirection(LedgerBalanceEffectType balanceEffectType) {
+        return switch (balanceEffectType) {
+            case INCREASE -> MovementDirection.INCREASE;
+            case DECREASE -> MovementDirection.DECREASE;
+            default -> throw new IllegalArgumentException("LIMIT_ADJUST only supports INCREASE or DECREASE effect");
+        };
+    }
+
+    private LedgerPostingIntentType resolveIntent(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
+        if (isFeeChargeLeg(resolvedRoute, leg)) {
+            return LedgerPostingIntentType.FEE;
+        }
         FundsTransactionEventType eventType = resolvedRoute.getEventType();
         return switch (eventType) {
             case AUTHORIZE -> LedgerPostingIntentType.AUTHORIZATION;
@@ -343,6 +604,14 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                     "balance-control transaction type requires FREEZE or UNFREEZE event");
             case ADJUSTMENT -> LedgerPostingIntentType.ADJUSTMENT;
         };
+    }
+
+    private boolean isFeeChargeLeg(ResolvedRouteSpec route, RouteLegSpec leg) {
+        PlatformAccountsSnapshotSpec platformAccounts = route.getPlatformAccounts();
+        return route.getEventType() != FundsTransactionEventType.FEE_REFUND
+                && FEE_ROUTE_LEG_ID.equals(leg.getLegId())
+                && platformAccounts != null
+                && sameSubject(platformAccounts.getFeeFundingAccount(), leg.getTargetNode().getSubjectRef());
     }
 
     private LedgerPostingScope resolvePostingScope(LedgerPostingIntentType intent, LedgerPhaseCode phaseCode) {
@@ -393,6 +662,25 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         }
         result.put("replayPolicy", leg.getReplayPolicy().name());
         return FundsContextVariables.immutableCopy(result);
+    }
+
+    private record PostingSemantics(LedgerSubjectCode sourceSubjectCode,
+                                    LedgerSubjectCode targetSubjectCode,
+                                    AccountBalancePeriodType periodType,
+                                    String periodId,
+                                    LedgerBalanceEffectType balanceEffectType,
+                                    LedgerPhaseCode phaseCode,
+                                    LedgerBalanceConstraintType sourceConstraint,
+                                    MovementDirection sourceDirection,
+                                    MovementDirection targetDirection) {
+    }
+
+    private record OriginalPosting(List<LedgerEntry> entries,
+                                   AccountBalancePeriodType periodType,
+                                   String periodId) {
+    }
+
+    private record LedgerPeriod(AccountBalancePeriodType periodType, String periodId) {
     }
 
     private enum MovementDirection {

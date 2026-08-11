@@ -1,7 +1,5 @@
 package com.wind.funds.route;
 
-import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSpecSupport;
@@ -14,9 +12,6 @@ import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.transaction.support.FundsRouteLegIds;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
@@ -41,7 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
 import static com.wind.funds.route.support.RouteSpecSupport.sourceNode;
 import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
@@ -199,19 +193,12 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                                  FundsInstructionSpec instruction) {
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
-        RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
             result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_PREFIX + sequence, sequence, RouteLegType.HOLD,
                     instruction)
-                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
-                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject),
-                            LedgerSubjectCode.AUTHORIZATION))
-                    .balanceEffectType(LedgerBalanceEffectType.HOLD)
-                    .phaseCode(LedgerPhaseCode.AUTHORIZATION)
-                    .periodType(period.periodType())
-                    .periodId(period.periodId())
+                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject)))
+                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject)))
                     .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                    .constraintOverrides(mustNotBeNegative(subject, LedgerSubjectCode.AVAILABLE))
                     .build());
             sequence++;
         }
@@ -222,19 +209,12 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                            FundsInstructionSpec instruction) {
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
-        RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
             result.add(routeLeg(FundsRouteLegIds.REVERSAL_PREFIX + sequence, sequence, RouteLegType.RELEASE,
                     instruction)
-                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject),
-                            LedgerSubjectCode.AUTHORIZATION))
-                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
-                    .balanceEffectType(LedgerBalanceEffectType.RELEASE)
-                    .phaseCode(LedgerPhaseCode.REVERSAL)
-                    .periodType(period.periodType())
-                    .periodId(period.periodId())
+                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject)))
+                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject)))
                     .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                    .constraintOverrides(mustNotBeNegative(subject, LedgerSubjectCode.AUTHORIZATION))
                     .build());
             sequence++;
         }
@@ -247,22 +227,13 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         SubjectRef settlementSubject = platformAccountRouteSupport.createSubjectRef(settlementAccount);
-        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
-                PlatformFundingAccountRole.SETTLEMENT);
-        RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
             result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_COMPLETION_PREFIX + sequence, sequence,
                     RouteLegType.CONSUME,
                     instruction)
-                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject),
-                            LedgerSubjectCode.AUTHORIZATION))
-                    .targetNode(targetNode(settlementSubject, settlementLedgerSubjectCode))
-                    .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                    .phaseCode(LedgerPhaseCode.COMPLETION)
-                    .periodType(period.periodType())
-                    .periodId(period.periodId())
+                    .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject)))
+                    .targetNode(targetNode(settlementSubject))
                     .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                    .constraintOverrides(mustNotBeNegative(subject, LedgerSubjectCode.AUTHORIZATION))
                     .build());
             sequence++;
         }
@@ -273,17 +244,11 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                                FundsAccountId settlementAccount,
                                                FundsInstructionSpec instruction) {
         SubjectRef settlementSubject = platformAccountRouteSupport.createSubjectRef(settlementAccount);
-        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
-                PlatformFundingAccountRole.SETTLEMENT);
         RouteLegSpec leg = routeLeg(FundsRouteLegIds.FORCE_COMPLETION_PREFIX + 1, 1, RouteLegType.CONSUME,
                 instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId),
-                        LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(settlementSubject, settlementLedgerSubjectCode))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.COMPLETION)
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
+                .targetNode(targetNode(settlementSubject))
                 .replayPolicy(RouteReplayPolicy.NON_REPLAYABLE)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build();
         return List.of(leg);
     }
@@ -294,39 +259,16 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         SubjectRef settlementSubject = platformAccountRouteSupport.createSubjectRef(settlementAccount);
-        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
-                PlatformFundingAccountRole.SETTLEMENT);
-        RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
             result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
                     instruction)
-                    .sourceNode(sourceNode(settlementSubject, settlementLedgerSubjectCode))
-                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
-                    .balanceEffectType(LedgerBalanceEffectType.RESTORE)
-                    .phaseCode(LedgerPhaseCode.REFUND)
-                    .periodType(period.periodType())
-                    .periodId(period.periodId())
+                    .sourceNode(sourceNode(settlementSubject))
+                    .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject)))
                     .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                     .build());
             sequence++;
         }
         return result;
-    }
-
-    private RoutePeriod routePeriod(FundsInstructionSpec instruction) {
-        AccountBalancePeriodType periodType = FundsInstructionContextReader.getValue(instruction,
-                FundsInstructionFieldKeys.LEDGER_PERIOD_TYPE, AccountBalancePeriodType.class);
-        String periodId = FundsInstructionContextReader.getValue(instruction,
-                FundsInstructionFieldKeys.LEDGER_PERIOD_ID, String.class);
-        if (periodType == null) {
-            AssertUtils.isTrue(periodId == null, "账本周期类型不能为空，periodId = {}", periodId);
-            return new RoutePeriod(AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
-        }
-        if (periodType == AccountBalancePeriodType.LIFETIME) {
-            return new RoutePeriod(AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
-        }
-        AssertUtils.hasText(periodId, "非生命周期账本周期 periodId 不能为空，periodType = {}", periodType);
-        return new RoutePeriod(periodType, periodId);
     }
 
     private ResolvedRouteSpec route(FundsInstructionSpec instruction,
@@ -424,6 +366,4 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return 20;
     }
 
-    private record RoutePeriod(AccountBalancePeriodType periodType, String periodId) {
-    }
 }

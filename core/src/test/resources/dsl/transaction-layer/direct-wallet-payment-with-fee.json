@@ -80,21 +80,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_merchant_20001_usd",
-          "ledgerSubjectCode": "CLEARING"
+          "subjectId": "fa_merchant_20001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 10000
         },
-        "balanceEffectType": "CONSUME",
-        "phaseCode": "SETTLEMENT",
         "replayPolicy": "PARTIAL_ALLOWED"
       },
       {
@@ -103,21 +99,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_platform_fee_usd",
-          "ledgerSubjectCode": "FEE"
+          "subjectId": "fa_platform_fee_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 150
         },
-        "balanceEffectType": "CONSUME",
-        "phaseCode": "FEE",
         "replayPolicy": "PARTIAL_ALLOWED"
       }
     ]

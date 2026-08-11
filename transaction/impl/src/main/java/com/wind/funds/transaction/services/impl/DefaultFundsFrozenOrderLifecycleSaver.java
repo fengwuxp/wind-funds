@@ -219,9 +219,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                                    RouteSnapshotSpec routeSnapshot) {
         String requestHash = requestHash(order);
         if (StringUtils.hasText(requestHash)) {
-            Map<String, Object> facts = requestHashFacts(instruction, routeSnapshot);
-            AssertUtils.isTrue(FundsStableHashSupport.matchesCanonicalOrLegacyJson(
-                            requestHash, FROZEN_ORDER_DIGEST_DOMAIN, facts, facts),
+            AssertUtils.isTrue(matchesRequestHash(order, requestHash, instruction, routeSnapshot),
                     "资金冻结单请求参数不一致，sn = {}", order.getSn());
             return;
         }
@@ -320,6 +318,14 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                 FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
     }
 
+    private @Nullable String persistedRouteSnapshot(FundsFrozenOrder order) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
+            return null;
+        }
+        return stringValue(parseContextVariables(order.getContextVariables()),
+                FundsInstructionContextKeys.ROUTE_SNAPSHOT);
+    }
+
     private Map<String, Object> parseContextVariables(String value) {
         return WindJson.parseObject(value, new TypeReference<>() {
         });
@@ -353,8 +359,45 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                 FROZEN_ORDER_DIGEST_DOMAIN, requestHashFacts(instruction, routeSnapshot));
     }
 
+    private boolean matchesRequestHash(FundsFrozenOrder order,
+                                       String requestHash,
+                                       FundsInstructionSpec instruction,
+                                       RouteSnapshotSpec routeSnapshot) {
+        Map<String, Object> currentFacts = requestHashFacts(instruction, routeSnapshot);
+        if (FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                requestHash, FROZEN_ORDER_DIGEST_DOMAIN, currentFacts, currentFacts)) {
+            return true;
+        }
+        String persistedRouteSnapshot = persistedRouteSnapshot(order);
+        if (!StringUtils.hasText(persistedRouteSnapshot)) {
+            return false;
+        }
+        Map<String, Object> persistedRoute = persistedRouteHashSummary(persistedRouteSnapshot, instruction);
+        if (!DefaultFundsInstructionLifecycleSaver.legacyRouteAccountingMatchesInstruction(
+                persistedRoute, instruction)) {
+            return false;
+        }
+        String currentPathDigest = FundsStableHashSupport.sha256CanonicalJson(
+                FROZEN_ORDER_DIGEST_DOMAIN + ".route-path", routeHashSummary(routeSnapshot));
+        String persistedPathDigest = FundsStableHashSupport.sha256CanonicalJson(
+                FROZEN_ORDER_DIGEST_DOMAIN + ".route-path",
+                RouteSnapshotJsonSupport.pathOnlyRouteSummary(persistedRoute));
+        if (!currentPathDigest.equals(persistedPathDigest)) {
+            return false;
+        }
+        Map<String, Object> persistedFacts = requestHashFacts(instruction, routeSnapshot, persistedRoute);
+        return FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                requestHash, FROZEN_ORDER_DIGEST_DOMAIN, persistedFacts, persistedFacts);
+    }
+
     private Map<String, Object> requestHashFacts(FundsInstructionSpec instruction,
                                                  @Nullable RouteSnapshotSpec routeSnapshot) {
+        return requestHashFacts(instruction, routeSnapshot, routeHashSummary(routeSnapshot));
+    }
+
+    private Map<String, Object> requestHashFacts(FundsInstructionSpec instruction,
+                                                 @Nullable RouteSnapshotSpec routeSnapshot,
+                                                 Map<String, Object> routeSummary) {
         Map<String, Object> values = new TreeMap<>();
         values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
         values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
@@ -369,7 +412,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableSubjectRef.Fields.subjectId, subjectId(instruction, routeSnapshot));
         values.put(ImmutableSubjectRef.Fields.subjectType, subjectType(instruction, routeSnapshot));
         values.put(HASH_FIELD_FREEZE_TYPE, resolveFreezeType(instruction));
-        values.put(HASH_FIELD_ROUTE, routeHashSummary(routeSnapshot));
+        values.put(HASH_FIELD_ROUTE, routeSummary);
         return values;
     }
 
@@ -381,6 +424,17 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableRouteSnapshotSpec.Fields.transactionType,
                 legacyCompatibleHashTransactionType(routeSnapshot.getEventType(),
                         routeSnapshot.getTransactionType()));
+        values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);
+        return FundsStableHashSupport.stableHashMap(values);
+    }
+
+    private Map<String, Object> persistedRouteHashSummary(String routeSnapshotJson,
+                                                          FundsInstructionSpec instruction) {
+        Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.persistedRouteSummary(routeSnapshotJson));
+        values.put(ImmutableRouteSnapshotSpec.Fields.transactionType,
+                legacyCompatibleHashTransactionType(instruction.getEventType(), instruction.getTransactionType()));
         values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
         values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
         values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);

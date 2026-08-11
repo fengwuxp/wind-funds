@@ -1,9 +1,6 @@
 package com.wind.funds.route.support;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableRouteLegSpec;
 import com.wind.funds.route.model.ImmutableRouteNodeSpec;
 import com.wind.funds.route.enums.RouteLegType;
@@ -15,7 +12,6 @@ import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
-import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 
@@ -27,8 +23,6 @@ import java.util.Map;
  * Route spec 构建辅助。
  */
 public final class RouteSpecSupport {
-
-    private static final String CONSTRAINT_KEY_SEPARATOR = ":";
 
     private static final String PARTICIPANTS_REQUIRED_MESSAGE = "ResolvedRoute participants 不能为空";
 
@@ -97,48 +91,25 @@ public final class RouteSpecSupport {
                 .amount(amount)
                 .originalAmount(originalAmount)
                 .exchangeRate(exchangeRate)
-                .periodType(AccountBalancePeriodType.LIFETIME)
-                .periodId(AccountBalancePeriodType.LIFETIME.name())
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
-                .constraintOverrides(Map.of())
                 .description(description)
                 .contextVariables(Map.of());
     }
 
-    public static RouteNodeSpec sourceNode(@NonNull SubjectRef subjectRef,
-                                           @NonNull LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.SOURCE);
+    public static RouteNodeSpec sourceNode(@NonNull SubjectRef subjectRef) {
+        return routeNode(subjectRef, RouteNodeRole.SOURCE);
     }
 
-    public static RouteNodeSpec targetNode(@NonNull SubjectRef subjectRef,
-                                           @NonNull LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.TARGET);
+    public static RouteNodeSpec targetNode(@NonNull SubjectRef subjectRef) {
+        return routeNode(subjectRef, RouteNodeRole.TARGET);
     }
 
     public static RouteNodeSpec routeNode(@NonNull SubjectRef subjectRef,
-                                          @NonNull LedgerSubjectCode ledgerSubjectCode,
                                           @NonNull RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
-    }
-
-    public static Map<String, LedgerBalanceConstraintType> mustNotBeNegative(
-            @NonNull FundsAccountId accountId,
-            @NonNull LedgerSubjectCode subjectCode) {
-        return balanceConstraint(accountId, subjectCode, LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
-    }
-
-    public static Map<String, LedgerBalanceConstraintType> balanceConstraint(
-            @NonNull FundsAccountId accountId,
-            @NonNull LedgerSubjectCode subjectCode,
-            @NonNull LedgerBalanceConstraintType constraintType) {
-        return Map.of(accountId.type() + CONSTRAINT_KEY_SEPARATOR
-                        + accountId.id() + CONSTRAINT_KEY_SEPARATOR
-                        + subjectCode.name(),
-                constraintType);
     }
 }

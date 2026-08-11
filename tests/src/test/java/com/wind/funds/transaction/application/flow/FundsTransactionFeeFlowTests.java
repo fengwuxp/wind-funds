@@ -922,6 +922,57 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：主交易收款人与平台费账户恰好是同一主体。
+     * 预期：只有 FEE leg 参与退费，主交易 leg 仍按普通支付和退款处理。
+     * 红线：不得按目标主体猜测 fee leg，导致本金重复退回。
+     */
+    @Test
+    void testPrincipalPaidToFeeAccountShouldNotBeClassifiedOrRefundedAsFee() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        topup(payer, 100L, "FEE_TARGET_COLLISION_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        payWithFixedFee(payer, feeAccount(), LedgerSubjectCode.FEE, 70L, 5L,
+                "FEE_TARGET_COLLISION_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -75L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 75L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(postingPlansOf(ledgerTransactionByBusinessSn("FEE_TARGET_COLLISION_PAY")).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsExactly(LedgerPhaseCode.SETTLEMENT.name(), LedgerPhaseCode.FEE.name());
+
+        String sourceTransactionSn = ledgerTransactionByBusinessSn("FEE_TARGET_COLLISION_PAY")
+                .getFundsTransactionSn();
+        refundFee(payer, 5L, sourceTransactionSn, "FEE_TARGET_COLLISION_REFUND");
+        BalanceSnapshot afterFeeRefund = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFeeRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, -5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 70L, CURRENCY);
+        assertFeeRefundFactsWithFundsTransaction("FEE_TARGET_COLLISION_REFUND", sourceTransactionSn);
+    }
+
+    /**
      * 场景：业务侧发起手续费退回，但传入的原费用交易流水不存在。
      * 输入：用户充值 100、付款 70 并收取手续费 5，随后退费 5 且 `feeSourceTransactionSn` 指向未知交易。
      * 输出：退费失败，付款方、收款方、平台 FEE/CASH/PREPAYMENT 余额保持付款后状态。
@@ -1392,8 +1443,6 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                             .singleElement()
                             .satisfies(leg -> {
                                 assertThat(leg.getReplayRefLegId()).isEqualTo("FEE");
-                                assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.REFUND);
-                                assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
                             });
                     assertThat(details)
                             .as("funds transaction details must point to fee refund ledger transaction for businessSn %s",
@@ -1422,8 +1471,8 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                 assertThat(plan.getAmount()).isEqualTo(replayLeg.getAmount().getAmount());
                                 assertThat(plan.getCurrency()).isEqualTo(replayLeg.getAmount().getCurrency());
                                 assertThat(plan.getBalanceEffectType())
-                                        .isEqualTo(replayLeg.getBalanceEffectType().name());
-                                assertThat(plan.getPhaseCode()).isEqualTo(replayLeg.getPhaseCode().name());
+                                        .isEqualTo(LedgerBalanceEffectType.RESTORE.name());
+                                assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.REFUND.name());
                                 assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.FEE_REFUND.name());
                                 assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.FEE.name());
                             });
@@ -1452,7 +1501,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                             .isEqualTo(replayLeg.getAmount().getAmount());
                     assertThat(entries.stream()
                             .map(entry -> new FeeRefundRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
-                                    entry.getLedgerSubjectCode(), entry.getEntrySide()))
+                                    entry.getEntrySide()))
                             .toList())
                             .as("fee refund entries must follow replay route leg nodes for businessSn %s", businessSn)
                             .containsExactlyInAnyOrder(
@@ -1468,19 +1517,18 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
     private record FeeRefundRouteNodeKey(String subjectId,
                                          String subjectType,
-                                         LedgerSubjectCode ledgerSubjectCode,
                                          EntrySide entrySide) {
 
         private static FeeRefundRouteNodeKey debit(RouteLegSpec routeLeg) {
             return new FeeRefundRouteNodeKey(routeLeg.getSourceNode().getSubjectRef().getSubjectId(),
                     routeLeg.getSourceNode().getSubjectRef().getSubjectType().name(),
-                    routeLeg.getSourceNode().getLedgerSubjectCode(), EntrySide.DEBIT);
+                    EntrySide.DEBIT);
         }
 
         private static FeeRefundRouteNodeKey credit(RouteLegSpec routeLeg) {
             return new FeeRefundRouteNodeKey(routeLeg.getTargetNode().getSubjectRef().getSubjectId(),
                     routeLeg.getTargetNode().getSubjectRef().getSubjectType().name(),
-                    routeLeg.getTargetNode().getLedgerSubjectCode(), EntrySide.CREDIT);
+                    EntrySide.CREDIT);
         }
     }
 

@@ -107,10 +107,6 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
                             assertThat(leg.getReplayPolicy()).isEqualTo(RouteReplayPolicy.NON_REPLAYABLE);
                             assertThat(leg.getSourceNode().getSubjectRef())
                                     .isEqualTo(leg.getTargetNode().getSubjectRef());
-                            assertThat(leg.getSourceNode().getLedgerSubjectCode())
-                                    .isEqualTo(LedgerSubjectCode.CLEARING);
-                            assertThat(leg.getTargetNode().getLedgerSubjectCode())
-                                    .isEqualTo(LedgerSubjectCode.AVAILABLE);
                         }));
         assertThat(entriesByFundsTransactionSn(first)).hasSize(2);
         assertLedgerFactsFollowRouteSnapshot("CLEARING_BATCH_001");

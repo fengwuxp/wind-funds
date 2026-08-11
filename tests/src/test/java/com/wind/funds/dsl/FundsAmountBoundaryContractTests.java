@@ -2,10 +2,6 @@ package com.wind.funds.dsl;
 
 import com.wind.jackson.WindJson;
 import com.wind.funds.support.WindOperatorTestFixture;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.route.model.ImmutableRouteLegSpec;
 import com.wind.funds.route.model.ImmutableRouteNodeSpec;
 import com.wind.funds.route.model.ImmutableSubjectRef;
@@ -15,7 +11,6 @@ import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.ref.SubjectRef;
-import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -26,7 +21,6 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,20 +75,17 @@ class FundsAmountBoundaryContractTests {
 
     /**
      * 场景：route leg 表达资金、额度或预算的路径金额。
-     * 预期：leg 金额必须为正，非终身账本周期必须带 periodId。
-     * 红线：route leg 不能用 0、负金额或缺周期标识进入后续 posting。
+     * 预期：leg 金额必须为正，同币种原始金额和汇率必须自洽。
+     * 红线：route leg 不能用非法金额事实进入后续 posting。
      */
     @Test
-    void testRouteLegShouldRejectNonPositiveAmountAndMissingPeriodId() {
+    void testRouteLegShouldRejectInvalidAmountFacts() {
         assertThatThrownBy(() -> routeLeg(0L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("routeLeg.amount must be positive");
         assertThatThrownBy(() -> routeLeg(-1L))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("routeLeg.amount must be positive");
-        assertThatThrownBy(() -> routeLeg(100L, AccountBalancePeriodType.DAYS, " "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("routeLeg.periodId is required for non-lifetime period");
         assertThatThrownBy(() -> routeLegWithAmountFacts(100L, Money.immutable(99L, CURRENCY), BigDecimal.ONE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("routeLeg.originalAmount must equal amount for same currency");
@@ -159,25 +150,15 @@ class FundsAmountBoundaryContractTests {
     }
 
     private ImmutableRouteLegSpec routeLeg(long amount) {
-        return routeLeg(amount, null, null);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId, long amount) {
-        return routeLeg(legId, amount, null, null);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId, long amount, FundsSubjectType sourceSubjectType) {
-        return routeLeg(legId, amount, CURRENCY, sourceSubjectType, null, null);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId, long amount, CurrencyIsoCode currency) {
-        return routeLeg(legId, amount, currency, null, null);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(long amount,
-                                           AccountBalancePeriodType periodType,
-                                           String periodId) {
-        return routeLeg("LEG-AMOUNT-001", amount, periodType, periodId);
+        return ImmutableRouteLegSpec.builder()
+                .legId("LEG-AMOUNT-001")
+                .sequence(1)
+                .legType(RouteLegType.CONSUME)
+                .sourceNode(routeNode("FA-SOURCE-001", RouteNodeRole.SOURCE))
+                .targetNode(routeNode("FA-TARGET-001", RouteNodeRole.TARGET))
+                .amount(Money.immutable(amount, CURRENCY))
+                .contextVariables(Map.of())
+                .build();
     }
 
     private ImmutableRouteLegSpec routeLegWithAmountFacts(long amount,
@@ -192,46 +173,6 @@ class FundsAmountBoundaryContractTests {
                 .amount(Money.immutable(amount, CURRENCY))
                 .originalAmount(originalAmount)
                 .exchangeRate(exchangeRate)
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
-                .constraintOverrides(Map.of())
-                .contextVariables(Map.of())
-                .build();
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId,
-                                           long amount,
-                                           AccountBalancePeriodType periodType,
-                                           String periodId) {
-        return routeLeg(legId, amount, CURRENCY, periodType, periodId);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId,
-                                           long amount,
-                                           CurrencyIsoCode currency,
-                                           AccountBalancePeriodType periodType,
-                                           String periodId) {
-        return routeLeg(legId, amount, currency, FundsSubjectType.FUNDING_ACCOUNT, periodType, periodId);
-    }
-
-    private ImmutableRouteLegSpec routeLeg(String legId,
-                                           long amount,
-                                           CurrencyIsoCode currency,
-                                           FundsSubjectType sourceSubjectType,
-                                           AccountBalancePeriodType periodType,
-                                           String periodId) {
-        return ImmutableRouteLegSpec.builder()
-                .legId(legId)
-                .sequence(1)
-                .legType(RouteLegType.CONSUME)
-                .sourceNode(routeNode("FA-SOURCE-001", sourceSubjectType, RouteNodeRole.SOURCE))
-                .targetNode(routeNode("FA-TARGET-001", RouteNodeRole.TARGET))
-                .amount(Money.immutable(amount, currency))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
-                .periodType(periodType)
-                .periodId(periodId)
-                .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
                 .build();
     }
@@ -244,13 +185,8 @@ class FundsAmountBoundaryContractTests {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef(subjectId, subjectType))
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .nodeRole(nodeRole)
                 .build();
-    }
-
-    private SubjectRef subjectRef(String subjectId) {
-        return subjectRef(subjectId, FundsSubjectType.FUNDING_ACCOUNT);
     }
 
     private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {

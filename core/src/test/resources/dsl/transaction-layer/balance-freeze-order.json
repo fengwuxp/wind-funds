@@ -59,21 +59,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "FROZEN"
+          "subjectId": "fa_user_10001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 3000
         },
-        "balanceEffectType": "HOLD",
-        "phaseCode": "FREEZE",
         "replayPolicy": "PARTIAL_ALLOWED"
       }
     ]

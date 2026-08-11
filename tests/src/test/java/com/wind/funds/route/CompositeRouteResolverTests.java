@@ -2,6 +2,7 @@ package com.wind.funds.route;
 
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSubjectSupport;
@@ -28,6 +29,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 组合路由解析器选择边界测试。
@@ -105,6 +108,36 @@ class CompositeRouteResolverTests {
     }
 
     /**
+     * 场景：自定义解析器返回了其它租户的路由。
+     * 预期：组合解析边界在后续补充处理前拒绝该路由。
+     * 红线：不得让错误租户的主体进入账务链。
+     */
+    @Test
+    void testResolveShouldRejectDelegateRouteWithDifferentTenant() {
+        FundsInstructionSpec instruction = directInstruction();
+        RouteResolver delegate = resolvedRouteDelegate(instruction, 2L,
+                instruction.getBusinessSn(), instruction.getEventType());
+
+        assertThatThrownBy(() -> resolver(List.of(delegate)).resolve(instruction))
+                .hasMessageContaining("ResolvedRoute tenantId 与资金指令不一致");
+    }
+
+    /**
+     * 场景：自定义解析器返回的事件类型与资金指令不一致。
+     * 预期：组合解析边界拒绝语义漂移的路由。
+     * 红线：不得按另一资金事件生成账务事实。
+     */
+    @Test
+    void testResolveShouldRejectDelegateRouteWithDifferentEventType() {
+        FundsInstructionSpec instruction = directInstruction();
+        RouteResolver delegate = resolvedRouteDelegate(instruction, instruction.getTenantId(),
+                instruction.getBusinessSn(), FundsTransactionEventType.TRANSFER);
+
+        assertThatThrownBy(() -> resolver(List.of(delegate)).resolve(instruction))
+                .hasMessageContaining("ResolvedRoute eventType 与资金指令不一致");
+    }
+
+    /**
      * 场景：PAYOUT 资金事件进入组合路由候选选择。
      * 输入：出款成功和出款失败指令。
      * 输出：通用直接交易解析器均不声明支持。
@@ -155,6 +188,29 @@ class CompositeRouteResolverTests {
                         accountQueryService),
                 new RouteAccountHierarchySnapshotAppender(
                         org.mockito.Mockito.mock(com.wind.funds.wallet.service.AccountHierarchyRelationService.class)));
+    }
+
+    private RouteResolver resolvedRouteDelegate(FundsInstructionSpec instruction,
+                                                Long tenantId,
+                                                String businessSn,
+                                                FundsTransactionEventType eventType) {
+        ResolvedRouteSpec route = mock(ResolvedRouteSpec.class);
+        when(route.getTenantId()).thenReturn(tenantId);
+        when(route.getRouteCode()).thenReturn("CUSTOM_ROUTE");
+        when(route.getRouteVersion()).thenReturn("v1");
+        when(route.getBusinessScene()).thenReturn(instruction.getBusinessScene());
+        when(route.getBusinessSn()).thenReturn(businessSn);
+        when(route.getInstructionType()).thenReturn(instruction.getInstructionType());
+        when(route.getEventType()).thenReturn(eventType);
+        when(route.getTransactionType()).thenReturn(instruction.getTransactionType());
+        when(route.getParticipants()).thenReturn(List.of(mock(RouteParticipantSpec.class)));
+        when(route.getLegs()).thenReturn(List.of());
+        when(route.getResolvedAt()).thenReturn(instruction.getEventTime());
+        when(route.getContextVariables()).thenReturn(Map.of());
+        RouteResolver delegate = mock(RouteResolver.class);
+        when(delegate.supports(instruction)).thenReturn(true);
+        when(delegate.resolve(instruction)).thenReturn(route);
+        return delegate;
     }
 
     private FundsAccountQueryService unexpectedAccountQueryService() {

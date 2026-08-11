@@ -1,6 +1,5 @@
 package com.wind.funds.route.model;
 
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.ref.SubjectRef;
@@ -16,7 +15,6 @@ import org.jspecify.annotations.NonNull;
 @FieldNameConstants
 public record ImmutableRouteNodeSpec(RouteNodeType nodeType,
                                      SubjectRef subjectRef,
-                                     LedgerSubjectCode ledgerSubjectCode,
                                      RouteNodeRole nodeRole) implements RouteNodeSpec {
 
     @Override
@@ -27,11 +25,6 @@ public record ImmutableRouteNodeSpec(RouteNodeType nodeType,
     @Override
     public @NonNull SubjectRef getSubjectRef() {
         return subjectRef;
-    }
-
-    @Override
-    public @NonNull LedgerSubjectCode getLedgerSubjectCode() {
-        return ledgerSubjectCode;
     }
 
     @Override

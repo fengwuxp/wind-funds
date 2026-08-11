@@ -2,6 +2,7 @@ package com.wind.funds.route;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -68,6 +69,8 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
                 delegate.getClass().getSimpleName(), instruction.getInstructionType(), instruction.getEventType(),
                 instruction.getTransactionType(), instruction.getBusinessSn());
         ResolvedRouteSpec result = delegate.resolve(instruction);
+        RouteSpecSupport.validateResolvedRoute(result);
+        assertSameInstructionIdentity(instruction, result);
         refundRouteAdmission.validate(instruction, result);
         ResolvedRouteSpec routeWithFee = routeFeeChargeAppender.append(instruction, result);
         return routeAccountHierarchySnapshotAppender.append(instruction, routeWithFee);
@@ -75,6 +78,21 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
 
     private int orderOf(RouteResolver routeResolver) {
         return routeResolver instanceof Ordered ordered ? ordered.getOrder() : 0;
+    }
+
+    private void assertSameInstructionIdentity(FundsInstructionSpec instruction, ResolvedRouteSpec route) {
+        AssertUtils.equals(route.getTenantId(), instruction.getTenantId(),
+                "ResolvedRoute tenantId 与资金指令不一致");
+        AssertUtils.equals(route.getBusinessScene(), instruction.getBusinessScene(),
+                "ResolvedRoute businessScene 与资金指令不一致");
+        AssertUtils.equals(route.getBusinessSn(), instruction.getBusinessSn(),
+                "ResolvedRoute businessSn 与资金指令不一致");
+        AssertUtils.equals(route.getInstructionType(), instruction.getInstructionType(),
+                "ResolvedRoute instructionType 与资金指令不一致");
+        AssertUtils.equals(route.getEventType(), instruction.getEventType(),
+                "ResolvedRoute eventType 与资金指令不一致");
+        AssertUtils.equals(route.getTransactionType(), instruction.getTransactionType(),
+                "ResolvedRoute transactionType 与资金指令不一致");
     }
 
     @Override

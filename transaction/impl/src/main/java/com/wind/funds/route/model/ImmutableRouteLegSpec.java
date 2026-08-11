@@ -1,10 +1,6 @@
 package com.wind.funds.route.model;
 
 import com.wind.funds.fx.FxAppliedRate;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteReplayPolicy;
@@ -32,13 +28,8 @@ public record ImmutableRouteLegSpec(String legId,
                                     Money amount,
                                     @Nullable Money originalAmount,
                                     @Nullable BigDecimal exchangeRate,
-                                    LedgerBalanceEffectType balanceEffectType,
-                                    LedgerPhaseCode phaseCode,
-                                    @Nullable AccountBalancePeriodType periodType,
-                                    @Nullable String periodId,
                                     @Nullable RouteReplayPolicy replayPolicy,
                                     @Nullable String replayRefLegId,
-                                    Map<String, LedgerBalanceConstraintType> constraintOverrides,
                                     @Nullable String description,
                                     Map<String, Object> contextVariables) implements RouteLegSpec {
 
@@ -65,11 +56,6 @@ public record ImmutableRouteLegSpec(String legId,
             }
         }
         FxAppliedRate.validateSupportedPrecision(exchangeRate);
-        if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME
-                && (periodId == null || periodId.isBlank())) {
-            throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");
-        }
-        constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "routeLeg");
     }
 
@@ -119,16 +105,6 @@ public record ImmutableRouteLegSpec(String legId,
     }
 
     @Override
-    public @NonNull AccountBalancePeriodType getPeriodType() {
-        return periodType == null ? AccountBalancePeriodType.LIFETIME : periodType;
-    }
-
-    @Override
-    public @NonNull Map<String, LedgerBalanceConstraintType> getConstraintOverrides() {
-        return constraintOverrides;
-    }
-
-    @Override
     public @NonNull RouteReplayPolicy getReplayPolicy() {
         return replayPolicy == null ? RouteReplayPolicy.FULL_ONLY : replayPolicy;
     }
@@ -142,21 +118,6 @@ public record ImmutableRouteLegSpec(String legId,
     @Override
     public int getSequence() {
         return sequence;
-    }
-
-    @Override
-    public @NonNull LedgerBalanceEffectType getBalanceEffectType() {
-        return balanceEffectType;
-    }
-
-    @Override
-    public @NonNull LedgerPhaseCode getPhaseCode() {
-        return phaseCode;
-    }
-
-    @Override
-    public @Nullable String getPeriodId() {
-        return periodId;
     }
 
     @Override

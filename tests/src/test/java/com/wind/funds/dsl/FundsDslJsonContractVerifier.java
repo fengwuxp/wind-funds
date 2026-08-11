@@ -51,6 +51,13 @@ final class FundsDslJsonContractVerifier {
             "SERVICE_FLOW",
             "GOVERNANCE_FLOW");
 
+    private static final Set<String> REMOVED_ROUTE_ACCOUNTING_FIELDS = Set.of(
+            "balanceEffectType",
+            "phaseCode",
+            "periodType",
+            "periodId",
+            "constraintOverrides");
+
     private FundsDslJsonContractVerifier() {
     }
 
@@ -170,12 +177,10 @@ final class FundsDslJsonContractVerifier {
                     "expectedRoute.legs.sourceNode"), "expectedRoute.legs.sourceNode");
             verifyNode(asNullableMap(leg.get("targetNode"), "expectedRoute.legs.targetNode"), "expectedRoute.legs.targetNode");
             verifyMoney(leg, "amount", "expectedRoute.legs.amount");
-            verifyEnum(LedgerBalanceEffectType.class, leg,
-                    "balanceEffectType", "expectedRoute.legs.balanceEffectType");
-            verifyEnum(LedgerPhaseCode.class, leg, "phaseCode", "expectedRoute.legs.phaseCode");
             verifyEnum(RouteReplayPolicy.class, leg, "replayPolicy", "expectedRoute.legs.replayPolicy");
             verifyRouteContext(asNullableMap(leg.get("contextVariables"), "expectedRoute.legs.contextVariables"),
                     "expectedRoute.legs.contextVariables");
+            rejectRemovedRouteAccountingFields(leg, "expectedRoute.legs");
         }
     }
 
@@ -249,8 +254,18 @@ final class FundsDslJsonContractVerifier {
             throw new IllegalArgumentException(routeLegNodeLabel(path) + " must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
         }
         requireText(node, "subjectId", path + ".subjectId");
-        verifyEnum(LedgerSubjectCode.class, node, "ledgerSubjectCode", path + ".ledgerSubjectCode");
+        if (node.containsKey("ledgerSubjectCode")) {
+            throw new IllegalArgumentException(path + ".ledgerSubjectCode route accounting field has been removed");
+        }
         return subjectType;
+    }
+
+    private static void rejectRemovedRouteAccountingFields(Map<String, ?> leg, String path) {
+        for (String field : REMOVED_ROUTE_ACCOUNTING_FIELDS) {
+            if (leg.containsKey(field)) {
+                throw new IllegalArgumentException(path + "." + field + " route accounting field has been removed");
+            }
+        }
     }
 
     private static String routeLegNodeLabel(String path) {

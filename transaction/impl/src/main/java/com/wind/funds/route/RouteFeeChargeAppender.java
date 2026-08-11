@@ -1,10 +1,6 @@
 package com.wind.funds.route;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutablePlatformAccountsSnapshotSpec;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -38,7 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
 import static com.wind.funds.route.support.RouteSpecSupport.sourceNode;
 import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
@@ -87,15 +82,9 @@ public class RouteFeeChargeAppender {
         List<RouteLegSpec> legs = new ArrayList<>(route.getLegs());
         legs.add(routeLeg(FundsRouteLegIds.FEE, nextSequence(legs), RouteLegType.INTERNAL_TRANSFER,
                 feeAmount, instruction.getDescription())
-                .sourceNode(sourceNode(feePayer.subjectRef(), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.FEE)
-                .periodType(feePayer.periodType())
-                .periodId(feePayer.periodId())
+                .sourceNode(sourceNode(feePayer.subjectRef()))
+                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount)))
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(mustNotBeNegative(feePayerAccountId, LedgerSubjectCode.AVAILABLE))
                 .build());
 
         List<RouteParticipantSpec> participants = new ArrayList<>(route.getParticipants());
@@ -132,39 +121,43 @@ public class RouteFeeChargeAppender {
 
     private List<FeePayer> targetFundingAccounts(ResolvedRouteSpec route) {
         return route.getLegs().stream()
-                .filter(leg -> leg.getTargetNode().getLedgerSubjectCode() == LedgerSubjectCode.AVAILABLE)
-                .map(leg -> feePayer(leg.getTargetNode(), leg))
+                .map(RouteLegSpec::getTargetNode)
+                .filter(node -> !isPlatformParticipant(route, node.getSubjectRef()))
+                .map(this::feePayer)
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
     private List<FeePayer> availableSourceFundingAccounts(ResolvedRouteSpec route) {
         return route.getLegs().stream()
-                .filter(leg -> leg.getPhaseCode() != LedgerPhaseCode.FEE)
-                .filter(leg -> leg.getSourceNode().getLedgerSubjectCode() == LedgerSubjectCode.AVAILABLE)
-                .map(leg -> feePayer(leg.getSourceNode(), leg))
+                .map(RouteLegSpec::getSourceNode)
+                .filter(node -> !isPlatformParticipant(route, node.getSubjectRef()))
+                .map(this::feePayer)
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
     private List<FeePayer> withdrawSourceFundingAccounts(ResolvedRouteSpec route) {
         return route.getLegs().stream()
-                .filter(leg -> leg.getPhaseCode() == LedgerPhaseCode.SETTLEMENT)
-                .filter(leg -> leg.getSourceNode().getLedgerSubjectCode() == LedgerSubjectCode.FROZEN)
-                .map(leg -> feePayer(leg.getSourceNode(), leg))
+                .map(RouteLegSpec::getSourceNode)
+                .filter(node -> !isPlatformParticipant(route, node.getSubjectRef()))
+                .map(this::feePayer)
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }
 
-    private FeePayer feePayer(RouteNodeSpec node, RouteLegSpec leg) {
+    private boolean isPlatformParticipant(ResolvedRouteSpec route, SubjectRef subjectRef) {
+        return route.getParticipants().stream()
+                .anyMatch(participant -> participant.getParticipantRole() == RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT
+                        && participant.getSubjectRef().getSubjectId().equals(subjectRef.getSubjectId())
+                        && participant.getSubjectRef().getSubjectType() == subjectRef.getSubjectType());
+    }
+
+    private FeePayer feePayer(RouteNodeSpec node) {
         if (node.getSubjectRef().getSubjectType() != FundsSubjectType.FUNDING_ACCOUNT) {
             return null;
         }
-        AccountBalancePeriodType periodType = leg.getPeriodType();
-        String periodId = leg.getPeriodId();
-        AssertUtils.notNull(periodType, "随交易手续费扣款账本周期类型不能为空");
-        AssertUtils.hasText(periodId, "随交易手续费扣款账本周期标识不能为空");
-        return new FeePayer(node.getSubjectRef(), periodType, periodId);
+        return new FeePayer(node.getSubjectRef());
     }
 
     private int nextSequence(List<RouteLegSpec> legs) {
@@ -209,8 +202,6 @@ public class RouteFeeChargeAppender {
                 .build();
     }
 
-    private record FeePayer(SubjectRef subjectRef,
-                            AccountBalancePeriodType periodType,
-                            String periodId) {
+    private record FeePayer(SubjectRef subjectRef) {
     }
 }

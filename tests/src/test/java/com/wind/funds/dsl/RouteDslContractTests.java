@@ -2,7 +2,6 @@ package com.wind.funds.dsl;
 
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableReplayRequestSpec;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.route.model.ImmutableRouteLegSpec;
@@ -34,6 +33,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +47,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RouteDslContractTests {
 
     /**
+     * 场景：资金路径进入 route 公共契约。
+     * 预期：route 只暴露路径与来源证据，会计科目、余额效果、阶段、账期和约束由 posting owner 推导。
+     * 红线：RouteLeg/RouteNode 不得继续成为 hybrid route/posting 契约。
+     */
+    @Test
+    void testRoutePathShouldNotExposeLedgerAccountingMembers() {
+        assertThat(publicMethodNames(RouteNodeSpec.class))
+                .doesNotContain("getLedgerSubjectCode");
+        assertThat(publicMethodNames(RouteLegSpec.class))
+                .doesNotContain(
+                        "getBalanceEffectType",
+                        "getPhaseCode",
+                        "getPeriodType",
+                        "getPeriodId",
+                        "getConstraintOverrides");
+    }
+
+    /**
      * 场景：支付工具或外部账户参与路由解析。
      * 预期：它们只能保存在工具、外部账户或决策快照中，不能成为 RouteLeg 的账务节点。
      * 红线：支付工具、外部账户或通道引用不得被写成可入账主体。
@@ -55,15 +73,12 @@ class RouteDslContractTests {
     void testRouteLegShouldRejectPaymentInstrumentOrExternalAccountNode() {
         RouteNodeSpec fundingSource = routeNode(RouteNodeType.SUBJECT,
                 fundingAccount("FA-PAYER-001"),
-                LedgerSubjectCode.AVAILABLE,
                 RouteNodeRole.SOURCE);
         RouteNodeSpec paymentInstrumentNode = routeNode(RouteNodeType.PAYMENT_INSTRUMENT,
                 fundingAccount("PI-CARD-001"),
-                LedgerSubjectCode.AVAILABLE,
                 RouteNodeRole.SOURCE);
         RouteNodeSpec externalAccountNode = routeNode(RouteNodeType.EXTERNAL_ACCOUNT,
                 fundingAccount("EA-BANK-001"),
-                LedgerSubjectCode.AVAILABLE,
                 RouteNodeRole.TARGET);
 
         assertThatThrownBy(() -> routeLeg(paymentInstrumentNode, fundingSource))
@@ -83,12 +98,10 @@ class RouteDslContractTests {
     void testRouteLegShouldAllowResolvedPlatformFundingAccountNode() {
         RouteNodeSpec platformSettlementAccount = routeNode(RouteNodeType.PLATFORM_FUNDING_ACCOUNT,
                 fundingAccount("FA-PLATFORM-SETTLEMENT"),
-                LedgerSubjectCode.SETTLEMENT,
                 RouteNodeRole.TARGET);
 
         RouteLegSpec leg = routeLeg(routeNode(RouteNodeType.SUBJECT,
                 fundingAccount("FA-PAYER-001"),
-                LedgerSubjectCode.AVAILABLE,
                 RouteNodeRole.SOURCE), platformSettlementAccount);
 
         assertThat(leg.getTargetNode().getNodeType()).isEqualTo(RouteNodeType.PLATFORM_FUNDING_ACCOUNT);
@@ -188,15 +201,11 @@ class RouteDslContractTests {
                 .legType(RouteLegType.CONSUME)
                 .sourceNode(routeNode(RouteNodeType.SUBJECT,
                         fundingAccount("FA-PAYER-SENSITIVE"),
-                        LedgerSubjectCode.AVAILABLE,
                         RouteNodeRole.SOURCE))
                 .targetNode(routeNode(RouteNodeType.SUBJECT,
                         fundingAccount("FA-PAYEE-SENSITIVE"),
-                        LedgerSubjectCode.SETTLEMENT,
                         RouteNodeRole.TARGET))
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .contextVariables(Map.of("processorPayload", Map.of("cardSecurityCode", "123")))
                 .build())
                 .hasMessageContaining("routeLeg.contextVariables must not contain sensitive fields");
@@ -339,6 +348,12 @@ class RouteDslContractTests {
         return replayRequest(referenceSnapshotId, replayType, Map.of("semanticBoundary", "ROUTE_REPLAY_ONLY"));
     }
 
+    private List<String> publicMethodNames(Class<?> contractType) {
+        return Arrays.stream(contractType.getMethods())
+                .map(java.lang.reflect.Method::getName)
+                .toList();
+    }
+
     private ReplayRequestSpec replayRequest(Map<String, Object> contextVariables) {
         return replayRequest("RS-PAY-001", RouteReplayType.REFUND, contextVariables);
     }
@@ -368,11 +383,9 @@ class RouteDslContractTests {
     private RouteLegSpec routeLeg(Map<String, Object> contextVariables) {
         return routeLeg(routeNode(RouteNodeType.SUBJECT,
                         fundingAccount("FA-PAYER-LEG"),
-                        LedgerSubjectCode.AVAILABLE,
                         RouteNodeRole.SOURCE),
                 routeNode(RouteNodeType.SUBJECT,
                         fundingAccount("FA-PAYEE-LEG"),
-                        LedgerSubjectCode.SETTLEMENT,
                         RouteNodeRole.TARGET),
                 contextVariables);
     }
@@ -387,10 +400,7 @@ class RouteDslContractTests {
                 .sourceNode(sourceNode)
                 .targetNode(targetNode)
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
-                .constraintOverrides(Map.of())
                 .contextVariables(contextVariables)
                 .build();
     }
@@ -408,11 +418,9 @@ class RouteDslContractTests {
                 .participants(List.of(routeParticipant(Map.of())))
                 .legs(List.of(routeLeg(routeNode(RouteNodeType.SUBJECT,
                                 fundingAccount("FA-PAYER-RESOLVED"),
-                                LedgerSubjectCode.AVAILABLE,
                                 RouteNodeRole.SOURCE),
                         routeNode(RouteNodeType.SUBJECT,
                                 fundingAccount("FA-PAYEE-RESOLVED"),
-                                LedgerSubjectCode.SETTLEMENT,
                                 RouteNodeRole.TARGET))))
                 .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .contextVariables(contextVariables)
@@ -434,11 +442,9 @@ class RouteDslContractTests {
                 .participants(List.of(routeParticipant(Map.of())))
                 .legs(List.of(routeLeg(routeNode(RouteNodeType.SUBJECT,
                                 fundingAccount("FA-PAYER-SNAPSHOT"),
-                                LedgerSubjectCode.AVAILABLE,
                                 RouteNodeRole.SOURCE),
                         routeNode(RouteNodeType.SUBJECT,
                                 fundingAccount("FA-PAYEE-SNAPSHOT"),
-                                LedgerSubjectCode.SETTLEMENT,
                                 RouteNodeRole.TARGET))))
                 .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .contextVariables(contextVariables)
@@ -467,12 +473,10 @@ class RouteDslContractTests {
 
     private RouteNodeSpec routeNode(RouteNodeType nodeType,
                                     SubjectRef subjectRef,
-                                    LedgerSubjectCode ledgerSubjectCode,
                                     RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(nodeType)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }

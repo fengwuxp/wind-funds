@@ -63,10 +63,8 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
                         .singleElement()
                         .satisfies(leg -> {
                             assertThat(leg.getReplayPolicy()).isEqualTo(RouteReplayPolicy.NON_REPLAYABLE);
-                            assertThat(leg.getSourceNode().getLedgerSubjectCode())
-                                    .isEqualTo(LedgerSubjectCode.AVAILABLE);
-                            assertThat(leg.getTargetNode().getLedgerSubjectCode())
-                                    .isEqualTo(LedgerSubjectCode.SETTLEMENT);
+                            assertThat(leg.getSourceNode().getSubjectRef())
+                                    .isEqualTo(leg.getTargetNode().getSubjectRef());
                         }));
         assertSingleFundsAndLedgerFactsForBusinessSn("SETTLEMENT_ORDER_001", 1, 1, 2);
         assertLedgerFactsFollowRouteSnapshot("SETTLEMENT_ORDER_001");

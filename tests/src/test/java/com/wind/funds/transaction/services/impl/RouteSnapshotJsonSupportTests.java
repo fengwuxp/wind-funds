@@ -2,8 +2,7 @@ package com.wind.funds.transaction.services.impl;
 
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.route.model.ImmutableRouteLegSpec;
@@ -26,12 +25,16 @@ import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
+import com.wind.funds.support.WindOperatorTestFixture;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +67,11 @@ class RouteSnapshotJsonSupportTests {
                 LocalDateTime.of(2026, 5, 24, 10, 0));
 
         assertThat(document.path("participants").path(0).path("subjectRef").has("description")).isFalse();
+        JsonNode serializedLeg = document.path("legs").path(0);
+        assertThat(List.of("balanceEffectType", "phaseCode", "periodType", "periodId", "constraintOverrides"))
+                .noneMatch(serializedLeg::has);
+        assertThat(serializedLeg.path("sourceNode").has("ledgerSubjectCode")).isFalse();
+        assertThat(serializedLeg.path("targetNode").has("ledgerSubjectCode")).isFalse();
         assertThat(parsed.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-JSON-001")
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
@@ -117,7 +125,6 @@ class RouteSnapshotJsonSupportTests {
      * 输入：支付工具原始 PAN、外部账户原始账号或路由决策敏感上下文。
      * 输出：RouteSnapshot JSON 持久化请求。
      * 预期：共享持久化边界拒绝写入。
-     * 红线：公共接口实现不能绕过不可变模型构造器的敏感数据校验。
      */
     @Test
     void testRouteSnapshotJsonShouldRejectSensitiveValuesFromCustomRouteComponents() {
@@ -164,6 +171,67 @@ class RouteSnapshotJsonSupportTests {
 
         assertThat(parsed.getPaymentInstrumentRef().getInstrumentNo()).isEqualTo("****1111");
         assertThat(parsed.getExternalAccountRef().getExternalAccountNo()).isEqualTo("****3456");
+    }
+
+    /**
+     * 场景：升级前的完成态明细依赖旧 Route 会计快照匹配 legacy 摘要。
+     * 预期：空账期按 LIFETIME 规范化，非默认账期和每条 leg 的旧会计字段必须完整且严格一致。
+     * 红线：当前请求缺失会计字段不能作为通配符命中历史摘要。
+     */
+    @Test
+    void testLegacyRouteAccountingShouldNormalizePeriodAndRejectIncompleteLegs() {
+        FundsInstructionSpec lifetimeInstruction = legacyTopupInstruction(null, null);
+        FundsInstructionSpec monthlyInstruction = legacyTopupInstruction(AccountBalancePeriodType.MONTHLY,
+                "2026-08");
+        Map<String, Object> lifetimeRoute = legacyRoute("LIFETIME", "LIFETIME");
+        Map<String, Object> monthlyRoute = legacyRoute("MONTHLY", "2026-08");
+
+        assertThat(DefaultFundsInstructionLifecycleSaver.legacyRouteAccountingMatchesInstruction(
+                lifetimeRoute, lifetimeInstruction)).isTrue();
+        assertThat(DefaultFundsInstructionLifecycleSaver.legacyRouteAccountingMatchesInstruction(
+                monthlyRoute, monthlyInstruction)).isTrue();
+        assertThat(DefaultFundsInstructionLifecycleSaver.legacyRouteAccountingMatchesInstruction(
+                monthlyRoute, lifetimeInstruction)).isFalse();
+
+        Map<String, Object> incompleteLeg = new LinkedHashMap<>(legacyLeg("LIFETIME", "LIFETIME"));
+        incompleteLeg.remove("constraintOverrides");
+        Map<String, Object> incompleteRoute = Map.of("legs", List.of(
+                legacyLeg("LIFETIME", "LIFETIME"), incompleteLeg));
+        assertThat(DefaultFundsInstructionLifecycleSaver.legacyRouteAccountingMatchesInstruction(
+                incompleteRoute, lifetimeInstruction)).isFalse();
+    }
+
+    private FundsInstructionSpec legacyTopupInstruction(AccountBalancePeriodType periodType, String periodId) {
+        Money amount = Money.immutable(100L, CurrencyIsoCode.USD);
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.TOPUP)
+                .transactionType(DefaultFundsTransactionType.TOPUP)
+                .amount(amount)
+                .ledgerPeriodType(periodType)
+                .ledgerPeriodId(periodId)
+                .businessScene("TOPUP")
+                .businessSn("LEGACY-ROUTE-ACCOUNTING")
+                .eventTime(LocalDateTime.of(2026, 8, 11, 10, 0))
+                .operator(WindOperatorTestFixture.system())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private Map<String, Object> legacyRoute(String periodType, String periodId) {
+        return Map.of("legs", List.of(legacyLeg(periodType, periodId)));
+    }
+
+    private Map<String, Object> legacyLeg(String periodType, String periodId) {
+        return Map.of(
+                "balanceEffectType", "INCREASE",
+                "phaseCode", "FUND_IN",
+                "periodType", periodType,
+                "periodId", periodId,
+                "constraintOverrides", Map.of(),
+                "sourceNode", Map.of("ledgerSubjectCode", LedgerSubjectCode.CASH.name()),
+                "targetNode", Map.of("ledgerSubjectCode", LedgerSubjectCode.AVAILABLE.name()));
     }
 
     private PaymentInstrumentRefSpec paymentInstrument(String instrumentNo,
@@ -291,22 +359,18 @@ class RouteSnapshotJsonSupportTests {
                 .legId("PAY")
                 .sequence(7)
                 .legType(RouteLegType.INTERNAL_TRANSFER)
-                .sourceNode(routeNode(sourceSubjectRef, LedgerSubjectCode.AVAILABLE, RouteNodeRole.SOURCE))
-                .targetNode(routeNode(subject("PAYEE-001"), LedgerSubjectCode.SETTLEMENT, RouteNodeRole.TARGET))
+                .sourceNode(routeNode(sourceSubjectRef, RouteNodeRole.SOURCE))
+                .targetNode(routeNode(subject("PAYEE-001"), RouteNodeRole.TARGET))
                 .amount(Money.immutable(900L, CurrencyIsoCode.USD))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .contextVariables(Map.of())
                 .build();
     }
 
     private ImmutableRouteNodeSpec routeNode(ImmutableSubjectRef subjectRef,
-                                             LedgerSubjectCode ledgerSubjectCode,
                                              RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }

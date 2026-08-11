@@ -54,21 +54,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_merchant_20001_usd",
-          "ledgerSubjectCode": "CLEARING"
+          "subjectId": "fa_merchant_20001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 4000
         },
-        "balanceEffectType": "RESTORE",
-        "phaseCode": "REFUND",
         "replayPolicy": "PARTIAL_ALLOWED"
       }
     ]

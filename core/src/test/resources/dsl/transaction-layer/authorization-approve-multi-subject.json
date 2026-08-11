@@ -67,21 +67,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "fa_user_10001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "FUNDING_ACCOUNT",
-          "subjectId": "fa_user_10001_usd",
-          "ledgerSubjectCode": "AUTHORIZATION"
+          "subjectId": "fa_user_10001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 7000
         },
-        "balanceEffectType": "HOLD",
-        "phaseCode": "AUTHORIZATION",
         "replayPolicy": "PARTIAL_ALLOWED"
       },
       {
@@ -90,21 +86,17 @@
         "sourceNode": {
           "nodeRole": "SOURCE",
           "subjectType": "CREDIT_ACCOUNT",
-          "subjectId": "ca_user_10001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
+          "subjectId": "ca_user_10001_usd"
         },
         "targetNode": {
           "nodeRole": "TARGET",
           "subjectType": "CREDIT_ACCOUNT",
-          "subjectId": "ca_user_10001_usd",
-          "ledgerSubjectCode": "AUTHORIZATION"
+          "subjectId": "ca_user_10001_usd"
         },
         "amount": {
           "currency": "USD",
           "amount": 5000
         },
-        "balanceEffectType": "HOLD",
-        "phaseCode": "AUTHORIZATION",
         "replayPolicy": "PARTIAL_ALLOWED"
       }
     ]

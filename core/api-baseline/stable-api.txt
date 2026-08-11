@@ -136,10 +136,13 @@ com.wind.funds.ledger.LedgerBalanceView	public default com.wind.funds.ledger.Led
 com.wind.funds.ledger.LedgerBalanceView	public default com.wind.funds.ledger.LedgerBalanceBucket getBalanceBucketNullable(com.wind.funds.ledger.enums.LedgerSubjectCode);
 com.wind.funds.ledger.LedgerBalanceView	public default com.wind.transaction.core.Money getBalance(com.wind.funds.ledger.enums.LedgerSubjectCode);
 com.wind.funds.ledger.LedgerBalanceView	public interface com.wind.funds.ledger.LedgerBalanceView {
+com.wind.funds.ledger.LedgerPostingAssembler	public abstract boolean supports(com.wind.funds.route.spec.ResolvedRouteSpec);
+com.wind.funds.ledger.LedgerPostingAssembler	public abstract com.wind.funds.ledger.spec.LedgerTransactionSpec assemble(com.wind.funds.transaction.spec.FundsInstructionSpec, java.lang.String, R);
 com.wind.funds.ledger.LedgerPostingAssembler	public interface com.wind.funds.ledger.LedgerPostingAssembler<R extends com.wind.funds.route.spec.ResolvedRouteSpec> {
 com.wind.funds.ledger.LedgerPostingRejectedException	public class com.wind.funds.ledger.LedgerPostingRejectedException extends java.lang.RuntimeException {
 com.wind.funds.ledger.LedgerPostingRejectedException	public com.wind.funds.ledger.LedgerPostingRejectedException(java.lang.String, java.lang.String);
 com.wind.funds.ledger.LedgerPostingRejectedException	public java.lang.String getFundsTransactionSn();
+com.wind.funds.ledger.LedgerTransactionPostingService	public abstract void post(com.wind.funds.ledger.spec.LedgerTransactionSpec);
 com.wind.funds.ledger.LedgerTransactionPostingService	public interface com.wind.funds.ledger.LedgerTransactionPostingService {
 com.wind.funds.ledger.enums.AccountBalancePeriodType	public final class com.wind.funds.ledger.enums.AccountBalancePeriodType extends java.lang.Enum<com.wind.funds.ledger.enums.AccountBalancePeriodType> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.ledger.enums.AccountBalancePeriodType	public java.lang.String getDesc();
@@ -736,11 +739,15 @@ com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public com.wind.funds.tra
 com.wind.funds.transaction.spec.FeeSpec$FeeSpecBuilder	public java.lang.String toString();
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public final class com.wind.funds.transaction.spec.FundsInstructionFieldKeys {
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String ACCOUNT_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LEDGER_PERIOD_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LEDGER_PERIOD_TYPE;
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String LINKED_FUNDING_ACCOUNT_ID;
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_ACCOUNT_ID;
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYEE_LEDGER_SUBJECT_CODE;
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_ACCOUNT_ID;
 com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_ID;
+com.wind.funds.transaction.spec.FundsInstructionFieldKeys	public static final java.lang.String PAYER_LEDGER_SUBJECT_CODE;
 com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract com.wind.funds.transaction.enums.FundsInstructionReferenceType getReferenceType();
 com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getAuthCode();
 com.wind.funds.transaction.spec.FundsInstructionReferenceSpec	public abstract java.lang.String getExternalTransactionId();
@@ -764,6 +771,9 @@ com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.S
 com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.lang.String getDescription();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.math.BigDecimal getExchangeRate();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public abstract java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.AccountBalancePeriodType getLedgerPeriodType();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.LedgerSubjectCode getPayeeLedgerSubjectCode();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.ledger.enums.LedgerSubjectCode getPayerLedgerSubjectCode();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.transaction.enums.FundsEffectType getExternalFundsEffectType();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getAccountId();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.funds.wallet.FundsAccountId getLinkedFundingAccountId();
@@ -774,8 +784,11 @@ com.wind.funds.transaction.spec.FundsInstructionSpec	public default com.wind.fun
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalFundsFactDigest();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalFundsFactSn();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getExternalSourceCode();
+com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getLedgerPeriodId();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public interface com.wind.funds.transaction.spec.FundsInstructionSpec {
 com.wind.funds.transaction.support.FundsContextVariables	public final class com.wind.funds.transaction.support.FundsContextVariables {
+com.wind.funds.transaction.support.FundsContextVariables	public static final java.lang.String ALLOW_NEGATIVE_BALANCE;
+com.wind.funds.transaction.support.FundsContextVariables	public static final java.lang.String INCREASE;
 com.wind.funds.transaction.support.FundsContextVariables	public static java.util.Map<java.lang.String, java.lang.Object> immutableCopy(java.util.Map<java.lang.String, java.lang.Object>);
 com.wind.funds.transaction.support.FundsInstructionContextValidator	public final class com.wind.funds.transaction.support.FundsInstructionContextValidator {
 com.wind.funds.transaction.support.FundsInstructionContextValidator	public static java.util.Map<java.lang.String, java.lang.Object> immutableInstructionContext(java.util.Map<java.lang.String, java.lang.Object>, java.lang.String);

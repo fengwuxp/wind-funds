@@ -1,9 +1,5 @@
 package com.wind.funds.route.spec;
 
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.transaction.core.Money;
@@ -19,7 +15,7 @@ import java.util.Map;
  * <p>职责：
  * <ul>
  *   <li>描述一笔路径中的最小资金移动单元</li>
- *   <li>承载来源/去向、金额、阶段、约束和回放策略</li>
+ *   <li>承载来源/去向、金额和回放策略</li>
  *   <li>作为 LedgerPostingAssembler 生成 LedgerPostingPlan 的基础输入</li>
  * </ul>
  *
@@ -58,27 +54,6 @@ public interface RouteLegSpec {
     @NonNull
     default BigDecimal getExchangeRate() {
         return BigDecimal.ONE;
-    }
-
-    @NonNull
-    LedgerBalanceEffectType getBalanceEffectType();
-
-    @NonNull
-    LedgerPhaseCode getPhaseCode();
-
-    @NonNull
-    default AccountBalancePeriodType getPeriodType() {
-        return AccountBalancePeriodType.LIFETIME;
-    }
-
-    @Nullable
-    default String getPeriodId() {
-        return null;
-    }
-
-    @NonNull
-    default Map<String, LedgerBalanceConstraintType> getConstraintOverrides() {
-        return Map.of();
     }
 
     @NonNull

@@ -1,9 +1,6 @@
 package com.wind.funds.route;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
@@ -32,7 +29,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
 import static com.wind.funds.route.support.RouteSpecSupport.sourceNode;
 import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
@@ -76,17 +72,12 @@ public class PayoutFundsInstructionRouteResolver implements RouteResolver, Order
         var prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         List<RouteLegSpec> legs = List.of(
                 routeLeg(FundsRouteLegIds.PAYOUT_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
-                        .sourceNode(sourceNode(accountSubject, LedgerSubjectCode.SETTLEMENT))
-                        .targetNode(targetNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
-                        .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                        .phaseCode(LedgerPhaseCode.SETTLEMENT)
-                        .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.SETTLEMENT))
+                        .sourceNode(sourceNode(accountSubject))
+                        .targetNode(targetNode(prepaymentSubject))
                         .build(),
                 routeLeg(FundsRouteLegIds.PAYOUT_FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
-                        .sourceNode(sourceNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
-                        .targetNode(targetNode(cashSubject, LedgerSubjectCode.CASH))
-                        .balanceEffectType(LedgerBalanceEffectType.DECREASE)
-                        .phaseCode(LedgerPhaseCode.FUND_OUT)
+                        .sourceNode(sourceNode(prepaymentSubject))
+                        .targetNode(targetNode(cashSubject))
                         .build());
         List<RouteParticipantSpec> participants = List.of(
                 routeParticipantFactory.createParticipant(RouteParticipantRole.PAYER, accountSubject,
@@ -106,11 +97,8 @@ public class PayoutFundsInstructionRouteResolver implements RouteResolver, Order
         FundsAccountId accountId = accountId(instruction);
         var subject = routeSubjectSupport.createSubjectRef(accountId);
         RouteLegSpec leg = routeLeg(FundsRouteLegIds.PAYOUT_FAILURE_RETURN, 1, RouteLegType.RESTORE, instruction)
-                .sourceNode(sourceNode(subject, LedgerSubjectCode.SETTLEMENT))
-                .targetNode(targetNode(subject, LedgerSubjectCode.AVAILABLE))
-                .balanceEffectType(LedgerBalanceEffectType.RESTORE)
-                .phaseCode(LedgerPhaseCode.REFUND)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.SETTLEMENT))
+                .sourceNode(sourceNode(subject))
+                .targetNode(targetNode(subject))
                 .build();
         RouteParticipantSpec participant = routeParticipantFactory.createParticipant(RouteParticipantRole.PAYER,
                 subject, routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),

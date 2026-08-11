@@ -154,7 +154,7 @@ flowchart TD
 
 | 分册 | 分册验收 ID | 产品语义 | DSL / 系分承接 | TDD 证据入口 | 编码准入要求 |
 | --- | --- | --- | --- | --- | --- |
-| 06 VCC 资金边界 | `VCC-AC-001`、`VCC-AC-002` | 授权批准只表达卡绑定资金/信用子账户授权占用，授权拒绝无账务副作用。 | 授权交易 DSL、`SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、支付工具引用、子账户/父账户快照和 `RouteSnapshot`；02 系分授权资金状态与支付工具边界。 | `TDD-P2-VCC-001`、`TDD-RAIL-001`、`TDD-AUTH-*`。 | 必须先证明卡、token、PAN/CVC 不作为账本主体，VCC 场景账务只能落到资金子账户或信用子账户，且拒绝不生成 route、posting 或 ledger entry。 |
+| 06 VCC 资金边界 | `VCC-AC-001`、`VCC-AC-002` | 授权批准只表达卡绑定资金/信用子账户授权占用，授权拒绝无账务副作用。 | 授权交易 DSL、`SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、支付工具引用、子账户/父账户快照和 `RouteSnapshot`；02 系分授权资金状态与支付工具边界。 | `TDD-P2-VCC-001`、`TDD-RAIL-001`、`TDD-AUTH-*`。 | 必须先证明卡、token、PAN/CVC 不作为账本主体，VCC 场景账务只能落到资金子账户或信用子账户，且拒绝不生成 route leg、posting 或 ledger entry；可保留空 RouteSnapshot。 |
 | 06 VCC 资金边界 | `VCC-AC-003` 至 `VCC-AC-006` | 撤销、clearing 和本金退款基于原授权或原 route 回放；dispute / chargeback 只承接上层已确认的资金结果。 | `COMPLETE`、`AUTH_REFUND`、原路径 replay 和安全外部证据引用；02/03 系分授权回放和对账差错。 | `TDD-P2-VCC-002`、`TDD-P2-VCC-003`、`TDD-RECON-*`。 | wind-funds 不创建 dispute / chargeback 案件、不裁决责任也不解释证据时限；未形成上层可执行的资金决定时不生成资金事实。 |
 | 06 VCC 资金边界 | `VCC-AC-007` | prepaid virtual card 只作为支付工具，预付余额必须落到该卡绑定的资金子账户，预付资金来源必须由上层确认并形成唯一显式资金路径。 | `PaymentInstrumentRef`、`SubjectRef(FUNDING_ACCOUNT)`、参与方父账户快照、资金来源引用和显式 route participant/leg；02 系分支付工具、账户层级和资金责任解析关系。 | `TDD-P2-VCC-004`、`TDD-RAIL-001A`、`TDD-WALLET-010`、`TDD-WALLET-015`、`TDD-WALLET-017`、`TDD-WALLET-020`。 | wind-funds 不从 prepaid 名称推断资金模式；不得绕过子账户 profile、应有的父账户关系和唯一资金路径，也不得创建卡号账本。 |
 | 06 VCC 资金边界 | `VCC-AC-008`、`VCC-AC-009` | shared card 是上层使用和绑定模式；资金授权必须固化支付工具、信用子账户、父账户、Spend Rule 和资金责任快照。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、binding snapshot、子账户/父账户快照、支出控制范围、Spend Rule、资金责任解析关系和规则版本；02 系分支付工具绑定与授权回放。 | `TDD-P2-VCC-005`、`TDD-P2-VCC-012`、`TDD-AUTH-008`、`TDD-AUTH-009`、`TDD-ROUTE-013`、`TDD-WALLET-016`、`TDD-WALLET-017`、`TDD-WALLET-020`。 | 卡、卡组、支出控制范围、Spend Rule、持卡人或部门不得成为账本主体；逆向资金事实不得按当前绑定重新解释；wind-funds 只提供可按支付工具和子账户追溯的资金事实，不生成卡账单或使用人视图。 |
@@ -199,12 +199,12 @@ flowchart TD
 | AC-MER-001 | 商户订单收款 | 用户基于订单向商户付款。 | 用户 AVAILABLE 减少，商户 CLEARING 增加。 | 商户订单款不得直入 AVAILABLE 或 SETTLEMENT。 |
 | AC-FEE-001 | 手续费收取 | 原交易含手续费规则。 | 本金和手续费分别入账，平台 FEE 增加。 | 本金、手续费、通道成本和补贴金额拆开。 |
 | AC-FEE-002 | 手续费退回 | 原费用事实存在且符合退费规则。 | 平台 FEE 减少，原责任方余额回补。 | 普通退款不自动退手续费；退费不超过原收费。 |
-| AC-ROUTE-001 | 商户收款路由快照 | 用户订单付款，存在用户资金账户、商户资金账户和平台费用账户角色。 | 生成包含用户、商户、平台资金账户角色解析结果、账目、费用拆分和规则版本的 route snapshot。 | 用户扣 AVAILABLE，商户入 CLEARING，平台费用入 FEE；本金、手续费、补贴和成本不可混成一个净额。 |
+| AC-ROUTE-001 | 商户收款路由快照 | 用户订单付款，存在用户资金账户、商户资金账户和平台费用账户角色。 | 生成包含用户、商户、平台资金账户角色解析结果、主体路径、费用拆分和规则版本的 route snapshot；账目由 posting 事实承载。 | 用户扣 AVAILABLE，商户入 CLEARING，平台费用入 FEE；本金、手续费、补贴和成本不可混成一个净额。 |
 | AC-ROUTE-002 | 普通支付不套商户清算 | 付款方支付给普通资金账户，不属于商户订单收款。 | 收款方进入产品命令指定目标账目。 | 不默认进入商户 CLEARING；路由必须先识别业务场景。 |
 | AC-ROUTE-003 | 原交易退款回放路径 | 原交易存在 route snapshot 且剩余可退金额充足。 | 生成基于原快照的逆向 route。 | 不按当前账户绑定、当前费率或当前商户配置重新选路；累计退款不得超额。 |
 | AC-ROUTE-004 | 平台角色解析 | 交易需要平台手续费、预收待付、现金映射或调整账户。 | 解析为唯一平台资金账户。 | 缺失或命中多个平台资金账户时路由失败；不得把“平台”抽象主体直接入账。 |
-| AC-ROUTE-005 | 路由失败不写账 | 账户不存在、币种不一致、余额不足、周期缺失、规则不唯一或外部账户被当作内部主体。 | 返回明确失败原因或进入人工处理。 | 不生成 posting plan、LedgerEntry 或余额投影；不得自动换路径试入账。 |
-| AC-ROUTE-006 | 授权路由周期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体、账目、账本周期和授权快照。 | 预算或信用的非 LIFETIME 周期必须有 periodId；释放和结算必须回到原周期。 |
+| AC-ROUTE-005 | 路由失败不写账 | 账户不存在、币种不一致、余额不足、路径无效、规则不唯一或外部账户被当作内部主体。 | 返回明确失败原因或进入人工处理。 | 不生成 posting plan、LedgerEntry 或余额投影；不得自动换路径试入账。 |
+| AC-ROUTE-006 | 授权账期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体路径和授权快照；资金指令与原账本事实保存账期依据。 | 预算或信用的非 LIFETIME 周期必须有 periodId；释放和结算必须按原账本事实回到原周期。 |
 
 ### 5.2.1 权益金额组件
 
@@ -275,7 +275,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-AUTH-007 | 授权完成后退款 | 原完成交易存在。 | 基于原完成快照回补。 | 累计退款和争议不得超过已完成金额；退款不得按当前绑定重新选路。 |
 | AC-AUTH-011 | 无授权强制完成 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 complete 的强制完成模式入账。 | 不伪造授权占用；必须有 FORCE 模式、受信策略或审批快照、上限、外部原事实引用、凭证、原因和审计；不得把普通完成的原授权流水当作强制完成凭证；不得污染授权生命周期。 |
 | AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在可追溯外部引用。 | 使用 refund 的无授权退款模式回补。 | 不补造原授权；以空原授权流水进入 no-auth 语义，保留 `externalReferenceSn`、退款原因、操作者和审计；不得携带或查询内部授权流水；缺外部引用、无原因或无审计不得静默退款。 |
-| AC-AUTH-008 | 发卡扩展：支出规则命中拒绝 | 授权请求命中禁用 MCC、商户、国家、POS、PAN entry mode、CVV/AVS 或金额规则。 | 授权拒绝，返回可解释原因。 | 记录命中规则、规则版本和审计信息；不生成 route、LedgerEntry 或 chargeback。 |
+| AC-AUTH-008 | 发卡扩展：支出规则命中拒绝 | 授权请求命中禁用 MCC、商户、国家、POS、PAN entry mode、CVV/AVS 或金额规则。 | 授权拒绝，返回可解释原因。 | 记录命中规则、规则版本和审计信息；不生成 route leg、LedgerEntry 或 chargeback，可保留空 RouteSnapshot。 |
 | AC-AUTH-009 | 发卡扩展：周期限额命中拒绝 | 授权请求超过日、周、月或自定义周期内的金额或次数窗口。 | 授权拒绝，累计窗口不被错误推进。 | 周期窗口口径明确；不得用清算账期、报表周期或归档水位替代支出窗口。 |
 | AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和资金或信用可用性均通过。 | 进入资金路由并生成资金或信用主体 AVAILABLE -> AUTHORIZATION。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责；支出控制范围和 Spend Rule 只进快照和审计。 |
 
@@ -584,8 +584,8 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-ROUTE-002 | DIRECT_TRANSACTION / PAY 普通支付路由变体 | 非商户订单收款不默认进入商户 CLEARING；收款方账目以产品命令和业务场景明确指定。 |
 | AC-ROUTE-003 | DIRECT_TRANSACTION / REFUND、DSL-REVERSE-REFUND-FEE-001、referenceRouteSnapshotId | 退款按原 route snapshot 反向回放，不按当前账户绑定、当前费率或当前配置重新选路；累计退款不得超额。 |
 | AC-ROUTE-004 | RouteSnapshot 平台角色、expectedRoute.legs | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台资金账户；缺失或多命中时不入账。 |
-| AC-ROUTE-005 | expectedRouteCreated=false、expectedPostingCreated=false | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
-| AC-ROUTE-006 | AUTHORIZATION_TRANSACTION / AUTHORIZE、DSL-AUTH-LIFECYCLE-001 | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
+| AC-ROUTE-005 | expectedRouteCreated=false、expectedPostingCreated=false | 账户缺失、币种不一致、余额不足、路径无效、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
+| AC-ROUTE-006 | AUTHORIZATION_TRANSACTION / AUTHORIZE、DSL-AUTH-LIFECYCLE-001 | RouteSnapshot 保存主体路径和授权快照；资金指令与原账本事实保存账期依据，释放和结算必须回到原周期。 |
 | AC-PI-001 至 AC-PI-012 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、SubjectRef(FUNDING_ACCOUNT/CREDIT_ACCOUNT)、AccountHierarchyRelation、参与方 AccountHierarchySnapshot、RoutingDecisionSpec、RouteParticipantSpec、RouteLegSpec、RouteSnapshotSpec、BindingHistory、PaymentInstrumentCapabilityApplicationService、FundingResponsibilityResolutionApplicationService、PaymentInstrumentTransactionApplicationService、ExternalFundsEventApplicationService、FundsAccountCapabilityApplicationService、AccountHierarchyRelationService | 业务入口参数只做产品或应用层选择口径；外部支付工具只做路由输入和快照引用；VCC 发卡账务落到卡绑定资金/信用子账户；工具绑定、方向、状态、账户选择、账户能力、内部钱包入口解析、绑定历史审计、授权应用入口准入和收款工具 route snapshot 归因必须可解释；最终资金路径由 participant/leg 显式表达，逆向交易按原快照回放；`FundingAccount` 只表示真实资金账户；AC-PI-010 只能新增外层 `authorizeByInstrument` 或等价 facade，不改变账户主体型交易内核。 |
 | AC-AUTH-007 | AUTHORIZATION_TRANSACTION / AUTH_REFUND、DSL-AUTH-REFUND-001 | 已完成授权退款和争议类退款均沿原完成路径反向回放；拒付/争议初始默认由 `refund` 携带原因、凭证、外部引用和审计上下文承接，查询、投影和审计不得压缩成不可区分的普通退款。 |
 | AC-AUTH-011 | AUTHORIZATION_TRANSACTION / COMPLETE 强制完成模式、DSL-AUTH-FORCE-CAPTURE-001 | 无前置授权的外部消费结果通过 complete 承接，不伪造授权占用；FORCE 模式、受信策略或审批快照、上限、外部原事实引用、凭证、原因和审计必填。 |
@@ -596,7 +596,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-AUTH-008 | AUTHORIZATION_CONTROL_DECLINE / DSL-AUTHORIZATION-CONTROL-SPEND-RULE-DECLINE-001 | 支出规则命中拒绝、拒绝原因、规则版本、请求摘要和审计。 |
 | AC-AUTH-009 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 日、周、月或自定义周期的金额/次数窗口，不能和账本周期混用。 |
 | AC-AUTH-010 | AUTHORIZATION_CONTROL_APPROVE_THEN_AUTHORIZE | 授权控制通过后才进入资金路由；通过不等于授权占用成功。 |
-| RED-025 | AUTHORIZATION_CONTROL_DECLINE | 支出规则拒绝后不得生成 route、posting plan 或 LedgerEntry。 |
+| RED-025 | AUTHORIZATION_CONTROL_DECLINE | 支出规则拒绝后不得生成 route leg、posting plan 或 LedgerEntry；可保留空 RouteSnapshot。 |
 | RED-026 | AUTHORIZATION_CONTROL_DECLINE | 拒绝必须保留规则版本、原因和请求摘要。 |
 | RED-027 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 支出窗口和账本周期双向隔离。 |
 | AC-BEN-001 至 AC-BEN-019 | `FundsBenefitContributionTransactionService`、`DSL-BENEFIT-CONTRIBUTION-SETTLE-001`、`DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-AUTH-HOLD-001`、`DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001`、`DSL-BENEFIT-MISSING-CONTRIBUTION-FACT-REPLAY-001`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`、伴随权益指令组、补充权益事实、审计证据包、使用者解释视图 | 让利出资记账交易只承接已决策且需要真实入账的出资结果；商户券、平台补贴、平台展示优惠、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实和清结算拆分都必须能解释资金影响；生产链路必须具备原让利出资事实、历史摘要或补充事实长期回放来源，使用者视图不能误导，且 `CONTRACT_ONLY` 夹具不得声明生产资金流完成。 |

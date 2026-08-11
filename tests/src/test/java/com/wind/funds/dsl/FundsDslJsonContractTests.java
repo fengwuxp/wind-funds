@@ -44,6 +44,33 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：样例继续把已经迁出 route 的会计字段写入 leg 或 node。
+     * 预期：六类旧字段均被显式拒绝。
+     * 红线：测试 DSL 不得继续批准 hybrid route/accounting 契约。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectRemovedRouteAccountingFields() {
+        Map<String, String> legFields = Map.of(
+                "balanceEffectType", "\"CONSUME\"",
+                "phaseCode", "\"SETTLEMENT\"",
+                "periodType", "\"LIFETIME\"",
+                "periodId", "\"LIFETIME\"",
+                "constraintOverrides", "{}");
+        legFields.forEach((field, value) -> assertThatThrownBy(() ->
+                FundsDslJsonContractVerifier.verifyTransactionLayerCase(
+                        removedRouteAccountingFieldDocument("\"%s\": %s".formatted(field, value), "")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.legs." + field)
+                .hasMessageContaining("has been removed"));
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(
+                removedRouteAccountingFieldDocument("", ", \"ledgerSubjectCode\": \"AVAILABLE\"")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.legs.sourceNode.ledgerSubjectCode")
+                .hasMessageContaining("has been removed");
+    }
+
+    /**
      * 场景：样例作者声明未被 DSL 基线允许的 fixtureLevel。
      * 预期：JSON 契约校验显式失败。
      * 红线：fixtureLevel 决定交付结论等级，不能用未知值绕过盘点和验证门禁。
@@ -1129,6 +1156,41 @@ class FundsDslJsonContractTests {
     private static Map<String, Object> parseObject(String json) {
         return WindJson.parseObject(json, new TypeReference<>() {
         });
+    }
+
+    private Map<String, Object> removedRouteAccountingFieldDocument(String legField, String nodeField) {
+        String optionalLegField = legField.isEmpty() ? "" : "," + legField;
+        return parseObject("""
+                {
+                  "caseId": "DSL-REMOVED-ROUTE-ACCOUNTING-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "TRANSFER",
+                    "transactionType": "TRANSFER",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "legs": [{
+                      "legType": "INTERNAL_TRANSFER",
+                      "sourceNode": {
+                        "nodeType": "SUBJECT",
+                        "nodeRole": "SOURCE",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "subjectId": "payer"%s
+                      },
+                      "targetNode": {
+                        "nodeType": "SUBJECT",
+                        "nodeRole": "TARGET",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "subjectId": "payee"
+                      },
+                      "amount": { "currency": "USD", "amount": 100 },
+                      "replayPolicy": "PARTIAL_ALLOWED"%s
+                    }]
+                  }
+                }
+                """.formatted(nodeField, optionalLegField));
     }
 
     private Path transactionLayerDslDir() {

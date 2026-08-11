@@ -55,7 +55,7 @@
 | `wallet` 资金责任 | 开发 / 受控联调可接入。 | 按支出主体解析资金账户或信用账户责任主体。 | 多资金责任、错币种、停用账户和冲突优先级必须在准入前失败。 |
 | `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、交易消费、退款补偿、可信控制释放和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
 | `transaction` 直接交易 | 开发 / 受控联调可接入。 | 充值、转账、付款、退款、提现、手续费和退费。 | 外部 pending、审批中或通道处理中不得进入交易事实。 |
-| `transaction` 授权交易 | 开发 / 受控联调可接入。 | 授权、撤销、完成和完成后本金退款，后继动作基于原路径。 | `refund` 只承接不超过已完成金额的本金；商家补偿、退货运费、FX credit 和 VCC 组件编排不属于该入口。授权拒绝不得生成 route、posting、ledger entry；清算、争议和强制完成需按专项边界确认。 |
+| `transaction` 授权交易 | 开发 / 受控联调可接入。 | 授权、撤销、完成和完成后本金退款，后继动作基于原路径。 | `refund` 只承接不超过已完成金额的本金；商家补偿、退货运费、FX credit 和 VCC 组件编排不属于该入口。授权拒绝不生成 `RouteLeg`、posting、`LedgerTransaction/LedgerEntry` 或余额变化；保留状态为 `REJECTED` 的 FundsTransaction/detail 与 `legs` 为空的 `RouteSnapshotSpec`。清算、争议和强制完成需按专项边界确认。 |
 | `transaction` 余额控制 | 开发 / 受控联调可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
 | 让利出资记账 | 开发 / 受控联调可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
 | 外部确认入金 | 开发 / 受控联调可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
@@ -124,7 +124,7 @@
 
 | 阶段 | 入口 | 说明 |
 | --- | --- | --- |
-| 授权 | `authorize` | 授权拒绝不得生成 route、posting 或 ledger entry。 |
+| 授权 | `authorize` | 授权拒绝不生成 `RouteLeg`、posting、`LedgerTransaction/LedgerEntry` 或余额变化；保留 `REJECTED` FundsTransaction/detail 与 `legs` 为空的 `RouteSnapshotSpec`。 |
 | 撤销 | `reversal` | 释放原授权占用。 |
 | 完成 | `complete` | 基于原授权路径完成，不按当前绑定重新选路。 |
 | 完成后退款 | `refund` | 引用原完成事实。 |
@@ -327,7 +327,7 @@ flowchart LR
 | 业务方直接写 ledger entry 或改余额投影。 | 破坏账本事实源。 |
 | 把支付工具、外部账户、VA、卡号、SpendControlScope、Spend Rule 当作 ledger subject。 | 它们只是引用或控制范围。 |
 | 把冻结当消费、扣款或提现成功。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`。 |
-| 授权拒绝后继续生成 route、posting 或 ledger entry。 | 拒绝不是资金事实。 |
+| 授权拒绝后继续生成 `RouteLeg`、posting、`LedgerTransaction/LedgerEntry` 或余额变化。 | 拒绝只保留 `REJECTED` FundsTransaction/detail 与 `legs` 为空的 `RouteSnapshotSpec`。 |
 | 用 `contextVariables` 承载核心金额、分摊、账户或规则事实。 | 核心事实必须是强字段或稳定引用。 |
 | 外部 pending、审批中、通道处理中直接入账。 | 还没有成立资金事实。 |
 

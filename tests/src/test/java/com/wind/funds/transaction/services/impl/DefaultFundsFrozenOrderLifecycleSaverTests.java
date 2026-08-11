@@ -1,13 +1,19 @@
 package com.wind.funds.transaction.services.impl;
 
 import com.wind.jackson.WindJson;
+import com.wind.funds.route.model.ImmutableRouteLegSpec;
+import com.wind.funds.route.model.ImmutableRouteNodeSpec;
 import com.wind.funds.route.model.ImmutableRouteParticipantSpec;
 import com.wind.funds.route.model.ImmutableRouteSnapshotSpec;
 import com.wind.funds.route.model.ImmutableSubjectRef;
 import com.wind.funds.transaction.instruction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteLegType;
+import com.wind.funds.route.enums.RouteNodeRole;
+import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
@@ -68,7 +74,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 "FREEZE-BIZ-001", 30L, null);
         RouteSnapshotSpec routeSnapshot = routeSnapshot(instruction);
         FundsFrozenOrder order = order("FO-FREEZE-001", instruction, null,
-                legacyRequestHash(instruction, routeSnapshot));
+                legacyRequestHash(instruction, routeSnapshot), legacyRouteSnapshotJson(routeSnapshot));
         FundsFrozenOrderMapper mapper = mock(FundsFrozenOrderMapper.class);
         when(mapper.selectOneByQuery(any())).thenReturn(order);
 
@@ -91,7 +97,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 "UNFREEZE-BIZ-001", 20L, original.getSn());
         RouteSnapshotSpec routeSnapshot = routeSnapshot(instruction);
         FundsFrozenOrder release = order("FO-UNFREEZE-001", instruction, original.getSn(),
-                legacyRequestHash(instruction, routeSnapshot));
+                legacyRequestHash(instruction, routeSnapshot), legacyRouteSnapshotJson(routeSnapshot));
         FundsFrozenOrderMapper mapper = mock(FundsFrozenOrderMapper.class);
         when(mapper.selectOneByQuery(any())).thenReturn(original, release, original);
 
@@ -186,7 +192,19 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                         .amount(instruction.getAmount())
                         .contextVariables(Map.of())
                         .build()))
-                .legs(List.of())
+                .legs(List.of(ImmutableRouteLegSpec.builder()
+                        .legId(instruction.getEventType().name())
+                        .sequence(1)
+                        .legType(instruction.getEventType() == FundsTransactionEventType.FREEZE
+                                ? RouteLegType.HOLD : RouteLegType.RELEASE)
+                        .sourceNode(routeNode(subjectRef, RouteNodeRole.SOURCE))
+                        .targetNode(routeNode(subjectRef, RouteNodeRole.TARGET))
+                        .amount(instruction.getAmount())
+                        .originalAmount(instruction.getAmount())
+                        .exchangeRate(java.math.BigDecimal.ONE)
+                        .replayPolicy(RouteReplayPolicy.FULL_ONLY)
+                        .contextVariables(Map.of())
+                        .build()))
                 .resolvedAt(EVENT_TIME)
                 .contextVariables(Map.of())
                 .build();
@@ -195,10 +213,14 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
     private FundsFrozenOrder order(String sn,
                                    FundsInstructionSpec instruction,
                                    String referenceFreezeSn,
-                                   String requestHash) {
+                                   String requestHash,
+                                   String persistedRouteSnapshot) {
         Map<String, Object> context = new TreeMap<>();
         context.put(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE, instruction.getEventType().name());
         context.put(FROZEN_ORDER_REQUEST_HASH, requestHash);
+        if (persistedRouteSnapshot != null) {
+            context.put(FundsInstructionContextKeys.ROUTE_SNAPSHOT, persistedRouteSnapshot);
+        }
         if (referenceFreezeSn != null) {
             context.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, referenceFreezeSn);
         }
@@ -221,7 +243,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
     private FundsFrozenOrder originalFreezeOrder() {
         FundsInstructionSpec instruction = instruction(FundsTransactionEventType.FREEZE,
                 "ORIGINAL-FREEZE-BIZ-001", 30L, null);
-        return order("FO-ORIGINAL-001", instruction, null, "unused");
+        return order("FO-ORIGINAL-001", instruction, null, "unused", null);
     }
 
     private String legacyRequestHash(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
@@ -245,13 +267,51 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
     }
 
     private Map<String, Object> legacyRouteHashSummary(RouteSnapshotSpec routeSnapshot) {
-        Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
-        values.put(ImmutableRouteSnapshotSpec.Fields.transactionType,
-                DefaultFundsTransactionType.ADJUSTMENT.name());
+        Map<String, Object> values = legacyRouteSummary(routeSnapshot);
         values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
         values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
         values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);
         return FundsStableHashSupport.stableHashMap(values);
+    }
+
+    private String legacyRouteSnapshotJson(RouteSnapshotSpec routeSnapshot) {
+        return WindJson.toJsonString(legacyRouteSummary(routeSnapshot));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> legacyRouteSummary(RouteSnapshotSpec routeSnapshot) {
+        Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
+        values.put(ImmutableRouteSnapshotSpec.Fields.transactionType,
+                DefaultFundsTransactionType.ADJUSTMENT.name());
+        List<Map<String, Object>> legs = ((List<Map<String, Object>>) values.get(
+                ImmutableRouteSnapshotSpec.Fields.legs)).stream()
+                .<Map<String, Object>>map(TreeMap::new)
+                .toList();
+        Map<String, Object> leg = legs.getFirst();
+        leg.put("balanceEffectType", routeSnapshot.getEventType() == FundsTransactionEventType.FREEZE
+                ? "HOLD" : "RELEASE");
+        leg.put("phaseCode", routeSnapshot.getEventType().name());
+        leg.put("periodType", "LIFETIME");
+        leg.put("periodId", "LIFETIME");
+        leg.put("constraintOverrides", Map.of());
+        Map<String, Object> sourceNode = new TreeMap<>((Map<String, Object>) leg.get("sourceNode"));
+        Map<String, Object> targetNode = new TreeMap<>((Map<String, Object>) leg.get("targetNode"));
+        sourceNode.put("ledgerSubjectCode", routeSnapshot.getEventType() == FundsTransactionEventType.FREEZE
+                ? "AVAILABLE" : "FROZEN");
+        targetNode.put("ledgerSubjectCode", routeSnapshot.getEventType() == FundsTransactionEventType.FREEZE
+                ? "FROZEN" : "AVAILABLE");
+        leg.put("sourceNode", sourceNode);
+        leg.put("targetNode", targetNode);
+        values.put(ImmutableRouteSnapshotSpec.Fields.legs, legs);
+        return values;
+    }
+
+    private ImmutableRouteNodeSpec routeNode(ImmutableSubjectRef subjectRef, RouteNodeRole role) {
+        return ImmutableRouteNodeSpec.builder()
+                .nodeType(RouteNodeType.SUBJECT)
+                .subjectRef(subjectRef)
+                .nodeRole(role)
+                .build();
     }
 
 }

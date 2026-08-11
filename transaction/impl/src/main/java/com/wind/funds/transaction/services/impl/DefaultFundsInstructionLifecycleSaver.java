@@ -34,6 +34,7 @@ import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
@@ -71,6 +72,8 @@ import java.util.TreeMap;
 public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleRecorder {
 
     private static final String TRANSACTION_DETAIL_DIGEST_DOMAIN = "transaction.detail.request";
+
+    private static final String TRANSACTION_ROUTE_PATH_DIGEST_DOMAIN = "transaction.route.path";
 
     private static final WindSequenceType FUNDS_TRANSACTION_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_TRANSACTION", "FT", 6);
@@ -130,7 +133,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             throw exception;
         }
         List<FundsTransactionDetail> existingDetails = findExistingTransactionDetails(instruction, routeSnapshot,
-                transaction.getSn());
+                transaction.getSn(), transaction.getRouteSnapshot());
         assertFailedTransactionCannotBeReposted(instruction, transaction, existingDetails);
         if (!existingDetails.isEmpty() && existingDetails.stream().allMatch(this::isCompletedDetail)) {
             return lifecycleResult(transaction.getSn(), existingDetails);
@@ -235,7 +238,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 : FUNDS_INSTRUCTION_EXECUTION_FAILED_ERROR_CODE;
     }
 
-    private FundsTransaction findOrCreateTransaction(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
+    private FundsTransaction findOrCreateTransaction(FundsInstructionSpec instruction,
+                                                     RouteSnapshotSpec routeSnapshot) {
         FundsTransaction result = findReferenceTransaction(instruction);
         if (result != null) {
             return result;
@@ -325,7 +329,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private List<FundsTransactionDetail> findExistingTransactionDetails(FundsInstructionSpec instruction,
                                                                         RouteSnapshotSpec routeSnapshot,
-                                                                        String transactionSn) {
+                                                                        String transactionSn,
+                                                                        String persistedRouteSnapshot) {
         List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
         AssertUtils.notEmpty(participants,
                 "RouteSnapshot participants 不能为空");
@@ -346,7 +351,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 return List.of();
             }
             AssertUtils.isTrue(matchesDetailRequestHash(
-                            detail.getRequestHash(), instruction, routeSnapshot, participant),
+                            detail.getRequestHash(), instruction, routeSnapshot, participant,
+                            isCompletedDetail(detail) ? persistedRouteSnapshot : null),
                     "资金交易明细请求参数不一致，sn = {}", detail.getSn());
             result.add(detail);
         }
@@ -377,7 +383,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 detail = createTransactionDetail(instruction, routeSnapshot, transactionSn, participant, requestHash);
             } else {
                 AssertUtils.isTrue(matchesDetailRequestHash(
-                                detail.getRequestHash(), instruction, routeSnapshot, participant),
+                                detail.getRequestHash(), instruction, routeSnapshot, participant, null),
                         "资金交易明细请求参数不一致，sn = {}", detail.getSn());
             }
             result.add(detail);
@@ -764,24 +770,57 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                                             RouteParticipantSpec participant) {
         return FundsStableHashSupport.sha256CanonicalJson(
                 TRANSACTION_DETAIL_DIGEST_DOMAIN,
-                detailRequestHashFacts(instruction, routeSnapshot, participant, true));
+                detailRequestHashFacts(instruction, routeSnapshot, participant, true, true));
     }
 
     private boolean matchesDetailRequestHash(String storedHash,
                                              FundsInstructionSpec instruction,
                                              RouteSnapshotSpec routeSnapshot,
-                                             RouteParticipantSpec participant) {
+                                             RouteParticipantSpec participant,
+                                             @Nullable String persistedRouteSnapshot) {
+        if (FundsStableHashSupport.matchesCanonicalOrLegacyJson(
+                storedHash,
+                TRANSACTION_DETAIL_DIGEST_DOMAIN,
+                detailRequestHashFacts(instruction, routeSnapshot, participant, true, true),
+                detailRequestHashFacts(instruction, routeSnapshot, participant, false, true))) {
+            return true;
+        }
+        if (!StringUtils.hasText(persistedRouteSnapshot)) {
+            return false;
+        }
+        Map<String, Object> persistedRoute = routeRequestHashSummary(persistedRouteSnapshot);
+        if (!legacyRouteAccountingMatchesInstruction(persistedRoute, instruction)) {
+            return false;
+        }
+        String currentRoutePathDigest = FundsStableHashSupport.sha256CanonicalJson(
+                TRANSACTION_ROUTE_PATH_DIGEST_DOMAIN, routeRequestHashSummary(routeSnapshot));
+        String persistedRoutePathDigest = FundsStableHashSupport.sha256CanonicalJson(
+                TRANSACTION_ROUTE_PATH_DIGEST_DOMAIN,
+                RouteSnapshotJsonSupport.pathOnlyRouteSummary(persistedRoute));
+        if (!currentRoutePathDigest.equals(persistedRoutePathDigest)) {
+            return false;
+        }
         return FundsStableHashSupport.matchesCanonicalOrLegacyJson(
                 storedHash,
                 TRANSACTION_DETAIL_DIGEST_DOMAIN,
-                detailRequestHashFacts(instruction, routeSnapshot, participant, true),
-                detailRequestHashFacts(instruction, routeSnapshot, participant, false));
+                detailRequestHashFacts(instruction, persistedRoute, participant, true, false),
+                detailRequestHashFacts(instruction, persistedRoute, participant, false, false));
     }
 
     private Map<String, Object> detailRequestHashFacts(FundsInstructionSpec instruction,
                                                        RouteSnapshotSpec routeSnapshot,
                                                        RouteParticipantSpec participant,
-                                                       boolean canonical) {
+                                                       boolean canonical,
+                                                       boolean includeInstructionAccounting) {
+        return detailRequestHashFacts(instruction, routeRequestHashSummary(routeSnapshot), participant, canonical,
+                includeInstructionAccounting);
+    }
+
+    private Map<String, Object> detailRequestHashFacts(FundsInstructionSpec instruction,
+                                                       Map<String, Object> routeSummary,
+                                                       RouteParticipantSpec participant,
+                                                       boolean canonical,
+                                                       boolean includeInstructionAccounting) {
         Map<String, Object> values = new TreeMap<>();
         values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
         values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
@@ -795,12 +834,72 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
         values.put(ImmutableFundsInstructionSpec.Fields.businessSn, instruction.getBusinessSn());
         values.put(ImmutableFundsInstructionSpec.Fields.accountId, accountIdSummary(instruction.getAccountId()));
+        if (includeInstructionAccounting) {
+            values.put(ImmutableFundsInstructionSpec.Fields.payerLedgerSubjectCode,
+                    enumName(instruction.getPayerLedgerSubjectCode()));
+            values.put(ImmutableFundsInstructionSpec.Fields.payeeLedgerSubjectCode,
+                    enumName(instruction.getPayeeLedgerSubjectCode()));
+            values.put(ImmutableFundsInstructionSpec.Fields.ledgerPeriodType,
+                    enumName(instruction.getLedgerPeriodType()));
+            values.put(ImmutableFundsInstructionSpec.Fields.ledgerPeriodId, instruction.getLedgerPeriodId());
+        }
         values.put(ImmutableFundsInstructionSpec.Fields.reference, referenceSummary(instruction.getReference()));
         values.put(HASH_FIELD_CONTEXT_VARIABLES,
                 instructionContextSummary(instruction.getContextVariables(), canonical));
-        values.put(HASH_FIELD_ROUTE, routeRequestHashSummary(routeSnapshot));
+        values.put(HASH_FIELD_ROUTE, routeSummary);
         values.put(HASH_FIELD_PARTICIPANT, participantSummary(participant));
         return values;
+    }
+
+    static boolean legacyRouteAccountingMatchesInstruction(Map<String, Object> persistedRoute,
+                                                            FundsInstructionSpec instruction) {
+        Object rawLegs = persistedRoute.get(ImmutableRouteSnapshotSpec.Fields.legs);
+        if (!(rawLegs instanceof List<?> legs) || legs.isEmpty() || !(legs.getFirst() instanceof Map<?, ?> firstLeg)) {
+            return false;
+        }
+        AccountBalancePeriodType periodType = instruction.getLedgerPeriodType() == null
+                ? AccountBalancePeriodType.LIFETIME : instruction.getLedgerPeriodType();
+        String periodId = periodType == AccountBalancePeriodType.LIFETIME
+                ? AccountBalancePeriodType.LIFETIME.name() : instruction.getLedgerPeriodId();
+        if (!StringUtils.hasText(periodId)) {
+            return false;
+        }
+        for (Object rawLeg : legs) {
+            if (!(rawLeg instanceof Map<?, ?> leg)
+                    || !legacyRouteLegAccountingIsComplete(leg)
+                    || !Objects.equals(leg.get("periodType"), periodType.name())
+                    || !Objects.equals(leg.get("periodId"), periodId)) {
+                return false;
+            }
+        }
+        return legacyNodeSubjectMatches(firstLeg.get("sourceNode"), instruction.getPayerLedgerSubjectCode())
+                && legacyNodeSubjectMatches(firstLeg.get("targetNode"), instruction.getPayeeLedgerSubjectCode());
+    }
+
+    private static boolean legacyRouteLegAccountingIsComplete(Map<?, ?> leg) {
+        return leg.containsKey("balanceEffectType")
+                && leg.containsKey("phaseCode")
+                && leg.containsKey("periodType")
+                && leg.containsKey("periodId")
+                && leg.containsKey("constraintOverrides")
+                && legacyNodeHasSubject(leg.get("sourceNode"))
+                && legacyNodeHasSubject(leg.get("targetNode"));
+    }
+
+    private static boolean legacyNodeHasSubject(Object rawNode) {
+        return rawNode instanceof Map<?, ?> node && node.containsKey("ledgerSubjectCode");
+    }
+
+    private static boolean legacyNodeSubjectMatches(Object rawNode, @Nullable Enum<?> expectedSubject) {
+        if (expectedSubject == null) {
+            return true;
+        }
+        return rawNode instanceof Map<?, ?> node
+                && Objects.equals(node.get("ledgerSubjectCode"), expectedSubject.name());
+    }
+
+    private static @Nullable String enumName(@Nullable Enum<?> value) {
+        return value == null ? null : value.name();
     }
 
     private Map<String, Object> instructionContextSummary(Map<String, Object> contextVariables, boolean canonical) {
@@ -847,6 +946,15 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
+        return routeRequestHashSummary(values);
+    }
+
+    private Map<String, Object> routeRequestHashSummary(String persistedRouteSnapshot) {
+        return routeRequestHashSummary(RouteSnapshotJsonSupport.persistedRouteSummary(persistedRouteSnapshot));
+    }
+
+    private Map<String, Object> routeRequestHashSummary(Map<String, Object> routeSummary) {
+        Map<String, Object> values = new TreeMap<>(routeSummary);
         values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
         values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
         values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);

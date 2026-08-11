@@ -551,7 +551,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     /**
      * 场景：授权交易命中月度账本 bucket 后，全额撤销必须继承原授权路由周期。
      * 输入：资金账户只预置 AVAILABLE/AUTHORIZATION 的 MONTHLY/2026-06 账本，授权 60 后撤销 60。
-     * 输出：授权和撤销都只改动 MONTHLY/2026-06 bucket，route snapshot 与 LedgerEntry 保留同一周期。
+     * 输出：授权和撤销都只改动 MONTHLY/2026-06 bucket，LedgerEntry 保留同一周期。
      * 预期：后继交易不得使用当前默认周期或 LIFETIME bucket 解释旧授权链路。
      * 红线：旧周期账本是授权事实的一部分，撤销、结算和退款不能静默串到账本新周期。
      */
@@ -570,14 +570,12 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertPeriodLedgerBalance(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 40L);
         assertPeriodLedgerBalance(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 60L);
-        assertRouteSnapshotPeriod(authorizationSn, periodType, periodId);
         assertLedgerEntriesPeriod("AUTH_PERIOD_AUTHORIZE", periodType, periodId);
 
         String reversalSn = reverseAuthorization(user, 60L, authorizationSn, "AUTH_PERIOD_REVERSAL");
 
         assertPeriodLedgerBalance(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 100L);
         assertPeriodLedgerBalance(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 0L);
-        assertRouteSnapshotPeriod(reversalSn, periodType, periodId);
         assertLedgerEntriesPeriod("AUTH_PERIOD_REVERSAL", periodType, periodId);
     }
 
@@ -3026,18 +3024,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         accountId, ledgerSubjectCode, periodType, periodId)
                 .singleElement();
         return ledgers.getFirst();
-    }
-
-    private void assertRouteSnapshotPeriod(String transactionSn,
-                                           AccountBalancePeriodType periodType,
-                                           String periodId) {
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
-                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs())
-                        .isNotEmpty()
-                        .allSatisfy(leg -> {
-                            assertThat(leg.getPeriodType()).isEqualTo(periodType);
-                            assertThat(leg.getPeriodId()).isEqualTo(periodId);
-                        }));
     }
 
     private void assertLedgerEntriesPeriod(String businessSn,

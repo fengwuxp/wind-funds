@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.constant;
 
+import com.wind.funds.transaction.support.FundsContextVariables;
+
 /**
  * 资金指令上下文 Key 常量。
  */
@@ -53,7 +55,7 @@ public final class FundsInstructionContextKeys {
 
     public static final String LINKED_SPEND_CONTROL_SCOPE_ID = "linkedSpendControlScopeId";
 
-    public static final String INCREASE = "increase";
+    public static final String INCREASE = FundsContextVariables.INCREASE;
 
     public static final String REFERENCE_FREEZE_SN = "referenceFreezeSn";
 
@@ -104,7 +106,7 @@ public final class FundsInstructionContextKeys {
 
     public static final String RESPONSIBILITY_REF = "responsibilityRef";
 
-    public static final String ALLOW_NEGATIVE_BALANCE = "allowNegativeBalance";
+    public static final String ALLOW_NEGATIVE_BALANCE = FundsContextVariables.ALLOW_NEGATIVE_BALANCE;
 
     public static final String NEGATIVE_AVAILABLE_POLICY_CODE = "negativeAvailablePolicyCode";
 

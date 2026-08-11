@@ -1,10 +1,5 @@
 package com.wind.funds.transaction.services.impl;
 
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.route.model.ImmutableExternalAccountRefSpec;
 import com.wind.funds.route.model.ImmutablePaymentInstrumentRefSpec;
@@ -44,7 +39,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -140,6 +134,55 @@ final class RouteSnapshotJsonSupport {
         return values;
     }
 
+    static Map<String, Object> persistedRouteSummary(String routeSnapshotJson) {
+        ObjectNode values = WindJson.parseObject(routeSnapshotJson, ObjectNode.class);
+        return new TreeMap<>(WindJson.convertValue(values, new TypeReference<Map<String, Object>>() {
+        }));
+    }
+
+    static Map<String, Object> pathOnlyRouteSummary(Map<String, Object> routeSummary) {
+        Map<String, Object> values = new TreeMap<>(routeSummary);
+        Object legsValue = values.get(ImmutableRouteSnapshotSpec.Fields.legs);
+        if (legsValue instanceof List<?> legs) {
+            values.put(ImmutableRouteSnapshotSpec.Fields.legs, legs.stream()
+                    .map(RouteSnapshotJsonSupport::pathOnlyLegSummary)
+                    .toList());
+        }
+        return values;
+    }
+
+    private static Map<String, Object> pathOnlyLegSummary(Object legValue) {
+        if (!(legValue instanceof Map<?, ?> leg)) {
+            return Map.of();
+        }
+        Map<String, Object> values = stringKeyMap(leg);
+        values.remove("balanceEffectType");
+        values.remove("phaseCode");
+        values.remove("periodType");
+        values.remove("periodId");
+        values.remove("constraintOverrides");
+        values.computeIfPresent(ImmutableRouteLegSpec.Fields.sourceNode,
+                (key, node) -> pathOnlyNodeSummary(node));
+        values.computeIfPresent(ImmutableRouteLegSpec.Fields.targetNode,
+                (key, node) -> pathOnlyNodeSummary(node));
+        return values;
+    }
+
+    private static Map<String, Object> pathOnlyNodeSummary(Object nodeValue) {
+        if (!(nodeValue instanceof Map<?, ?> node)) {
+            return Map.of();
+        }
+        Map<String, Object> values = stringKeyMap(node);
+        values.remove("ledgerSubjectCode");
+        return values;
+    }
+
+    private static Map<String, Object> stringKeyMap(Map<?, ?> source) {
+        Map<String, Object> values = new TreeMap<>();
+        source.forEach((key, value) -> values.put(String.valueOf(key), value));
+        return values;
+    }
+
     private static void assertNoSensitiveFields(RouteSnapshotSpec routeSnapshot) {
         assertNoSensitiveContext(routeSnapshot.getContextVariables(), "routeSnapshot.contextVariables");
         routeSnapshot.getParticipants().forEach(participant -> assertNoSensitiveContext(
@@ -188,11 +231,6 @@ final class RouteSnapshotJsonSupport {
         values.put(ImmutableRouteLegSpec.Fields.amount, moneySummary(leg.getAmount()));
         values.put(ImmutableRouteLegSpec.Fields.originalAmount, moneySummary(leg.getOriginalAmount()));
         values.put(ImmutableRouteLegSpec.Fields.exchangeRate, leg.getExchangeRate());
-        values.put(ImmutableRouteLegSpec.Fields.balanceEffectType, leg.getBalanceEffectType().name());
-        values.put(ImmutableRouteLegSpec.Fields.phaseCode, leg.getPhaseCode().name());
-        values.put(ImmutableRouteLegSpec.Fields.periodType, leg.getPeriodType().name());
-        values.put(ImmutableRouteLegSpec.Fields.periodId, leg.getPeriodId());
-        values.put(ImmutableRouteLegSpec.Fields.constraintOverrides, sortedEnumMap(leg.getConstraintOverrides()));
         values.put(ImmutableRouteLegSpec.Fields.replayPolicy, leg.getReplayPolicy().name());
         values.put(ImmutableRouteLegSpec.Fields.replayRefLegId, leg.getReplayRefLegId());
         values.put(ImmutableRouteLegSpec.Fields.description, leg.getDescription());
@@ -308,7 +346,6 @@ final class RouteSnapshotJsonSupport {
         }
         values.put(ImmutableRouteNodeSpec.Fields.nodeType, node.getNodeType().name());
         values.put(ImmutableRouteNodeSpec.Fields.subjectRef, subjectSummary(node.getSubjectRef()));
-        values.put(ImmutableRouteNodeSpec.Fields.ledgerSubjectCode, enumName(node.getLedgerSubjectCode()));
         values.put(ImmutableRouteNodeSpec.Fields.nodeRole, node.getNodeRole().name());
         return values;
     }
@@ -337,18 +374,8 @@ final class RouteSnapshotJsonSupport {
         return values;
     }
 
-    private static Map<String, Object> sortedEnumMap(Map<String, ? extends Enum<?>> values) {
-        Map<String, Object> result = new TreeMap<>();
-        values.forEach((key, value) -> result.put(key, enumName(value)));
-        return result;
-    }
-
     private static Map<String, Object> sortedMap(Map<String, Object> values) {
         return new TreeMap<>(values);
-    }
-
-    private static String enumName(Enum<?> value) {
-        return value == null ? null : value.name();
     }
 
     private static List<RouteParticipantSpec> parseParticipants(ArrayNode participants) {
@@ -392,14 +419,6 @@ final class RouteSnapshotJsonSupport {
                     .amount(parseMoney(objectValue(value, ImmutableRouteLegSpec.Fields.amount)))
                     .originalAmount(parseMoney(objectValue(value, ImmutableRouteLegSpec.Fields.originalAmount)))
                     .exchangeRate(decimalValue(value, ImmutableRouteLegSpec.Fields.exchangeRate))
-                    .balanceEffectType(LedgerBalanceEffectType.valueOf(
-                            textValue(value, ImmutableRouteLegSpec.Fields.balanceEffectType)))
-                    .phaseCode(LedgerPhaseCode.valueOf(textValue(value, ImmutableRouteLegSpec.Fields.phaseCode)))
-                    .periodType(AccountBalancePeriodType.valueOf(textValue(value,
-                            ImmutableRouteLegSpec.Fields.periodType)))
-                    .periodId(textValue(value, ImmutableRouteLegSpec.Fields.periodId))
-                    .constraintOverrides(parseConstraintOverrides(objectValue(value,
-                            ImmutableRouteLegSpec.Fields.constraintOverrides)))
                     .replayPolicy(RouteReplayPolicy.valueOf(textValue(value,
                             ImmutableRouteLegSpec.Fields.replayPolicy)))
                     .replayRefLegId(textValue(value, ImmutableRouteLegSpec.Fields.replayRefLegId))
@@ -417,8 +436,6 @@ final class RouteSnapshotJsonSupport {
                         ? RouteNodeType.valueOf(textValue(value, ImmutableRouteNodeSpec.Fields.nodeType))
                         : RouteNodeType.SUBJECT)
                 .subjectRef(parseSubjectRef(objectValue(value, ImmutableRouteNodeSpec.Fields.subjectRef)))
-                .ledgerSubjectCode(LedgerSubjectCode.valueOf(textValue(value,
-                        ImmutableRouteNodeSpec.Fields.ledgerSubjectCode)))
                 .nodeRole(RouteNodeRole.valueOf(textValue(value, ImmutableRouteNodeSpec.Fields.nodeRole)))
                 .build();
     }
@@ -443,17 +460,6 @@ final class RouteSnapshotJsonSupport {
         }
         return Money.immutable(longValue(value, MONEY_AMOUNT),
                 CurrencyIsoCode.valueOf(textValue(value, MONEY_CURRENCY)));
-    }
-
-    private static Map<String, LedgerBalanceConstraintType> parseConstraintOverrides(ObjectNode value) {
-        if (value == null || value.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, LedgerBalanceConstraintType> result = new LinkedHashMap<>();
-        for (Map.Entry<String, JsonNode> entry : value.properties()) {
-            result.put(entry.getKey(), LedgerBalanceConstraintType.valueOf(entry.getValue().asString()));
-        }
-        return Map.copyOf(result);
     }
 
     private static PaymentInstrumentRefSpec parsePaymentInstrumentRef(ObjectNode value) {

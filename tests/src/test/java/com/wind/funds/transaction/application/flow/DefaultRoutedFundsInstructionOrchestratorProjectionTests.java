@@ -489,7 +489,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(routeSnapshot.getBusinessSn()).isEqualTo("PROJECTION_UNFREEZE_RELEASE");
             assertThat(routeSnapshot.getLegs()).singleElement().satisfies(routeLeg -> {
                 assertThat(routeLeg.getLegType()).isEqualTo(RouteLegType.RELEASE);
-                assertThat(routeLeg.getPhaseCode()).isEqualTo(LedgerPhaseCode.UNFREEZE);
             });
         });
     }

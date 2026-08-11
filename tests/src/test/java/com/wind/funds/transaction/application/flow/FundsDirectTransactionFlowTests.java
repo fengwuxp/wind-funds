@@ -6,6 +6,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
@@ -41,6 +42,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -69,6 +74,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * 直接交易业务流测试。
@@ -78,9 +84,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     private static final String CORE1B_BUSINESS_SN = "DIRECT_CORE1B_LEGACY_TOPUP";
 
     private static final Map<String, String> CORE1B_CANONICAL_DETAIL_DIGESTS = Map.of(
-            "funding_user", "6fdd065744256b25bce7dac276a30695400eafe1ce10a520abb3052fd876aa34",
-            "platform_cash_mapping", "22cb79f6b8fff071b09d7ff9c987544e5ac9d4bd4e771921e1e244f4d49a8c1d",
-            "platform_prepayment", "0ef2b0f6e431f6abe4dc085215d7f95b003171f3676dcdf102e19ecb352a229d");
+            "funding_user", "5ba7816caaf9364a8f41656cf3676c406cb359b195018c39f217a9bd8214f53a",
+            "platform_cash_mapping", "aa08a32f91c032b3b906ad8cfcba93796f72b0ef3bdf948ff0c89ee8b6199e5e",
+            "platform_prepayment", "b241e319e526e583fa68a85768337b9115dbb1a706633f31903d56a15e4da957");
 
     private static final Map<String, String> CORE1B_LEGACY_DETAIL_DIGESTS = Map.of(
             "funding_user", "868c7b3858bb95b4ce98345f737b547e2b9165272d58553f43d7d9386085fc91",
@@ -100,7 +106,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     /**
      * 场景：历史直接充值的三条参与方明细已保存 legacy 摘要，当前版本收到相同请求和金额冲突请求。
-     * 输入：先由当前 writer 写入 canonical v1，再按参与方把 request_hash 替换为基线旧 writer 的固定 golden。
+     * 输入：先由当前 writer 写入 canonical v1，再把 route 和 request_hash 替换为基线旧 writer 的固定事实。
      * 输出：同请求复用原资金交易，冲突金额被拒绝，route、资金/账务事实和逐桶余额均保持不变。
      * 红线：兼容读取不得重写历史摘要、重复入账或让冲突请求产生任何资金副作用。
      */
@@ -122,6 +128,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .isEqualTo(CORE1B_CANONICAL_DETAIL_DIGESTS)
                 .isNotEqualTo(CORE1B_LEGACY_DETAIL_DIGESTS);
         assertSingleFundsAndLedgerFactsForBusinessSn(CORE1B_BUSINESS_SN, 3, 2, 4);
+        replaceRouteSnapshotWithLegacyAccountingFields();
         replaceDetailDigest("funding_user", RouteParticipantRole.PAYEE);
         replaceDetailDigest("platform_cash_mapping", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
         replaceDetailDigest("platform_prepayment", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
@@ -150,6 +157,39 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerFactsUnchanged(core1bJdbcTemplate, persistedLegacyLedgerFacts);
         assertThat(snapshot(balances(account, cashMappingAccount(), prepaymentAccount()))).isEqualTo(afterFirst);
         assertSingleFundsAndLedgerFactsForBusinessSn(CORE1B_BUSINESS_SN, 3, 2, 4);
+    }
+
+    /**
+     * 场景：升级前明细保存了 legacy 摘要，但其中一条仍处于处理中。
+     * 预期：同请求不能使用历史 Route 兼容回退继续记账。
+     * 红线：只有已完成历史事实才允许跨版本摘要兼容。
+     */
+    @Test
+    void testPersistedLegacyDetailDigestShouldRejectIncompleteDetail() {
+        FundsAccountId account = fundingAccount("funding_user");
+        directTransactionService.topup(core1bTopupRequest(40L), WindOperatorFactory.system());
+        replaceRouteSnapshotWithLegacyAccountingFields();
+        replaceDetailDigest("funding_user", RouteParticipantRole.PAYEE);
+        replaceDetailDigest("platform_cash_mapping", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
+        replaceDetailDigest("platform_prepayment", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
+        assertThat(core1bJdbcTemplate.update("""
+                        UPDATE t_funds_transaction_detail
+                        SET status = 'PROCESSING'
+                        WHERE tenant_id = ? AND business_sn = ? AND subject_id = ?
+                        """, TENANT_ID, CORE1B_BUSINESS_SN, "funding_user")).isEqualTo(1);
+        BalanceSnapshot balancesBeforeReplay = snapshot(balances(
+                account, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot ledgerBeforeReplay = ledgerFactSnapshot();
+        PersistedTopupFacts fundsFactsBeforeReplay = persistedTopupFacts();
+
+        assertThatThrownBy(() -> directTransactionService.topup(
+                core1bTopupRequest(40L), WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        assertThat(snapshot(balances(account, cashMappingAccount(), prepaymentAccount())))
+                .isEqualTo(balancesBeforeReplay);
+        assertThat(persistedTopupFacts()).isEqualTo(fundsFactsBeforeReplay);
+        assertLedgerFactsUnchanged(core1bJdbcTemplate, ledgerBeforeReplay);
     }
 
     @Test
@@ -4183,6 +4223,43 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 participantRole.name())).isEqualTo(1);
     }
 
+    private void replaceRouteSnapshotWithLegacyAccountingFields() {
+        String routeSnapshotJson = core1bJdbcTemplate.queryForObject("""
+                SELECT route_snapshot
+                FROM t_funds_transaction
+                WHERE tenant_id = ? AND business_sn = ?
+                """, String.class, TENANT_ID, CORE1B_BUSINESS_SN);
+        ObjectNode routeSnapshot = WindJson.parseObject(routeSnapshotJson, ObjectNode.class);
+        ArrayNode legs = (ArrayNode) routeSnapshot.get("legs");
+        for (JsonNode value : legs) {
+            ObjectNode leg = (ObjectNode) value;
+            String legId = leg.get("legId").asText();
+            ObjectNode sourceNode = (ObjectNode) leg.get("sourceNode");
+            ObjectNode targetNode = (ObjectNode) leg.get("targetNode");
+            if ("FUND_IN".equals(legId)) {
+                sourceNode.put("ledgerSubjectCode", LedgerSubjectCode.CASH.name());
+                targetNode.put("ledgerSubjectCode", LedgerSubjectCode.PREPAYMENT.name());
+                leg.put("phaseCode", LedgerPhaseCode.FUND_IN.name());
+            } else {
+                sourceNode.put("ledgerSubjectCode", LedgerSubjectCode.PREPAYMENT.name());
+                targetNode.put("ledgerSubjectCode", LedgerSubjectCode.AVAILABLE.name());
+                leg.put("phaseCode", LedgerPhaseCode.SETTLEMENT.name());
+            }
+            leg.put("balanceEffectType", "INCREASE");
+            leg.put("periodType", "LIFETIME");
+            leg.put("periodId", "LIFETIME");
+            leg.set("constraintOverrides", WindJson.parseObject("{}", ObjectNode.class));
+        }
+        assertThat(core1bJdbcTemplate.update("""
+                        UPDATE t_funds_transaction
+                        SET route_snapshot = ?
+                        WHERE tenant_id = ? AND business_sn = ?
+                        """,
+                WindJson.toJsonString(routeSnapshot),
+                TENANT_ID,
+                CORE1B_BUSINESS_SN)).isEqualTo(1);
+    }
+
     private Map<String, String> detailRequestHashes(String businessSn) {
         Map<String, String> result = new LinkedHashMap<>();
         core1bJdbcTemplate.queryForList("""
@@ -4342,13 +4419,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         assertThat(plan.getCurrency())
                                 .as("posting currency must follow route leg for direct transaction %s", businessSn)
                                 .isEqualTo(routeLeg.getAmount().getCurrency());
-                        assertThat(plan.getBalanceEffectType())
-                                .as("posting balance effect must follow route leg for direct transaction %s",
-                                        businessSn)
-                                .isEqualTo(routeLeg.getBalanceEffectType().name());
-                        assertThat(plan.getPhaseCode())
-                                .as("posting phase must follow route leg for direct transaction %s", businessSn)
-                                .isEqualTo(routeLeg.getPhaseCode().name());
                     });
                 });
     }
@@ -4665,17 +4735,16 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private record DirectRouteNodeKey(String subjectId,
                                       String subjectType,
-                                      LedgerSubjectCode ledgerSubjectCode,
                                       EntrySide entrySide) {
 
         private static DirectRouteNodeKey from(RouteNodeSpec node, EntrySide entrySide) {
             return new DirectRouteNodeKey(node.getSubjectRef().getSubjectId(),
-                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode(), entrySide);
+                    node.getSubjectRef().getSubjectType().name(), entrySide);
         }
 
         private static DirectRouteNodeKey from(LedgerEntry entry) {
             return new DirectRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
-                    entry.getLedgerSubjectCode(), entry.getEntrySide());
+                    entry.getEntrySide());
         }
     }
 

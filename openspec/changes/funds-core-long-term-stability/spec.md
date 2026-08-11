@@ -8,8 +8,8 @@
 | Goal key | `CORE-STABILITY-20260804` |
 | Runtime Goal thread | `019fc59d-b771-75b0-b5bc-6f9e366e30d8` |
 | Goal state | `ACTIVE` |
-| Current stage | `CORE_1_BOUNDARY_C_READY` |
-| Date | `2026-08-10` |
+| Current stage | `CORE_1_BOUNDARY_D_VERIFIED` |
+| Date | `2026-08-11` |
 | Baseline HEAD | `ac9d1565` |
 | Maker | `wind-funds` maintainer or assigned implementation Agent |
 | Checker | 独立、可重复的测试/静态门禁；公共语义由对应 Owner 复核 |
@@ -24,8 +24,8 @@
 ### Current Decision
 
 - 当前业务主链可以继续使用，但 `core` 尚不满足稳定 `1.0` 公共契约冻结条件。
-- `CORE-0A/B/C` 已通过独立 core 门禁、余额精确语义契约和 DIGEST-A 摘要迁移；`CORE-1B-A` 已补齐 ledger/detail persisted-legacy 持久边界证据；`CORE-1A` 已固化首轮公共 API 分级和 stable signature 门禁；`CORE-1E` 已按 Owner 的破坏式授权完成 capability-first 包归位、默认实现下沉和 Benefit face 账户契约收敛，独立 Checker 已封板通过；`CORE-1D / BOUNDARY-B` 已完成实现、扩大测试、PMD、完整 CAD 和独立 Checker 封板，可进入 `BOUNDARY-C`。
-- 余额 View 已按 Profile 多态契约冻结；其余摘要批次、时间语义以及 `BOUNDARY-C` 的 route/posting 会计字段归属仍存在长期风险，必须按既定切片继续验证。
+- `CORE-0A/B/C` 已通过独立 core 门禁、余额精确语义契约和 DIGEST-A 摘要迁移；`CORE-1B-A` 已补齐 ledger/detail persisted-legacy 持久边界证据；`CORE-1A` 已固化首轮公共 API 分级和 stable signature 门禁；`CORE-1E` 已完成 capability-first 包归位、默认实现下沉和 Benefit face 账户契约收敛；`CORE-1D / BOUNDARY-C/D` 已删除 route 会计成员和 wire 字段，由 posting/ledger 独立拥有会计效果，并通过扩大测试、PMD、完整 CAD 与独立 Checker 封板。
+- 余额 View 已按 Profile 多态契约冻结，route/path 与 posting/accounting 目标边界已实现；其余摘要批次和 `D-CS-004` 时间语义仍存在长期风险，必须按独立 Owner Gate 继续验证。
 - `core` 继续只承载跨能力稳定事实、值对象、不变量和引擎 SPI；场景编排、默认不可变实现、产品目录、应用服务和测试验证器按既有模块归属演进，不新建 Maven 模块。
 - Owner 已批准当前 `1.0.0-SNAPSHOT` 直接按目标契约收敛，不保留旧 FQN、旧 getter、deprecated 适配、双写、双读或 V2 平行类型；该授权不降低资金平衡、幂等、回放依据和拒绝无副作用门禁。
 
@@ -58,7 +58,7 @@
 | `D-CS-002` | 余额汇总归属 View：`getAuthorizationBalance()` 精确表达 `AUTHORIZATION`；`getTotalBalance()` 由具体 `FundsAccountBalanceView` 按 Profile 实现；删除无稳定口径的 `pending` 和查询服务聚合。 | `CONFIRMED_VIEW_POLYMORPHISM_VERIFIED` | 原始 bucket 始终是唯一事实；新增其他 Profile 总余额实现必须重新裁决。 |
 | `D-CS-003` | legacy golden + domain/version 有界 canonical v1；按持久边界 write-v1/read-legacy，不全局替换。 | `CONFIRMED_DIGEST_A_VERIFIED` | 后续批次仍需逐边界验证，不把 DIGEST-A 外推到 reconciliation。 |
 | `D-CS-004` | `LocalDateTime` 到绝对时间的迁移必须定义时区来源和历史读兼容。 | `PENDING_OWNER` | Architecture Owner 批准迁移边界后实施。 |
-| `D-CS-005` | route 只保留路径与来源证据；posting 独立拥有科目、期间、阶段、余额效果和约束，直接切换目标契约，不保留 hybrid route 或旧 snapshot reader。 | `CONFIRMED_BREAKING` | 实施必须分切片保持现有资金行为并通过 route/posting、回放、幂等和 H2 业务流；不得用无兼容约束掩盖资金语义缺口。 |
+| `D-CS-005` | route 只保留路径与来源证据；posting 独立拥有科目、期间、阶段、余额效果和约束，直接切换目标契约，不保留 hybrid route 或可恢复旧会计成员的领域/public snapshot reader。 | `CONFIRMED_BREAKING` | 实施必须分切片保持现有资金行为并通过 route/posting、回放、幂等和 H2 业务流；内部历史摘要核验可读取 generic map，但不得恢复旧 route 会计契约。 |
 | `D-CS-006` | Core API 基线随 Owner 批准的破坏式收敛重建；默认不可变 route/instruction 实现退出 Core 后，目标分类为 107 public 顶层类型、99 stable / 4 experimental / 4 internal；public nested 类型继承外层分类。 | `CONFIRMED_REBASE_VERIFIED` | baseline 只能由明确的 `--update` 动作重建，并须由包边界、编译、聚焦测试和 Checker 共同证明。 |
 | `D-CS-007` | Core DSL 是资金主链内部规范事实和引擎 SPI，不是业务直接拼装 SDK；契约按 transaction/route/ledger/wallet/fx capability 归属，业务调用方使用 `*-face` 和稳定叶子值对象。 | `CONFIRMED_VERIFIED` | 禁止顶层 `com.wind.funds.spec` / `model`、Core public `Immutable*`、`com.wind.funds.dsl` facade、兼容桥和 V2 平行类型图。 |
 
@@ -123,11 +123,11 @@
 
 正式执行证据：
 
-- `core/api-baseline/api-policy.tsv` 固化 4 个 experimental、4 个 internal 和 36 个精确成员例外；其余 99 个 public 顶层类型及继承 stable 分类的 7 个 public nested 类型生成 1049 行 stable signature baseline。`BOUNDARY-B` 新增的 `LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已显式进入基线。
+- `core/api-baseline/api-policy.tsv` 固化 4 个 experimental、4 个 internal 和 19 个精确成员例外；其余 99 个 public 顶层类型及继承 stable 分类的 7 个 public nested 类型生成 1062 行 stable signature baseline。`BOUNDARY-C` 删除的 route 会计成员不再进入基线；`BOUNDARY-B` 新增的 `LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已显式进入基线；Core-owned `FundsContextVariables.INCREASE / ALLOW_NEGATIVE_BALANCE` 用于约束 transaction 与 ledger 共享的 instruction context 语义，避免实现层裸字符串协议。
 - `scripts/verify-core-api-baseline.sh` 仅使用 JDK `javap -public` 和系统命令，校验 107/99/4/4 数量、public nested 继承分类、重复或失效分类、重复或失效成员例外，并对规范化结果做精确 diff；`just verify-core-api` 强制先执行 clean compile，只有显式 `--update` 才能重建批准基线，未增加构建或运行时依赖。
 - `Justfile` 增加独立 `verify-core-api` 门禁，并在 `verify-cad` 的 clean compile 后、全量测试前执行。缺少 policy 的 RED、正式 baseline 的 GREEN 和删除一行 baseline 的 drift probe 均按预期 fail closed。
-- `getLedgerProfileCode()`、`getAuthorizationBalance()`、`getTotalBalance()`、`LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已进入 stable baseline；`sha256Json`、时间/宿主时钟和 route/posting 会计归属成员未冻结；具体 `Immutable*` 已退出 Core 构件。
-- Java 21 的 21 模块 clean compile、`test-core` 104/104、`test-boundary` 195/195、Benefit Spring/H2 流程 12/12、PMD 和本次候选提交完整 `verify-cad` 均通过；完整 CAD 为 110 suites / 1050 tests / 0 failures / 0 errors / 1 expected MySQL skip，API、public contract、classfile 和 codegen 门禁通过。
+- `getLedgerProfileCode()`、`getAuthorizationBalance()`、`getTotalBalance()`、`LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已进入 stable baseline；route/path 与 posting/accounting 目标归属已冻结，`sha256Json` 和时间/宿主时钟成员继续按各自 Owner Gate 排除；具体 `Immutable*` 已退出 Core 构件。
+- Java 21 的 21 模块 clean compile、本轮聚焦 58/58、`test-transaction` 149/149、`test-boundary` 199/199、`test-business-flow` 和 PMD 已在对应共享工作区验证；本轮隔离提交候选的完整 `verify-cad` 为 110 suites / 1061 tests / 0 failures / 0 errors / 1 expected MySQL skip，API、public contract、classfile 和 codegen 门禁通过。共享工作区其余并行测试切片不作为本候选证据。
 - `CORE-1E` 独立 Checker 确认 nested signature、standalone fresh-build 和 Benefit 幂等证据缺口均已关闭，结论为 `PASS`，`P0=0 / P1=0 / P2=0`。门禁覆盖 stable public 顶层及其 public nested classfile signature，不覆盖 Javadoc、注解值、参数名、常量值、JSON/wire 行为和运行时语义；这些继续由相应契约测试负责。
 
 ### 2.4 Time and Replay Semantics Evidence
@@ -153,11 +153,11 @@
 
 ### 2.5 Route / Posting Boundary Evidence
 
-- 当前边界只有物理隔离，没有语义隔离。`RouteLegSpec` 一方面声明 route 不是账务分录、不决定余额，另一方面公开 `balanceEffectType`、`phaseCode`、`periodType/periodId` 和 `constraintOverrides`；`RouteNodeSpec` 公开 `ledgerSubjectCode`。
-- `DefaultLedgerPostingAssembler` 直接读取上述 route 字段来选择 posting scope、余额效果、账本、账期和余额约束，只补充 ledger id、借贷方向、intent 与金额。因此 route 当前实际承载 posting intent，assembler 不是会计语义的独立 owner。
+- `RouteLegSpec` 已只保留路径、金额、参与方和回放来源，删除 `balanceEffectType`、`phaseCode`、`periodType/periodId` 和 `constraintOverrides`；`RouteNodeSpec` 已删除 `ledgerSubjectCode`。默认不可变实现、route resolver 和新写 RouteSnapshot JSON 同步移除这些字段，不保留旧 getter、双写或兼容 API。
+- `DefaultLedgerPostingAssembler` 已成为会计语义 owner：新交易按 instruction 事件/类型、route path、参与方角色、账户 Profile 和账本查询推导科目、期间、阶段、余额效果、约束、借贷方向及 posting scope；费用腿以 `legId=FEE` 作为强身份并校验目标为平台费用账户，`FEE_RECEIVER` 角色只用于回放时消歧同主体参与方。
 - `t_ledger_posting_plan` 和 `t_ledger_entry` 已持久化 route leg 关联、科目、期间、阶段、余额效果、约束、借贷方向和摘要；`LedgerPostingPlanSpec` 已有 `routeLegId`，`FundsInstructionReferenceSpec` 已有 `referenceLedgerTransactionSn`。这些现有事实足以支持追溯和回放，不需要新增平行 posting 模型或证据引用类型。
-- `DefaultRouteReplayService` 当前用 route snapshot 的 `phaseCode` 选择回放腿，并复制或反转科目、期间、余额效果和约束；直接删除字段会破坏回放。目标实现应由 ledger assembler 通过 `referenceLedgerTransactionSn + routeLegId` 读取原 posting/entry 证据并生成 reversal/restore，route replay 只反转主体路径、金额和回放资格。
-- 9 个 transaction route 源文件仍写入会计字段，75 处测试引用 `RouteLegSpec`，其中 28 处直接读取或断言会计字段；现有 `RouteResolverFactBoundaryTests` 只证明 route 不注入事实写服务，不能证明语义已解耦。因此直接切换目标契约前仍必须用特征测试固定资金行为，但不为旧字段保留双算或兼容入口。
+- `DefaultRouteReplayService` 现在只选择回放腿、反转主体路径和金额并保留 replay provenance；ledger assembler 通过 `referenceLedgerTransactionSn + routeLegId` 精确读取原 posting plan/entry，生成 reversal、completion、refund、fee refund 或 unfreeze 的会计事实。来源不存在、不唯一或期间不一致时 fail closed。
+- 旧 route JSON 只在已完成 transaction detail 的历史摘要校验中通过内部 generic-map 读取：先剥离旧会计字段计算当前 path digest，再要求每条旧 leg 的会计字段完整，且将当前空账期规范化为 `LIFETIME/LIFETIME` 后逐 leg 严格匹配；instruction 显式提供的 payer/payee 科目只与主 leg 对应节点匹配，最后以包含完整旧 route 的原始 hash 校验其自洽性。旧字段不会还原为 `RouteSpec`、参与新写或驱动 replay，未完成 detail 不进入降级路径；当前 detail digest 已直接纳入 payer/payee ledger subject 与 period，改变这些显式输入仍产生摘要冲突。
 - `BOUNDARY-B` 已把 `UNFREEZE` 固化为余额控制专属 `RELEASE + CONTROL_RELEASE`，并继续由 `LedgerPostingAccessType` 派生 `CLOSING` 准入；真实 H2 测试证明同主体 `FROZEN -> AVAILABLE` 保持平衡，`SUSPENDED` 的 FROZEN 账本仍可释放且状态不被改写，重复解冻继续复用原事实。
 - 基于原交易的 direct `REFUND` 与 `FEE_REFUND` 已把原 `LedgerTransaction.sn` 写入 instruction reference、退款 `LedgerTransaction.referenceLedgerTransactionSn` 和全部退款 detail。来源规则为按 tenant 与原 `FundsTransaction.sn` 查询至多两条并要求恰好一条；不存在或不唯一时 fail closed，不任取第一条，也不新增平行 provenance 类型。既有 H2 流程继续证明 `referenceTransactionSn + replayRefLegId + routeLegId`、累计退款上限、并发、幂等和拒绝无副作用。
 - 旧产品、DSL 和系分文档曾要求 route 决定 ledger subject、period 和 accounting effect；`D-CS-005` 是已批准的目标语义变更，不是实现缺陷修复。实施时必须同步这些权威规格。
@@ -170,7 +170,7 @@
 | accounting effect | 迁到 posting/ledger | `ledgerSubjectCode`、`balanceEffectType`、`phaseCode`、`periodType/periodId`、`constraintOverrides`、借贷方向和 posting scope。 |
 | new posting | ledger assembler 拥有 | 按 instruction event/transaction type、route path、参与方角色、账户 Profile 和 ledger 查询推导会计效果。 |
 | replay posting | ledger assembler 拥有 | 通过 `referenceLedgerTransactionSn + routeLegId` 读取原 ledger transaction、posting plan 和 entry，推导冲正或恢复。 |
-| fee path | 复用现有模型 | 使用 `RouteParticipantRole.FEE_RECEIVER`、目标主体和既有 `RouteLegType` 识别费用路径，不新增 fee-purpose 枚举。 |
+| fee path | 复用现有模型 | posting 使用 `legId=FEE` 强身份并校验目标为平台费用账户；replay 使用同一 leg ID 区分本金与费用腿，`FEE_RECEIVER` 只参与同主体角色消歧，不新增 fee-purpose 枚举。 |
 | contract cutover | 直接替换 | 当前 Snapshot 基线直接改为 path/provenance-only；不保留 v5 reader、legacy 字段、deprecated 访问器或双写。 |
 
 `D-CS-005` 按四个最小批次执行：
@@ -195,7 +195,11 @@
 
 `UNFREEZE` Owner 子决策：不复用 `AUTHORIZATION_REVERSAL`，也不退化为 `HOLD`；目标契约新增余额控制专属 release intent/scope，并保留 `CLOSING` 准入，使 `SUSPENDED` 账本仍可完成既有冻结释放。
 
-`BOUNDARY-B` 验证证据：三类资金流程 86/86、assembler 9/9、ledger 55/55、balance-control 44/44、transaction 143/143、business-flow 169/169、core 104/104、boundary 195/195 和 21 模块 compile 均通过；退款账本来源 0 条/2 条参数化 H2 负例直接命中唯一性边界并证明零资金副作用；1049 行 stable API baseline 精确验证通过；PMD 与完整 `verify-cad` 已通过，CAD 汇总为 110 suites / 1050 tests / 0 failures / 0 errors / 1 expected MySQL skip，API、public contract、classfile 和 codegen 门禁通过。独立 Checker 结论为 `PASS`，`P0=0 / P1=0 / P2=0`，当前状态为 `BOUNDARY_B_VERIFIED`，可进入 `BOUNDARY-C`。
+`BOUNDARY-B` 验证证据：三类资金流程 86/86、assembler 9/9、ledger 55/55、balance-control 44/44、transaction 143/143、business-flow 169/169、core 104/104、boundary 195/195 和 21 模块 compile 均通过；退款账本来源 0 条/2 条参数化 H2 负例直接命中唯一性边界并证明零资金副作用；1049 行 stable API baseline 精确验证通过；PMD 与完整 `verify-cad` 已通过，CAD 汇总为 111 suites / 1078 tests / 0 failures / 0 errors / 1 expected MySQL skip，API、public contract、classfile 和 codegen 门禁通过。独立 Checker 结论为 `PASS`，`P0=0 / P1=0 / P2=0`，当前状态为 `BOUNDARY_B_VERIFIED`，可进入 `BOUNDARY-C`。
+
+`BOUNDARY-C/D` 最终执行证据：route 六类会计成员及新写 wire 字段已删除；DSL JSON 契约 32/32、RouteSnapshot 历史边界 5/5、core 106/106、ledger 55/55、transaction 148/148、boundary 197/197、四组业务 H2 43/43 和 21 模块 compile/PMD 均通过。四组业务证据由 `GlobalAccountAchBusinessFlowTests`、`AcquiringSettlementBusinessFlowTests`、`AgentCommissionSettlementBusinessFlowTests`、`ClearingBatchApplicationServiceTests` 与 `ReconciliationGateApplicationServiceTests` 组成，继续复用同一 FundsTransaction/Route/Ledger/Balance 主链。完整 `verify-cad` 为 112 suites / 1100 tests / 0 failures / 0 errors / 1 expected MySQL skip；1060 行 stable API baseline、public contract、classfile 和 codegen 门禁均通过。Checker 发现的两项 P1 已分别以完成态、逐 leg 严格 legacy fallback 和拒绝旧 route 会计字段的 DSL verifier 关闭；P2 措辞漂移同步修正，最终结论为 `P0=0 / P1=0 / P2=0`，状态为 `BOUNDARY_D_VERIFIED`。
+
+后续工程 CR 新鲜证据：冻结单旧 full-route 摘要兼容、resolver 输出身份、原账本交易归属、费用腿强身份与同主体角色消歧均已补回归；两个 instruction context 共享 key 归属 Core。对应共享工作区的聚焦测试 58/58、transaction 149/149、boundary 199/199、business-flow 与 PMD 已通过；本轮隔离提交候选的完整 CAD 为 110 suites / 1061 tests / 0 failures / 0 errors / 1 expected MySQL skip，现行 stable API baseline 为 1062 行。
 
 `D-CS-005` 停止条件：任一切片无法同时证明 posting 平衡、LedgerTransaction/LedgerEntry 可追溯、逆向累计上限、幂等和拒绝无副作用时停止；不回退到兼容桥或 hybrid route。
 
@@ -215,10 +219,10 @@ Core-0 准出：`SC-CS-001` 完成，`D-CS-002` 和 `D-CS-003` 均有 Owner 决�
 
 | Task | 状态 | 目标 | 准出证据 |
 | --- | --- | --- | --- |
-| `CORE-1A` 公共 API 分级与冻结 | `API_BASELINE_VERIFIED_REBASED_BY_CORE_1E` | 首轮曾按 121 public / 99 stable / 18 experimental / 4 internal 分类；`CORE-1E` 下沉默认实现后，现行基线为 107/99/4/4，99 个 stable 顶层类型及其 7 个 public nested 类型保留 1049 行签名 | CORE-1A 当时历史证据为完整 CAD 1045/0/0/1、Checker `PASS`；现行基线与门禁证据见 `CORE-1E` 和 `BOUNDARY-B`。 |
+| `CORE-1A` 公共 API 分级与冻结 | `API_BASELINE_VERIFIED_REBASED_BY_BOUNDARY_C` | 首轮曾按 121 public / 99 stable / 18 experimental / 4 internal 分类；默认实现下沉且 route 会计成员删除后，现行基线为 107/99/4/4，99 个 stable 顶层类型及其 7 个 public nested 类型保留 1062 行签名 | CORE-1A 当时历史证据为完整 CAD 1045/0/0/1、Checker `PASS`；现行基线与门禁证据见 `CORE-1E` 和 `BOUNDARY-C/D`。 |
 | `CORE-1B` 版本化摘要协议 | `CORE1B_A_VERIFIED` | 显式 schema/hash version，规范化输入，旧版本可读/可比；ledger/detail persisted-legacy 边界专测已完成 | CORE-1B-A golden、双版本读取、幂等和重放测试已通过；其余摘要批次仍待后续 Owner Gate。 |
 | `CORE-1C` 时间与重放语义 | `ANALYZED_OWNER_GATE` | 已区分绝对事实、业务日历和宿主时钟，形成 `TIME-A` 至 `TIME-E` 分批迁移 | `D-CS-004` 批准历史 zone/破坏边界后，补 JSON、H2 持久化和跨时区重放测试。 |
-| `CORE-1D` route/posting 边界 | `BOUNDARY_B_VERIFIED` | `BOUNDARY-A` 四组 H2 现状矩阵已完成；`BOUNDARY-B` 已固化 UNFREEZE release 语义和 direct/fee refund 直接账本来源。 | PMD、完整 CAD 和 Checker P0/P1/P2 清零，可进入 `BOUNDARY-C` 删除 route 会计成员。 |
+| `CORE-1D` route/posting 边界 | `BOUNDARY_D_VERIFIED` | `BOUNDARY-A/B` 已固定现状、release 与 refund provenance；`BOUNDARY-C` 已删除 route 会计成员，由 posting/ledger 从 instruction、path、Profile 和原账本事实推导。 | compile、PMD、core/ledger/transaction/boundary、四组 H2 与完整 CAD 已通过；独立 Checker `P0/P1/P2=0/0/0`。 |
 | `CORE-1E` DSL 包与实现归属 | `PACKAGE_CONVERGENCE_VERIFIED` | capability-first 包名；默认 route/instruction 实现下沉 `transaction-impl`；face 请求只暴露稳定账户值对象。 | 107/99/4/4 API 门禁、Core 包边界测试、让利契约与 H2 资金流、compile/PMD 和 Checker。 |
 
 `CORE-1B-A` persisted-legacy compatibility 状态为 `VERIFIED_TEST_ONLY`。仅在
@@ -235,12 +239,14 @@ persisted-legacy 证据缺口，不代表 `CORE-1B` 整体完成。
 副本中直接落库取得，当前临时副本的 ledger/detail writer 生产源码 blob 与正式工作树一致。正式测试必须使用以下常量，
 不得通过当前双读 helper 反算 legacy 值。
 
+表中 detail canonical 值已按 `BOUNDARY-C` 当前 writer 更新：route 会计字段移除后，payer/payee ledger subject 与 period 由 instruction 直接进入 detail digest。legacy golden 保持不变，并由当前生产兼容路径继续验证；这不改变 `CORE-1B-A` 当时仅补测试的历史执行范围。
+
 | 边界与身份 | legacy golden | canonical v1 golden |
 | --- | --- | --- |
 | ledger `LE_LEDGER_CONTEXT_001` | `50c63ea9e47976aae601f54b38e0ca92128ed454411ee270621ddf880068a71c` | `f27b0b1798d3c1b06576b4c87301bb037bd87dc30f5cdb69ac827990004c80a6` |
-| detail `funding_user / PAYEE` | `868c7b3858bb95b4ce98345f737b547e2b9165272d58553f43d7d9386085fc91` | `6fdd065744256b25bce7dac276a30695400eafe1ce10a520abb3052fd876aa34` |
-| detail `platform_cash_mapping / PLATFORM_FUNDING_ACCOUNT` | `d24d56e8f0eb2a3dfdfee0d76e481c3e574651bb4ad1851573b566c68998291f` | `22cb79f6b8fff071b09d7ff9c987544e5ac9d4bd4e771921e1e244f4d49a8c1d` |
-| detail `platform_prepayment / PLATFORM_FUNDING_ACCOUNT` | `ce86ddc28cd3e34e818f375cda7fcbfcede955187b7f1620c85d092f8af24f84` | `0ef2b0f6e431f6abe4dc085215d7f95b003171f3676dcdf102e19ecb352a229d` |
+| detail `funding_user / PAYEE` | `868c7b3858bb95b4ce98345f737b547e2b9165272d58553f43d7d9386085fc91` | `5ba7816caaf9364a8f41656cf3676c406cb359b195018c39f217a9bd8214f53a` |
+| detail `platform_cash_mapping / PLATFORM_FUNDING_ACCOUNT` | `d24d56e8f0eb2a3dfdfee0d76e481c3e574651bb4ad1851573b566c68998291f` | `aa08a32f91c032b3b906ad8cfcba93796f72b0ef3bdf948ff0c89ee8b6199e5e` |
+| detail `platform_prepayment / PLATFORM_FUNDING_ACCOUNT` | `ce86ddc28cd3e34e818f375cda7fcbfcede955187b7f1620c85d092f8af24f84` | `b241e319e526e583fa68a85768337b9115dbb1a706633f31903d56a15e4da957` |
 
 隔离证据结果：基线旧写 2/2、当前新写 2/2、把固定 legacy 值写回当前 H2 后的同请求双读重放 PoC 2/2，均为
 0 failures / 0 errors / 0 skips。PoC 已证明现有 reader 可以读取上述 legacy 值，因此正式执行无需先修改生产源码；但临时
@@ -280,9 +286,9 @@ Core-2 准出：`SC-CS-001` 至 `SC-CS-008` 全部有新鲜证据，Goal 才能�
 
 ## 4. Plan Grant
 
-当前 Plan Grant 为 `CORE_1_BOUNDARY_C_READY`：Owner 已批准当前 `1.0.0-SNAPSHOT` 按推荐实践直接进行破坏式收敛；`BOUNDARY-B` 实现、扩大测试、PMD、完整 CAD、差异复核和独立 Checker 已全部完成。
+当前 Plan Grant 为 `CORE_1_BOUNDARY_D_VERIFIED`：Owner 已批准当前 `1.0.0-SNAPSHOT` 按推荐实践直接进行破坏式收敛；`BOUNDARY-C/D` 实现、扩大测试、API baseline、PMD、完整 CAD 和独立 Checker 已完成。
 
-`BOUNDARY-C` 尚未开始；下一执行循环可按 `D-CS-005` 既定切片删除 route 会计成员，并继续以 posting 平衡、历史回放和零副作用为停止门禁。
+本轮停止在 `CORE-1D / BOUNDARY-D` 封板；下一循环不得默认实施时间迁移、其余摘要批次或工作树中的 settlement release，须按各自 Owner Gate 重新授权。
 
 以下动作仍需单独授权或 Owner 决策：
 
@@ -299,14 +305,16 @@ Core-2 准出：`SC-CS-001` 至 `SC-CS-008` 全部有新鲜证据，Goal 才能�
 5. `CORE-1A` 只增加受控 API policy、stable signature baseline 和验证门禁；不改生产源码、运行时依赖、JSON/wire 行为或未裁决公共语义。
 6. `CORE-1E` 直接把 transaction/ledger spec、交易支持类型归入 capability 包，把 14 个默认 route/instruction 实现下沉到 `transaction-impl`，并把 Benefit settle 请求改为稳定 `FundsAccountId`；不增加 facade、factory、兼容桥或 V2 类型图，也不提前实施 `BOUNDARY-B/C`。
 7. `CORE-1D / BOUNDARY-B` 新增余额控制专属 `RELEASE / CONTROL_RELEASE` 并保持 `CLOSING` 准入；direct refund 与 fee refund 复用现有账本查询端口，只有原资金交易恰好对应一条账本流水时才固化直接 provenance；0 条/2 条 H2 负例均 fail closed 且零资金副作用，不新增兼容层或平行证据模型。
+8. `CORE-1D / BOUNDARY-C` 删除 route 会计成员和新写 snapshot 会计字段；posting/ledger 复用现有 instruction、route path、账户 Profile、posting/entry 与原账本引用推导会计效果，不新增公共 API、DDL、依赖、平行模型或兼容桥。
+9. `CORE-1D / BOUNDARY-D` 同步 DSL verifier、五份 transaction-layer fixture、权威文档和 API 门禁；legacy detail fallback 仅接受完成态、完整逐 leg 会计事实与规范化账期严格匹配，独立 Checker `P0/P1/P2=0/0/0`。
 
 ## 5. Goal Ledger
 
 | Field | Current value |
 | --- | --- |
-| Latest completed action | `CORE-1D / BOUNDARY-B` 已完成：UNFREEZE 使用专属 `RELEASE / CONTROL_RELEASE` 并保持 SUSPENDED ledger 的 `CLOSING` 准入；direct/fee refund 固化直接账本来源且对 0 条/2 条来源 fail closed。1049 行 API baseline、PMD 和完整 CAD 110 suites/1050 tests/0 failures/0 errors/1 expected skip 均通过；独立 Checker `PASS`，P0/P1/P2=0。 |
-| Current task | `CORE_1_BOUNDARY_C_READY`；`BOUNDARY-B` 已封板，尚未开始删除 route 会计成员 |
-| Current write set | Core ledger posting intent/access/scope、ledger assembler 与 fallback、direct transaction instruction converter、三类资金流程和 assembler 测试、Core API baseline、本规格；保留进入本轮前的其他工作树变更，不做 Git 操作 |
-| Next action | 按 `D-CS-005 / BOUNDARY-C` 先补 RED，再删除 route 会计成员并由 posting owner 独立推导；时间 `D-CS-004` 与其余摘要批次继续独立等待 Owner Gate。 |
+| Latest completed action | `CORE-1D / BOUNDARY-D` 后续工程 CR 已完成：冻结单旧 full-route 摘要兼容、resolver 输出身份校验、原账本交易归属校验、费用腿强身份与同主体角色消歧均已回归；instruction context 共享 key 收敛到 Core，现行 API baseline 为 1062 行。本轮隔离提交候选完整 CAD 为 110 suites / 1061 tests / 0 failures / 0 errors / 1 expected skip，独立 Checker `P0/P1/P2=0/0/0`。 |
+| Current task | `CORE_1_BOUNDARY_D_VERIFIED`；本轮工程交付已封板，Goal 因 `D-CS-004` 与其余摘要批次继续保持 `ACTIVE`。 |
+| Current write set | Core route public contract、transaction route resolver/replay/snapshot/detail digest、ledger posting assembler、相关契约/H2 测试、Core API baseline、权威规格与用户指南；保留进入本轮前的其他工作树变更，不做 Git 操作 |
+| Next action | 时间 `D-CS-004` 与其余摘要批次继续独立等待 Owner Gate；settlement release 及其他既有工作树切片不纳入本轮结论。 |
 | Stop condition | Checker 发现未关闭 P0/P1；任一资金切片不能同时证明 posting 平衡、LedgerTransaction/LedgerEntry 可追溯、逆向累计上限、幂等和拒绝无副作用；baseline 更新混入未批准 API；Git、安装和生产动作仍未授权 |
 | Deferred owners | Architecture/Payment Owner：其余摘要；Architecture Owner：时间；settlement release 变更 Owner：独立 API/资金切片收口 |
