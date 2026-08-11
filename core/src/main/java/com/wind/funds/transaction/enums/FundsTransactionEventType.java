@@ -24,6 +24,7 @@ public enum FundsTransactionEventType implements DescriptiveEnum {
     FEE_REFUND("funds.transaction.fee.refund", "手续费退回"),
     CLEARING_CONFIRM("funds.clearing.confirm", "清算确认"),
     SETTLEMENT_LOCK("funds.settlement.lock", "结算锁定"),
+    SETTLEMENT_RELEASE("funds.settlement.release", "结算锁定释放"),
     PAYOUT_SUCCEEDED("funds.payout.succeeded", "出款成功"),
     PAYOUT_FAILED("funds.payout.failed", "出款失败回退"),
 

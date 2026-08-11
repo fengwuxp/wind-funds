@@ -17,15 +17,19 @@ import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
+import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.wind.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
+import com.wind.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionState;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -85,6 +89,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     private final FundsTransactionMapper fundsTransactionMapper;
 
     private final FundsTransactionDetailMapper fundsTransactionDetailMapper;
+
+    private final FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
     @Override
     public String topup(FundsTransactionTopupRequest request, WindOperator operator) {
@@ -177,6 +183,9 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     @Override
     public String freeze(FundsBalanceFreezeRequest request, WindOperator operator) {
+        AssertUtils.isFalse(FundsSettlementTransactionServiceImpl.SETTLEMENT_RELEASE_HOLD.equals(
+                        request.getBusinessScene()),
+                "SETTLEMENT_RELEASE_HOLD 只能由结算释放资金入口创建");
         return execute(balanceControlInstructionConverter.convertToFreezeInstruction(request, operator));
     }
 
@@ -229,7 +238,24 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     private @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
+        assertProtectedFreezeOrderNotConsumed(instruction);
         return fundsInstructionOrchestrator.execute(instruction);
+    }
+
+    private void assertProtectedFreezeOrderNotConsumed(FundsInstructionSpec instruction) {
+        if (instruction.getReference() == null
+                || instruction.getReference().getReferenceType() != FundsInstructionReferenceType.FREEZE_ORDER
+                || instruction.getReference().getReferenceSn() == null) {
+            return;
+        }
+        FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
+        FundsFrozenOrder order = fundsFrozenOrderMapper.selectOneByQuery(QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(instruction.getTenantId()))
+                .and(ref.sn.eq(instruction.getReference().getReferenceSn())));
+        AssertUtils.isTrue(order == null
+                        || !FundsSettlementTransactionServiceImpl.SETTLEMENT_RELEASE_HOLD.equals(order.getFreezeType()),
+                "SETTLEMENT_RELEASE_HOLD 只能由结算专用处置入口消费，freezeOrderSn = {}",
+                instruction.getReference().getReferenceSn());
     }
 
     private @NonNull String executeAuthorizationSuccessor(

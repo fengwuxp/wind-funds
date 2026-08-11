@@ -119,7 +119,7 @@ public enum DefaultFundsTransactionType implements DescriptiveEnum {
             case FEE_REFUND -> instructionType == FundsInstructionType.DIRECT_TRANSACTION && transactionType == REFUND;
             case CLEARING_CONFIRM -> instructionType == FundsInstructionType.DIRECT_TRANSACTION
                     && transactionType == CLEARING;
-            case SETTLEMENT_LOCK -> instructionType == FundsInstructionType.DIRECT_TRANSACTION
+            case SETTLEMENT_LOCK, SETTLEMENT_RELEASE -> instructionType == FundsInstructionType.DIRECT_TRANSACTION
                     && transactionType == SETTLEMENT;
             case PAYOUT_SUCCEEDED, PAYOUT_FAILED -> instructionType == FundsInstructionType.DIRECT_TRANSACTION
                     && transactionType == PAYOUT;

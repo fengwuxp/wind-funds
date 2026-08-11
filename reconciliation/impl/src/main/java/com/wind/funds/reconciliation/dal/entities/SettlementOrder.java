@@ -7,6 +7,7 @@ import com.mybatisflex.annotation.Table;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
+import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -97,6 +98,36 @@ public class SettlementOrder implements Serializable, TenantIsolationObject<Long
     private String settlementApprovalRef;
 
     private String lockFundsTransactionSn;
+
+    private String releaseFundsTransactionSn;
+
+    private String releaseFreezeOrderSn;
+
+    private SettlementReleaseDisposition releaseDisposition;
+
+    private String releaseDigest;
+
+    private String releaseReconciliationRunResultSn;
+
+    private String releaseReconciliationResultDigest;
+
+    private String releaseCurrentLineageBatchSn;
+
+    private String releaseGateEvidenceDigest;
+
+    private String releaseSourceClosureDigest;
+
+    private String releaseAuthorityDecisionDigest;
+
+    private String releaseAuthorityEvidenceRefs;
+
+    private String releaseApprovalRef;
+
+    private String releaseReason;
+
+    private String releasedBy;
+
+    private LocalDateTime releasedTime;
 
     private String reconciliationRunResultSn;
 

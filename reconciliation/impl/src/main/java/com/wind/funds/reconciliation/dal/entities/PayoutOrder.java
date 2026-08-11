@@ -86,6 +86,12 @@ public class PayoutOrder implements TenantIsolationObject<Long> {
 
     private LocalDateTime completedTime;
 
+    private String cancelledBy;
+
+    private LocalDateTime cancelledTime;
+
+    private String cancelReason;
+
     @Column(version = true)
     private Integer version;
 }

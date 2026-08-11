@@ -33,7 +33,9 @@ public enum PayoutOrderState implements DescriptiveEnum {
     /** 出款成功后资金被外部退回。 */
     RETURNED("外部退回"),
     /** 外部回执与本地出款事实不一致。 */
-    MISMATCHED("回单不一致");
+    MISMATCHED("回单不一致"),
+    /** 出款单在允许阶段被取消。 */
+    CANCELLED("已取消");
 
     private final String desc;
 }

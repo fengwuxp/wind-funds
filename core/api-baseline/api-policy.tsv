@@ -9,6 +9,7 @@ INTERNAL	com.wind.funds.transaction.enums.FundsBenefitLedgerEffect
 INTERNAL	com.wind.funds.wallet.enums.UserWalletFundsAccountType
 
 # Settlement lifecycle is an independent dirty-worktree slice and needs its own Owner approval.
+EXCLUDED_MEMBER	com.wind.funds.transaction.enums.FundsTransactionEventType	public static final com.wind.funds.transaction.enums.FundsTransactionEventType SETTLEMENT_RELEASE;
 
 # D-CS-003 legacy JSON digest entry point.
 EXCLUDED_MEMBER	com.wind.funds.transaction.support.FundsStableHashSupport	public static java.lang.String sha256Json(java.lang.Object);

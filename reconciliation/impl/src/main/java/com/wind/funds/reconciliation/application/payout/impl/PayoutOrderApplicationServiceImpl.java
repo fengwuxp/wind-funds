@@ -154,8 +154,9 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     public PayoutOrderDTO handleReceipt(HandlePayoutReceiptRequest request, WindOperator operator) {
         validateReceiptRequest(request, operator);
         PayoutOrder order = requiredOrderForUpdate(request.getTenantId(), request.getPayoutOrderSn());
-        AssertUtils.isTrue(order.getState() != PayoutOrderState.CREATED,
-                "未提交出款单不能接收外部回单");
+        AssertUtils.isTrue(order.getState() != PayoutOrderState.CREATED
+                        && order.getState() != PayoutOrderState.CANCELLED,
+                "未提交或已取消出款单不能接收外部回单");
         String normalizedDigest = normalizedReceiptDigest(request);
         PayoutReceipt existing = payoutReceiptMapper.selectBySource(
                 request.getTenantId(), request.getChannelRef(), request.getExternalReceiptRef());
@@ -206,7 +207,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             case FAILED -> applyFailure(order, request, operator);
             case RETURNED -> completeWithoutFunds(order, PayoutOrderState.RETURNED, request);
             case MISMATCHED -> markMismatched(order, "宿主归一回单标记为不一致");
-            case CREATED, SUBMITTED -> throw new IllegalArgumentException("外部回单状态不支持：" + request.getState());
+            case CREATED, SUBMITTED, CANCELLED ->
+                    throw new IllegalArgumentException("外部回单状态不支持：" + request.getState());
         }
         update(order, "更新出款回单结果失败");
         return toDTO(order);
@@ -516,7 +518,9 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 .setFailureCode(source.getFailureCode())
                 .setFailureReason(source.getFailureReason())
                 .setSubmittedTime(source.getSubmittedTime())
-                .setCompletedTime(source.getCompletedTime());
+                .setCompletedTime(source.getCompletedTime())
+                .setCancelledTime(source.getCancelledTime())
+                .setCancelReason(source.getCancelReason());
     }
 
     private List<String> parseEvidenceRefs(String value) {
@@ -531,6 +535,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             case FAILED -> PayoutDisplayStatus.FAILED;
             case RETURNED -> PayoutDisplayStatus.RETURNED;
             case MISMATCHED -> PayoutDisplayStatus.REVIEW_REQUIRED;
+            case CANCELLED -> PayoutDisplayStatus.CANCELLED;
         };
     }
 
@@ -540,6 +545,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             case SUBMITTED, ACCEPTED, PROCESSING -> PayoutNextAction.WAITING_EXTERNAL_RESULT;
             case SUCCEEDED, FAILED -> PayoutNextAction.NO_ACTION_REQUIRED;
             case RETURNED, MISMATCHED -> PayoutNextAction.REVIEW_REQUIRED;
+            case CANCELLED -> PayoutNextAction.NO_ACTION_REQUIRED;
         };
     }
 }

@@ -102,4 +102,9 @@ public class PayoutOrderDTO implements Serializable {
     @Schema(description = "完成时间")
     private LocalDateTime completedTime;
 
+    @Schema(description = "取消时间")
+    private LocalDateTime cancelledTime;
+
+    @Schema(description = "取消原因")
+    private String cancelReason;
 }

@@ -27,7 +27,9 @@ public enum SettlementOrderState implements DescriptiveEnum {
     /** 结算资金锁定失败。 */
     FAILED("锁定失败"),
     /** 结算单已经取消。 */
-    CANCELLED("已取消");
+    CANCELLED("已取消"),
+    /** 已锁定资金已经完成安全释放。 */
+    RELEASED("已释放");
 
     private final String desc;
 }

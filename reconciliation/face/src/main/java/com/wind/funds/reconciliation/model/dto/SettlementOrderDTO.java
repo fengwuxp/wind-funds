@@ -1,6 +1,7 @@
 package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
+import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -61,6 +62,42 @@ public class SettlementOrderDTO implements Serializable {
     @Schema(description = "结算锁定资金交易流水号")
     private String lockFundsTransactionSn;
 
+    @Schema(description = "结算释放资金交易流水号")
+    private String releaseFundsTransactionSn;
+
+    @Schema(description = "承接释放金额的冻结单流水号")
+    private String releaseFreezeOrderSn;
+
+    @Schema(description = "结算锁定资金释放去向")
+    private SettlementReleaseDisposition releaseDisposition;
+
+    @Schema(description = "结算释放事实摘要")
+    private String releaseDigest;
+
+    @Schema(description = "释放消费的对账运行结果流水号")
+    private String releaseReconciliationRunResultSn;
+
+    @Schema(description = "释放消费的对账结果摘要")
+    private String releaseReconciliationResultDigest;
+
+    @Schema(description = "释放消费的当前谱系批次流水号")
+    private String releaseCurrentLineageBatchSn;
+
+    @Schema(description = "释放时权威 Gate 证据摘要")
+    private String releaseGateEvidenceDigest;
+
+    @Schema(description = "释放来源闭合摘要")
+    private String releaseSourceClosureDigest;
+
+    @Schema(description = "释放授权决定摘要")
+    private String releaseAuthorityDecisionDigest;
+
+    @Schema(description = "释放授权证据引用")
+    private List<String> releaseAuthorityEvidenceRefs;
+
+    @Schema(description = "释放审批引用")
+    private String releaseApprovalRef;
+
     @Schema(description = "结算锁定消费的对账运行结果流水号")
     private String reconciliationRunResultSn;
 
@@ -93,6 +130,9 @@ public class SettlementOrderDTO implements Serializable {
 
     @Schema(description = "资金锁定时间")
     private LocalDateTime lockedTime;
+
+    @Schema(description = "资金释放时间")
+    private LocalDateTime releasedTime;
 
     @Schema(description = "退回草稿时间")
     private LocalDateTime returnedTime;

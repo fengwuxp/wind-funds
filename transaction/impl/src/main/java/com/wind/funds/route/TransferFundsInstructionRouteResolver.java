@@ -73,6 +73,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
                 && instruction.getEventType() != FundsTransactionEventType.CLEARING_CONFIRM
                 && instruction.getEventType() != FundsTransactionEventType.SETTLEMENT_LOCK
+                && instruction.getEventType() != FundsTransactionEventType.SETTLEMENT_RELEASE
                 && instruction.getEventType() != FundsTransactionEventType.PAYOUT_SUCCEEDED
                 && instruction.getEventType() != FundsTransactionEventType.PAYOUT_FAILED
                 && !RouteReplaySupport.isReplayInstruction(instruction);

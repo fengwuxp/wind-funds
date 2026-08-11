@@ -25,7 +25,9 @@ public enum PayoutDisplayStatus implements DescriptiveEnum {
     /** 出款后资金被外部退回。 */
     RETURNED("已退回"),
     /** 外部结果无法自动确认，需要人工核对。 */
-    REVIEW_REQUIRED("待核对");
+    REVIEW_REQUIRED("待核对"),
+    /** 出款单已经取消。 */
+    CANCELLED("已取消");
 
     private final String desc;
 }

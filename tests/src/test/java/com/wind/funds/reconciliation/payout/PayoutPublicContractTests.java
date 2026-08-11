@@ -19,7 +19,7 @@ class PayoutPublicContractTests {
         assertThat(PayoutOrderState.values())
                 .extracting(Enum::name)
                 .containsExactly("CREATED", "SUBMITTED", "ACCEPTED", "PROCESSING",
-                        "SUCCEEDED", "FAILED", "RETURNED", "MISMATCHED");
+                        "SUCCEEDED", "FAILED", "RETURNED", "MISMATCHED", "CANCELLED");
         assertThat(SettlementDestination.values())
                 .extracting(Enum::name)
                 .contains("EXTERNAL_ENDPOINT");

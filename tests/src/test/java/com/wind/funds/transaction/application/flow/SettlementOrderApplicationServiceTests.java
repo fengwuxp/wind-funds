@@ -3,6 +3,7 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
@@ -12,22 +13,34 @@ import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrder
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
+import com.wind.funds.reconciliation.enums.SettlementReleaseCoverageStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
+import com.wind.funds.reconciliation.enums.SettlementReleaseLateDataStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseResultReplacementStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseLineageSupersessionStatus;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderDTO;
+import com.wind.funds.reconciliation.model.dto.SettlementReleaseAuthorityContextDTO;
+import com.wind.funds.reconciliation.model.dto.SettlementReleaseDecisionDTO;
 import com.wind.funds.reconciliation.model.request.ApproveSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.CancelSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
+import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
+import com.wind.funds.reconciliation.service.SettlementReleaseAuthority;
 import com.wind.funds.transaction.application.FundsSettlementTransactionService;
 import com.wind.funds.transaction.application.impl.FundsSettlementTransactionServiceImpl;
 import com.wind.funds.transaction.model.request.FundsSettlementLockRequest;
+import com.wind.funds.transaction.model.dto.FundsSettlementReleaseResultDTO;
+import com.wind.funds.transaction.model.request.FundsSettlementReleaseRequest;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -81,14 +94,239 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
     @Autowired
     private FailAfterLockFundsSettlementTransactionService failAfterLockFundsSettlementTransactionService;
 
+    @Autowired
+    private TestSettlementReleaseAuthority settlementReleaseAuthority;
+
     @BeforeEach
     void clearSettlementFacts() {
+        jdbcTemplate.update("DELETE FROM t_payout_receipt");
+        jdbcTemplate.update("DELETE FROM t_payout_order");
         jdbcTemplate.update("DELETE FROM t_settlement_order_item");
         jdbcTemplate.update("DELETE FROM t_settlement_order");
         jdbcTemplate.update("DELETE FROM t_clearing_batch_detail");
         jdbcTemplate.update("DELETE FROM t_clearing_batch");
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
         ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
+        failAfterLockFundsSettlementTransactionService.reset();
+        settlementReleaseAuthority.reset();
+    }
+
+    @Test
+    void testReleaseShouldAtomicallyMoveLockedFundsToProtectedFrozenAndReplay() {
+        FundsAccountId accountId = fundingAccount("stl_release_merchant");
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(accountId, LedgerSubjectCode.FROZEN);
+        topup(accountId, 1_000L, "SETTLEMENT_RELEASE_TOPUP");
+        insertConfirmedClearingBatch(accountId, "CLB_SETTLEMENT_RELEASE", 600L, "release");
+        SettlementOrderDTO order = approve(createRequest("CLB_SETTLEMENT_RELEASE", "policy-v1"));
+        GateFixture gate = prepareSettlementGateFixture(order.getSn(), "release");
+        settlementOrderApplicationService.lockOrder(new LockSettlementOrderRequest()
+                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
+                .setReconciliationRunResultSn(gate.runResultSn()), WindOperatorFactory.system());
+        var before = snapshot(balance(accountId));
+        ReleaseSettlementOrderRequest request = releaseRequest(order, gate, "release approved");
+
+        SettlementOrderDTO released = settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system());
+        settlementReleaseAuthority.reject();
+        SettlementOrderDTO replay = settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system());
+
+        assertThat(released.getState()).isEqualTo(SettlementOrderState.RELEASED);
+        assertThat(released.getReleaseDisposition()).isEqualTo(SettlementReleaseDisposition.FROZEN);
+        assertThat(released.getReleaseFundsTransactionSn()).isNotBlank();
+        assertThat(released.getReleaseFreezeOrderSn()).isNotBlank();
+        assertThat(released.getReleaseDigest()).hasSize(64);
+        assertThat(replay.getReleaseFundsTransactionSn()).isEqualTo(released.getReleaseFundsTransactionSn());
+        assertThat(replay.getReleaseFreezeOrderSn()).isEqualTo(released.getReleaseFreezeOrderSn());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_settlement_order_item WHERE settlement_order_sn = ? AND active_source_claim = 1",
+                Integer.class, order.getSn())).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT active_order_digest FROM t_settlement_order WHERE sn = ?", String.class, order.getSn()))
+                .isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT freeze_type FROM t_funds_frozen_order WHERE sn = ?", String.class,
+                released.getReleaseFreezeOrderSn())).isEqualTo("SETTLEMENT_RELEASE_HOLD");
+        assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
+                delta(accountId, LedgerSubjectCode.SETTLEMENT, -600L, CURRENCY),
+                delta(accountId, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(accountId, LedgerSubjectCode.FROZEN, 600L, CURRENCY));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_ledger_transaction WHERE business_sn IN (?, ?)", Integer.class,
+                order.getSn() + ":RELEASE", order.getSn() + ":HOLD")).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_ledger_posting_plan p "
+                        + "JOIN t_ledger_transaction t ON t.sn = p.ledger_transaction_sn "
+                        + "WHERE t.business_sn IN (?, ?)", Integer.class,
+                order.getSn() + ":RELEASE", order.getSn() + ":HOLD")).isEqualTo(2);
+
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                releaseRequest(order, gate, "different reason"), WindOperatorFactory.system()))
+                .hasMessageContaining("不同释放请求");
+        SettlementOrderDTO rebuilt = settlementOrderApplicationService.createOrder(
+                createRequest("CLB_SETTLEMENT_RELEASE", "policy-v2"), WindOperatorFactory.system());
+        assertThat(rebuilt.getSn()).isNotEqualTo(order.getSn());
+    }
+
+    /**
+     * 已完成资金释放的结算单不能再被取消命令当作幂等取消处理。
+     */
+    @Test
+    void testReleasedOrderShouldRejectCancelCommand() {
+        FundsAccountId accountId = fundingAccount("stl_release_cancel");
+        SettlementOrderDTO order = lockedReleaseOrder(
+                accountId, "CLB_RELEASE_CANCEL_REJECTED", "release-cancel-rejected");
+        settlementOrderApplicationService.releaseOrder(
+                releaseRequest(order, currentGate(order, "release-cancel-rejected"), "release before cancel"),
+                WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> settlementOrderApplicationService.cancelOrder(
+                new CancelSettlementOrderRequest()
+                        .setTenantId(TENANT_ID)
+                        .setSettlementOrderSn(order.getSn())
+                        .setReason("cancel after release"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("只有 DRAFT 或 REVIEWING 结算单可以取消");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM t_settlement_order WHERE sn = ?", String.class, order.getSn()))
+                .isEqualTo("RELEASED");
+    }
+
+    @Test
+    void testConcurrentReleaseReplayShouldReturnSameFundsFacts() throws Exception {
+        FundsAccountId accountId = fundingAccount("stl_release_concurrent");
+        SettlementOrderDTO order = lockedReleaseOrder(
+                accountId, "CLB_RELEASE_CONCURRENT", "release-concurrent");
+        ReleaseSettlementOrderRequest request = releaseRequest(
+                order, currentGate(order, "release-concurrent"), "concurrent release");
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<SettlementOrderDTO> first = executor.submit(concurrentReleaseAttempt(startGate, request));
+            Future<SettlementOrderDTO> second = executor.submit(concurrentReleaseAttempt(startGate, request));
+            startGate.countDown();
+            List<SettlementOrderDTO> results = List.of(
+                    first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+
+            assertThat(results).extracting(SettlementOrderDTO::getReleaseFundsTransactionSn)
+                    .containsOnly(results.getFirst().getReleaseFundsTransactionSn());
+            assertThat(results).extracting(SettlementOrderDTO::getReleaseFreezeOrderSn)
+                    .containsOnly(results.getFirst().getReleaseFreezeOrderSn());
+            assertSingleFundsAndLedgerFactsForBusinessSn(order.getSn() + ":RELEASE", 1, 1, 2);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM t_funds_frozen_order WHERE business_sn = ?",
+                    Integer.class, order.getSn() + ":HOLD")).isOne();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void testReleaseShouldCancelCreatedPayoutAndRejectSubmittedPayout() {
+        FundsAccountId createdAccount = fundingAccount("stl_pyo_created");
+        SettlementOrderDTO createdOrder = lockedReleaseOrder(
+                createdAccount, "CLB_RELEASE_PAYOUT_CREATED", "payout-created");
+        insertPayoutOrder(createdOrder, "PYO_RELEASE_CREATED", PayoutOrderState.CREATED);
+        GateFixture createdGate = currentGate(createdOrder, "payout-created");
+
+        settlementOrderApplicationService.releaseOrder(
+                releaseRequest(createdOrder, createdGate, "cancel draft payout"), WindOperatorFactory.system());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM t_payout_order WHERE sn = ?", String.class, "PYO_RELEASE_CREATED"))
+                .isEqualTo(PayoutOrderState.CANCELLED.name());
+        assertThat(settlementReleaseAuthority.lastContext().getPayoutOrder().getState())
+                .isEqualTo(PayoutOrderState.CREATED);
+
+        clearSettlementFacts();
+        FundsAccountId submittedAccount = fundingAccount("stl_pyo_submitted");
+        SettlementOrderDTO submittedOrder = lockedReleaseOrder(
+                submittedAccount, "CLB_RELEASE_PAYOUT_SUBMITTED", "payout-submitted");
+        insertPayoutOrder(submittedOrder, "PYO_RELEASE_SUBMITTED", PayoutOrderState.SUBMITTED);
+        GateFixture submittedGate = currentGate(submittedOrder, "payout-submitted");
+        var before = snapshot(balance(submittedAccount));
+
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                releaseRequest(submittedOrder, submittedGate, "must reject"), WindOperatorFactory.system()))
+                .hasMessageContaining("出款单状态不允许释放");
+        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, submittedOrder.getSn()).getState())
+                .isEqualTo(SettlementOrderState.LOCKED);
+        assertOnlyBalanceDeltas(before, snapshot(balance(submittedAccount)),
+                delta(submittedAccount, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(submittedAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY));
+    }
+
+    @Test
+    void testReleaseShouldFailClosedAndRollbackAllFundsFacts() {
+        FundsAccountId accountId = fundingAccount("stl_release_rollback");
+        SettlementOrderDTO order = lockedReleaseOrder(accountId, "CLB_RELEASE_ROLLBACK", "rollback");
+        GateFixture gate = currentGate(order, "rollback");
+        ReleaseSettlementOrderRequest request = releaseRequest(order, gate, "rollback test");
+        var before = snapshot(balance(accountId));
+
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                releaseRequest(order, new GateFixture("missing-run", "b".repeat(64), "missing-batch"),
+                        "missing gate"), WindOperatorFactory.system()))
+                .hasMessageContaining("Gate 未通过");
+        settlementReleaseAuthority.reject();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).hasMessageContaining("释放授权未通过");
+        settlementReleaseAuthority.reset();
+        failAfterLockFundsSettlementTransactionService.failReleaseWithLedgerRejection();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).isInstanceOf(LedgerPostingRejectedException.class);
+        failAfterLockFundsSettlementTransactionService.failReleaseWithRuntimeException();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).isInstanceOf(IllegalStateException.class);
+
+        SettlementOrderDTO unchanged = settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn());
+        assertThat(unchanged.getState()).isEqualTo(SettlementOrderState.LOCKED);
+        assertThat(unchanged.getReleaseFundsTransactionSn()).isNull();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_funds_transaction WHERE business_sn = ?", Integer.class,
+                order.getSn() + ":RELEASE")).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_funds_frozen_order WHERE business_sn = ?", Integer.class,
+                order.getSn() + ":HOLD")).isZero();
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_settlement_order_item WHERE settlement_order_sn = ? AND active_source_claim = 1",
+                Integer.class, order.getSn())).isOne();
+        assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
+                delta(accountId, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(accountId, LedgerSubjectCode.FROZEN, 0L, CURRENCY));
+    }
+
+    @Test
+    void testReleaseShouldRejectInvalidAuthorityEvidenceWithoutSideEffects() {
+        FundsAccountId accountId = fundingAccount("stl_release_authority");
+        SettlementOrderDTO order = lockedReleaseOrder(accountId, "CLB_RELEASE_AUTHORITY", "authority");
+        GateFixture gate = currentGate(order, "authority");
+        ReleaseSettlementOrderRequest request = releaseRequest(order, gate, "authority validation");
+        var before = snapshot(balance(accountId));
+
+        settlementReleaseAuthority.invalidDigest();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).hasMessageContaining("SHA-256");
+        settlementReleaseAuthority.emptyEvidence();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).hasMessageContaining("授权证据引用不能为空");
+        settlementReleaseAuthority.expired();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).hasMessageContaining("授权结果已过期");
+        settlementReleaseAuthority.emptyDisposition();
+        assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
+                request, WindOperatorFactory.system())).hasMessageContaining("处置必须为 FROZEN");
+
+        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getState())
+                .isEqualTo(SettlementOrderState.LOCKED);
+        assertNoFundsOrLedgerFactsForBusinessSn(order.getSn() + ":RELEASE");
+        assertNoFundsOrLedgerFactsForBusinessSn(order.getSn() + ":HOLD");
+        assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
+                delta(accountId, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(accountId, LedgerSubjectCode.FROZEN, 0L, CURRENCY));
     }
 
     @Test
@@ -185,9 +423,22 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 createRequest("CLB_SETTLEMENT_CLAIM", "policy-v2"), WindOperatorFactory.system()))
                 .hasMessageContaining("已被其他有效结算单占用");
 
-        settlementOrderApplicationService.cancelOrder(new CancelSettlementOrderRequest()
-                .setTenantId(TENANT_ID).setSettlementOrderSn(first.getSn()).setReason("重建策略快照"),
-                WindOperatorFactory.system());
+        CancelSettlementOrderRequest cancelRequest = new CancelSettlementOrderRequest()
+                .setTenantId(TENANT_ID).setSettlementOrderSn(first.getSn()).setReason("重建策略快照");
+        SettlementOrderDTO cancelled = settlementOrderApplicationService.cancelOrder(
+                cancelRequest, WindOperatorFactory.system());
+        LocalDateTime persistedCancelledTime = jdbcTemplate.queryForObject(
+                "SELECT cancelled_time FROM t_settlement_order WHERE sn = ?",
+                LocalDateTime.class, first.getSn());
+        SettlementOrderDTO cancelReplay = settlementOrderApplicationService.cancelOrder(
+                cancelRequest, WindOperatorFactory.system());
+
+        assertThat(cancelReplay.getCancelledTime()).isEqualTo(persistedCancelledTime);
+        assertThat(cancelReplay.getReason()).isEqualTo(cancelled.getReason());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_settlement_order_item "
+                        + "WHERE settlement_order_sn = ? AND active_source_claim = 1",
+                Integer.class, first.getSn())).isZero();
         SettlementOrderDTO recreated = settlementOrderApplicationService.createOrder(
                 createRequest("CLB_SETTLEMENT_CLAIM", "policy-v2"), WindOperatorFactory.system());
         assertThat(recreated.getSn()).isNotEqualTo(first.getSn());
@@ -361,13 +612,17 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
     }
 
     private String prepareSettlementGate(String settlementOrderSn, String suffix) {
+        return prepareSettlementGateFixture(settlementOrderSn, suffix).runResultSn();
+    }
+
+    private GateFixture prepareSettlementGateFixture(String settlementOrderSn, String suffix) {
         String batchSn = "settlement_recon_batch_" + suffix;
         String referenceSourceRef = "internal:settlement:" + suffix;
         String comparisonSourceRef = "external:settlement:" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, batchSn,
                 ReconciliationGateObjectType.SETTLEMENT, settlementOrderSn, "recon-rule-1",
                 "report:settlement-" + suffix, referenceSourceRef, comparisonSourceRef);
-        return reconciliationRunResultApplicationService.recordRunResult(
+        String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
                 new RecordReconciliationRunResultRequest().setTenantId(TENANT_ID)
                         .setReconciliationBatchSn(batchSn)
                         .setMatchResults(List.of(new ReconciliationMatchResultItem()
@@ -377,6 +632,66 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                                 .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                                 .setEvidenceRef("report:settlement-" + suffix + "#line-1"))),
                 WindOperatorFactory.system()).getSn();
+        String resultDigest = jdbcTemplate.queryForObject(
+                "SELECT result_digest FROM t_reconciliation_run_result WHERE sn = ?", String.class, runResultSn);
+        return new GateFixture(runResultSn, resultDigest, batchSn);
+    }
+
+    private SettlementOrderDTO lockedReleaseOrder(FundsAccountId accountId,
+                                                   String clearingBatchSn,
+                                                   String suffix) {
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(accountId, LedgerSubjectCode.FROZEN);
+        topup(accountId, 1_000L, "SETTLEMENT_RELEASE_TOPUP_" + suffix);
+        insertConfirmedClearingBatch(accountId, clearingBatchSn, 600L, suffix);
+        SettlementOrderDTO order = approve(createRequest(clearingBatchSn, "policy-v1"));
+        GateFixture gate = prepareSettlementGateFixture(order.getSn(), suffix);
+        return settlementOrderApplicationService.lockOrder(new LockSettlementOrderRequest()
+                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
+                .setReconciliationRunResultSn(gate.runResultSn()), WindOperatorFactory.system());
+    }
+
+    private GateFixture currentGate(SettlementOrderDTO order, String suffix) {
+        return new GateFixture(order.getReconciliationRunResultSn(), order.getReconciliationResultDigest(),
+                "settlement_recon_batch_" + suffix);
+    }
+
+    private ReleaseSettlementOrderRequest releaseRequest(SettlementOrderDTO order,
+                                                          GateFixture gate,
+                                                          String reason) {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(1);
+        return new ReleaseSettlementOrderRequest()
+                .setTenantId(TENANT_ID)
+                .setSettlementOrderSn(order.getSn())
+                .setReconciliationRunResultSn(gate.runResultSn())
+                .setReconciliationResultDigest(gate.resultDigest())
+                .setCoverageStatus(SettlementReleaseCoverageStatus.COMPLETE)
+                .setCoverageDigest(FundsStableHashSupport.sha256("coverage:" + order.getSn()))
+                .setWatermark(cutoff)
+                .setCutoff(cutoff)
+                .setRuleVersion("recon-rule-1")
+                .setRuleDecisionDigest(FundsStableHashSupport.sha256("rule:" + order.getSn()))
+                .setCurrentLineageBatchSn(gate.batchSn())
+                .setLateDataStatus(SettlementReleaseLateDataStatus.CLOSED)
+                .setResultReplacementStatus(SettlementReleaseResultReplacementStatus.CURRENT)
+                .setLineageSupersessionStatus(SettlementReleaseLineageSupersessionStatus.CURRENT)
+                .setApprovalRef("RELEASE_APPROVAL_" + order.getSn())
+                .setReason(reason)
+                .setEvidenceRefs(List.of("release:evidence:" + order.getSn()));
+    }
+
+    private void insertPayoutOrder(SettlementOrderDTO order, String payoutOrderSn, PayoutOrderState state) {
+        jdbcTemplate.update("""
+                        INSERT INTO t_payout_order (
+                            sn, tenant_id, settlement_order_sn, settlement_subject_type, settlement_subject_id,
+                            amount, currency, status, created_by, version
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                payoutOrderSn, TENANT_ID, order.getSn(), order.getSettlementSubjectType(),
+                order.getSettlementSubjectId(), order.getNetAmount(), order.getCurrency().name(), state.name(),
+                "system", 0);
     }
 
     private Callable<CreateAttempt> concurrentCreateAttempt(CountDownLatch startGate,
@@ -390,6 +705,19 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 return new CreateAttempt(true, result.getSn(), null);
             } catch (RuntimeException exception) {
                 return new CreateAttempt(false, null, exception.getMessage());
+            } finally {
+                TenantContextHolder.clear();
+            }
+        };
+    }
+
+    private Callable<SettlementOrderDTO> concurrentReleaseAttempt(CountDownLatch startGate,
+                                                                   ReleaseSettlementOrderRequest request) {
+        return () -> {
+            TenantContextHolder.setTenantId(TENANT_ID);
+            try {
+                startGate.await();
+                return settlementOrderApplicationService.releaseOrder(request, WindOperatorFactory.system());
             } finally {
                 TenantContextHolder.clear();
             }
@@ -410,6 +738,11 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 FundsSettlementTransactionServiceImpl delegate) {
             return new FailAfterLockFundsSettlementTransactionService(delegate);
         }
+
+        @Bean
+        TestSettlementReleaseAuthority settlementReleaseAuthority() {
+            return new TestSettlementReleaseAuthority();
+        }
     }
 
     private static final class FailAfterLockFundsSettlementTransactionService
@@ -418,6 +751,10 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         private final FundsSettlementTransactionService delegate;
 
         private boolean failNext;
+
+        private boolean failReleaseWithLedgerRejection;
+
+        private boolean failReleaseWithRuntimeException;
 
         private FailAfterLockFundsSettlementTransactionService(FundsSettlementTransactionService delegate) {
             this.delegate = delegate;
@@ -433,9 +770,109 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
             return result;
         }
 
+        @Override
+        public FundsSettlementReleaseResultDTO release(FundsSettlementReleaseRequest request, WindOperator operator) {
+            FundsSettlementReleaseResultDTO result = delegate.release(request, operator);
+            if (failReleaseWithLedgerRejection) {
+                failReleaseWithLedgerRejection = false;
+                throw new LedgerPostingRejectedException(result.getReleaseFundsTransactionSn(),
+                        "simulated release freeze posting rejected");
+            }
+            if (failReleaseWithRuntimeException) {
+                failReleaseWithRuntimeException = false;
+                throw new IllegalStateException("simulated release persistence failure");
+            }
+            return result;
+        }
+
         private void failNext() {
             failNext = true;
         }
+
+        private void failReleaseWithLedgerRejection() {
+            failReleaseWithLedgerRejection = true;
+        }
+
+        private void failReleaseWithRuntimeException() {
+            failReleaseWithRuntimeException = true;
+        }
+
+        private void reset() {
+            failNext = false;
+            failReleaseWithLedgerRejection = false;
+            failReleaseWithRuntimeException = false;
+        }
+    }
+
+    private static final class TestSettlementReleaseAuthority implements SettlementReleaseAuthority {
+
+        private DecisionMode mode = DecisionMode.ALLOWED;
+
+        private SettlementReleaseAuthorityContextDTO lastContext;
+
+        @Override
+        public SettlementReleaseDecisionDTO authorize(SettlementReleaseAuthorityContextDTO context,
+                                                       WindOperator operator) {
+            lastContext = context;
+            LocalDateTime now = LocalDateTime.now();
+            SettlementReleaseDecisionDTO result = new SettlementReleaseDecisionDTO()
+                    .setReleaseAllowed(mode != DecisionMode.REJECTED)
+                    .setReleaseDisposition(SettlementReleaseDisposition.FROZEN)
+                    .setDecisionDigest("a".repeat(64))
+                    .setEvidenceRefs(List.of("authority:release-approved"))
+                    .setExpiresAt(now.plusMinutes(5))
+                    .setAuthorizedBy(operator.getOperatorAsText())
+                    .setAuthorizedAt(now)
+                    .setBlockingReason(mode == DecisionMode.REJECTED ? "release rejected for test" : null);
+            return switch (mode) {
+                case INVALID_DIGEST -> result.setDecisionDigest("invalid");
+                case EMPTY_EVIDENCE -> result.setEvidenceRefs(List.of());
+                case EXPIRED -> result.setExpiresAt(now.minusMinutes(1));
+                case EMPTY_DISPOSITION -> result.setReleaseDisposition(null);
+                case ALLOWED, REJECTED -> result;
+            };
+        }
+
+        private void reject() {
+            mode = DecisionMode.REJECTED;
+        }
+
+        private void invalidDigest() {
+            mode = DecisionMode.INVALID_DIGEST;
+        }
+
+        private void emptyEvidence() {
+            mode = DecisionMode.EMPTY_EVIDENCE;
+        }
+
+        private void expired() {
+            mode = DecisionMode.EXPIRED;
+        }
+
+        private void emptyDisposition() {
+            mode = DecisionMode.EMPTY_DISPOSITION;
+        }
+
+        private SettlementReleaseAuthorityContextDTO lastContext() {
+            return lastContext;
+        }
+
+        private void reset() {
+            mode = DecisionMode.ALLOWED;
+            lastContext = null;
+        }
+
+        private enum DecisionMode {
+            ALLOWED,
+            REJECTED,
+            INVALID_DIGEST,
+            EMPTY_EVIDENCE,
+            EXPIRED,
+            EMPTY_DISPOSITION
+        }
+    }
+
+    private record GateFixture(String runResultSn, String resultDigest, String batchSn) {
     }
 
     private record CreateAttempt(boolean succeeded, String sn, String message) {

@@ -25,6 +25,8 @@ public final class FundsRouteLegIds {
 
     public static final String SETTLEMENT_LOCK = "SETTLEMENT_LOCK";
 
+    public static final String SETTLEMENT_RELEASE = "SETTLEMENT_RELEASE";
+
     public static final String PAYOUT_SETTLEMENT = "PAYOUT_SETTLEMENT";
 
     public static final String PAYOUT_FUND_OUT = "PAYOUT_FUND_OUT";

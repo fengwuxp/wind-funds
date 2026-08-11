@@ -6,6 +6,7 @@ import com.wind.funds.reconciliation.model.request.CancelSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
+import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.integration.operator.WindOperator;
 import org.jspecify.annotations.NullMarked;
@@ -74,6 +75,15 @@ public interface SettlementOrderApplicationService {
      * @return 更新后的结算单事实
      */
     SettlementOrderDTO lockOrder(LockSettlementOrderRequest request, WindOperator operator);
+
+    /**
+     * 在事务内重查 Gate 和释放授权后，将结算锁定资金安全释放到冻结余额。
+     *
+     * @param request  释放请求及来源闭合证据
+     * @param operator 操作者
+     * @return 更新后的结算单事实
+     */
+    SettlementOrderDTO releaseOrder(ReleaseSettlementOrderRequest request, WindOperator operator);
 
     /**
      * 查询租户内指定结算单。

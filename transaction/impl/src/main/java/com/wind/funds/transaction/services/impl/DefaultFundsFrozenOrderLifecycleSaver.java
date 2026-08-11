@@ -22,6 +22,7 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -133,6 +134,10 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setFreezeType(resolveFreezeType(instruction));
         entity.setBusinessScene(instruction.getBusinessScene());
         entity.setBusinessSn(instruction.getBusinessSn());
+        if (instruction.getReference() != null
+                && instruction.getReference().getReferenceType() == FundsInstructionReferenceType.ORIGINAL_TRANSACTION) {
+            entity.setTransactionSn(instruction.getReference().getReferenceSn());
+        }
         entity.setAmount(instruction.getAmount().getAmount());
         entity.setReleasedAmount(0L);
         entity.setCurrency(instruction.getAmount().getCurrency());

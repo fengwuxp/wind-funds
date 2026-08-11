@@ -413,6 +413,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case LIMIT_ADJUST -> resolveLimitAdjustSubjectCode(instruction, source);
             case CLEARING_CONFIRM -> source ? LedgerSubjectCode.CLEARING : LedgerSubjectCode.AVAILABLE;
             case SETTLEMENT_LOCK -> source ? LedgerSubjectCode.AVAILABLE : LedgerSubjectCode.SETTLEMENT;
+            case SETTLEMENT_RELEASE -> source ? LedgerSubjectCode.SETTLEMENT : LedgerSubjectCode.AVAILABLE;
             case PAYOUT_SUCCEEDED -> source ? LedgerSubjectCode.SETTLEMENT : LedgerSubjectCode.PREPAYMENT;
             case PAYOUT_FAILED -> source ? LedgerSubjectCode.SETTLEMENT : LedgerSubjectCode.AVAILABLE;
         };
@@ -496,7 +497,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case WITHDRAW, PAYOUT_SUCCEEDED -> leg.getLegType() == RouteLegType.EXTERNAL_OUT
                     ? LedgerBalanceEffectType.DECREASE : LedgerBalanceEffectType.CONSUME;
             case AUTHORIZE, FREEZE -> LedgerBalanceEffectType.HOLD;
-            case REVERSAL, UNFREEZE, CLEARING_CONFIRM -> LedgerBalanceEffectType.RELEASE;
+            case REVERSAL, UNFREEZE, CLEARING_CONFIRM, SETTLEMENT_RELEASE -> LedgerBalanceEffectType.RELEASE;
             case SETTLEMENT_LOCK -> LedgerBalanceEffectType.CONSUME;
         };
     }
@@ -531,7 +532,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case FREEZE -> LedgerPhaseCode.FREEZE;
             case UNFREEZE -> LedgerPhaseCode.UNFREEZE;
             case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPhaseCode.ADJUSTMENT;
-            case CLEARING_CONFIRM, SETTLEMENT_LOCK -> LedgerPhaseCode.SETTLEMENT;
+            case CLEARING_CONFIRM, SETTLEMENT_LOCK, SETTLEMENT_RELEASE -> LedgerPhaseCode.SETTLEMENT;
         };
     }
 
@@ -583,7 +584,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPostingIntentType.ADJUSTMENT;
             case WITHDRAW -> LedgerPostingIntentType.WITHDRAWAL;
             case CLEARING_CONFIRM -> LedgerPostingIntentType.SETTLEMENT;
-            case SETTLEMENT_LOCK -> LedgerPostingIntentType.SETTLEMENT;
+            case SETTLEMENT_LOCK, SETTLEMENT_RELEASE -> LedgerPostingIntentType.SETTLEMENT;
             case PAYOUT_SUCCEEDED -> LedgerPostingIntentType.WITHDRAWAL;
             case PAYOUT_FAILED -> LedgerPostingIntentType.REFUND;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedIntent(resolvedRoute.getTransactionType());

@@ -25,6 +25,8 @@ public final class FundsRouteCodes {
 
     public static final String SETTLEMENT_LOCK_STANDARD = "SETTLEMENT_LOCK_STANDARD";
 
+    public static final String SETTLEMENT_RELEASE_STANDARD = "SETTLEMENT_RELEASE_STANDARD";
+
     public static final String PAYOUT_SUCCESS_STANDARD = "PAYOUT_SUCCESS_STANDARD";
 
     public static final String PAYOUT_FAILURE_RETURN = "PAYOUT_FAILURE_RETURN";

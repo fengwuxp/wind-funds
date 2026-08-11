@@ -1,21 +1,33 @@
 package com.wind.funds.reconciliation.application.settlement.impl;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.jackson.WindJson;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ClearingBatch;
+import com.wind.funds.reconciliation.dal.entities.PayoutOrder;
 import com.wind.funds.reconciliation.dal.entities.SettlementOrder;
 import com.wind.funds.reconciliation.dal.entities.SettlementOrderItem;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchMapper;
+import com.wind.funds.reconciliation.dal.mapper.PayoutOrderMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderMapper;
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.SettlementMode;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
+import com.wind.funds.reconciliation.enums.SettlementReleaseCoverageStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
+import com.wind.funds.reconciliation.enums.SettlementReleaseLateDataStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseResultReplacementStatus;
+import com.wind.funds.reconciliation.enums.SettlementReleaseLineageSupersessionStatus;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
+import com.wind.funds.reconciliation.model.dto.PayoutOrderDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
+import com.wind.funds.reconciliation.model.dto.SettlementReleaseAuthorityContextDTO;
+import com.wind.funds.reconciliation.model.dto.SettlementReleaseDecisionDTO;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderDTO;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderItemDTO;
 import com.wind.funds.reconciliation.model.dto.SettlementPolicySnapshotDTO;
@@ -25,11 +37,21 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
+import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
+import com.wind.funds.reconciliation.service.SettlementReleaseAuthority;
+import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.RouteLegSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsSettlementTransactionService;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
+import com.wind.funds.transaction.model.dto.FundsSettlementReleaseResultDTO;
 import com.wind.funds.transaction.model.request.FundsSettlementLockRequest;
+import com.wind.funds.transaction.model.request.FundsSettlementReleaseRequest;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
@@ -39,6 +61,7 @@ import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -75,6 +98,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
 
     private final SettlementOrderItemMapper settlementOrderItemMapper;
 
+    private final PayoutOrderMapper payoutOrderMapper;
+
     private final ClearingBatchMapper clearingBatchMapper;
 
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
@@ -82,6 +107,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     private final FundsSettlementTransactionService fundsSettlementTransactionService;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
+
+    private final ObjectProvider<SettlementReleaseAuthority> settlementReleaseAuthorityProvider;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -242,10 +269,289 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SettlementOrderDTO releaseOrder(ReleaseSettlementOrderRequest request, WindOperator operator) {
+        validateReleaseRequest(request, operator);
+        SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
+        PayoutOrder payoutOrder = payoutOrderMapper.selectBySettlementOrderSnForUpdate(
+                order.getTenantId(), order.getSn());
+        String releaseDigest = releaseDigest(order, request);
+        SettlementOrderDTO replay = completedReleaseReplay(order, releaseDigest);
+        if (replay != null) {
+            return replay;
+        }
+
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.LOCKED,
+                "只有 LOCKED 结算单可以释放资金，status = {}", order.getState());
+        AssertUtils.hasText(order.getLockFundsTransactionSn(), "结算单缺少原锁定资金交易流水号");
+        if (payoutOrder != null) {
+            AssertUtils.isTrue(payoutOrder.getState() == PayoutOrderState.CREATED,
+                    "出款单状态不允许释放结算资金，payoutOrderSn = {}, status = {}",
+                    payoutOrder.getSn(), payoutOrder.getState());
+        }
+
+        ReconciliationGateDecisionDTO gateDecision = reconciliationGateApplicationService.checkGate(
+                new CheckReconciliationGateRequest()
+                        .setTenantId(order.getTenantId())
+                        .setGateObjectType(ReconciliationGateObjectType.SETTLEMENT)
+                        .setGateObjectSn(order.getSn())
+                        .setReconciliationRunResultSn(request.getReconciliationRunResultSn()),
+                operator);
+        validateReleaseGate(request, gateDecision);
+        String routeSnapshotDigest = validateOriginalLock(order);
+
+        SettlementReleaseAuthority authority = settlementReleaseAuthorityProvider.getIfUnique();
+        AssertUtils.notNull(authority, "宿主权威结算释放授权服务未配置或配置不唯一");
+        SettlementReleaseDecisionDTO authorityDecision = authority.authorize(
+                new SettlementReleaseAuthorityContextDTO()
+                        .setSettlementOrder(toDTO(order))
+                        .setPayoutOrder(toPayoutDTO(payoutOrder))
+                        .setRequest(request)
+                        .setGateDecision(gateDecision)
+                        .setOriginalLockRouteSnapshotDigest(routeSnapshotDigest)
+                        .setReleaseRequestDigest(releaseDigest),
+                operator);
+        validateReleaseDecision(authorityDecision);
+
+        FundsSettlementReleaseResultDTO fundsResult = fundsSettlementTransactionService.release(
+                new FundsSettlementReleaseRequest()
+                        .setLockFundsTransactionSn(order.getLockFundsTransactionSn())
+                        .setSettlementOrderSn(order.getSn()),
+                operator);
+        AssertUtils.hasText(fundsResult.getReleaseFundsTransactionSn(), "结算释放缺少资金交易流水号");
+        AssertUtils.hasText(fundsResult.getReleaseFreezeOrderSn(), "结算释放缺少受保护冻结单流水号");
+
+        LocalDateTime releasedAt = LocalDateTime.now();
+        if (payoutOrder != null) {
+            payoutOrder.setState(PayoutOrderState.CANCELLED);
+            payoutOrder.setCancelledBy(operator.getOperatorAsText());
+            payoutOrder.setCancelledTime(releasedAt);
+            payoutOrder.setCancelReason(request.getReason());
+            AssertUtils.isTrue(payoutOrderMapper.update(payoutOrder) == 1, "取消待提交出款单失败");
+        }
+        List<SettlementOrderItem> items = requiredItems(order);
+        AssertUtils.isTrue(settlementOrderItemMapper.releaseActiveSourceClaims(
+                order.getTenantId(), order.getSn()) == items.size(), "释放结算来源占用失败");
+        releaseActiveOrderDigest(order);
+
+        order.setState(SettlementOrderState.RELEASED);
+        order.setReleaseFundsTransactionSn(fundsResult.getReleaseFundsTransactionSn());
+        order.setReleaseFreezeOrderSn(fundsResult.getReleaseFreezeOrderSn());
+        order.setReleaseDisposition(SettlementReleaseDisposition.FROZEN);
+        order.setReleaseDigest(releaseDigest);
+        order.setReleaseReconciliationRunResultSn(gateDecision.getReconciliationRunResultSn());
+        order.setReleaseReconciliationResultDigest(gateDecision.getReconciliationResultDigest());
+        order.setReleaseCurrentLineageBatchSn(gateDecision.getReconciliationBatchSn());
+        order.setReleaseGateEvidenceDigest(FundsStableHashSupport.sha256CanonicalJson(
+                "settlement-release-gate-evidence", gateDecision.getEvidenceRefs().stream().sorted().toList()));
+        order.setReleaseSourceClosureDigest(sourceClosureDigest(request));
+        order.setReleaseAuthorityDecisionDigest(authorityDecision.getDecisionDigest());
+        order.setReleaseAuthorityEvidenceRefs(WindJson.toJsonString(
+                authorityDecision.getEvidenceRefs().stream().sorted().toList()));
+        order.setReleaseApprovalRef(request.getApprovalRef());
+        order.setReleaseReason(request.getReason().trim());
+        order.setReleasedBy(operator.getOperatorAsText());
+        order.setReleasedTime(releasedAt);
+        update(order, "记录结算释放结果失败");
+        return toDTO(order);
+    }
+
+    @Override
     @Transactional(readOnly = true, rollbackFor = Exception.class)
     public SettlementOrderDTO getOrder(Long tenantId, String settlementOrderSn) {
         validateQuery(tenantId, settlementOrderSn);
         return toDTO(requiredOrder(tenantId, settlementOrderSn));
+    }
+
+    private SettlementOrderDTO completedReleaseReplay(SettlementOrder order, String releaseDigest) {
+        boolean hasFundsReference = StringUtils.hasText(order.getReleaseFundsTransactionSn());
+        boolean hasFreezeReference = StringUtils.hasText(order.getReleaseFreezeOrderSn());
+        if (!hasFundsReference && !hasFreezeReference) {
+            AssertUtils.isTrue(order.getReleaseDigest() == null && order.getReleaseDisposition() == null,
+                    "结算单存在不完整释放审计事实，settlementOrderSn = {}", order.getSn());
+            return null;
+        }
+        AssertUtils.isTrue(hasFundsReference && hasFreezeReference,
+                "结算单释放资金事实引用不完整，settlementOrderSn = {}", order.getSn());
+        AssertUtils.equals(order.getReleaseDigest(), releaseDigest, "结算单已使用不同释放请求完成释放");
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.RELEASED
+                        && order.getReleaseDisposition() == SettlementReleaseDisposition.FROZEN,
+                "结算单释放完成态事实不一致，settlementOrderSn = {}", order.getSn());
+        return toDTO(order);
+    }
+
+    private void validateReleaseGate(ReleaseSettlementOrderRequest request,
+                                     ReconciliationGateDecisionDTO decision) {
+        AssertUtils.isTrue(decision.isPassed(), "结算释放时对账 Gate 未通过：{}", decision.getExplanation());
+        AssertUtils.isTrue(decision.getGateObjectType() == ReconciliationGateObjectType.SETTLEMENT
+                        && Objects.equals(decision.getGateObjectSn(), request.getSettlementOrderSn()),
+                "结算释放 Gate 对象不一致");
+        AssertUtils.equals(decision.getReconciliationRunResultSn(), request.getReconciliationRunResultSn(),
+                "结算释放 Gate 运行结果不一致");
+        AssertUtils.equals(decision.getReconciliationResultDigest(), request.getReconciliationResultDigest(),
+                "结算释放对账结果摘要不一致");
+        AssertUtils.equals(decision.getReconciliationBatchSn(), request.getCurrentLineageBatchSn(),
+                "结算释放请求不是当前对账批次血缘头");
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "结算释放 Gate 证据引用不能为空");
+        AssertUtils.isTrue(decision.getEvidenceRefs().stream().allMatch(StringUtils::hasText),
+                "结算释放 Gate 证据引用不能为空");
+    }
+
+    private String validateOriginalLock(SettlementOrder order) {
+        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
+                order.getLockFundsTransactionSn()).orElse(null);
+        AssertUtils.notNull(transaction, "结算单原锁定资金交易不存在，transactionSn = {}",
+                order.getLockFundsTransactionSn());
+        AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), order.getTenantId())
+                        && transaction.getTransactionType() == DefaultFundsTransactionType.SETTLEMENT
+                        && transaction.getState() == FundsTransactionState.CLOSED
+                        && FundsTransactionEventType.SETTLEMENT_LOCK.name().equals(transaction.getBusinessScene())
+                        && Objects.equals(transaction.getBusinessSn(), order.getSn())
+                        && Objects.equals(transaction.getAmount(), order.getNetAmount())
+                        && transaction.getCurrency() == order.getCurrency(),
+                "结算单与原 SETTLEMENT_LOCK 资金事实不一致，transactionSn = {}", transaction.getSn());
+        AssertUtils.hasText(transaction.getRouteSnapshot(), "原 SETTLEMENT_LOCK 缺少 RouteSnapshot");
+        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "原 SETTLEMENT_LOCK RouteSnapshot 不可读取，transactionSn = " + transaction.getSn()));
+        AssertUtils.isTrue(route.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK
+                        && route.getTransactionType() == DefaultFundsTransactionType.SETTLEMENT
+                        && route.getParticipants().size() == 1
+                        && route.getParticipants().getFirst().getParticipantRole() == RouteParticipantRole.PAYER,
+                "原 SETTLEMENT_LOCK RouteSnapshot 主体事实不合法，transactionSn = {}", transaction.getSn());
+        var participant = route.getParticipants().getFirst();
+        AssertUtils.notNull(participant.getAmount(),
+                "原 SETTLEMENT_LOCK RouteSnapshot 缺少主体金额，transactionSn = {}", transaction.getSn());
+        var subjectRef = participant.getSubjectRef();
+        AssertUtils.isTrue(Objects.equals(subjectRef.getSubjectId(), order.getSettlementSubjectId())
+                        && subjectRef.getSubjectType().name().equals(order.getSettlementSubjectType())
+                        && participant.getAmount().getAmount() == order.getNetAmount()
+                        && participant.getAmount().getCurrency() == order.getCurrency(),
+                "原 SETTLEMENT_LOCK RouteSnapshot 与结算主体或金额不一致，transactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(route.getLegs().size() == 1,
+                "原 SETTLEMENT_LOCK RouteSnapshot 必须包含唯一资金路径，transactionSn = {}", transaction.getSn());
+        RouteLegSpec leg = route.getLegs().getFirst();
+        AssertUtils.isTrue(sameSubject(leg.getSourceNode().getSubjectRef(), subjectRef)
+                        && sameSubject(leg.getTargetNode().getSubjectRef(), subjectRef),
+                "原 SETTLEMENT_LOCK RouteSnapshot 资金路径不合法，transactionSn = {}", transaction.getSn());
+        return FundsStableHashSupport.sha256(transaction.getRouteSnapshot());
+    }
+
+    private boolean sameSubject(SubjectRef left, SubjectRef right) {
+        return Objects.equals(left.getSubjectId(), right.getSubjectId())
+                && left.getSubjectType() == right.getSubjectType();
+    }
+
+    private void validateReleaseDecision(SettlementReleaseDecisionDTO decision) {
+        AssertUtils.notNull(decision, "宿主权威结算释放授权结果不能为空");
+        AssertUtils.isTrue(decision.isReleaseAllowed(), "宿主权威结算释放授权未通过：{}",
+                decision.getBlockingReason());
+        AssertUtils.isTrue(decision.getReleaseDisposition() == SettlementReleaseDisposition.FROZEN,
+                "结算释放处置必须为 FROZEN");
+        AssertUtils.isTrue(isSha256(decision.getDecisionDigest()), "结算释放授权决策摘要必须是 SHA-256");
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "结算释放授权证据引用不能为空");
+        AssertUtils.isTrue(decision.getEvidenceRefs().stream().allMatch(StringUtils::hasText),
+                "结算释放授权证据引用不能为空");
+        AssertUtils.hasText(decision.getAuthorizedBy(), "结算释放授权人不能为空");
+        AssertUtils.notNull(decision.getAuthorizedAt(), "结算释放授权时间不能为空");
+        AssertUtils.notNull(decision.getExpiresAt(), "结算释放授权有效期不能为空");
+        LocalDateTime now = LocalDateTime.now();
+        AssertUtils.isFalse(decision.getAuthorizedAt().isAfter(now), "结算释放授权时间不能晚于当前时间");
+        AssertUtils.isTrue(decision.getExpiresAt().isAfter(now), "结算释放授权结果已过期");
+        AssertUtils.isFalse(decision.getAuthorizedAt().isAfter(decision.getExpiresAt()),
+                "结算释放授权时间不能晚于有效期");
+    }
+
+    private String releaseDigest(SettlementOrder order, ReleaseSettlementOrderRequest request) {
+        Map<String, Object> facts = releaseRequestFacts(request);
+        facts.put("orderDigest", order.getOrderDigest());
+        facts.put("lockFundsTransactionSn", order.getLockFundsTransactionSn());
+        return FundsStableHashSupport.sha256CanonicalJson("settlement-release-request", facts);
+    }
+
+    private String sourceClosureDigest(ReleaseSettlementOrderRequest request) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("coverageStatus", request.getCoverageStatus());
+        facts.put("coverageDigest", request.getCoverageDigest());
+        facts.put("watermark", request.getWatermark());
+        facts.put("cutoff", request.getCutoff());
+        facts.put("ruleVersion", request.getRuleVersion());
+        facts.put("ruleDecisionDigest", request.getRuleDecisionDigest());
+        facts.put("lateDataStatus", request.getLateDataStatus());
+        facts.put("resultReplacementStatus", request.getResultReplacementStatus());
+        facts.put("lineageSupersessionStatus", request.getLineageSupersessionStatus());
+        facts.put("evidenceRefs", request.getEvidenceRefs().stream().sorted().toList());
+        return FundsStableHashSupport.sha256CanonicalJson("settlement-release-source-closure", facts);
+    }
+
+    private Map<String, Object> releaseRequestFacts(ReleaseSettlementOrderRequest request) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("tenantId", request.getTenantId());
+        facts.put("settlementOrderSn", request.getSettlementOrderSn());
+        facts.put("reconciliationRunResultSn", request.getReconciliationRunResultSn());
+        facts.put("reconciliationResultDigest", request.getReconciliationResultDigest());
+        facts.put("coverageStatus", request.getCoverageStatus());
+        facts.put("coverageDigest", request.getCoverageDigest());
+        facts.put("watermark", request.getWatermark());
+        facts.put("cutoff", request.getCutoff());
+        facts.put("ruleVersion", request.getRuleVersion());
+        facts.put("ruleDecisionDigest", request.getRuleDecisionDigest());
+        facts.put("currentLineageBatchSn", request.getCurrentLineageBatchSn());
+        facts.put("lateDataStatus", request.getLateDataStatus());
+        facts.put("resultReplacementStatus", request.getResultReplacementStatus());
+        facts.put("lineageSupersessionStatus", request.getLineageSupersessionStatus());
+        facts.put("approvalRef", request.getApprovalRef());
+        facts.put("reason", request.getReason().trim());
+        facts.put("evidenceRefs", request.getEvidenceRefs().stream().sorted().toList());
+        return facts;
+    }
+
+    private void validateReleaseRequest(ReleaseSettlementOrderRequest request, WindOperator operator) {
+        AssertUtils.notNull(request, "结算释放请求不能为空");
+        validateCommand(request.getTenantId(), request.getSettlementOrderSn(), operator);
+        AssertUtils.hasText(request.getReconciliationRunResultSn(), "结算释放对账运行结果流水号不能为空");
+        AssertUtils.isTrue(isSha256(request.getReconciliationResultDigest()),
+                "结算释放对账结果摘要必须是 SHA-256");
+        AssertUtils.isTrue(request.getCoverageStatus() == SettlementReleaseCoverageStatus.COMPLETE,
+                "结算释放来源覆盖状态必须为 COMPLETE");
+        AssertUtils.isTrue(isSha256(request.getCoverageDigest()), "结算释放来源覆盖摘要必须是 SHA-256");
+        AssertUtils.notNull(request.getWatermark(), "结算释放来源 watermark 不能为空");
+        AssertUtils.notNull(request.getCutoff(), "结算释放来源 cutoff 不能为空");
+        AssertUtils.isFalse(request.getWatermark().isAfter(request.getCutoff()),
+                "结算释放来源 watermark 不能晚于 cutoff");
+        AssertUtils.hasText(request.getRuleVersion(), "结算释放规则版本不能为空");
+        AssertUtils.isTrue(isSha256(request.getRuleDecisionDigest()), "结算释放规则决策摘要必须是 SHA-256");
+        AssertUtils.hasText(request.getCurrentLineageBatchSn(), "结算释放当前血缘批次流水号不能为空");
+        AssertUtils.isTrue(request.getLateDataStatus() == SettlementReleaseLateDataStatus.CLOSED,
+                "结算释放迟到数据状态必须为 CLOSED");
+        AssertUtils.isTrue(request.getResultReplacementStatus() == SettlementReleaseResultReplacementStatus.CURRENT,
+                "结算释放替代状态必须为 CURRENT");
+        AssertUtils.isTrue(request.getLineageSupersessionStatus() == SettlementReleaseLineageSupersessionStatus.CURRENT,
+                "结算释放取代状态必须为 CURRENT");
+        AssertUtils.hasText(request.getApprovalRef(), "结算释放审批引用不能为空");
+        validateReason(request.getReason(), ReleaseSettlementOrderRequest.MAX_REASON_LENGTH, "结算释放原因");
+        AssertUtils.notEmpty(request.getEvidenceRefs(), "结算释放来源证据引用不能为空");
+        AssertUtils.isTrue(request.getEvidenceRefs().stream().allMatch(StringUtils::hasText),
+                "结算释放来源证据引用不能为空");
+    }
+
+    private boolean isSha256(String value) {
+        return value != null && value.matches("[0-9a-fA-F]{64}");
+    }
+
+    private PayoutOrderDTO toPayoutDTO(PayoutOrder source) {
+        if (source == null) {
+            return null;
+        }
+        return new PayoutOrderDTO()
+                .setSn(source.getSn())
+                .setTenantId(source.getTenantId())
+                .setSettlementOrderSn(source.getSettlementOrderSn())
+                .setSettlementSubjectType(source.getSettlementSubjectType())
+                .setSettlementSubjectId(source.getSettlementSubjectId())
+                .setAmount(source.getAmount())
+                .setCurrency(source.getCurrency())
+                .setState(source.getState());
     }
 
     private SettlementOrder newOrder(CreateSettlementOrderRequest request,
@@ -509,6 +815,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         String reason = switch (source.getState()) {
             case FAILED -> source.getFailureReason();
             case CANCELLED -> source.getCancelReason();
+            case RELEASED -> source.getReleaseReason();
             default -> source.getReturnReason();
         };
         return new SettlementOrderDTO()
@@ -533,6 +840,18 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 .setItems(items)
                 .setSettlementApprovalRef(source.getSettlementApprovalRef())
                 .setLockFundsTransactionSn(source.getLockFundsTransactionSn())
+                .setReleaseFundsTransactionSn(source.getReleaseFundsTransactionSn())
+                .setReleaseFreezeOrderSn(source.getReleaseFreezeOrderSn())
+                .setReleaseDisposition(source.getReleaseDisposition())
+                .setReleaseDigest(source.getReleaseDigest())
+                .setReleaseReconciliationRunResultSn(source.getReleaseReconciliationRunResultSn())
+                .setReleaseReconciliationResultDigest(source.getReleaseReconciliationResultDigest())
+                .setReleaseCurrentLineageBatchSn(source.getReleaseCurrentLineageBatchSn())
+                .setReleaseGateEvidenceDigest(source.getReleaseGateEvidenceDigest())
+                .setReleaseSourceClosureDigest(source.getReleaseSourceClosureDigest())
+                .setReleaseAuthorityDecisionDigest(source.getReleaseAuthorityDecisionDigest())
+                .setReleaseAuthorityEvidenceRefs(parseEvidenceRefs(source.getReleaseAuthorityEvidenceRefs()))
+                .setReleaseApprovalRef(source.getReleaseApprovalRef())
                 .setReconciliationRunResultSn(source.getReconciliationRunResultSn())
                 .setReconciliationResultDigest(source.getReconciliationResultDigest())
                 .setReconciliationEvidenceDigest(source.getReconciliationEvidenceDigest())
@@ -544,9 +863,14 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 .setSubmittedTime(source.getSubmittedTime())
                 .setApprovedTime(source.getApprovedTime())
                 .setLockedTime(source.getLockedTime())
+                .setReleasedTime(source.getReleasedTime())
                 .setReturnedTime(source.getReturnedTime())
                 .setCancelledTime(source.getCancelledTime())
                 .setFailedTime(source.getFailedTime())
                 .setReason(reason);
+    }
+
+    private List<String> parseEvidenceRefs(String value) {
+        return StringUtils.hasText(value) ? WindJson.parseArray(value, String.class) : List.of();
     }
 }

@@ -30,6 +30,14 @@ public interface PayoutOrderMapper extends BaseMapper<PayoutOrder> {
     PayoutOrder selectBySettlementOrderSn(@Param("tenantId") Long tenantId,
                                           @Param("settlementOrderSn") String settlementOrderSn);
 
+    @Select("""
+            SELECT * FROM t_payout_order
+            WHERE tenant_id = #{tenantId} AND settlement_order_sn = #{settlementOrderSn}
+            FOR UPDATE
+            """)
+    PayoutOrder selectBySettlementOrderSnForUpdate(@Param("tenantId") Long tenantId,
+                                                   @Param("settlementOrderSn") String settlementOrderSn);
+
     @Update("""
             UPDATE t_payout_order
             SET external_reference = #{externalReference}

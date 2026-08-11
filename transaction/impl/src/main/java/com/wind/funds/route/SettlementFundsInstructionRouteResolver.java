@@ -46,19 +46,22 @@ public class SettlementFundsInstructionRouteResolver implements RouteResolver, O
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
-                && instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK;
+                && (instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK
+                || instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_RELEASE);
     }
 
     @Override
     public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
-        AssertUtils.equals(FundsTransactionEventType.SETTLEMENT_LOCK, instruction.getEventType(),
-                "结算锁定资金指令只支持 SETTLEMENT_LOCK 事件");
+        AssertUtils.isTrue(instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK
+                        || instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_RELEASE,
+                "结算资金指令只支持 SETTLEMENT_LOCK 或 SETTLEMENT_RELEASE 事件");
         AssertUtils.equals(DefaultFundsTransactionType.SETTLEMENT, instruction.getTransactionType(),
                 "结算锁定资金指令只支持 SETTLEMENT 交易类型");
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
-        RouteLegSpec leg = routeLeg(FundsRouteLegIds.SETTLEMENT_LOCK, 1,
-                RouteLegType.INTERNAL_TRANSFER, instruction)
+        boolean release = instruction.getEventType() == FundsTransactionEventType.SETTLEMENT_RELEASE;
+        RouteLegSpec leg = routeLeg(release ? FundsRouteLegIds.SETTLEMENT_RELEASE : FundsRouteLegIds.SETTLEMENT_LOCK, 1,
+                release ? RouteLegType.RELEASE : RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId)))
                 .replayPolicy(RouteReplayPolicy.NON_REPLAYABLE)
@@ -72,7 +75,8 @@ public class SettlementFundsInstructionRouteResolver implements RouteResolver, O
                 Map.of());
         ResolvedRouteSpec result = ImmutableResolvedRouteSpec.builder()
                 .tenantId(instruction.getTenantId())
-                .routeCode(FundsRouteCodes.SETTLEMENT_LOCK_STANDARD)
+                .routeCode(release ? FundsRouteCodes.SETTLEMENT_RELEASE_STANDARD
+                        : FundsRouteCodes.SETTLEMENT_LOCK_STANDARD)
                 .routeVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
                 .businessScene(instruction.getBusinessScene())
                 .businessSn(instruction.getBusinessSn())

@@ -298,6 +298,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 && switch (instruction.getEventType()) {
             case REFUND -> isOriginalTransactionReference(instruction.getReference());
             case FEE_REFUND -> true;
+            case SETTLEMENT_RELEASE -> true;
             default -> false;
         };
     }
@@ -521,7 +522,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             }
             case REVERSAL -> applyReversedSummary(transaction, amount);
             case COMPLETE -> applyCompletedSummary(transaction, primaryDetail, amount);
-            case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE, CLEARING_CONFIRM, SETTLEMENT_LOCK,
+            case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE, CLEARING_CONFIRM, SETTLEMENT_LOCK, SETTLEMENT_RELEASE,
                     PAYOUT_SUCCEEDED, PAYOUT_FAILED ->
                     applyPostedSummary(transaction, primaryDetail, details);
             case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount, resolveFeeAmount(details));
@@ -729,6 +730,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case BALANCE_ADJUST, LIMIT_ADJUST -> FundsEffectType.ADJUST;
             case CLEARING_CONFIRM -> FundsEffectType.RELEASE;
             case SETTLEMENT_LOCK -> FundsEffectType.CONSUME;
+            case SETTLEMENT_RELEASE -> FundsEffectType.RELEASE;
             case PAYOUT_SUCCEEDED -> FundsEffectType.CONSUME;
             case PAYOUT_FAILED -> FundsEffectType.RETURN;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedFundsEffectType(instruction);
