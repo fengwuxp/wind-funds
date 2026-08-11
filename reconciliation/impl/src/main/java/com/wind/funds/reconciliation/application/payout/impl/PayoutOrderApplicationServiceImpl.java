@@ -30,7 +30,9 @@ import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
 import com.wind.funds.transaction.application.FundsPayoutTransactionService;
 import com.wind.funds.transaction.model.request.FundsPayoutRequest;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.sequence.WindSequenceType;
@@ -77,6 +79,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
 
     private final FundsPayoutTransactionService fundsPayoutTransactionService;
 
+    private final FundsAccountQueryService fundsAccountQueryService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public PayoutOrderDTO createOrder(CreatePayoutOrderRequest request, WindOperator operator) {
@@ -118,6 +122,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             return toDTO(order);
         }
         assertSettlementReady(settlement);
+        assertWithdrawAllowed(order);
         ReconciliationGateDecisionDTO gateDecision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(order.getTenantId())
@@ -147,6 +152,15 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setSubmittedTime(LocalDateTime.now());
         update(order, "提交出款单失败");
         return toDTO(order);
+    }
+
+    private void assertWithdrawAllowed(PayoutOrder order) {
+        FundsAccountId accountId = FundsAccountId.immutable(
+                order.getSettlementSubjectId(), order.getSettlementSubjectType());
+        FundsAccount account = fundsAccountQueryService.getAccount(accountId);
+        AssertUtils.isTrue(account.canWithdraw(),
+                "结算资金账户不具备 WITHDRAW 能力，accountId = {}, accountType = {}, capabilitySource = {}",
+                accountId.id(), accountId.type(), account.getCapabilitySource());
     }
 
     @Override

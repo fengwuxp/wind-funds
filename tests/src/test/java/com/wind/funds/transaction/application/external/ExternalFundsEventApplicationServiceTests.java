@@ -207,6 +207,34 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertExternalEventRouteSnapshot();
     }
 
+    @Test
+    void testConsumeConfirmedCreditWithoutReceiveCapabilityShouldKeepFailedFundsFacts() {
+        createCreditConsumeScenario();
+        int updated = jdbcTemplate.update("""
+                UPDATE t_funding_account
+                SET context_variables = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, "{\"fundsAccountCapabilities\":[\"PAY\"]}", TENANT_ID, TARGET_ACCOUNT_SN);
+        assertThat(updated).isOne();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(
+                consumeRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("RECEIVE")
+                .hasMessageContaining(TARGET_ACCOUNT_SN);
+
+        assertThat(fundsTransactionState()).isEqualTo(FundsTransactionState.FAILED.name());
+        assertThat(fundsTransactionDetailStatuses())
+                .isNotEmpty()
+                .containsOnly(FundsTransactionDetailState.FAILED.name());
+        assertThat(ledgerTransactionEvents()).isEmpty();
+        assertThat(postingPlanCount()).isZero();
+        assertThat(ledgerEntryCount()).isZero();
+        assertThat(WindJson.parseObject(routeSnapshotJson(), JsonNode.class).path("legs")).isNotEmpty();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD);
+    }
+
     /**
      * 场景：可信银行入金事实已完成资金入账，上层对账任务确认银行流水与内部交易完全一致。
      * 结果：资金底座冻结外部流水、账本交易和 BALANCED 结论。

@@ -15,6 +15,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>验证权益让利应用服务不直接写账务事实，而是委派标准直接交易链路生成 route snapshot、
  * 交易事实、posting plan、ledger entry 和余额影响。</p>
  */
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransactionFlowTestSupport {
 
     @Autowired
@@ -111,6 +113,24 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertBucket(balance(costBearer), LedgerSubjectCode.AVAILABLE, 85L, CURRENCY);
         assertBucket(balance(receiver), LedgerSubjectCode.SETTLEMENT, 15L, CURRENCY);
         assertThat(fundsTransaction(settleTransactionSn).getRefundedAmount()).isEqualTo(15L);
+    }
+
+    @Test
+    void testCapabilityRejectionShouldKeepFailedBenefitTransactionFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_capability_cost");
+        FundsAccountId receiver = creditAccount("ben_capability_receiver");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureCreditAccount(receiver);
+        topup(costBearer, 10L, "BENEFIT_CAPABILITY_TOPUP");
+        String businessSn = "BENEFIT_CAPABILITY_REJECT";
+
+        assertThatThrownBy(() -> benefitContributionTransactionService.settle(
+                settleRequest(costBearer, receiver, 10L, businessSn), WindOperatorFactory.system()))
+                .hasMessageContaining("RECEIVE");
+
+        assertFailedFundsTransactionWithoutLedgerFacts(businessSn);
+        assertBucket(balance(costBearer), LedgerSubjectCode.AVAILABLE, 10L, CURRENCY);
+        assertBucket(balance(receiver), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
     }
 
     /**

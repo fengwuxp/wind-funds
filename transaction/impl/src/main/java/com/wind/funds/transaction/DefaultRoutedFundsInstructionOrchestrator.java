@@ -1,5 +1,6 @@
 package com.wind.funds.transaction;
 
+import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublishContext;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublisher;
@@ -12,7 +13,12 @@ import com.wind.funds.route.RouteSnapshotFactory;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
+import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -58,6 +64,8 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
 
     private final FundsInstructionLifecycleRecorder fundsInstructionLifecycleRecorder;
 
+    private final FundsAccountQueryService fundsAccountQueryService;
+
     private final List<FundsTransactionProjectionPublisher> projectionPublishers;
 
     /**
@@ -84,18 +92,19 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
             publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult, null);
             return lifecycleResult.getTransactionSn();
         }
-        if (resolvedRoute.getLegs().isEmpty()) {
-            fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, null);
-            logAfterCommit(() -> LOGGER.info("资金指令无账务影响，已标记成功，instructionType={}, eventType={}, "
-                            + "transactionType={}, businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
-                    instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
-                    instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
-                    instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
-            publishProjection(instruction, resolvedRoute, routeSnapshot,
-                    completedLifecycleResult(lifecycleResult, null), null);
-            return lifecycleResult.getTransactionSn();
-        }
         try {
+            assertAccountCapabilities(instruction, resolvedRoute, lifecycleResult.getTransactionSn());
+            if (resolvedRoute.getLegs().isEmpty()) {
+                fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, null);
+                logAfterCommit(() -> LOGGER.info("资金指令无账务影响，已标记成功，instructionType={}, eventType={}, "
+                                + "transactionType={}, businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                        instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
+                        instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
+                        instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
+                publishProjection(instruction, resolvedRoute, routeSnapshot,
+                        completedLifecycleResult(lifecycleResult, null), null);
+                return lifecycleResult.getTransactionSn();
+            }
             LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
                     resolvedRoute);
             ledgerTransactionPostingService.post(transaction);
@@ -130,6 +139,84 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     @Override
     public boolean supports(@NonNull Class<FundsInstructionSpec> specType) {
         return FundsInstructionSpec.class.isAssignableFrom(specType);
+    }
+
+    private void assertAccountCapabilities(FundsInstructionSpec instruction,
+                                           ResolvedRouteSpec resolvedRoute,
+                                           String transactionSn) {
+        switch (resolvedRoute.getEventType()) {
+            case TOPUP -> assertCanReceive(instruction.getAccountId(), transactionSn);
+            case TRANSFER -> {
+                assertCanPay(instruction.getPayerAccountId(), transactionSn);
+                assertCanReceive(instruction.getPayeeAccountId(), transactionSn);
+            }
+            case PAY -> {
+                assertCanPay(instruction.getAccountId(), transactionSn);
+                assertCanReceive(instruction.getPayeeId(), transactionSn);
+            }
+            case REFUND -> {
+                if (!isOriginalTransactionReference(instruction.getReference())) {
+                    assertCanPay(instruction.getPayerId(), transactionSn);
+                    assertCanReceive(instruction.getAccountId(), transactionSn);
+                }
+            }
+            case WITHDRAW -> assertCanWithdraw(instruction.getAccountId(), transactionSn);
+            case FEE_CHARGE -> assertCanPay(instruction.getAccountId(), transactionSn);
+            case AUTHORIZE -> {
+                assertCanPay(instruction.getAccountId(), transactionSn);
+                FundsAccountId linkedFundingAccountId = instruction.getLinkedFundingAccountId();
+                if (linkedFundingAccountId != null && !linkedFundingAccountId.equals(instruction.getAccountId())) {
+                    assertCanPay(linkedFundingAccountId, transactionSn);
+                }
+            }
+            case FEE_REFUND, CLEARING_CONFIRM, SETTLEMENT_LOCK, SETTLEMENT_RELEASE,
+                    PAYOUT_SUCCEEDED, PAYOUT_FAILED, REVERSAL, COMPLETE, AUTH_REFUND,
+                    FREEZE, UNFREEZE, BALANCE_ADJUST, LIMIT_ADJUST -> {
+                // 原交易逆向、余额控制和清结算阶段只执行既有事实，不重判当前账户能力。
+            }
+            default -> throw new LedgerPostingRejectedException(transactionSn,
+                    "资金事件未配置账户能力准入规则，eventType = " + resolvedRoute.getEventType());
+        }
+    }
+
+    private boolean isOriginalTransactionReference(FundsInstructionReferenceSpec reference) {
+        return reference != null
+                && reference.getReferenceType() == FundsInstructionReferenceType.ORIGINAL_TRANSACTION;
+    }
+
+    private void assertCanPay(FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(accountId);
+        if (!account.canPay()) {
+            throw capabilityRejected(transactionSn, accountId, account, "PAY");
+        }
+    }
+
+    private void assertCanReceive(FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(accountId);
+        if (!account.canReceive()) {
+            throw capabilityRejected(transactionSn, accountId, account, "RECEIVE");
+        }
+    }
+
+    private void assertCanWithdraw(FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(accountId);
+        if (!account.canWithdraw()) {
+            throw capabilityRejected(transactionSn, accountId, account, "WITHDRAW");
+        }
+    }
+
+    private LedgerPostingRejectedException capabilityRejected(String transactionSn,
+                                                               FundsAccountId accountId,
+                                                               FundsAccount account,
+                                                               String capability) {
+        return new LedgerPostingRejectedException(transactionSn,
+                "资金账户不具备 %s 能力，accountId = %s, accountType = %s, capabilitySource = %s".formatted(
+                        capability, accountId.id(), accountId.type(), account.getCapabilitySource()));
+    }
+
+    private FundsAccount requiredAccount(FundsAccountId accountId) {
+        AssertUtils.notNull(accountId, "资金账户能力校验缺少账户标识");
+        return fundsAccountQueryService.getAccount(accountId);
     }
 
     private FundsInstructionLifecycleResult completedLifecycleResult(FundsInstructionLifecycleResult source,

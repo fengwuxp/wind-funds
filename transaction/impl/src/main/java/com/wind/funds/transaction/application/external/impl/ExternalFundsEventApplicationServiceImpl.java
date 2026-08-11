@@ -4,6 +4,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
@@ -41,7 +42,7 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     private final FundsDirectTransactionService directTransactionService;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public @NonNull String consume(@NonNull ConsumeExternalFundsEventRequest request,
                                    @NonNull WindOperator operator) {
         validateConsumeRequest(request);

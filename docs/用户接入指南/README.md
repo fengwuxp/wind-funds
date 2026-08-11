@@ -32,7 +32,7 @@
 | 能力 | 公共入口 | 已验证场景 | 主要测试 |
 | --- | --- | --- | --- |
 | 账本基础 | `LedgerService`、`LedgerTransactionPostingService`、`LedgerTransactionService` | 建账；通过 posting gateway 过账；通过 query service 按 SN 查询交易/分录；查询余额投影。 | `LedgerServiceImplTests`、`DefaultLedgerTransactionPostingServiceImplTests`、`LedgerTransactionServiceFactQueryTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests` |
-| 账户和余额查询 | `FundsAccountCapabilityApplicationService`、`FundsSubjectBalanceQueryService` | 账户能力准入、余额查询、账本 profile 初始化。 | `FundsAccountCapabilityApplicationServiceTests`、`FundsSubjectBalanceQueryServiceImplTests`、`LedgerProfileContractTests`、`ControlAccountLedgerInitializationTests` |
+| 账户和余额查询 | `FundsAccountCapabilityApplicationService`、`FundsSubjectBalanceQueryService` | 账户能力解析、canonical 交易动作准入、余额查询、账本 profile 初始化。 | `FundsAccountCapabilityApplicationServiceTests`、`FundsAccountCapabilityAdmissionFlowTests`、`FundsSubjectBalanceQueryServiceImplTests`、`LedgerProfileContractTests`、`ControlAccountLedgerInitializationTests` |
 | 支付工具 | `PaymentInstrumentCapabilityApplicationService`、`PaymentInstrumentPreTransactionSnapshotApplicationService` | 支付工具能力、绑定快照、交易前快照。 | `PaymentInstrumentCapabilityApplicationServiceTests`、`PaymentInstrumentPreTransactionSnapshotApplicationServiceTests`、`PaymentInstrumentServiceImplTests` |
 | 资金责任 | `FundingResponsibilityResolutionApplicationService` | 按关系解析当前资金责任主体。 | `FundingResponsibilityResolutionApplicationServiceTests`、`SpendSubjectFundingRelationServiceImplTests` |
 | 支出控制 | `SpendControlAdmissionApplicationService`、`BudgetControlLimitAdjustmentApplicationService`、`SpendControlTransactionConsumptionApplicationService` | Spend Rule 准入、预算控制调整、交易消费记录。 | `SpendControlAdmissionApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendRuleDefinitionServiceFlowTests` |
@@ -54,7 +54,7 @@
 | `wallet` 账户和支付工具 | 开发 / 受控联调可接入。 | 资金账户、信用账户、账户能力、支付工具能力、绑定快照和交易前快照。 | 支付工具只做引用和准入快照，不作为账本主体；敏感数据不得进入 request、日志和投影。 |
 | `wallet` 资金责任 | 开发 / 受控联调可接入。 | 按支出主体解析资金账户或信用账户责任主体。 | 多资金责任、错币种、停用账户和冲突优先级必须在准入前失败。 |
 | `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、交易消费、退款补偿、可信控制释放和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
-| `transaction` 直接交易 | 开发 / 受控联调可接入。 | 充值、转账、付款、退款、提现、手续费和退费。 | 外部 pending、审批中或通道处理中不得进入交易事实。 |
+| `transaction` 直接交易 | 开发 / 受控联调可接入。 | 充值、转账、付款、退款、提现、手续费和退费；首次 canonical 命令按账户 `RECEIVE/PAY/WITHDRAW` 能力准入。 | 外部 pending、审批中或通道处理中不得进入交易事实；已完成重放和原交易逆向不按当前 capability 漂移重判。 |
 | `transaction` 授权交易 | 开发 / 受控联调可接入。 | 授权、撤销、完成和完成后本金退款，后继动作基于原路径。 | `refund` 只承接不超过已完成金额的本金；商家补偿、退货运费、FX credit 和 VCC 组件编排不属于该入口。授权拒绝不生成 `RouteLeg`、posting、`LedgerTransaction/LedgerEntry` 或余额变化；保留状态为 `REJECTED` 的 FundsTransaction/detail 与 `legs` 为空的 `RouteSnapshotSpec`。清算、争议和强制完成需按专项边界确认。 |
 | `transaction` 余额控制 | 开发 / 受控联调可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
 | 让利出资记账 | 开发 / 受控联调可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
@@ -343,7 +343,7 @@ flowchart LR
 | 事实终态 | 外部事件必须是已确认入金或终态成功出款；pending、processing、审批中、通道处理中不得入账。 |
 | 公共契约 | 接入方只依赖 `*-face` 和 `core`，不得依赖 `*-impl`、Entity、Mapper、测试工具或内部包。 |
 | 幂等和重放 | 业务流水、请求摘要、原交易引用和重复提交行为已验证；同键不同摘要必须拒绝。 |
-| 失败无副作用 | 准入失败、余额不足、规则拒绝、外部非终态和路由失败不得留下错误资金事实。 |
+| 失败无副作用 | 准入已进入资金生命周期时允许单一稳定 `FAILED` 审计事实与已解析但未执行的 `RouteSnapshot`；任何失败都不得产生 posting、ledger transaction/entry 或余额变化。 |
 | 账务验收 | 已验证 transaction、route、posting、ledger transaction、ledger entry、余额桶和投影查询。 |
 | 敏感数据 | 不在 request、contextVariables、日志或审计摘要中保存 PAN、CVV、密钥、证件号、手机号或外部账号原文。 |
 | P2 边界 | 本轮只验收 VCC、全球账户、ACH 和收单等场景对公共资金能力的映射与可执行测试；完整业务产品、FX quote 与执行、退汇、NOC、外部 rail reversal、多币种对账和通道协议不属于 wind-funds 的交付承诺。 |
@@ -367,6 +367,7 @@ flowchart LR
 | ledger 接入说明或账本事实 | `just verify-slice DefaultLedgerPostingAssemblerTests,LedgerServiceImplTests,LedgerTransactionServiceImplTests,LedgerBalanceProjectionServiceImplTests tests` |
 | wallet 接入说明 | `just verify-slice FundsAccountCapabilityApplicationServiceTests,PaymentInstrumentCapabilityApplicationServiceTests,FundingResponsibilityResolutionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests tests` |
 | transaction 接入说明 | `just verify-slice FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,FundsBalanceControlFailureFlowTests tests` |
+| 账户动作与出款能力准入 | `just verify-slice FundsAccountCapabilityAdmissionFlowTests,PayoutOrderApplicationServiceTests tests` |
 | FX 来源价格和金额换算 | `just test-fx` |
 | 让利或外部入金说明 | `just verify-slice FundsBenefitContributionTransactionServiceContractTests,FundsBenefitContributionTransactionServiceFlowTests,ExternalFundsEventApplicationServiceTests tests` |
 | 交易投影恢复 | `just test-governance` |

@@ -4,6 +4,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
@@ -81,7 +82,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
     private final FundsDirectTransactionService directTransactionService;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public @NonNull String settle(@NonNull FundsBenefitContributionSettleRequest request,
                                   @NonNull WindOperator operator) {
         assertSettleRequest(request);
@@ -100,7 +101,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public @NonNull String refund(@NonNull FundsBenefitContributionRefundRequest request,
                                   @NonNull WindOperator operator) {
         assertRefundRequest(request);

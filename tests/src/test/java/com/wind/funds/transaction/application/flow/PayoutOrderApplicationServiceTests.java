@@ -312,6 +312,53 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
     }
 
     @Test
+    void testFirstSubmitShouldRequireWithdrawCapability() {
+        FundsAccountId accountId = fundingAccount("payout_cap_merchant");
+        PayoutOrderDTO payout = newCreatedPayout(accountId, 100L, "capability");
+        String runResultSn = prepareGate(ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-capability");
+        setCapabilities(accountId, "RECEIVE", "PAY");
+
+        assertThatThrownBy(() -> payoutOrderApplicationService.submitOrder(
+                submitRequest(payout, runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("WITHDRAW")
+                .hasMessageContaining(accountId.id());
+        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payout.getSn()).getState())
+                .isEqualTo(PayoutOrderState.CREATED);
+        assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
+    }
+
+    @Test
+    void testSubmittedReplayAndReceiptsShouldIgnoreCapabilityDrift() {
+        FundsAccountId accountId = fundingAccount("payout_cap_replay");
+        PayoutOrderDTO submitted = newSubmittedPayout(accountId, 100L, "capability-replay");
+        setCapabilities(accountId, "RECEIVE", "PAY");
+
+        PayoutOrderDTO replay = payoutOrderApplicationService.submitOrder(
+                submitRequest(submitted, submitted.getReconciliationRunResultSn()), WindOperatorFactory.system());
+        PayoutOrderDTO succeeded = payoutOrderApplicationService.handleReceipt(
+                receipt(submitted, PayoutOrderState.SUCCEEDED, 100L,
+                        "capability-replay", "external-capability-replay"),
+                WindOperatorFactory.system());
+
+        assertThat(replay.getState()).isEqualTo(PayoutOrderState.SUBMITTED);
+        assertThat(succeeded.getState()).isEqualTo(PayoutOrderState.SUCCEEDED);
+        assertThat(succeeded.getCompletionFundsTransactionSn()).isNotBlank();
+
+        FundsAccountId failedAccountId = fundingAccount("payout_cap_failed");
+        PayoutOrderDTO failedSubmitted = newSubmittedPayout(failedAccountId, 100L, "capability-failed");
+        setCapabilities(failedAccountId, "RECEIVE", "PAY");
+        PayoutOrderDTO failed = payoutOrderApplicationService.handleReceipt(
+                receipt(failedSubmitted, PayoutOrderState.FAILED, 100L,
+                        "capability-failed", "external-capability-failed")
+                        .setFailureCode("DECLINED")
+                        .setFailureReason("beneficiary rejected"),
+                WindOperatorFactory.system());
+
+        assertThat(failed.getState()).isEqualTo(PayoutOrderState.FAILED);
+        assertThat(failed.getRollbackFundsTransactionSn()).isNotBlank();
+    }
+
+    @Test
     void testReleaseAndSubmitShouldHaveExactlyOneWinner() throws Exception {
         FundsAccountId accountId = fundingAccount("payout_release_submit");
         ensureLedger(accountId, LedgerSubjectCode.FROZEN);
@@ -487,6 +534,17 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                 sn, TENANT_ID, accountId.type(), accountId.id(), CURRENCY.name(), "ACQUIRING", "2026-07",
                 "CLEARING_RULE", "v1", 1, amount, amountDigest, "FT_" + sn,
                 "CONFIRMED", "system", "system", LocalDateTime.now());
+    }
+
+    private void setCapabilities(FundsAccountId accountId, String... capabilities) {
+        String values = "[\"" + String.join("\",\"", capabilities) + "\"]";
+        int updated = jdbcTemplate.update("""
+                        UPDATE t_funding_account
+                        SET context_variables = ?
+                        WHERE tenant_id = ? AND sn = ?
+                        """,
+                "{\"fundsAccountCapabilities\":" + values + "}", TENANT_ID, accountId.id());
+        assertThat(updated).as("payout account capabilities updated for %s", accountId).isOne();
     }
 
     private Callable<ReceiptAttempt> concurrentReceiptAttempt(CountDownLatch startGate,
