@@ -3,7 +3,7 @@ package com.wind.funds.wallet;
 import com.wind.common.WindConstants;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 
@@ -55,7 +55,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      * @return 账户状态
      */
     @NonNull
-    FundsAccountStatus getStatus();
+    FundsAccountState getState();
 
     /**
      * 账户能力
@@ -74,15 +74,15 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
     String getCapabilitySource();
 
     default boolean canWithdraw() {
-        return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.WITHDRAW);
+        return getState().canDebit() && getCapabilities().contains(FundsAccountCapability.WITHDRAW);
     }
 
     default boolean canPay() {
-        return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.PAY);
+        return getState().canDebit() && getCapabilities().contains(FundsAccountCapability.PAY);
     }
 
     default boolean canReceive() {
-        return getStatus().canCredit() && getCapabilities().contains(FundsAccountCapability.RECEIVE);
+        return getState().canCredit() && getCapabilities().contains(FundsAccountCapability.RECEIVE);
     }
 
     /**

@@ -7,7 +7,7 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.query.QueryColumn;
@@ -20,7 +20,7 @@ import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.spec.SettlementPolicySpec;
@@ -60,22 +60,22 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     @Override
-    public void updateLedgerStatus(@NonNull UpdateLedgerStatusRequest request) {
+    public void updateLedgerState(@NonNull UpdateLedgerStateRequest request) {
         Ledger ledger = findLedger(request.getId());
-        LedgerStatus targetStatus = request.getStatus();
-        LedgerStatus.assertTransitionAllowed(ledger.getId(), ledger.getStatus(), targetStatus);
-        if (ledger.getStatus() == targetStatus) {
+        LedgerState targetState = request.getState();
+        LedgerState.assertTransitionAllowed(ledger.getId(), ledger.getState(), targetState);
+        if (ledger.getState() == targetState) {
             return;
         }
-        assertCloseableBalance(ledger, targetStatus);
+        assertCloseableBalance(ledger, targetState);
         Ledger entity = UpdateEntity.of(Ledger.class);
         UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
-        updateWrapper.set(LedgerNameRefs.ledger.status, targetStatus, true);
+        updateWrapper.set(LedgerNameRefs.ledger.state, targetState, true);
         setRawDelta(updateWrapper, LedgerNameRefs.ledger.version, 1L);
         AssertUtils.isTrue(ledgerMapper.updateByQuery(entity, QueryWrapper.create()
                         .where(LedgerNameRefs.ledger.id.eq(request.getId()))
                         .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
-                        .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()))) == 1,
+                        .and(LedgerNameRefs.ledger.state.eq(ledger.getState()))) == 1,
                 "账本状态更新失败");
     }
 
@@ -111,7 +111,7 @@ public class LedgerServiceImpl implements LedgerService {
                 .and(ledger.allowNegative.eq(query.getAllowNegative()))
                 .and(ledger.debitAmount.eq(query.getDebitAmount()))
                 .and(ledger.creditAmount.eq(query.getCreditAmount()))
-                .and(ledger.status.eq(query.getStatus()))
+                .and(ledger.state.eq(query.getState()))
                 .and(ledger.currency.eq(query.getCurrency()))
                 .and(ledger.settlementPolicy.eq(query.getSettlementPolicy()))
                 .and(ledger.cutOffTime.eq(query.getCutOffTime()))
@@ -137,8 +137,8 @@ public class LedgerServiceImpl implements LedgerService {
         return result;
     }
 
-    private void assertCloseableBalance(Ledger ledger, LedgerStatus targetStatus) {
-        if (targetStatus != LedgerStatus.CLOSED) {
+    private void assertCloseableBalance(Ledger ledger, LedgerState targetState) {
+        if (targetState != LedgerState.CLOSED) {
             return;
         }
         AssertUtils.isTrue(Objects.equals(0L, ledger.getNormalBalance()),
@@ -180,8 +180,8 @@ public class LedgerServiceImpl implements LedgerService {
         if (entity.getCreditAmount() == null) {
             entity.setCreditAmount(0L);
         }
-        if (entity.getStatus() == null) {
-            entity.setStatus(LedgerStatus.ACTIVE);
+        if (entity.getState() == null) {
+            entity.setState(LedgerState.ACTIVE);
         }
         if (entity.getSettlementPolicy() == null) {
             entity.setSettlementPolicy(SettlementPolicySpec.RT.getRaw());

@@ -66,7 +66,7 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
                 .and(ref.businessScene.eq(query.getBusinessScene()))
                 .and(ref.businessSn.eq(query.getBusinessSn()))
                 .and(ref.transactionSn.eq(query.getTransactionSn()))
-                .and(ref.status.eq(query.getStatus()))
+                .and(ref.state.eq(query.getState()))
                 .and(ref.currency.eq(query.getCurrency()));
         return MybatisQueryHelper.<FundsFrozenOrder, FundsFrozenOrderDTO>query(wrapper)
                 .counter(fundsFrozenOrderMapper::selectCountByQuery)

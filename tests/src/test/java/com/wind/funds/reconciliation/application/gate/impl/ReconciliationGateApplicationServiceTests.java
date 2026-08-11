@@ -12,9 +12,9 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -151,14 +151,14 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
         assertThat(result.getGateObjectSn()).isEqualTo("clearing-candidate-001");
         assertThat(result.getBlockingDifferences())
                 .extracting(ReconciliationGateBlockingDifferenceDTO::getDifferenceSn)
                 .containsExactly(requiredDifferenceSn(clearingMatchResultSn));
         ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
-        assertThat(blockingDifference.getStatus()).isEqualTo(ReconciliationDifferenceStatus.BLOCKED);
+        assertThat(blockingDifference.getState()).isEqualTo(ReconciliationDifferenceState.BLOCKED);
         assertThat(blockingDifference.getResponsiblePartyRef()).isEqualTo("processor:issuer-ledger");
         assertThat(blockingDifference.getEvidenceRef()).isEqualTo("processor-gate-file-digest-001#line-1");
         assertThat(blockingDifference.getBlockingReason()).contains("未闭环");
@@ -182,7 +182,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(clearingRunResultSn);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001");
@@ -208,7 +208,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getExplanation()).contains("不是当前批次血缘头");
     }
 
@@ -229,7 +229,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getResolvedDifferenceCount()).isZero();
     }
@@ -261,7 +261,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getExplanation()).contains("差错数量超过单次检查容量");
     }
@@ -295,7 +295,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getResolvedDifferenceCount())
                 .isEqualTo(ReconciliationGateApplicationServiceImpl.MAX_GATE_DIFFERENCE_COUNT + 1);
         assertThat(result.getBlockingDifferences()).isEmpty();
@@ -375,7 +375,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(clearingRunResultSn);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -401,7 +401,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getExplanation()).contains("不是当前批次血缘头");
     }
 
@@ -417,7 +417,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs()).isEmpty();
         assertThat(result.getExplanation()).contains("运行结果不存在");
@@ -438,7 +438,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-difference-001");
         assertThat(result.getExplanation()).contains("DIFFERENCE_FOUND");
     }
@@ -453,7 +453,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest().setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getExplanation()).contains("准入对象不匹配");
     }
 
@@ -476,7 +476,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest().setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getExplanation()).contains("未绑定准入对象");
     }
 
@@ -495,7 +495,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs()).containsExactly("report:settlement-recon-run-001");
@@ -515,7 +515,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getExplanation()).contains("不是当前批次血缘头");
     }
 
@@ -539,7 +539,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getBlockingDifferences())
                 .extracting(ReconciliationGateBlockingDifferenceDTO::getDifferenceSn)
                 .containsExactly(requiredDifferenceSn(clearingMatchResultSn));
@@ -567,7 +567,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
         assertThat(result.getGateObjectSn()).isEqualTo("settlement-order-001");
         ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
@@ -667,9 +667,9 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
-        assertThat(blockingDifference.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RECONCILING);
+        assertThat(blockingDifference.getState()).isEqualTo(ReconciliationDifferenceState.RECONCILING);
         assertThat(blockingDifference.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
         assertThat(blockingDifference.getAdjustmentSn()).isEqualTo(ADJUSTMENT_SN);
         assertThat(blockingDifference.getLastRerunSn()).isEqualTo(unbalancedRunResultSn);
@@ -694,7 +694,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getResolvedDifferenceCount()).isOne();
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001");
@@ -719,7 +719,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getResolvedDifferenceCount()).isOne();
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-later-balanced-001");
@@ -745,7 +745,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getBlockingDifferences()).hasSize(1);
         assertThat(result.getBlockingDifferences().getFirst().getOriginalFactRef())
                 .isEqualTo("external-balance-anomaly:issuer-ledger-gate-001");

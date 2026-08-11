@@ -3,7 +3,7 @@ package com.wind.funds.transaction.mapstruct;
 import com.wind.jackson.WindJson;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
@@ -87,7 +87,7 @@ public interface FundsTransactionConverter {
     @AfterMapping
     default void fillInstructionDefaults(FundsInstructionSpec instruction,
                                          @MappingTarget FundsTransaction entity) {
-        entity.setStatus(FundsTransactionStatus.PROCESSING);
+        entity.setState(FundsTransactionState.PROCESSING);
         initSummaryAmounts(entity);
     }
 

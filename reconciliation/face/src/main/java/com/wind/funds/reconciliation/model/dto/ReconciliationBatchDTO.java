@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -57,7 +57,7 @@ public class ReconciliationBatchDTO implements Serializable {
     private String previousBatchSn;
 
     @Schema(description = "批次状态")
-    private ReconciliationBatchStatus status;
+    private ReconciliationBatchState state;
 
     @Schema(description = "完成态运行结果流水号")
     private String runResultSn;

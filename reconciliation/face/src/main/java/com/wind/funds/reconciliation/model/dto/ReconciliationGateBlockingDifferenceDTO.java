@@ -2,7 +2,7 @@ package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -33,7 +33,7 @@ public class ReconciliationGateBlockingDifferenceDTO implements Serializable {
     private String differenceSn;
 
     @Schema(description = "对账差错状态")
-    private ReconciliationDifferenceStatus status;
+    private ReconciliationDifferenceState state;
 
     @Schema(description = "对账差错严重等级")
     private ReconciliationDifferenceSeverity severity;

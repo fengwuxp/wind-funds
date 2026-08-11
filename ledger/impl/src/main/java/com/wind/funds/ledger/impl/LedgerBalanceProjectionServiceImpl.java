@@ -16,7 +16,7 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
@@ -88,7 +88,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                                       ProjectionDelta delta,
                                       Long minimumNormalBalance,
                                       LedgerPostingAccessType postingAccessType) {
-        LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), postingAccessType);
+        LedgerState.assertPostable(ledger.getId(), ledger.getState(), postingAccessType);
         validateMinimumNormalBalance(ledger, delta, minimumNormalBalance);
         Ledger entity = UpdateEntity.of(Ledger.class);
         UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
@@ -98,7 +98,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         QueryWrapper where = QueryWrapper.create()
                 .where(LedgerNameRefs.ledger.id.eq(ledger.getId()))
                 .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
-                .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()));
+                .and(LedgerNameRefs.ledger.state.eq(ledger.getState()));
         if (minimumNormalBalance != null) {
             where.and(normalBalanceAfterDelta(ledger.getNormalBalanceSide(), delta).ge(minimumNormalBalance));
         }

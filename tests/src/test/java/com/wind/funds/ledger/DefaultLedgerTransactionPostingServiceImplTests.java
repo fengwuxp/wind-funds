@@ -10,7 +10,7 @@ import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
@@ -29,7 +29,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
@@ -346,7 +346,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         seedFundingAccount(TARGET_SUBJECT_ID);
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
-        markLedgerStatus(sourceLedgerId, LedgerStatus.SUSPENDED);
+        markLedgerState(sourceLedgerId, LedgerState.SUSPENDED);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
@@ -368,7 +368,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         seedFundingAccount(TARGET_SUBJECT_ID);
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
-        markLedgerStatus(sourceLedgerId, LedgerStatus.SUSPENDED);
+        markLedgerState(sourceLedgerId, LedgerState.SUSPENDED);
 
         postingService.post(transaction(
                 List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
@@ -380,7 +380,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                 LedgerSubjectCategory.ASSET, null))))));
 
         assertThat(ledgerService.getLedgerById(sourceLedgerId).getNormalBalance()).isEqualTo(100L);
-        assertThat(ledgerService.getLedgerById(sourceLedgerId).getStatus()).isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(sourceLedgerId).getState()).isEqualTo(LedgerState.SUSPENDED);
         assertThat(ledgerService.getLedgerById(targetLedgerId).getNormalBalance()).isEqualTo(100L);
     }
 
@@ -396,7 +396,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         seedFundingAccount(TARGET_SUBJECT_ID);
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
-        markLedgerStatus(sourceLedgerId, LedgerStatus.CLOSED);
+        markLedgerState(sourceLedgerId, LedgerState.CLOSED);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
@@ -841,8 +841,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 ledgerId);
     }
 
-    private void markLedgerStatus(Long ledgerId, LedgerStatus status) {
-        jdbcTemplate.update("UPDATE t_ledger SET status = ? WHERE id = ?", status.name(), ledgerId);
+    private void markLedgerState(Long ledgerId, LedgerState state) {
+        jdbcTemplate.update("UPDATE t_ledger SET status = ? WHERE id = ?", state.name(), ledgerId);
     }
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {
@@ -895,7 +895,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("ledger posting boundary funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -911,7 +911,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setCurrency(CURRENCY)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
-                .setStatus(FundsAccountStatus.ACTIVE)
+                .setState(FundsAccountState.ACTIVE)
                 .setDescription("ledger posting boundary budget group"));
     }
 

@@ -10,7 +10,7 @@ import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResul
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -125,7 +125,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
         assertThat(result.getGateObjectSn()).isEqualTo(CLEARING_OBJECT_SN);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(clearingRunResultSn);
@@ -156,7 +156,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                 settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
         assertThat(result.getGateObjectSn()).isEqualTo(SETTLEMENT_OBJECT_SN);
         assertThat(result.getBlockingDifferences())
@@ -186,7 +186,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-gate-run-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -208,7 +208,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                 clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
         assertThat(result.getResolvedDifferenceCount()).isOne();
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-gate-run-001");

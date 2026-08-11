@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
-import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
+import com.wind.funds.wallet.enums.SpendRuleDefinitionState;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -55,7 +55,7 @@ public class SpendRuleDefinitionDTO implements Serializable {
     private SpendRuleDomain ruleDomain;
 
     @Schema(description = "规则状态")
-    private SpendRuleDefinitionStatus status;
+    private SpendRuleDefinitionState state;
 
     @Schema(description = "描述")
     private String description;

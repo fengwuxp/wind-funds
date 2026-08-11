@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ClearingSplitBatchStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -69,7 +69,7 @@ public class ClearingSplitBatchDTO implements Serializable {
     private String batchDigest;
 
     @Schema(description = "批次状态")
-    private ClearingSplitBatchStatus status;
+    private ClearingSplitBatchState state;
 
     @Schema(description = "创建时间")
     private LocalDateTime createdTime;

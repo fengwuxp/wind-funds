@@ -5,7 +5,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.dal.entities.SpendRuleVersion;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleVersionNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleVersionMapper;
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.service.SpendRuleVersionService;
@@ -61,7 +61,7 @@ public class SpendRuleVersionServiceImpl implements SpendRuleVersionService {
                                                             @NonNull String ruleVersion) {
         SpendRuleVersionDTO version = findVersion(tenantId, ruleId, ruleVersion);
         AssertUtils.notNull(version, "Spend Rule 版本不存在，ruleId = {}, ruleVersion = {}", ruleId, ruleVersion);
-        AssertUtils.isTrue(version.getStatus() == SpendRuleVersionStatus.PUBLISHED,
+        AssertUtils.isTrue(version.getState() == SpendRuleVersionState.PUBLISHED,
                 "Spend Rule 版本未发布，ruleId = {}, ruleVersion = {}",
                 ruleId,
                 ruleVersion);
@@ -84,7 +84,7 @@ public class SpendRuleVersionServiceImpl implements SpendRuleVersionService {
         result.setRuleVersion(request.getRuleVersion());
         result.setRuleSpec(request.getRuleSpec());
         result.setRuleDigest(request.getRuleDigest());
-        result.setStatus(SpendRuleVersionStatus.PUBLISHED);
+        result.setState(SpendRuleVersionState.PUBLISHED);
         result.setOperatorId(request.getOperatorId());
         result.setAuditReferenceSn(request.getAuditReferenceSn());
         result.setDescription(request.getDescription());
@@ -101,7 +101,7 @@ public class SpendRuleVersionServiceImpl implements SpendRuleVersionService {
                 .setRuleVersion(entity.getRuleVersion())
                 .setRuleSpec(entity.getRuleSpec())
                 .setRuleDigest(entity.getRuleDigest())
-                .setStatus(entity.getStatus())
+                .setState(entity.getState())
                 .setOperatorId(entity.getOperatorId())
                 .setAuditReferenceSn(entity.getAuditReferenceSn())
                 .setDescription(entity.getDescription());

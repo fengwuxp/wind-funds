@@ -11,7 +11,7 @@ import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsClearingConfirmRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -85,7 +85,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
                 .singleElement()
                 .satisfies(transaction -> {
                     assertThat(transaction.getTransactionMode()).isEqualTo(FundsTransactionMode.DIRECT);
-                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+                    assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
                     assertThat(transaction.getCompletedAmount()).isEqualTo(600L);
                 });
         assertThat(ledgerTransactionByBusinessSn("CLEARING_BATCH_001").getEventType())

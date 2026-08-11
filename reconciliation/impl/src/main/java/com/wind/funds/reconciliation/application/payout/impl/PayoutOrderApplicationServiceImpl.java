@@ -13,11 +13,11 @@ import com.wind.funds.reconciliation.dal.mapper.PayoutReceiptMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderMapper;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
-import com.wind.funds.reconciliation.enums.PayoutOperationStatus;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutNextAction;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutOrderDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutSubmissionAdmissionDecisionDTO;
@@ -96,7 +96,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setSettlementSubjectId(settlement.getSettlementSubjectId());
         order.setAmount(settlement.getNetAmount());
         order.setCurrency(settlement.getCurrency());
-        order.setStatus(PayoutOrderStatus.CREATED);
+        order.setState(PayoutOrderState.CREATED);
         order.setCreatedBy(operator.getOperatorAsText());
         order.setVersion(0);
         payoutOrderMapper.insertSelective(order);
@@ -113,7 +113,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         PayoutOrder order = requiredOrderForUpdate(request.getTenantId(), request.getPayoutOrderSn());
         assertOrderMatchesSettlement(order, settlement);
         String submitDigest = submitDigest(request);
-        if (order.getStatus() != PayoutOrderStatus.CREATED) {
+        if (order.getState() != PayoutOrderState.CREATED) {
             AssertUtils.equals(order.getSubmitDigest(), submitDigest, "出款单已使用不同提交参数完成提交");
             return toDTO(order);
         }
@@ -131,7 +131,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         PayoutSubmissionAdmissionDecisionDTO admission = authority.authorize(toDTO(order), request, operator);
         validateAdmissionDecision(admission);
 
-        order.setStatus(PayoutOrderStatus.SUBMITTED);
+        order.setState(PayoutOrderState.SUBMITTED);
         order.setPayoutAccountRef(request.getPayoutAccountRef());
         order.setPayeeEndpointRef(request.getPayeeEndpointRef());
         order.setChannelRef(request.getChannelRef());
@@ -154,7 +154,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     public PayoutOrderDTO handleReceipt(HandlePayoutReceiptRequest request, WindOperator operator) {
         validateReceiptRequest(request, operator);
         PayoutOrder order = requiredOrderForUpdate(request.getTenantId(), request.getPayoutOrderSn());
-        AssertUtils.isTrue(order.getStatus() != PayoutOrderStatus.CREATED,
+        AssertUtils.isTrue(order.getState() != PayoutOrderState.CREATED,
                 "未提交出款单不能接收外部回单");
         String normalizedDigest = normalizedReceiptDigest(request);
         PayoutReceipt existing = payoutReceiptMapper.selectBySource(
@@ -188,25 +188,25 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             return mismatch(order, "外部出款 reference 已被其他出款单占用");
         }
 
-        if (order.getStatus() == PayoutOrderStatus.MISMATCHED) {
+        if (order.getState() == PayoutOrderState.MISMATCHED) {
             update(order, "更新出款回单证据失败");
             return toDTO(order);
         }
-        if (isTerminal(order.getStatus())) {
-            if (order.getStatus() != request.getStatus()) {
+        if (isTerminal(order.getState())) {
+            if (order.getState() != request.getState()) {
                 return mismatch(order, "出款终态回单冲突");
             }
             update(order, "更新出款终态回单证据失败");
             return toDTO(order);
         }
 
-        switch (request.getStatus()) {
-            case ACCEPTED, PROCESSING -> advanceNonTerminal(order, request.getStatus());
+        switch (request.getState()) {
+            case ACCEPTED, PROCESSING -> advanceNonTerminal(order, request.getState());
             case SUCCEEDED -> applySuccess(order, operator);
             case FAILED -> applyFailure(order, request, operator);
-            case RETURNED -> completeWithoutFunds(order, PayoutOrderStatus.RETURNED, request);
+            case RETURNED -> completeWithoutFunds(order, PayoutOrderState.RETURNED, request);
             case MISMATCHED -> markMismatched(order, "宿主归一回单标记为不一致");
-            case CREATED, SUBMITTED -> throw new IllegalArgumentException("外部回单状态不支持：" + request.getStatus());
+            case CREATED, SUBMITTED -> throw new IllegalArgumentException("外部回单状态不支持：" + request.getState());
         }
         update(order, "更新出款回单结果失败");
         return toDTO(order);
@@ -223,7 +223,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         try {
             order.setCompletionFundsTransactionSn(fundsPayoutTransactionService.succeed(
                     fundsRequest(order, "payout succeeded"), operator));
-            order.setStatus(PayoutOrderStatus.SUCCEEDED);
+            order.setState(PayoutOrderState.SUCCEEDED);
             order.setCompletedTime(LocalDateTime.now());
         } catch (LedgerPostingRejectedException exception) {
             markMismatched(order, "出款成功回单对应账务入账被拒绝：" + exception.getMessage());
@@ -236,7 +236,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         try {
             order.setRollbackFundsTransactionSn(fundsPayoutTransactionService.fail(
                     fundsRequest(order, "payout failed return"), operator));
-            completeWithoutFunds(order, PayoutOrderStatus.FAILED, request);
+            completeWithoutFunds(order, PayoutOrderState.FAILED, request);
         } catch (LedgerPostingRejectedException exception) {
             markMismatched(order, "出款失败回退对应账务入账被拒绝：" + exception.getMessage());
         }
@@ -280,17 +280,17 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     }
 
     private void completeWithoutFunds(PayoutOrder order,
-                                      PayoutOrderStatus status,
+                                      PayoutOrderState state,
                                       HandlePayoutReceiptRequest request) {
-        order.setStatus(status);
+        order.setState(state);
         order.setFailureCode(request.getFailureCode());
         order.setFailureReason(request.getFailureReason());
         order.setCompletedTime(LocalDateTime.now());
     }
 
-    private void advanceNonTerminal(PayoutOrder order, PayoutOrderStatus status) {
-        if (status == PayoutOrderStatus.PROCESSING || order.getStatus() == PayoutOrderStatus.SUBMITTED) {
-            order.setStatus(status);
+    private void advanceNonTerminal(PayoutOrder order, PayoutOrderState state) {
+        if (state == PayoutOrderState.PROCESSING || order.getState() == PayoutOrderState.SUBMITTED) {
+            order.setState(state);
         }
     }
 
@@ -301,15 +301,15 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     }
 
     private void markMismatched(PayoutOrder order, String reason) {
-        order.setStatus(PayoutOrderStatus.MISMATCHED);
+        order.setState(PayoutOrderState.MISMATCHED);
         order.setFailureReason(reason);
         order.setCompletedTime(LocalDateTime.now());
     }
 
-    private boolean isTerminal(PayoutOrderStatus status) {
-        return status == PayoutOrderStatus.SUCCEEDED
-                || status == PayoutOrderStatus.FAILED
-                || status == PayoutOrderStatus.RETURNED;
+    private boolean isTerminal(PayoutOrderState state) {
+        return state == PayoutOrderState.SUCCEEDED
+                || state == PayoutOrderState.FAILED
+                || state == PayoutOrderState.RETURNED;
     }
 
     private PayoutReceipt newReceipt(HandlePayoutReceiptRequest request,
@@ -322,7 +322,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         result.setChannelRef(request.getChannelRef());
         result.setExternalReceiptRef(request.getExternalReceiptRef());
         result.setExternalReference(request.getExternalReference());
-        result.setStatus(request.getStatus());
+        result.setState(request.getState());
         result.setAmount(request.getAmount());
         result.setCurrency(request.getCurrency());
         result.setSourceReceiptDigest(request.getSourceReceiptDigest());
@@ -340,7 +340,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 "channelRef", request.getChannelRef(),
                 "externalReceiptRef", request.getExternalReceiptRef(),
                 "externalReference", request.getExternalReference(),
-                "status", request.getStatus().name(),
+                "status", request.getState().name(),
                 "amount", request.getAmount(),
                 "currency", request.getCurrency().name(),
                 "sourceReceiptDigest", request.getSourceReceiptDigest()));
@@ -422,7 +422,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         AssertUtils.hasText(request.getChannelRef(), "出款回单通道引用不能为空");
         AssertUtils.hasText(request.getExternalReceiptRef(), "外部回单唯一引用不能为空");
         AssertUtils.hasText(request.getExternalReference(), "外部出款 reference 不能为空");
-        AssertUtils.notNull(request.getStatus(), "出款回单状态不能为空");
+        AssertUtils.notNull(request.getState(), "出款回单状态不能为空");
         AssertUtils.notNull(request.getAmount(), "出款回单金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0, "出款回单金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "出款回单币种不能为空");
@@ -444,8 +444,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     }
 
     private void assertSettlementReady(SettlementOrder settlement) {
-        AssertUtils.isTrue(settlement.getStatus() == SettlementOrderStatus.LOCKED,
-                "只有 LOCKED 结算单可以创建或提交出款，status = {}", settlement.getStatus());
+        AssertUtils.isTrue(settlement.getState() == SettlementOrderState.LOCKED,
+                "只有 LOCKED 结算单可以创建或提交出款，status = {}", settlement.getState());
         AssertUtils.isTrue(settlement.getSettlementDestination() == SettlementDestination.EXTERNAL_ENDPOINT,
                 "只有外部收款端点结算单可以创建出款");
         AssertUtils.hasText(settlement.getLockFundsTransactionSn(), "结算单缺少资金锁定事实");
@@ -499,9 +499,9 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 .setSettlementSubjectId(source.getSettlementSubjectId())
                 .setAmount(source.getAmount())
                 .setCurrency(source.getCurrency())
-                .setFactStatus(source.getStatus())
-                .setDisplayStatus(displayStatus(source.getStatus()))
-                .setOperationStatus(operationStatus(source.getStatus()))
+                .setState(source.getState())
+                .setDisplayStatus(displayStatus(source.getState()))
+                .setNextAction(nextAction(source.getState()))
                 .setPayoutAccountRef(source.getPayoutAccountRef())
                 .setPayeeEndpointRef(source.getPayeeEndpointRef())
                 .setChannelRef(source.getChannelRef())
@@ -523,8 +523,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         return StringUtils.hasText(value) ? WindJson.parseArray(value, String.class) : List.of();
     }
 
-    private PayoutDisplayStatus displayStatus(PayoutOrderStatus status) {
-        return switch (status) {
+    private PayoutDisplayStatus displayStatus(PayoutOrderState state) {
+        return switch (state) {
             case CREATED -> PayoutDisplayStatus.PENDING;
             case SUBMITTED, ACCEPTED, PROCESSING -> PayoutDisplayStatus.PROCESSING;
             case SUCCEEDED -> PayoutDisplayStatus.SUCCEEDED;
@@ -534,12 +534,12 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         };
     }
 
-    private PayoutOperationStatus operationStatus(PayoutOrderStatus status) {
-        return switch (status) {
-            case CREATED -> PayoutOperationStatus.SUBMIT_ALLOWED;
-            case SUBMITTED, ACCEPTED, PROCESSING -> PayoutOperationStatus.WAITING_EXTERNAL_RESULT;
-            case SUCCEEDED, FAILED -> PayoutOperationStatus.NO_ACTION_REQUIRED;
-            case RETURNED, MISMATCHED -> PayoutOperationStatus.REVIEW_REQUIRED;
+    private PayoutNextAction nextAction(PayoutOrderState state) {
+        return switch (state) {
+            case CREATED -> PayoutNextAction.SUBMIT_ALLOWED;
+            case SUBMITTED, ACCEPTED, PROCESSING -> PayoutNextAction.WAITING_EXTERNAL_RESULT;
+            case SUCCEEDED, FAILED -> PayoutNextAction.NO_ACTION_REQUIRED;
+            case RETURNED, MISMATCHED -> PayoutNextAction.REVIEW_REQUIRED;
         };
     }
 }

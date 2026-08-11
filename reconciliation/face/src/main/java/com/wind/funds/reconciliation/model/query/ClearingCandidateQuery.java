@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.query;
 
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,7 +24,7 @@ public class ClearingCandidateQuery {
     private Long tenantId;
 
     @Schema(description = "候选状态")
-    private ClearingCandidateStatus status;
+    private ClearingCandidateState state;
 
     @Schema(description = "最晚可清算时间，包含边界")
     private LocalDateTime clearingAvailableTimeMax;

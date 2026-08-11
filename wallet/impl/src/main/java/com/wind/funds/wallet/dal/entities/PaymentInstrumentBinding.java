@@ -2,7 +2,7 @@ package com.wind.funds.wallet.dal.entities;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -108,7 +108,12 @@ public class PaymentInstrumentBinding implements Serializable, TenantIsolationOb
      * 绑定生命周期状态。
      */
     @NotNull
-    private PaymentInstrumentBindingStatus status;
+    @Column("status")
+    private PaymentInstrumentBindingState state;
+
+    void setStatus(PaymentInstrumentBindingState state) {
+        this.state = state;
+    }
 
     /**
      * 绑定版本号。

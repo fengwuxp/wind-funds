@@ -30,9 +30,9 @@ import com.wind.funds.transaction.application.spend.impl.SpendControlTransaction
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -58,7 +58,7 @@ import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptio
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -300,9 +300,9 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         FundsSubjectBalanceDTO afterAuthorize = balance(creditAccount);
         assertBucket(afterAuthorize, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(afterAuthorize, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
-        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionState(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionState.OPEN.name());
         assertThat(fundsTransactionDetailStatuses(AUTHORIZE_BUSINESS_SN))
-                .containsExactly(FundsTransactionDetailStatus.SUCCEEDED.name());
+                .containsExactly(FundsTransactionDetailState.SUCCEEDED.name());
         assertThat(ledgerTransactionEvents(AUTHORIZE_BUSINESS_SN))
                 .containsExactly(FundsTransactionEventType.AUTHORIZE.name());
         assertThat(ledgerEntrySubjects(AUTHORIZE_BUSINESS_SN)).containsOnly(CREDIT_ACCOUNT_SN);
@@ -358,10 +358,10 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         assertBucket(afterCreditAuthorize, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
         assertBucket(afterParentAuthorize, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(afterParentAuthorize, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
-        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionState(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionState.OPEN.name());
         assertThat(fundsTransactionDetailStatuses(AUTHORIZE_BUSINESS_SN))
-                .containsExactly(FundsTransactionDetailStatus.SUCCEEDED.name(),
-                        FundsTransactionDetailStatus.SUCCEEDED.name());
+                .containsExactly(FundsTransactionDetailState.SUCCEEDED.name(),
+                        FundsTransactionDetailState.SUCCEEDED.name());
         assertThat(ledgerEntrySubjects(AUTHORIZE_BUSINESS_SN))
                 .containsExactlyInAnyOrder(CREDIT_ACCOUNT_SN, CREDIT_ACCOUNT_SN,
                         PARENT_FUNDING_ACCOUNT_SN, PARENT_FUNDING_ACCOUNT_SN);
@@ -504,7 +504,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
 
         assertThat(completionSn).isEqualTo(authorizationSn);
         assertThat(replayedCompletionSn).isEqualTo(completionSn);
-        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionState(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionState.OPEN.name());
         assertThat(fundsTransactionAmounts(AUTHORIZE_BUSINESS_SN)).containsExactly(60L, 0L, 40L, 0L);
         assertThat(ledgerTransactionEvents(COMPLETION_BUSINESS_SCENE, COMPLETION_BUSINESS_SN))
                 .containsExactly(FundsTransactionEventType.COMPLETE.name());
@@ -594,7 +594,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
 
         assertThat(reversalSn).isEqualTo(authorizationSn);
         assertThat(replayedReversalSn).isEqualTo(reversalSn);
-        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionState(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionState.OPEN.name());
         assertThat(ledgerTransactionEvents(REVERSAL_BUSINESS_SCENE, REVERSAL_BUSINESS_SN))
                 .containsExactly(FundsTransactionEventType.REVERSAL.name());
 
@@ -1110,9 +1110,9 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         assertBucket(afterDecline, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(afterDecline, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeDeclineFacts);
-        assertThat(fundsTransactionStatus(DECLINE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.REJECTED.name());
+        assertThat(fundsTransactionState(DECLINE_BUSINESS_SN)).isEqualTo(FundsTransactionState.REJECTED.name());
         assertThat(fundsTransactionDetailStatuses(DECLINE_BUSINESS_SN))
-                .containsExactly(FundsTransactionDetailStatus.REJECTED.name());
+                .containsExactly(FundsTransactionDetailState.REJECTED.name());
         assertThat(fundsTransactionAmounts(DECLINE_BUSINESS_SN))
                 .containsExactly(0L, 0L, 0L, 0L);
         assertThat(routeSnapshotJson(DECLINE_BUSINESS_SN)).isNotBlank();
@@ -1342,7 +1342,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateFundingAccountRequest createPlatformSettlementAccountRequest() {
@@ -1356,7 +1356,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setAccountRoleCode(PlatformFundingAccountRole.SETTLEMENT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_PLATFORM)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateFundingAccountRequest createParentFundingAccountRequest() {
@@ -1369,7 +1369,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateFundingAccountRequest createPrepaidFundingAccountRequest() {
@@ -1391,7 +1391,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_auth_admission_2468")
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
@@ -1642,7 +1642,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .setCurrency(CURRENCY));
     }
 
-    private String fundsTransactionStatus(String businessSn) {
+    private String fundsTransactionState(String businessSn) {
         return jdbcTemplate.queryForObject("""
                 SELECT status FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
@@ -1747,7 +1747,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         assertThat(paymentInstrumentRef.path("instrumentId").asString()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(paymentInstrumentRef.path("instrumentType").asString()).isEqualTo("CARD");
         assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
 
         JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
@@ -1829,7 +1829,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
                 .containsEntry("instrumentType", "CARD")
                 .containsEntry("instrumentNo", "****2468")
                 .containsEntry("currency", CurrencyIsoCode.USD.name())
-                .containsEntry("status", FundsAccountStatus.ACTIVE.name());
+                .containsEntry("status", FundsAccountState.ACTIVE.name());
         assertThat(paymentInstrumentRef)
                 .doesNotContainKey("externalInstrumentId");
         assertThat(paymentInstrumentRef.toString()).doesNotContain("tok_auth_admission_2468");

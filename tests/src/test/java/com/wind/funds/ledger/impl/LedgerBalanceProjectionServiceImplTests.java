@@ -3,7 +3,7 @@ package com.wind.funds.ledger.impl;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
@@ -21,13 +21,13 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
@@ -260,9 +260,9 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testProjectShouldRejectSuspendedLedgerForNormalPosting() {
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(availableLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L))))
@@ -277,15 +277,15 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
      * 红线：关闭账本不是清零动作，余额归零必须来自前置账务事实。
      */
     @Test
-    void testUpdateLedgerStatusShouldRejectClosingNonZeroBalanceLedger() {
+    void testUpdateLedgerStateShouldRejectClosingNonZeroBalanceLedger() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        assertThatThrownBy(() -> ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(availableLedgerId)
-                .setStatus(LedgerStatus.CLOSED)))
+                .setState(LedgerState.CLOSED)))
                 .hasMessageContaining("非零余额账本不允许关闭");
 
-        assertThat(ledgerService.getLedgerById(availableLedgerId).getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertThat(ledgerService.getLedgerById(availableLedgerId).getState()).isEqualTo(LedgerState.ACTIVE);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -295,19 +295,19 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
      * 红线：关闭账本只校验净余额，不得清零历史发生额。
      */
     @Test
-    void testUpdateLedgerStatusShouldCloseZeroNormalBalanceLedgerWithHistoricalAmounts() {
+    void testUpdateLedgerStateShouldCloseZeroNormalBalanceLedgerWithHistoricalAmounts() {
         projectionService.project(List.of(ledgerEntry(
                 availableLedgerId,
                 LedgerSubjectCode.AVAILABLE,
                 EntrySide.CREDIT,
                 100L)));
 
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(availableLedgerId)
-                .setStatus(LedgerStatus.CLOSED));
+                .setState(LedgerState.CLOSED));
 
         LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
-        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.CLOSED);
+        assertThat(ledger.getState()).isEqualTo(LedgerState.CLOSED);
         assertThat(ledger.getDebitAmount()).isEqualTo(100L);
         assertThat(ledger.getCreditAmount()).isEqualTo(100L);
         assertThat(ledger.getNormalBalance()).isZero();
@@ -343,7 +343,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("balance projection service flow test funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);

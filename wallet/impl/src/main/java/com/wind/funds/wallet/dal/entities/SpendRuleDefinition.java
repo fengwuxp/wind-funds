@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
+import com.wind.funds.wallet.enums.SpendRuleDefinitionState;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.integration.core.model.TenantIsolationObject;
@@ -80,7 +80,12 @@ public class SpendRuleDefinition implements Serializable, TenantIsolationObject<
      * 规则定义状态。
      */
     @NotNull
-    private SpendRuleDefinitionStatus status;
+    @Column("status")
+    private SpendRuleDefinitionState state;
+
+    void setStatus(SpendRuleDefinitionState state) {
+        this.state = state;
+    }
 
     /**
      * 规则定义说明。

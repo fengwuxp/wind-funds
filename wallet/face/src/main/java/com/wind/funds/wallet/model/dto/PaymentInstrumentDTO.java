@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -71,7 +71,7 @@ public class PaymentInstrumentDTO implements Serializable {
     private CurrencyIsoCode currency;
 
     @Schema(description = "状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 
     @Schema(description = "生效时间")
     private LocalDateTime validFrom;

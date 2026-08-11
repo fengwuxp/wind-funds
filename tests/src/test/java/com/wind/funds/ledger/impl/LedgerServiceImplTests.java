@@ -8,11 +8,11 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,7 +94,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
-        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertThat(ledger.getState()).isEqualTo(LedgerState.ACTIVE);
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
@@ -134,7 +134,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
-        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertThat(ledger.getState()).isEqualTo(LedgerState.ACTIVE);
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
@@ -163,18 +163,18 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testUpdateLedgerStatusShouldAllowReactivatingSuspendedLedger() {
+    void testUpdateLedgerStateShouldAllowReactivatingSuspendedLedger() {
         Long ledgerId = ledgerService.createLedger(createLedgerRequest(
                 AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID));
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(ledgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
 
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(ledgerId)
-                .setStatus(LedgerStatus.ACTIVE));
+                .setState(LedgerState.ACTIVE));
 
-        assertThat(ledgerService.getLedgerById(ledgerId).getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertThat(ledgerService.getLedgerById(ledgerId).getState()).isEqualTo(LedgerState.ACTIVE);
     }
 
     @BeforeEach

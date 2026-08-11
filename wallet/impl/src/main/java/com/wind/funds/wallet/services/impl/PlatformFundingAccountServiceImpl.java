@@ -3,7 +3,7 @@ package com.wind.funds.wallet.services.impl;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.query.FundingAccountQuery;
@@ -52,9 +52,9 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
                 "平台资金账户配置不唯一，tenantId = {}, currency = {}, role = {}, count = {}",
                 tenantId, currency, role, results.size());
         FundingAccountDTO result = results.getFirst();
-        AssertUtils.isTrue(Boolean.TRUE.equals(result.getPlatform()) && result.getStatus() == FundsAccountStatus.ACTIVE,
+        AssertUtils.isTrue(Boolean.TRUE.equals(result.getPlatform()) && result.getState() == FundsAccountState.ACTIVE,
                 "平台资金账户状态不可用，tenantId = {}, currency = {}, role = {}, accountId = {}, platform = {}, status = {}",
-                tenantId, currency, role, result.getSn(), result.getPlatform(), result.getStatus());
+                tenantId, currency, role, result.getSn(), result.getPlatform(), result.getState());
         AssertUtils.isTrue(result.getCurrency() == currency,
                 "平台资金账户币种不匹配，tenantId = {}, expectedCurrency = {}, actualCurrency = {}, role = {}, accountId = {}",
                 tenantId, currency, result.getCurrency(), role, result.getSn());

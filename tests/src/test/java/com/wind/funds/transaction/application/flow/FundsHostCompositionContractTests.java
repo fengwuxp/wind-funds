@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.governance.enums.ProjectionReplayMode;
-import com.wind.funds.governance.enums.ProjectionReplayTaskStatus;
+import com.wind.funds.governance.enums.ProjectionReplayTaskState;
 import com.wind.funds.governance.projection.CreateFundsProjectionReplayTaskRequest;
 import com.wind.funds.governance.projection.FundsProjectionReplayApplicationService;
 import com.wind.funds.governance.projection.FundsProjectionReplayService;
@@ -126,7 +126,7 @@ class FundsHostCompositionContractTests extends FundsTransactionFlowTestSupport 
                 .maxBatchSize(1)
                 .build(), WindOperatorFactory.system());
         FundsProjectionReplayTaskDTO completedVerify = task(verifyTask.taskSn());
-        assertThat(completedVerify.status()).isEqualTo(ProjectionReplayTaskStatus.COMPLETED);
+        assertThat(completedVerify.state()).isEqualTo(ProjectionReplayTaskState.COMPLETED);
         assertThat(completedVerify.differenceCount()).isPositive();
         assertThat(projectionRowCount("OFFICIAL", "OFFICIAL")).isZero();
         assertThat(projectionRowCount("SHADOW", verifyTask.taskSn())).isZero();
@@ -172,7 +172,7 @@ class FundsHostCompositionContractTests extends FundsTransactionFlowTestSupport 
         assertThatThrownBy(() -> run(task)).hasMessageContaining("RouteSnapshot");
 
         FundsProjectionReplayTaskDTO unchanged = task(task.taskSn());
-        assertThat(unchanged.status()).isEqualTo(ProjectionReplayTaskStatus.CREATED);
+        assertThat(unchanged.state()).isEqualTo(ProjectionReplayTaskState.CREATED);
         assertThat(unchanged.checkpoint().checkpointSn()).isEqualTo(checkpointBefore);
         assertThat(unchanged.successCount()).isZero();
     }

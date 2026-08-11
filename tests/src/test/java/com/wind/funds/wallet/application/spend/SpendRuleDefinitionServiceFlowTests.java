@@ -5,13 +5,13 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
+import com.wind.funds.wallet.enums.SpendRuleDefinitionState;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
@@ -130,10 +130,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
 
         assertThat(definition.getRuleId()).isEqualTo(RULE_ID);
-        assertThat(definition.getStatus()).isEqualTo(SpendRuleDefinitionStatus.ACTIVE);
+        assertThat(definition.getState()).isEqualTo(SpendRuleDefinitionState.ACTIVE);
         assertThat(published.getRuleId()).isEqualTo(RULE_ID);
         assertThat(published.getRuleVersion()).isEqualTo(RULE_VERSION);
-        assertThat(published.getStatus()).isEqualTo(SpendRuleVersionStatus.PUBLISHED);
+        assertThat(published.getState()).isEqualTo(SpendRuleVersionState.PUBLISHED);
         assertThat(replayed.getId()).isEqualTo(published.getId());
         assertThatThrownBy(() -> spendRuleDefinitionService.publishVersion(
                 publishVersionRequest(CHANGED_RULE_DIGEST, "{\"window\":\"MONTHLY\"}")))
@@ -162,7 +162,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
 
         assertThat(instrumentBinding.getSn()).isNotBlank();
         assertThat(instrumentBinding.getScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
-        assertThat(instrumentBinding.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
+        assertThat(instrumentBinding.getState()).isEqualTo(SpendRuleBindingState.ACTIVE);
         assertThat(budgetBinding.getScopeType()).isEqualTo(SpendRuleScopeType.SPEND_CONTROL_SCOPE);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);

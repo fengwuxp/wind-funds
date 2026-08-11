@@ -1,6 +1,7 @@
 package com.wind.funds.reconciliation.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -8,10 +9,14 @@ import lombok.Getter;
  * 对账差错生命周期状态。
  *
  * <p>职责：表达差错从发现、阻断、处理、重跑到关闭的服务端事实状态。</p>
+ *
+ * @author wuxp
+ * @since 2026-06-17
  */
+@Schema(description = "对账差错生命周期状态")
 @Getter
 @AllArgsConstructor
-public enum ReconciliationDifferenceStatus implements DescriptiveEnum {
+public enum ReconciliationDifferenceState implements DescriptiveEnum {
 
     /**
      * 已阻断相关清分、清算、结算、出款或报表对象。

@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -41,7 +41,7 @@ public class FundsAccountCapabilityDecisionDTO implements Serializable {
     private CurrencyIsoCode currency;
 
     @Schema(description = "账户状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 
     @Schema(description = "当前账户能力集合")
     private Set<FundsAccountCapability> capabilities;

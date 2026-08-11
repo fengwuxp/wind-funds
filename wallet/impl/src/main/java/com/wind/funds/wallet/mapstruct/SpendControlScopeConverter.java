@@ -3,7 +3,7 @@ package com.wind.funds.wallet.mapstruct;
 import com.wind.funds.wallet.dal.entities.SpendControlScope;
 import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
@@ -51,6 +51,6 @@ public interface SpendControlScopeConverter {
         entity.setPeriodType(periodType);
         entity.setPeriodId(periodType == AccountBalancePeriodType.LIFETIME
                 ? AccountBalancePeriodType.LIFETIME.name() : request.getPeriodId());
-        entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
+        entity.setState(request.getState() == null ? FundsAccountState.ACTIVE : request.getState());
     }
 }

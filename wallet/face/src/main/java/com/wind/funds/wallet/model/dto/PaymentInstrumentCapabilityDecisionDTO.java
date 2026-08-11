@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -67,7 +67,7 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
     private CurrencyIsoCode currency;
 
     @Schema(description = "支付工具状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 
     @Schema(description = "绑定主键；请求未指定绑定角色时为空")
     private Long bindingId;

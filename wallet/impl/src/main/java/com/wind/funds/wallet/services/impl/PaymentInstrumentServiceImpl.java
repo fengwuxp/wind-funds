@@ -30,7 +30,7 @@ import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -241,7 +241,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     private boolean sameBindingState(PaymentInstrumentBindingDTO left, PaymentInstrumentBindingDTO right) {
         return Objects.equals(left.getPriority(), right.getPriority())
                 && Objects.equals(left.getDefaultBinding(), right.getDefaultBinding())
-                && left.getStatus() == right.getStatus()
+                && left.getState() == right.getState()
                 && Objects.equals(left.getValidFrom(), right.getValidFrom())
                 && Objects.equals(left.getValidTo(), right.getValidTo())
                 && Objects.equals(left.getDescription(), right.getDescription())
@@ -298,7 +298,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.channelCode.eq(query.getChannelCode()))
                 .and(ref.externalInstrumentId.eq(query.getExternalInstrumentId()))
                 .and(ref.currency.eq(query.getCurrency()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.state.eq(query.getState()));
         return MybatisQueryHelper.<PaymentInstrument, PaymentInstrumentDTO>query(wrapper)
                 .counter(paymentInstrumentMapper::selectCountByQuery)
                 .resultQueryFunc(paymentInstrumentMapper::selectListByQuery)
@@ -336,7 +336,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private void assertInstrumentCanBind(PaymentInstrument instrument, CreatePaymentInstrumentBindingRequest request) {
-        AssertUtils.isTrue(instrument.getStatus() == FundsAccountStatus.ACTIVE,
+        AssertUtils.isTrue(instrument.getState() == FundsAccountState.ACTIVE,
                 "支付工具不可用于绑定，instrumentSn = {}",
                 request.getInstrumentSn());
         AssertUtils.isTrue(instrument.getCurrency() == request.getCurrency(),
@@ -425,8 +425,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         if (request.getDefaultBinding() != null) {
             entity.setDefaultBinding(request.getDefaultBinding());
         }
-        if (request.getStatus() != null) {
-            entity.setStatus(request.getStatus());
+        if (request.getState() != null) {
+            entity.setState(request.getState());
         }
         if (request.getValidFrom() != null) {
             entity.setValidFrom(request.getValidFrom());
@@ -453,7 +453,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .setNextVersion(after.getVersion())
                 .setPriority(request.getPriority() == null ? null : after.getPriority())
                 .setDefaultBinding(request.getDefaultBinding() == null ? null : after.getDefaultBinding())
-                .setStatus(request.getStatus() == null ? null : after.getStatus())
+                .setState(request.getState() == null ? null : after.getState())
                 .setValidFrom(request.getValidFrom() == null ? null : after.getValidFrom())
                 .setValidTo(request.getValidTo() == null ? null : after.getValidTo())
                 .setDescription(request.getDescription() == null ? null : after.getDescription())
@@ -494,7 +494,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         values.put(PaymentInstrumentBinding.Fields.currency, binding.getCurrency());
         values.put(PaymentInstrumentBinding.Fields.priority, binding.getPriority());
         values.put(PaymentInstrumentBinding.Fields.defaultBinding, binding.getDefaultBinding());
-        values.put(PaymentInstrumentBinding.Fields.status, binding.getStatus());
+        values.put(PaymentInstrumentBinding.Fields.state, binding.getState());
         values.put(PaymentInstrumentBinding.Fields.version, binding.getVersion());
         values.put(PaymentInstrumentBinding.Fields.validFrom, binding.getValidFrom());
         values.put(PaymentInstrumentBinding.Fields.validTo, binding.getValidTo());
@@ -517,7 +517,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         result.setCurrency(source.getCurrency());
         result.setPriority(source.getPriority());
         result.setDefaultBinding(source.getDefaultBinding());
-        result.setStatus(source.getStatus());
+        result.setState(source.getState());
         result.setVersion(source.getVersion());
         result.setValidFrom(source.getValidFrom());
         result.setValidTo(source.getValidTo());

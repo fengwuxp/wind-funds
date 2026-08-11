@@ -17,7 +17,7 @@ import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
@@ -156,9 +156,9 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
             return null;
         }
         FundsTransactionDTO transaction = existing.get();
-        AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
+        AssertUtils.isTrue(transaction.getState() == FundsTransactionState.CLOSED,
                 "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
-                transaction.getSn(), transaction.getStatus());
+                transaction.getSn(), transaction.getState());
         RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
                 .findRouteSnapshotByTransactionSn(transaction.getSn())
                 .orElse(null);
@@ -495,7 +495,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
                 .ownerId(instrument.getOwnerId())
                 .ownerType(instrument.getOwnerType().name())
                 .currency(instrument.getCurrency().name())
-                .status(instrument.getStatus().name())
+                .status(instrument.getState().name())
                 .bindingSnapshot(bindingSnapshot(snapshot, instrument))
                 .description(instrument.getDescription())
                 .build();
@@ -508,7 +508,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         AssertUtils.notNull(instrument.getOwnerType(), "支付工具快照归属主体类型不能为空");
         AssertUtils.hasText(instrument.getInstrumentType(), "支付工具快照类型不能为空");
         AssertUtils.notNull(instrument.getCurrency(), "支付工具快照币种不能为空");
-        AssertUtils.notNull(instrument.getStatus(), "支付工具快照状态不能为空");
+        AssertUtils.notNull(instrument.getState(), "支付工具快照状态不能为空");
         AssertUtils.hasText(instrument.getBindingSn(), "支付工具绑定快照绑定号不能为空");
         AssertUtils.notNull(instrument.getBindingVersion(), "支付工具绑定快照版本不能为空");
         AssertUtils.notNull(instrument.getBindingRole(), "支付工具绑定快照角色不能为空");

@@ -6,12 +6,12 @@ import com.wind.funds.reconciliation.dal.entities.RecoveryOrder;
 import com.wind.funds.reconciliation.dal.entities.RecoveryResult;
 import com.wind.funds.reconciliation.dal.mapper.RecoveryOrderMapper;
 import com.wind.funds.reconciliation.dal.mapper.RecoveryResultMapper;
-import com.wind.funds.reconciliation.enums.RecoveryOrderStatus;
+import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.funds.reconciliation.model.dto.RecoveryOrderDTO;
 import com.wind.funds.reconciliation.model.request.CreateRecoveryOrderRequest;
 import com.wind.funds.reconciliation.model.request.RecordRecoveryResultRequest;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -112,10 +112,10 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         order.setRecoveredAmount(order.getRecoveredAmount() + transaction.getAmount());
         order.setLastFundsTransactionSn(transaction.getSn());
         if (Objects.equals(order.getRecoveredAmount(), order.getExpectedAmount())) {
-            order.setStatus(RecoveryOrderStatus.RECOVERED);
+            order.setState(RecoveryOrderState.RECOVERED);
             order.setRecoveredTime(LocalDateTime.now());
         } else {
-            order.setStatus(RecoveryOrderStatus.PARTIALLY_RECOVERED);
+            order.setState(RecoveryOrderState.PARTIALLY_RECOVERED);
         }
         AssertUtils.isTrue(recoveryOrderMapper.update(order) == 1, "更新追偿单累计结果失败");
         return toDTO(order);
@@ -141,7 +141,7 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         result.setExpectedAmount(request.getExpectedAmount());
         result.setRecoveredAmount(0L);
         result.setCurrency(request.getCurrency());
-        result.setStatus(RecoveryOrderStatus.CREATED);
+        result.setState(RecoveryOrderState.CREATED);
         result.setSourceDigest(request.getSourceDigest());
         result.setOrderDigest(digest);
         result.setApprovalRef(request.getApprovalRef());
@@ -176,7 +176,7 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
                 .orElseThrow(() -> new IllegalArgumentException(
                         "追偿资金交易不存在，fundsTransactionSn = " + transactionSn));
         AssertUtils.equals(order.getTenantId(), transaction.getTenantId(), "追偿资金交易租户不一致");
-        AssertUtils.equals(FundsTransactionStatus.CLOSED, transaction.getStatus(), "追偿资金交易必须已关闭");
+        AssertUtils.equals(FundsTransactionState.CLOSED, transaction.getState(), "追偿资金交易必须已关闭");
         AssertUtils.equals(RECOVERY_BUSINESS_SCENE, transaction.getBusinessScene(),
                 "追偿资金交易 businessScene 必须为 RECOVERY");
         AssertUtils.notNull(transaction.getAmount(), "追偿资金交易金额不能为空");
@@ -185,7 +185,7 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
 
         List<FundsTransactionDetailDTO> details = fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
         boolean responsibleSubjectIncluded = details.stream().anyMatch(detail ->
-                detail.getStatus() == FundsTransactionDetailStatus.SUCCEEDED
+                detail.getState() == FundsTransactionDetailState.SUCCEEDED
                         && Objects.equals(order.getTenantId(), detail.getTenantId())
                         && Objects.equals(order.getResponsibleSubjectType(), detail.getSubjectType())
                         && Objects.equals(order.getResponsibleSubjectId(), detail.getSubjectId())
@@ -246,7 +246,7 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
                 .setRecoveredAmount(source.getRecoveredAmount())
                 .setRemainingAmount(source.getExpectedAmount() - source.getRecoveredAmount())
                 .setCurrency(source.getCurrency())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setLastFundsTransactionSn(source.getLastFundsTransactionSn())
                 .setRecoveredTime(source.getRecoveredTime());
     }

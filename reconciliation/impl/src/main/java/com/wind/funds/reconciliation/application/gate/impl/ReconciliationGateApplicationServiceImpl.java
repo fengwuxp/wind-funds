@@ -12,10 +12,10 @@ import com.wind.funds.reconciliation.dal.mapper.ReconciliationBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationBatchLineageMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
@@ -60,9 +60,9 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     @Transactional(propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     public ReconciliationGateDecisionDTO checkGate(CheckReconciliationGateRequest request, WindOperator operator) {
         ReconciliationGateDecisionDTO result = evaluateGate(request, operator, true);
-        log.info("对账 Gate 检查完成，tenantId = {}, gateObjectType = {}, gateObjectSn = {}, runResultSn = {}, decisionStatus = {}, blockingDifferenceCount = {}",
+        log.info("对账 Gate 检查完成，tenantId = {}, gateObjectType = {}, gateObjectSn = {}, runResultSn = {}, decisionResult = {}, blockingDifferenceCount = {}",
                 request.getTenantId(), request.getGateObjectType(), request.getGateObjectSn(),
-                request.getReconciliationRunResultSn(), result.getDecisionStatus(),
+                request.getReconciliationRunResultSn(), result.getDecisionResult(),
                 result.getBlockingDifferences().size());
         return result;
     }
@@ -112,9 +112,9 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
                     "对账批次未完成或与运行结果绑定不一致，准入必须阻断");
         }
-        if (runResult.getStatus() != ReconciliationRunResultStatus.BALANCED) {
+        if (runResult.getOutcome() != ReconciliationRunOutcome.BALANCED) {
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
-                    "对账运行结果状态为 " + runResult.getStatus() + "，只有 BALANCED 可以进入后续准入");
+                    "对账运行结果状态为 " + runResult.getOutcome() + "，只有 BALANCED 可以进入后续准入");
         }
         Set<String> currentLineageBatchSns = currentLineageBatchSns(batch);
         List<String> currentLineage = List.copyOf(currentLineageBatchSns);
@@ -127,20 +127,20 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         }
         int resolvedDifferenceCount = reconciliationDifferenceMapper.countResolvedByGateObject(
                 request.getTenantId(), request.getGateObjectType().name(), request.getGateObjectSn(), currentLineage);
-        ReconciliationGateDecisionStatus decisionStatus = resolveDecisionStatus(blockingDifferences);
+        ReconciliationGateDecisionResult decisionResult = resolveDecisionResult(blockingDifferences);
         return new ReconciliationGateDecisionDTO()
-                .setPassed(decisionStatus != ReconciliationGateDecisionStatus.BLOCKED)
-                .setDecisionStatus(decisionStatus)
+                .setPassed(decisionResult != ReconciliationGateDecisionResult.BLOCKED)
+                .setDecisionResult(decisionResult)
                 .setGateObjectType(request.getGateObjectType())
                 .setGateObjectSn(request.getGateObjectSn())
                 .setReconciliationRunResultSn(runResult.getSn())
                 .setReconciliationBatchSn(runResult.getReconciliationBatchSn())
-                .setReconciliationRunResultStatus(runResult.getStatus())
+                .setReconciliationRunOutcome(runResult.getOutcome())
                 .setReconciliationResultDigest(runResult.getResultDigest())
                 .setBlockingDifferences(toBlockingDifferenceDTOs(blockingDifferences))
                 .setResolvedDifferenceCount(resolvedDifferenceCount)
                 .setEvidenceRefs(evidenceRefs(runEvidenceRefs, blockingDifferences))
-                .setExplanation(resolveExplanation(decisionStatus, resolvedDifferenceCount, blockingDifferences))
+                .setExplanation(resolveExplanation(decisionResult, resolvedDifferenceCount, blockingDifferences))
                 .setCheckedAt(LocalDateTime.now())
                 .setCheckedBy(operatorId(operator));
     }
@@ -163,7 +163,7 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     private boolean isCompletedBatchBoundToRunResult(@Nullable ReconciliationBatch batch,
                                                      ReconciliationRunResult runResult) {
         return batch != null
-                && batch.getStatus() == ReconciliationBatchStatus.COMPLETED
+                && batch.getState() == ReconciliationBatchState.COMPLETED
                 && Objects.equals(batch.getRunResultSn(), runResult.getSn())
                 && Objects.equals(batch.getReconciliationScopeRef(), runResult.getReconciliationScopeRef())
                 && batch.getGateObjectType() == runResult.getGateObjectType()
@@ -197,11 +197,11 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         return result;
     }
 
-    private ReconciliationGateDecisionStatus resolveDecisionStatus(List<ReconciliationDifference> blockingDifferences) {
+    private ReconciliationGateDecisionResult resolveDecisionResult(List<ReconciliationDifference> blockingDifferences) {
         if (!blockingDifferences.isEmpty()) {
-            return ReconciliationGateDecisionStatus.BLOCKED;
+            return ReconciliationGateDecisionResult.BLOCKED;
         }
-        return ReconciliationGateDecisionStatus.PASSED;
+        return ReconciliationGateDecisionResult.PASSED;
     }
 
     private List<ReconciliationGateBlockingDifferenceDTO> toBlockingDifferenceDTOs(
@@ -214,7 +214,7 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     private ReconciliationGateBlockingDifferenceDTO toBlockingDifferenceDTO(ReconciliationDifference difference) {
         return new ReconciliationGateBlockingDifferenceDTO()
                 .setDifferenceSn(difference.getDifferenceSn())
-                .setStatus(difference.getStatus())
+                .setState(difference.getState())
                 .setSeverity(difference.getSeverity())
                 .setResponsiblePartyRef(difference.getResponsiblePartyRef())
                 .setBlockingObjectType(difference.getBlockingObjectType())
@@ -232,7 +232,7 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     }
 
     private String blockingReason(ReconciliationDifference difference) {
-        if (difference.getStatus() == ReconciliationDifferenceStatus.BLOCKED) {
+        if (difference.getState() == ReconciliationDifferenceState.BLOCKED) {
             return "对账差错未闭环，仍命中阻断范围";
         }
         if (!Boolean.TRUE.equals(difference.getLastRerunBalanced())) {
@@ -263,12 +263,12 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
                                                                String explanation) {
         return new ReconciliationGateDecisionDTO()
                 .setPassed(false)
-                .setDecisionStatus(ReconciliationGateDecisionStatus.BLOCKED)
+                .setDecisionResult(ReconciliationGateDecisionResult.BLOCKED)
                 .setGateObjectType(request.getGateObjectType())
                 .setGateObjectSn(request.getGateObjectSn())
                 .setReconciliationRunResultSn(request.getReconciliationRunResultSn())
                 .setReconciliationBatchSn(runResult == null ? null : runResult.getReconciliationBatchSn())
-                .setReconciliationRunResultStatus(runResult == null ? null : runResult.getStatus())
+                .setReconciliationRunOutcome(runResult == null ? null : runResult.getOutcome())
                 .setReconciliationResultDigest(runResult == null ? null : runResult.getResultDigest())
                 .setBlockingDifferences(List.of())
                 .setResolvedDifferenceCount(0)
@@ -284,10 +284,10 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         }
     }
 
-    private String resolveExplanation(ReconciliationGateDecisionStatus decisionStatus,
+    private String resolveExplanation(ReconciliationGateDecisionResult decisionResult,
                                       int resolvedDifferenceCount,
                                       List<ReconciliationDifference> blockingDifferences) {
-        if (decisionStatus == ReconciliationGateDecisionStatus.BLOCKED) {
+        if (decisionResult == ReconciliationGateDecisionResult.BLOCKED) {
             return "存在 " + blockingDifferences.size() + " 个未闭环对账差错，准入必须阻断";
         }
         if (resolvedDifferenceCount > 0) {

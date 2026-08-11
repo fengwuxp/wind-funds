@@ -37,7 +37,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -381,7 +381,7 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("ledger transaction service fact query funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);

@@ -12,7 +12,7 @@ import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityAppl
 import com.wind.funds.wallet.application.spend.impl.BudgetControlLimitAdjustmentApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
@@ -433,7 +433,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private void cleanupBudgetControlLimitAdjustmentTestData() {

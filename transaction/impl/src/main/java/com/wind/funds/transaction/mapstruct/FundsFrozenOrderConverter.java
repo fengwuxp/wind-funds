@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.mapstruct;
 
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.transaction.model.dto.FundsFrozenOrderDTO;
 import com.wind.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import org.mapstruct.AfterMapping;
@@ -51,14 +51,14 @@ public interface FundsFrozenOrderConverter {
     @AfterMapping
     default void fillCreateDefaults(CreateFundsFrozenOrderRequest request, @MappingTarget FundsFrozenOrder entity) {
         entity.setReleasedAmount(0L);
-        entity.setStatus(request.getStatus() == null
-                ? resolveInitialStatus(request)
-                : request.getStatus());
+        entity.setState(request.getState() == null
+                ? resolveInitialState(request)
+                : request.getState());
     }
 
-    private FundsFrozenOrderStatus resolveInitialStatus(CreateFundsFrozenOrderRequest request) {
+    private FundsFrozenOrderState resolveInitialState(CreateFundsFrozenOrderRequest request) {
         return StringUtils.hasText(request.getFreezeLedgerTransactionSn())
-                ? FundsFrozenOrderStatus.FROZEN
-                : FundsFrozenOrderStatus.CREATED;
+                ? FundsFrozenOrderState.FROZEN
+                : FundsFrozenOrderState.CREATED;
     }
 }

@@ -11,8 +11,8 @@ import com.wind.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
 import com.wind.funds.transaction.enums.FundsEffectType;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -287,7 +287,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 .where(ref.tenantId.eq(originalOrder.getTenantId()))
                 .and(ref.businessScene.eq(excludedBusinessScene))
                 .and(ref.businessSn.eq(excludedBusinessSn))
-                .and(ref.status.eq(FundsFrozenOrderStatus.RELEASED))
+                .and(ref.state.eq(FundsFrozenOrderState.RELEASED))
                 .and(ref.currency.eq(originalOrder.getCurrency()));
         return fundsFrozenOrderMapper.selectListByQuery(wrapper)
                 .stream()
@@ -317,7 +317,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 .from(ref)
                 .where(ref.referenceDetailSn.eq(referenceTransactionSn))
                 .and(ref.eventType.eq(eventType))
-                .and(ref.status.eq(FundsTransactionDetailStatus.SUCCEEDED))
+                .and(ref.state.eq(FundsTransactionDetailState.SUCCEEDED))
                 .and(ref.ledgerTransactionSn.isNotNull())
                 .orderBy(ref.id.asc());
         return fundsTransactionDetailMapper.selectListByQuery(wrapper);

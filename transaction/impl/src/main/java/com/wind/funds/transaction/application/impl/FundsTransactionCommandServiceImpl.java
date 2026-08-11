@@ -23,9 +23,9 @@ import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameR
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -100,9 +100,9 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.isTrue(ExternalFundsFactDigestSupport.matches(
                         existingTransaction.getExternalFundsFactDigest(), instruction),
                 "外部资金事实请求参数不一致，transactionSn = {}", existingTransaction.getSn());
-        AssertUtils.isTrue(existingTransaction.getStatus() == FundsTransactionStatus.CLOSED,
+        AssertUtils.isTrue(existingTransaction.getState() == FundsTransactionState.CLOSED,
                 "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
-                existingTransaction.getSn(), existingTransaction.getStatus());
+                existingTransaction.getSn(), existingTransaction.getState());
         log.info("外部资金事实已完成，复用原资金交易，externalSourceCode={}, externalFundsFactSn={}, "
                         + "transactionSn={}", instruction.getExternalSourceCode(), instruction.getExternalFundsFactSn(),
                 existingTransaction.getSn());
@@ -330,7 +330,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                 .and(ref.eventType.eq(instruction.getEventType()));
         List<FundsTransactionDetail> details = fundsTransactionDetailMapper.selectListByQuery(wrapper);
         return !details.isEmpty()
-                && details.stream().allMatch(detail -> detail.getStatus() == FundsTransactionDetailStatus.SUCCEEDED);
+                && details.stream().allMatch(detail -> detail.getState() == FundsTransactionDetailState.SUCCEEDED);
     }
 
 }

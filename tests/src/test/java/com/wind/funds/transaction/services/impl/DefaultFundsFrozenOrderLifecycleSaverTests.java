@@ -22,7 +22,7 @@ import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -235,7 +235,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         result.setAmount(instruction.getAmount().getAmount());
         result.setReleasedAmount(0L);
         result.setCurrency(instruction.getAmount().getCurrency());
-        result.setStatus(FundsFrozenOrderStatus.RELEASED);
+        result.setState(FundsFrozenOrderState.RELEASED);
         result.setContextVariables(WindJson.toJsonString(context));
         return result;
     }

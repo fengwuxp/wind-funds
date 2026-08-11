@@ -2,9 +2,9 @@ package com.wind.funds.transaction.projection.impl;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
@@ -80,8 +80,8 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
                 .ownerId(primaryDetail.getSubjectId())
                 .occurredTime(primaryDetail.getGmtCreate())
                 .ledgerTransactionSn(primaryDetail.getLedgerTransactionSn())
-                .completed(isCompleted(primaryDetail.getStatus()))
-                .failed(primaryDetail.getStatus() == FundsTransactionDetailStatus.FAILED)
+                .completed(isCompleted(primaryDetail.getState()))
+                .failed(primaryDetail.getState() == FundsTransactionDetailState.FAILED)
                 .eventType(primaryDetail.getEventType())
                 .amount(Money.immutable(primaryDetail.getAmount(), primaryDetail.getCurrency()))
                 .contextVariables(parseContextVariables(primaryDetail.getContextVariables()))
@@ -182,12 +182,12 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
 
     private boolean isFrozenOrderCompleted(FundsFrozenOrder order, FundsTransactionEventType eventType) {
         if (eventType == FundsTransactionEventType.UNFREEZE) {
-            return order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                    || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
+            return order.getState() == FundsFrozenOrderState.RELEASED
+                    || order.getState() == FundsFrozenOrderState.CLOSED;
         }
-        return order.getStatus() == FundsFrozenOrderStatus.FROZEN
-                || order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
+        return order.getState() == FundsFrozenOrderState.FROZEN
+                || order.getState() == FundsFrozenOrderState.RELEASED
+                || order.getState() == FundsFrozenOrderState.CLOSED;
     }
 
     private boolean matchesEvent(FundsTransactionProjectionScanQuery query,
@@ -230,10 +230,10 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
         return id == null ? 0L : id;
     }
 
-    private boolean isCompleted(FundsTransactionDetailStatus status) {
-        return status == FundsTransactionDetailStatus.SUCCEEDED
-                || status == FundsTransactionDetailStatus.REJECTED
-                || status == FundsTransactionDetailStatus.FAILED;
+    private boolean isCompleted(FundsTransactionDetailState state) {
+        return state == FundsTransactionDetailState.SUCCEEDED
+                || state == FundsTransactionDetailState.REJECTED
+                || state == FundsTransactionDetailState.FAILED;
     }
 
     private @NonNull Map<String, Object> parseContextVariables(@Nullable String contextVariables) {
@@ -246,7 +246,7 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
     }
 
     private @Nullable String resolveFailureReason(FundsTransactionDetailDTO primaryDetail) {
-        if (primaryDetail.getStatus() != FundsTransactionDetailStatus.FAILED) {
+        if (primaryDetail.getState() != FundsTransactionDetailState.FAILED) {
             return null;
         }
         if (StringUtils.hasText(primaryDetail.getErrorMessage())) {

@@ -15,8 +15,8 @@ import com.wind.funds.reconciliation.dal.mapper.ClearingBatchDetailMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingCandidateMapper;
 import com.wind.funds.reconciliation.dal.entities.table.ClearingBatchNameRefs;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ClearingBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
@@ -30,7 +30,7 @@ import com.wind.funds.reconciliation.model.request.ReturnClearingBatchToDraftReq
 import com.wind.funds.reconciliation.model.request.SubmitClearingBatchRequest;
 import com.wind.funds.transaction.application.FundsClearingTransactionService;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsClearingConfirmRequest;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -91,7 +91,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         validateCandidateRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getCandidateSns(), operator);
         List<ClearingCandidate> candidates = requiredCandidates(request.getTenantId(), request.getCandidateSns());
-        validateBatchBoundary(candidates, ClearingCandidateStatus.READY);
+        validateBatchBoundary(candidates, ClearingCandidateState.READY);
         ClearingBatch batch = newBatch(request.getTenantId(), candidates, operator);
         clearingBatchMapper.insertSelective(batch);
         AssertUtils.notNull(batch.getId(), "创建清算批次失败");
@@ -107,10 +107,10 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                 request == null ? null : request.getClearingBatchSn(), operator);
         validateCandidateSns(request.getCandidateSns());
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
-        AssertUtils.isTrue(batch.getStatus() == ClearingBatchStatus.DRAFT,
-                "只有 DRAFT 清算批次可以替换候选，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT,
+                "只有 DRAFT 清算批次可以替换候选，status = {}", batch.getState());
         List<ClearingCandidate> candidates = requiredCandidates(request.getTenantId(), request.getCandidateSns());
-        validateBatchBoundary(candidates, ClearingCandidateStatus.READY);
+        validateBatchBoundary(candidates, ClearingCandidateState.READY);
         applySummary(batch, candidates);
         AssertUtils.isTrue(clearingBatchMapper.update(batch) == 1, "更新清算批次草稿失败");
         replaceDetails(batch, candidates, operator);
@@ -123,14 +123,14 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         validateCommandRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getClearingBatchSn(), operator);
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
-        if (batch.getStatus() == ClearingBatchStatus.REVIEWING) {
+        if (batch.getState() == ClearingBatchState.REVIEWING) {
             validateReviewingBatch(batch);
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingBatchStatus.DRAFT,
-                "只有 DRAFT 清算批次可以提交复核，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT,
+                "只有 DRAFT 清算批次可以提交复核，status = {}", batch.getState());
         List<ClearingCandidate> candidates = batchCandidates(batch);
-        validateBatchBoundary(candidates, ClearingCandidateStatus.READY);
+        validateBatchBoundary(candidates, ClearingCandidateState.READY);
         applySummary(batch, candidates);
         replaceDetails(batch, candidates, operator);
         LocalDateTime now = LocalDateTime.now();
@@ -141,7 +141,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                     "锁定清算候选失败，candidateSn = {}", candidate.getSn());
         }
         batch.setActiveAmountDigest(batch.getAmountDigest());
-        batch.setStatus(ClearingBatchStatus.REVIEWING);
+        batch.setState(ClearingBatchState.REVIEWING);
         batch.setSubmittedBy(updatedBy);
         batch.setSubmittedTime(now);
         AssertUtils.isTrue(clearingBatchMapper.update(batch) == 1, "提交清算批次复核失败");
@@ -155,14 +155,14 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                 request == null ? null : request.getClearingBatchSn(), operator);
         validateReason(request.getReason(), ReturnClearingBatchToDraftRequest.MAX_REASON_LENGTH, "清算批次退回原因");
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
-        if (batch.getStatus() == ClearingBatchStatus.DRAFT) {
+        if (batch.getState() == ClearingBatchState.DRAFT) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingBatchStatus.REVIEWING,
-                "只有 REVIEWING 清算批次可以退回草稿，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingBatchState.REVIEWING,
+                "只有 REVIEWING 清算批次可以退回草稿，status = {}", batch.getState());
         assertNoFundsFact(batch);
         releaseCandidates(batch, operator);
-        batch.setStatus(ClearingBatchStatus.DRAFT);
+        batch.setState(ClearingBatchState.DRAFT);
         batch.setActiveAmountDigest(null);
         releaseActiveAmountDigest(batch);
         batch.setReturnedBy(operator.getOperatorAsText());
@@ -178,11 +178,11 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         validateCommandRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getClearingBatchSn(), operator);
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
-        if (batch.getStatus() == ClearingBatchStatus.CONFIRMED) {
+        if (batch.getState() == ClearingBatchState.CONFIRMED) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingBatchStatus.REVIEWING,
-                "只有 REVIEWING 清算批次可以确认，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingBatchState.REVIEWING,
+                "只有 REVIEWING 清算批次可以确认，status = {}", batch.getState());
         List<ClearingCandidate> candidates = validateReviewingBatch(batch);
         for (ClearingCandidate candidate : candidates) {
             validateCurrentCandidate(batch, candidate, operator);
@@ -200,7 +200,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                     .setDescription("clearing batch confirmation"), operator);
             markCandidatesCleared(batch, candidates, operator);
             batch.setFundsTransactionSn(fundsTransactionSn);
-            batch.setStatus(ClearingBatchStatus.CONFIRMED);
+            batch.setState(ClearingBatchState.CONFIRMED);
             batch.setActiveAmountDigest(null);
             releaseActiveAmountDigest(batch);
             batch.setConfirmedBy(operator.getOperatorAsText());
@@ -222,17 +222,17 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                 request == null ? null : request.getClearingBatchSn(), operator);
         validateReason(request.getReason(), CancelClearingBatchRequest.MAX_REASON_LENGTH, "清算批次取消原因");
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
-        if (batch.getStatus() == ClearingBatchStatus.CANCELLED) {
+        if (batch.getState() == ClearingBatchState.CANCELLED) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingBatchStatus.DRAFT
-                        || batch.getStatus() == ClearingBatchStatus.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 清算批次可以取消，status = {}", batch.getStatus());
-        if (batch.getStatus() == ClearingBatchStatus.REVIEWING) {
+        AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT
+                        || batch.getState() == ClearingBatchState.REVIEWING,
+                "只有 DRAFT 或 REVIEWING 清算批次可以取消，status = {}", batch.getState());
+        if (batch.getState() == ClearingBatchState.REVIEWING) {
             assertNoFundsFact(batch);
             releaseCandidates(batch, operator);
         }
-        batch.setStatus(ClearingBatchStatus.CANCELLED);
+        batch.setState(ClearingBatchState.CANCELLED);
         batch.setActiveAmountDigest(null);
         releaseActiveAmountDigest(batch);
         batch.setCancelledBy(operator.getOperatorAsText());
@@ -263,7 +263,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(batch)
                 .where(batch.tenantId.eq(tenantId))
-                .and(batch.status.eq(query.getStatus()))
+                .and(batch.state.eq(query.getState()))
                 .and(batch.gmtModified.le(query.getGmtModifiedMax()))
                 .orderBy(batch.gmtModified.asc(), batch.id.asc());
         return MybatisQueryHelper.<ClearingBatch, ClearingBatchDTO>query(wrapper)
@@ -277,7 +277,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         ClearingBatch result = new ClearingBatch();
         result.setSn(TemporalSequenceFactory.hourNext(BATCH_SEQUENCE_TYPE));
         result.setTenantId(tenantId);
-        result.setStatus(ClearingBatchStatus.DRAFT);
+        result.setState(ClearingBatchState.DRAFT);
         result.setCreatedBy(operator.getOperatorAsText());
         applySummary(result, candidates);
         return result;
@@ -324,7 +324,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         AssertUtils.isTrue(details.size() == batch.getCandidateCount(), "清算批次候选数量与摘要不一致");
         List<ClearingCandidate> candidates = requiredCandidates(batch.getTenantId(),
                 details.stream().map(ClearingBatchDetail::getCandidateSn).toList());
-        validateBatchBoundary(candidates, ClearingCandidateStatus.LOCKED);
+        validateBatchBoundary(candidates, ClearingCandidateState.LOCKED);
         for (ClearingCandidate candidate : candidates) {
             AssertUtils.equals(batch.getSn(), candidate.getLockedClearingBatchSn(),
                     "清算候选未由当前批次锁定，candidateSn = {}", candidate.getSn());
@@ -357,8 +357,8 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         AssertUtils.notNull(transaction, "清算来源交易不存在，fundsTransactionSn = {}",
                 candidate.getFundsTransactionSn());
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), batch.getTenantId())
-                        && (transaction.getStatus() == FundsTransactionStatus.OPEN
-                        || transaction.getStatus() == FundsTransactionStatus.CLOSED)
+                        && (transaction.getState() == FundsTransactionState.OPEN
+                        || transaction.getState() == FundsTransactionState.CLOSED)
                         && defaultAmount(transaction.getRefundedAmount()) == 0
                         && transaction.getCurrency() == candidate.getCurrency(),
                 "清算来源交易已变化，fundsTransactionSn = {}", candidate.getFundsTransactionSn());
@@ -387,7 +387,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                                             WindOperator operator) {
         FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
                 exception.getFundsTransactionSn()).orElse(null);
-        if (transaction == null || transaction.getStatus() != FundsTransactionStatus.FAILED) {
+        if (transaction == null || transaction.getState() != FundsTransactionState.FAILED) {
             throw new IllegalStateException("清算资金结果未知，不能释放候选", exception);
         }
         LocalDateTime now = LocalDateTime.now();
@@ -398,7 +398,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                     "阻断明确失败的清算候选失败，candidateSn = {}", candidate.getSn());
         }
         batch.setFundsTransactionSn(transaction.getSn());
-        batch.setStatus(ClearingBatchStatus.FAILED);
+        batch.setState(ClearingBatchState.FAILED);
         batch.setActiveAmountDigest(null);
         releaseActiveAmountDigest(batch);
         batch.setFailedBy(updatedBy);
@@ -460,12 +460,12 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
     }
 
     private void validateBatchBoundary(List<ClearingCandidate> candidates,
-                                       ClearingCandidateStatus requiredStatus) {
+                                       ClearingCandidateState requiredState) {
         AssertUtils.notEmpty(candidates, "清算候选不能为空");
         ClearingCandidate first = candidates.getFirst();
         for (ClearingCandidate candidate : candidates) {
-            AssertUtils.isTrue(candidate.getStatus() == requiredStatus,
-                    "清算候选状态必须为 {}，candidateSn = {}", requiredStatus, candidate.getSn());
+            AssertUtils.isTrue(candidate.getState() == requiredState,
+                    "清算候选状态必须为 {}，candidateSn = {}", requiredState, candidate.getSn());
             AssertUtils.isTrue(candidate.getAmount() != null && candidate.getAmount() > 0,
                     "清算候选金额必须大于 0，candidateSn = {}", candidate.getSn());
             AssertUtils.isTrue(Objects.equals(first.getSubjectType(), candidate.getSubjectType())
@@ -567,7 +567,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
     }
 
     private ClearingBatchDTO toDTO(ClearingBatch source) {
-        String reason = switch (source.getStatus()) {
+        String reason = switch (source.getState()) {
             case DRAFT -> source.getReturnReason();
             case CANCELLED -> source.getCancelReason();
             case FAILED -> source.getFailureReason();
@@ -588,7 +588,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                 .setTotalAmount(source.getTotalAmount())
                 .setAmountDigest(source.getAmountDigest())
                 .setFundsTransactionSn(source.getFundsTransactionSn())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setCreatedTime(source.getGmtCreate())
                 .setSubmittedTime(source.getSubmittedTime())
                 .setConfirmedTime(source.getConfirmedTime())

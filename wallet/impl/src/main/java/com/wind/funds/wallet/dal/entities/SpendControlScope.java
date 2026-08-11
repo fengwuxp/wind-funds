@@ -6,7 +6,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -106,7 +106,12 @@ public class SpendControlScope implements Serializable, TenantIsolationObject<Lo
      * 支出控制范围状态。
      */
     @NotNull
-    private FundsAccountStatus status;
+    @Column("status")
+    private FundsAccountState state;
+
+    void setStatus(FundsAccountState state) {
+        this.state = state;
+    }
 
     /**
      * 支出控制范围说明。

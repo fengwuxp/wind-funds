@@ -4,7 +4,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
@@ -204,7 +204,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private void assertClosedTransaction(SpendControlTransactionConsumptionRequest request,
                                          FundsTransactionDTO transaction) {
-        AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
+        AssertUtils.isTrue(transaction.getState() == FundsTransactionState.CLOSED,
                 "资金交易必须已关闭，transactionSn = {}", request.getTransactionSn());
     }
 
@@ -376,7 +376,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "退款交易不能引用另一笔退款交易，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
                 refundTransaction.getReferenceTransactionSn());
-        AssertUtils.isTrue(referencedTransaction.getStatus() == FundsTransactionStatus.CLOSED,
+        AssertUtils.isTrue(referencedTransaction.getState() == FundsTransactionState.CLOSED,
                 "退款交易引用的原消费交易必须已关闭，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
                 refundTransaction.getReferenceTransactionSn());

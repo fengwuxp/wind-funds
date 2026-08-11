@@ -17,8 +17,8 @@ import com.wind.funds.reconciliation.dal.mapper.ClearingSplitBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingSplitResultSnapshotMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingSplittableDetailMapper;
 import com.wind.funds.reconciliation.dal.entities.table.ClearingSplitBatchNameRefs;
-import com.wind.funds.reconciliation.enums.ClearingSplitBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitResultSnapshotDTO;
@@ -29,7 +29,7 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.ConfirmClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchRequest;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
@@ -124,12 +124,12 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         validateCommandRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getSplitBatchSn(), operator);
         ClearingSplitBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getSplitBatchSn());
-        if (batch.getStatus() == ClearingSplitBatchStatus.REVIEWING) {
+        if (batch.getState() == ClearingSplitBatchState.REVIEWING) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingSplitBatchStatus.DRAFT,
-                "只有 DRAFT 清分批次可以提交复核，status = {}", batch.getStatus());
-        batch.setStatus(ClearingSplitBatchStatus.REVIEWING);
+        AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.DRAFT,
+                "只有 DRAFT 清分批次可以提交复核，status = {}", batch.getState());
+        batch.setState(ClearingSplitBatchState.REVIEWING);
         batch.setSubmittedBy(operator.getOperatorAsText());
         batch.setSubmittedTime(LocalDateTime.now());
         AssertUtils.isTrue(clearingSplitBatchMapper.update(batch) == 1, "提交清分批次复核失败");
@@ -142,11 +142,11 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         validateCommandRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getSplitBatchSn(), operator);
         ClearingSplitBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getSplitBatchSn());
-        if (batch.getStatus() == ClearingSplitBatchStatus.CONFIRMED) {
+        if (batch.getState() == ClearingSplitBatchState.CONFIRMED) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingSplitBatchStatus.REVIEWING,
-                "只有 REVIEWING 清分批次可以确认，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.REVIEWING,
+                "只有 REVIEWING 清分批次可以确认，status = {}", batch.getState());
         List<ClearingSplittableDetail> details = batchDetails(batch);
         for (ClearingSplittableDetail detail : details) {
             validateCurrentSource(batch, detail, operator);
@@ -154,7 +154,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         for (ClearingSplittableDetail detail : details) {
             clearingSplitResultSnapshotMapper.insertSelective(toSnapshot(batch, detail, operator));
         }
-        batch.setStatus(ClearingSplitBatchStatus.CONFIRMED);
+        batch.setState(ClearingSplitBatchState.CONFIRMED);
         batch.setConfirmedBy(operator.getOperatorAsText());
         batch.setConfirmedTime(LocalDateTime.now());
         AssertUtils.isTrue(clearingSplitBatchMapper.update(batch) == 1, "确认清分批次失败");
@@ -170,19 +170,19 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
                 request == null ? null : request.getSplitBatchSn(), operator);
         AssertUtils.hasText(request.getReason(), "清分批次取消原因不能为空");
         ClearingSplitBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getSplitBatchSn());
-        if (batch.getStatus() == ClearingSplitBatchStatus.CANCELLED) {
+        if (batch.getState() == ClearingSplitBatchState.CANCELLED) {
             return toDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() == ClearingSplitBatchStatus.DRAFT
-                        || batch.getStatus() == ClearingSplitBatchStatus.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 清分批次可以取消，status = {}", batch.getStatus());
+        AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.DRAFT
+                        || batch.getState() == ClearingSplitBatchState.REVIEWING,
+                "只有 DRAFT 或 REVIEWING 清分批次可以取消，status = {}", batch.getState());
         AssertUtils.isTrue(clearingSplitBatchDetailMapper.releaseActiveMembership(batch.getTenantId(), batch.getSn())
                         == batch.getDetailCount(),
                 "释放清分批次成员占用失败");
         AssertUtils.isTrue(clearingSplitBatchMapper.releaseActiveDigest(batch.getTenantId(), batch.getSn()) == 1,
                 "释放清分批次幂等占用失败");
         batch.setActiveBatchDigest(null);
-        batch.setStatus(ClearingSplitBatchStatus.CANCELLED);
+        batch.setState(ClearingSplitBatchState.CANCELLED);
         batch.setCancelledBy(operator.getOperatorAsText());
         batch.setCancelledTime(LocalDateTime.now());
         batch.setCancelReason(request.getReason());
@@ -211,7 +211,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(batch)
                 .where(batch.tenantId.eq(tenantId))
-                .and(batch.status.eq(query.getStatus()))
+                .and(batch.state.eq(query.getState()))
                 .and(batch.gmtModified.le(query.getGmtModifiedMax()))
                 .orderBy(batch.gmtModified.asc(), batch.id.asc());
         return MybatisQueryHelper.<ClearingSplitBatch, ClearingSplitBatchDTO>query(wrapper)
@@ -253,7 +253,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         result.setMemberDigest(memberDigest);
         result.setBatchDigest(batchDigest(tenantId, details, totalAmount, memberDigest));
         result.setActiveBatchDigest(result.getBatchDigest());
-        result.setStatus(ClearingSplitBatchStatus.DRAFT);
+        result.setState(ClearingSplitBatchState.DRAFT);
         result.setCreatedBy(operator.getOperatorAsText());
         return result;
     }
@@ -384,8 +384,8 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), batch.getTenantId())
                         && defaultAmount(transaction.getRefundedAmount()) == detail.getRefundAmount()
                         && defaultAmount(transaction.getRefundedAmount()) == 0
-                        && (transaction.getStatus() == FundsTransactionStatus.OPEN
-                        || transaction.getStatus() == FundsTransactionStatus.CLOSED)
+                        && (transaction.getState() == FundsTransactionState.OPEN
+                        || transaction.getState() == FundsTransactionState.CLOSED)
                         && transaction.getCurrency() == detail.getCurrency(),
                 "清分来源交易已变化，fundsTransactionSn = {}", detail.getFundsTransactionSn());
         AssertUtils.hasText(transaction.getRouteSnapshot(),
@@ -410,7 +410,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
     private void validateBatchBoundary(List<ClearingSplittableDetail> details) {
         ClearingSplittableDetail first = details.getFirst();
         for (ClearingSplittableDetail detail : details) {
-            AssertUtils.isTrue(detail.getStatus() == ClearingSplittableDetailStatus.SPLIT_READY,
+            AssertUtils.isTrue(detail.getAdmissionResult() == ClearingSplittableAdmissionResult.SPLIT_READY,
                     "只有 SPLIT_READY 明细可以进入清分批次，splittableDetailSn = {}", detail.getSn());
             AssertUtils.isTrue(Objects.equals(first.getSubjectType(), detail.getSubjectType())
                             && Objects.equals(first.getSubjectId(), detail.getSubjectId()),
@@ -482,7 +482,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
                 .setTotalAmount(source.getTotalAmount())
                 .setMemberDigest(source.getMemberDigest())
                 .setBatchDigest(source.getBatchDigest())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setCreatedTime(source.getGmtCreate())
                 .setSubmittedTime(source.getSubmittedTime())
                 .setConfirmedTime(source.getConfirmedTime())

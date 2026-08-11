@@ -37,9 +37,9 @@ import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConvert
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
@@ -54,10 +54,10 @@ import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplica
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
@@ -213,10 +213,10 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         assertThat(transactionSn).isNotBlank();
         FundsSubjectBalanceDTO afterReceive = balance(receiveAccount);
         assertBucket(afterReceive, LedgerSubjectCode.AVAILABLE, 80L, CurrencyIsoCode.USD);
-        assertThat(fundsTransactionStatus(RECEIVE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.CLOSED.name());
+        assertThat(fundsTransactionState(RECEIVE_BUSINESS_SN)).isEqualTo(FundsTransactionState.CLOSED.name());
         assertThat(fundsTransactionDetailStatuses(RECEIVE_BUSINESS_SN))
                 .hasSize(3)
-                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED.name());
+                .containsOnly(FundsTransactionDetailState.SUCCEEDED.name());
         assertThat(ledgerTransactionEvents(RECEIVE_BUSINESS_SN))
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertThat(ledgerEntrySubjects(RECEIVE_BUSINESS_SN))
@@ -496,7 +496,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE));
+                .setState(FundsAccountState.ACTIVE));
     }
 
     private void createPaymentOnlyInstrumentScenario() {
@@ -516,7 +516,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         account.setCurrency(CurrencyIsoCode.USD);
         account.setLedgerProfileCode(role.getLedgerProfileCode());
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("instrument lifecycle platform funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -575,7 +575,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .setChannelCode(providerCode)
                 .setExternalInstrumentId(externalInstrumentId(instrumentSn))
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private String externalInstrumentId(String instrumentSn) {
@@ -644,7 +644,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         paymentInstrumentService.changePaymentInstrumentBinding(new ChangePaymentInstrumentBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setBindingSn(bindingSn)
-                .setStatus(PaymentInstrumentBindingStatus.SUSPENDED)
+                .setState(PaymentInstrumentBindingState.SUSPENDED)
                 .setOperatorId("TEST")
                 .setChangeReason("verify established receive replay"));
     }
@@ -668,7 +668,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .setCurrency(CurrencyIsoCode.USD));
     }
 
-    private String fundsTransactionStatus(String businessSn) {
+    private String fundsTransactionState(String businessSn) {
         return jdbcTemplate.queryForObject("""
                 SELECT status FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
@@ -752,7 +752,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         assertThat(paymentInstrumentRef.path("ownerId").asString()).isEqualTo(OWNER_ID);
         assertThat(paymentInstrumentRef.path("ownerType").asString()).isEqualTo(FundsAccountOwnerType.USER.name());
         assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
         assertThat(paymentInstrumentRef.toString()).doesNotContain("va_lifecycle_2468");
         JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();

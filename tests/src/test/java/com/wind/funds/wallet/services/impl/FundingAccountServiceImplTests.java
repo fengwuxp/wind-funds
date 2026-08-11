@@ -24,7 +24,7 @@ import com.wind.funds.wallet.ImmutableFundsAccount;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
@@ -119,7 +119,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         List<LedgerDTO> ledgers = loadLedgers();
 
         assertThat(account.getSn()).isEqualTo(ACCOUNT_SN);
-        assertThat(account.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(account.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_BASIC);
         assertThat(ledgers).hasSize(3);
         assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
@@ -320,7 +320,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .tenantId(TENANT_ID)
                 .accountId(FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT))
                 .owner(FundsAccountOwner.of(OWNER_ID, FundsAccountOwnerType.USER))
-                .status(FundsAccountStatus.ACTIVE)
+                .state(FundsAccountState.ACTIVE)
                 .currency(CurrencyIsoCode.USD)
                 .version(1)
                 .build();

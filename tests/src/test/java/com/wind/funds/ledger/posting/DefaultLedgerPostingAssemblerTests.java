@@ -10,7 +10,7 @@ import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -785,7 +785,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         }
 
         @Override
-        public void updateLedgerStatus(UpdateLedgerStatusRequest request) {
+        public void updateLedgerState(UpdateLedgerStateRequest request) {
             throw new UnsupportedOperationException();
         }
 

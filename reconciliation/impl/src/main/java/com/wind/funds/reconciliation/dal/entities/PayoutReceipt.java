@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Data;
@@ -37,7 +37,13 @@ public class PayoutReceipt implements TenantIsolationObject<Long> {
 
     private String externalReference;
 
-    private PayoutOrderStatus status;
+    @Column("status")
+
+    private PayoutOrderState state;
+
+    void setStatus(PayoutOrderState state) {
+        this.state = state;
+    }
 
     private Long amount;
 

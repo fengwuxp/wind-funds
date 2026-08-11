@@ -11,8 +11,8 @@ import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
-import com.wind.funds.reconciliation.enums.PayoutPreflightFactStatus;
-import com.wind.funds.reconciliation.enums.PayoutPreflightOperationStatus;
+import com.wind.funds.reconciliation.enums.PayoutPreflightDecisionResult;
+import com.wind.funds.reconciliation.enums.PayoutPreflightAction;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
@@ -138,9 +138,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
-        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_BLOCKED);
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.WAITING_EVIDENCE);
-        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
+        assertThat(result.getAction()).isEqualTo(PayoutPreflightAction.BLOCKED);
         assertThat(result.getExternalRuleVerificationStatus())
                 .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
         assertThat(result.isManualReviewRequired()).isTrue();
@@ -189,10 +189,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
         assertThat(result.getBlockingReasons()).isEmpty();
-        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_PASSED);
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.PREFLIGHT_PASSED);
-        assertThat(result.getOperationStatus())
-                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
+        assertThat(result.getAction())
+                .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
         assertThat(result.getReconciliationRunResultSn()).isEqualTo(payoutRunResultSn);
         assertThat(result.getReconciliationResultDigest()).hasSize(64);
@@ -220,10 +220,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
-        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
+        assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_PASSED);
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.PREFLIGHT_PASSED);
-        assertThat(result.getOperationStatus())
-                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
+        assertThat(result.getAction())
+                .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -269,9 +269,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
-        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_BLOCKED);
+        assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_BLOCKED);
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.RECONCILIATION_REQUIRED);
-        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
+        assertThat(result.getAction()).isEqualTo(PayoutPreflightAction.BLOCKED);
         assertThat(result.getBlockingReasons())
                 .extracting(PayoutPreflightBlockingReasonDTO::getCode)
                 .containsExactly(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
@@ -319,9 +319,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
         assertThat(result.getBlockingReasons()).isEmpty();
-        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
-        assertThat(result.getOperationStatus())
-                .isEqualTo(PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED);
+        assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_PASSED);
+        assertThat(result.getAction())
+                .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getEvidenceRefs())
                 .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);

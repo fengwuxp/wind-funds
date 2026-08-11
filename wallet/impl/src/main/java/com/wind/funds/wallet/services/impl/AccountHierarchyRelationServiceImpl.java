@@ -10,7 +10,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.dal.entities.AccountHierarchyRelation;
 import com.wind.funds.wallet.dal.entities.table.AccountHierarchyRelationNameRefs;
 import com.wind.funds.wallet.dal.mapper.AccountHierarchyRelationMapper;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.mapstruct.AccountHierarchyRelationConverter;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
@@ -133,19 +133,19 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
     private ResolvedAccount resolveFundingAccount(Long tenantId, String accountId) {
         FundingAccountDTO account = fundingAccountService.getFundingAccount(tenantId, accountId);
         return new ResolvedAccount(account.getSn(), FundsSubjectType.FUNDING_ACCOUNT,
-                account.getCurrency(), account.getStatus());
+                account.getCurrency(), account.getState());
     }
 
     private ResolvedAccount resolveCreditAccount(Long tenantId, String accountId) {
         CreditAccountDTO account = creditAccountService.getCreditAccount(tenantId, accountId);
         return new ResolvedAccount(account.getSn(), FundsSubjectType.CREDIT_ACCOUNT,
-                account.getCurrency(), account.getStatus());
+                account.getCurrency(), account.getState());
     }
 
     private void validateRelation(ResolvedAccount account, ResolvedAccount parentAccount) {
         AssertUtils.isFalse(account.key().equals(parentAccount.key()), "父账户不能等于子账户");
-        AssertUtils.isTrue(account.status() != FundsAccountStatus.CLOSED
-                        && parentAccount.status() != FundsAccountStatus.CLOSED,
+        AssertUtils.isTrue(account.state() != FundsAccountState.CLOSED
+                        && parentAccount.state() != FundsAccountState.CLOSED,
                 "CLOSED 账户不能创建账户层级关系");
         AssertUtils.equals(account.currency(), parentAccount.currency(), "账户层级关系账户币种必须一致");
     }
@@ -230,7 +230,7 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
     private record ResolvedAccount(String accountId,
                                    FundsSubjectType accountType,
                                    CurrencyIsoCode currency,
-                                   FundsAccountStatus status) {
+                                   FundsAccountState state) {
 
         private AccountKey key() {
             return new AccountKey(accountId, accountType);

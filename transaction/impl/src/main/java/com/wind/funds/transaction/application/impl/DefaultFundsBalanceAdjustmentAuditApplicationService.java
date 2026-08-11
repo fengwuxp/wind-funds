@@ -101,7 +101,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 .setBusinessScene(transactionDTO.getBusinessScene())
                 .setBusinessSn(transactionDTO.getBusinessSn())
                 .setTransactionType(transactionDTO.getTransactionType())
-                .setTransactionStatus(transactionDTO.getStatus())
+                .setTransactionState(transactionDTO.getState())
                 .setAmount(transactionDTO.getAmount())
                 .setCurrency(transactionDTO.getCurrency())
                 .setAuditCompleteness(completeness)

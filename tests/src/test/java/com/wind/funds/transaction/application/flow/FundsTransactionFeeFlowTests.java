@@ -8,8 +8,8 @@ import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.enums.FundsEffectType;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -1373,8 +1373,8 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .singleElement()
                 .satisfies(transaction -> {
                     assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
-                    assertThat(transaction.getStatus())
-                            .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
+                    assertThat(transaction.getState())
+                            .isIn(FundsTransactionState.OPEN, FundsTransactionState.CLOSED);
                     assertThat(transaction.getReferenceTransactionSn()).isEqualTo(sourceTransactionSn);
                     assertThat(routeSnapshot(businessSn).getBusinessSn()).isEqualTo(businessSn);
                 });
@@ -1394,10 +1394,10 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .as("funds transaction detail effect types for fee refund businessSn %s", businessSn)
                 .containsOnly(FundsEffectType.RETURN);
         assertThat(details.stream()
-                .map(detail -> detail.getStatus())
+                .map(detail -> detail.getState())
                 .toList())
                 .as("funds transaction detail statuses for fee refund businessSn %s", businessSn)
-                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED);
+                .containsOnly(FundsTransactionDetailState.SUCCEEDED);
         assertThat(details.stream()
                 .map(detail -> detail.getParticipantRole())
                 .toList())

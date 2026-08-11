@@ -5,7 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -50,7 +50,12 @@ public class ReconciliationRunResult implements Serializable, TenantIsolationObj
     private String gateObjectSn;
 
     @NotNull
-    private ReconciliationRunResultStatus status;
+    @Column("status")
+    private ReconciliationRunOutcome outcome;
+
+    void setStatus(ReconciliationRunOutcome outcome) {
+        this.outcome = outcome;
+    }
 
     @NotNull
     private String ruleVersion;

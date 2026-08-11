@@ -7,12 +7,12 @@ import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
 import com.wind.funds.reconciliation.application.batch.impl.ReconciliationBatchApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
@@ -166,14 +166,14 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         assertThat(first.getReferenceSourceDigest()).hasSize(64);
         assertThat(first.getComparisonSourceDigest()).hasSize(64);
         assertThat(first.getSourceDigest()).hasSize(64);
-        assertThat(first.getStatus()).isEqualTo(ReconciliationRunResultStatus.BALANCED);
+        assertThat(first.getOutcome()).isEqualTo(ReconciliationRunOutcome.BALANCED);
         assertThat(first.getTotalCount()).isOne();
         assertThat(first.getMatchedCount()).isOne();
         assertThat(first.getDifferenceCount()).isZero();
         assertThat(first.getEvidenceRefs()).containsExactly("report:comparison", "report:reference");
         assertThat(replay.getSn()).isEqualTo(first.getSn());
         assertThat(replay.getResultDigest()).isEqualTo(first.getResultDigest());
-        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
         assertThat(runResultCount()).isOne();
         assertThat(matchResultCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -291,7 +291,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
-        assertThat(batchStatus(batchSn)).isEqualTo(ReconciliationBatchStatus.DATA_READY.name());
+        assertThat(batchStatus(batchSn)).isEqualTo(ReconciliationBatchState.DATA_READY.name());
         jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET source_digest = ? WHERE sn = ?",
                 sourceDigest, snapshotSn);
     }
@@ -387,7 +387,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
                 request, WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
+        assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
         assertThat(result.getMatchedCount()).isZero();
         assertThat(result.getDifferenceCount()).isOne();
     }
@@ -417,7 +417,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
                 request, WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
+        assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM t_reconciliation_match_result
@@ -491,7 +491,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
-        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchStatus.DATA_READY.name());
+        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
     }
 
     /**

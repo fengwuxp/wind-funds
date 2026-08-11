@@ -5,7 +5,7 @@ import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -180,8 +180,8 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsExactly(LedgerPhaseCode.SETTLEMENT.name(), LedgerPhaseCode.FUND_OUT.name());
 
-        assertThat(frozenOrderByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE").getReleasedAmount()).isZero();
     }
 }

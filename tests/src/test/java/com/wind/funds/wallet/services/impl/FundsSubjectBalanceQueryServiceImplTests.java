@@ -22,7 +22,7 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -426,7 +426,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         account.setCurrency(CurrencyIsoCode.USD);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("funds subject balance query boundary test");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -448,7 +448,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         spendControlScope.setCurrency(CurrencyIsoCode.USD);
         spendControlScope.setPeriodType(AccountBalancePeriodType.LIFETIME);
         spendControlScope.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
-        spendControlScope.setStatus(FundsAccountStatus.ACTIVE);
+        spendControlScope.setState(FundsAccountState.ACTIVE);
         spendControlScope.setDescription("budget group must not be a balance subject");
         spendControlScope.setVersion(0);
         spendControlScopeMapper.insertSelective(spendControlScope);

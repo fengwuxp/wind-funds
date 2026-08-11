@@ -39,7 +39,7 @@ public class ClearingSettlementGateConsumerServiceImpl implements ClearingSettle
                 toGateRequest(request), operator);
         return new ClearingSettlementGateResultDTO()
                 .setPassed(decision.isPassed())
-                .setDecisionStatus(decision.getDecisionStatus())
+                .setDecisionResult(decision.getDecisionResult())
                 .setGateObjectType(decision.getGateObjectType())
                 .setGateObjectSn(decision.getGateObjectSn())
                 .setReconciliationRunResultSn(decision.getReconciliationRunResultSn())

@@ -1,7 +1,7 @@
 package com.wind.funds.wallet;
 
 import com.wind.funds.wallet.enums.FundsAccountCapability;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,7 +29,7 @@ public class ImmutableFundsAccount implements FundsAccount {
 
     private final FundsAccountOwner owner;
 
-    private final FundsAccountStatus status;
+    private final FundsAccountState state;
 
     private final CurrencyIsoCode currency;
 
@@ -46,6 +46,6 @@ public class ImmutableFundsAccount implements FundsAccount {
 
     @Override
     public boolean isAvailable() {
-        return getStatus() == FundsAccountStatus.ACTIVE;
+        return getState() == FundsAccountState.ACTIVE;
     }
 }

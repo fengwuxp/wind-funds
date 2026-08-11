@@ -14,7 +14,7 @@ import com.wind.funds.reconciliation.application.clearing.ClearingSplittableDeta
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ClearingSplittableDetail;
 import com.wind.funds.reconciliation.dal.mapper.ClearingSplittableDetailMapper;
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.mapstruct.ClearingSplittableDetailConverter;
@@ -25,10 +25,10 @@ import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDet
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -113,7 +113,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 request.getTenantId(), request.getLedgerEntrySn());
         log.info("可清分明细准入完成，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}, status = {}, exclusionReason = {}",
                 request.getTenantId(), request.getFundsTransactionSn(), request.getLedgerEntrySn(),
-                candidate.getStatus(), candidate.getExclusionReason());
+                candidate.getAdmissionResult(), candidate.getExclusionReason());
         return ClearingSplittableDetailConverter.INSTANCE.toDTO(saved);
     }
 
@@ -166,11 +166,11 @@ public class ClearingSplittableDetailApplicationServiceImpl
         result.setSplitPeriod(request.getSplitPeriod());
         result.setSplitRuleCode(request.getSplitRuleCode());
         result.setSplitRuleVersion(request.getSplitRuleVersion());
-        result.setStatus(exclusionReason == null
-                ? ClearingSplittableDetailStatus.SPLIT_READY
-                : ClearingSplittableDetailStatus.EXCLUDED);
+        result.setAdmissionResult(exclusionReason == null
+                ? ClearingSplittableAdmissionResult.SPLIT_READY
+                : ClearingSplittableAdmissionResult.EXCLUDED);
         result.setExclusionReason(exclusionReason);
-        result.setReconciliationDecisionStatus(reconciliationDecision.getDecisionStatus());
+        result.setReconciliationDecisionResult(reconciliationDecision.getDecisionResult());
         result.setReconciliationRunResultSn(reconciliationDecision.getReconciliationRunResultSn());
         result.setReconciliationResultDigest(reconciliationDecision.getReconciliationResultDigest());
         result.setReconciliationEvidenceRefs(WindJson.toJsonString(reconciliationDecision.getEvidenceRefs()));
@@ -193,11 +193,11 @@ public class ClearingSplittableDetailApplicationServiceImpl
             ReconciliationGateDecisionDTO reconciliationDecision) {
         long refundedAmount = defaultAmount(transaction.getRefundedAmount());
         boolean partiallyRefunded = refundedAmount > 0
-                && transaction.getStatus() == FundsTransactionStatus.OPEN;
-        if (transaction.getStatus() != FundsTransactionStatus.CLOSED && !partiallyRefunded) {
+                && transaction.getState() == FundsTransactionState.OPEN;
+        if (transaction.getState() != FundsTransactionState.CLOSED && !partiallyRefunded) {
             return ClearingSplittableExclusionReason.TRANSACTION_NOT_ELIGIBLE;
         }
-        if (detail.getStatus() != FundsTransactionDetailStatus.SUCCEEDED) {
+        if (detail.getState() != FundsTransactionDetailState.SUCCEEDED) {
             return ClearingSplittableExclusionReason.TRANSACTION_DETAIL_NOT_SUCCEEDED;
         }
         if (!hasCompleteRouteSnapshot(transaction.getRouteSnapshot())
@@ -295,14 +295,14 @@ public class ClearingSplittableDetailApplicationServiceImpl
         TreeMap<String, Object> facts = new TreeMap<>();
         facts.put("tenantId", request.getTenantId());
         facts.put("fundsTransactionSn", transaction.getSn());
-        facts.put("fundsTransactionStatus", transaction.getStatus());
+        facts.put("fundsTransactionStatus", transaction.getState());
         facts.put("fundsTransactionMode", transaction.getTransactionMode());
         facts.put("fundsTransactionType", transaction.getTransactionType());
         facts.put("fundsTransactionBusinessScene", transaction.getBusinessScene());
         facts.put("fundsTransactionBusinessSn", transaction.getBusinessSn());
         facts.put("fundsTransactionDetailSn", detail.getSn());
         facts.put("fundsTransactionDetailTransactionSn", detail.getTransactionSn());
-        facts.put("fundsTransactionDetailStatus", detail.getStatus());
+        facts.put("fundsTransactionDetailStatus", detail.getState());
         facts.put("fundsTransactionDetailType", detail.getTransactionType());
         facts.put("fundsTransactionDetailEventType", detail.getEventType());
         facts.put("fundsTransactionDetailEffectType", detail.getFundsEffectType());
@@ -345,7 +345,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("splitPeriod", request.getSplitPeriod());
         facts.put("splitRuleCode", request.getSplitRuleCode());
         facts.put("splitRuleVersion", request.getSplitRuleVersion());
-        facts.put("reconciliationDecisionStatus", reconciliationDecision.getDecisionStatus());
+        facts.put("reconciliationDecisionResult", reconciliationDecision.getDecisionResult());
         facts.put("reconciliationRunResultSn", reconciliationDecision.getReconciliationRunResultSn());
         facts.put("reconciliationResultDigest", reconciliationDecision.getReconciliationResultDigest());
         facts.put("reconciliationEvidenceRefs", List.copyOf(reconciliationDecision.getEvidenceRefs()));

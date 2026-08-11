@@ -7,7 +7,7 @@ import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -127,7 +127,12 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
      * 账本状态。
      */
     @NotNull
-    private LedgerStatus status;
+    @Column("status")
+    private LedgerState state;
+
+    void setStatus(LedgerState state) {
+        this.state = state;
+    }
 
     /**
      * 币种

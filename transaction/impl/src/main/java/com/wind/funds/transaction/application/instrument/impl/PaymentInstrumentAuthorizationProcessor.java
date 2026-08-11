@@ -11,7 +11,7 @@ import com.wind.funds.transaction.application.FundsAuthorizationTransactionServi
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -106,7 +106,7 @@ public class PaymentInstrumentAuthorizationProcessor {
     private @Nullable String findEstablishedAuthorizationReplay(AuthorizeByPaymentInstrumentRequest request) {
         Optional<FundsTransactionDTO> existing = fundsTransactionQueryService.findFundsTransactionByBusiness(
                 request.getTenantId(), request.getBusinessScene(), request.getBusinessSn());
-        if (existing.isEmpty() || !isEstablished(existing.get().getStatus())) {
+        if (existing.isEmpty() || !isEstablished(existing.get().getState())) {
             return null;
         }
         FundsTransactionDTO transaction = existing.get();
@@ -122,10 +122,10 @@ public class PaymentInstrumentAuthorizationProcessor {
         return transaction.getSn();
     }
 
-    private boolean isEstablished(FundsTransactionStatus status) {
-        return status == FundsTransactionStatus.OPEN
-                || status == FundsTransactionStatus.CLOSED
-                || status == FundsTransactionStatus.REJECTED;
+    private boolean isEstablished(FundsTransactionState state) {
+        return state == FundsTransactionState.OPEN
+                || state == FundsTransactionState.CLOSED
+                || state == FundsTransactionState.REJECTED;
     }
 
     private void assertEstablishedAuthorizationMatches(AuthorizeByPaymentInstrumentRequest request,
@@ -481,7 +481,7 @@ public class PaymentInstrumentAuthorizationProcessor {
                 .ownerId(instrumentDecision.getOwnerId())
                 .ownerType(instrumentDecision.getOwnerType().name())
                 .currency(instrumentDecision.getCurrency().name())
-                .status(instrumentDecision.getStatus().name())
+                .status(instrumentDecision.getState().name())
                 .bindingSnapshot(bindingSnapshot(request, instrumentDecision))
                 .description(instrumentDecision.getDescription())
                 .build();
@@ -494,7 +494,7 @@ public class PaymentInstrumentAuthorizationProcessor {
         AssertUtils.notNull(instrumentDecision.getOwnerType(), "支付工具快照归属主体类型不能为空");
         AssertUtils.hasText(instrumentDecision.getInstrumentType(), "支付工具快照类型不能为空");
         AssertUtils.notNull(instrumentDecision.getCurrency(), "支付工具快照币种不能为空");
-        AssertUtils.notNull(instrumentDecision.getStatus(), "支付工具快照状态不能为空");
+        AssertUtils.notNull(instrumentDecision.getState(), "支付工具快照状态不能为空");
         AssertUtils.hasText(instrumentDecision.getBindingSn(), "支付工具绑定快照绑定号不能为空");
         AssertUtils.notNull(instrumentDecision.getBindingVersion(), "支付工具绑定快照版本不能为空");
         AssertUtils.notNull(instrumentDecision.getBindingRole(), "支付工具绑定快照角色不能为空");

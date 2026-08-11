@@ -5,7 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
@@ -110,7 +110,12 @@ public class SpendRuleBinding implements Serializable, TenantIsolationObject<Lon
      * 挂载状态。
      */
     @NotNull
-    private SpendRuleBindingStatus status;
+    @Column("status")
+    private SpendRuleBindingState state;
+
+    void setStatus(SpendRuleBindingState state) {
+        this.state = state;
+    }
 
     /**
      * 创建挂载的审计引用。

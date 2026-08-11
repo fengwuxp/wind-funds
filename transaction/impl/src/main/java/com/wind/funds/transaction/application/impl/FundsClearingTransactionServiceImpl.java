@@ -8,7 +8,7 @@ import com.wind.funds.transaction.application.FundsClearingTransactionService;
 import com.wind.funds.transaction.converter.FundsClearingInstructionConverter;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsClearingConfirmRequest;
 import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountQueryService;
@@ -82,10 +82,10 @@ public class FundsClearingTransactionServiceImpl implements FundsClearingTransac
                     sourceTransactionSn);
             AssertUtils.notNull(sourceTransaction,
                     "清算来源交易不存在，fundsTransactionSn = {}", sourceTransactionSn);
-            AssertUtils.isTrue(sourceTransaction.getStatus() == FundsTransactionStatus.OPEN
-                            || sourceTransaction.getStatus() == FundsTransactionStatus.CLOSED,
+            AssertUtils.isTrue(sourceTransaction.getState() == FundsTransactionState.OPEN
+                            || sourceTransaction.getState() == FundsTransactionState.CLOSED,
                     "清算来源交易状态不可清算，fundsTransactionSn = {}，status = {}",
-                    sourceTransactionSn, sourceTransaction.getStatus());
+                    sourceTransactionSn, sourceTransaction.getState());
             AssertUtils.equals(request.getAmount().getCurrency(), sourceTransaction.getCurrency(),
                     "清算来源交易币种不一致，fundsTransactionSn = {}", sourceTransactionSn);
             AssertUtils.isTrue(sourceTransaction.getRefundedAmount() == null

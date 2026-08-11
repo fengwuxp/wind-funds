@@ -14,7 +14,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderDTO;
 import com.wind.funds.reconciliation.model.request.ApproveSettlementOrderRequest;
@@ -111,7 +111,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 request, WindOperatorFactory.system());
 
         assertThat(replay.getSn()).isEqualTo(created.getSn());
-        assertThat(created.getStatus()).isEqualTo(SettlementOrderStatus.DRAFT);
+        assertThat(created.getState()).isEqualTo(SettlementOrderState.DRAFT);
         assertThat(created.getNetAmount()).isEqualTo(600L);
         assertThat(created.getItems()).singleElement().satisfies(item -> {
             assertThat(item.getSourceSn()).isEqualTo("CLB_SETTLEMENT_001");
@@ -122,19 +122,19 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         SettlementOrderDTO reviewing = settlementOrderApplicationService.submitOrder(
                 new SubmitSettlementOrderRequest().setTenantId(TENANT_ID)
                         .setSettlementOrderSn(created.getSn()), WindOperatorFactory.system());
-        assertThat(reviewing.getStatus()).isEqualTo(SettlementOrderStatus.REVIEWING);
+        assertThat(reviewing.getState()).isEqualTo(SettlementOrderState.REVIEWING);
         SettlementOrderDTO returned = settlementOrderApplicationService.returnToDraft(
                 new ReturnSettlementOrderToDraftRequest().setTenantId(TENANT_ID)
                         .setSettlementOrderSn(created.getSn()).setReason("补充结算审批证据"),
                 WindOperatorFactory.system());
-        assertThat(returned.getStatus()).isEqualTo(SettlementOrderStatus.DRAFT);
+        assertThat(returned.getState()).isEqualTo(SettlementOrderState.DRAFT);
         settlementOrderApplicationService.submitOrder(new SubmitSettlementOrderRequest().setTenantId(TENANT_ID)
                 .setSettlementOrderSn(created.getSn()), WindOperatorFactory.system());
         SettlementOrderDTO approved = settlementOrderApplicationService.approveOrder(
                 new ApproveSettlementOrderRequest().setTenantId(TENANT_ID)
                         .setSettlementOrderSn(created.getSn()).setSettlementApprovalRef("SETTLEMENT_APPROVAL_001"),
                 WindOperatorFactory.system());
-        assertThat(approved.getStatus()).isEqualTo(SettlementOrderStatus.APPROVED);
+        assertThat(approved.getState()).isEqualTo(SettlementOrderState.APPROVED);
 
         String runResultSn = prepareSettlementGate(created.getSn(), "001");
         var before = snapshot(balance(accountId));
@@ -147,7 +147,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                         .setSettlementOrderSn(created.getSn()).setReconciliationRunResultSn(runResultSn),
                 WindOperatorFactory.system());
 
-        assertThat(locked.getStatus()).isEqualTo(SettlementOrderStatus.LOCKED);
+        assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
         assertThat(lockReplay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
         assertThat(locked.getReconciliationRunResultSn()).isEqualTo(runResultSn);
         assertThat(locked.getReconciliationResultDigest()).hasSize(64);
@@ -211,12 +211,12 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 .isInstanceOf(LedgerPostingRejectedException.class)
                 .hasMessageContaining("账本余额不足");
         SettlementOrderDTO failed = settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn());
-        assertThat(failed.getStatus()).isEqualTo(SettlementOrderStatus.FAILED);
+        assertThat(failed.getState()).isEqualTo(SettlementOrderState.FAILED);
         assertThat(failed.getLockFundsTransactionSn()).isNotBlank();
         assertFailedFundsTransactionWithoutLedgerFacts(order.getSn());
         SettlementOrderDTO rebuilt = settlementOrderApplicationService.createOrder(request, WindOperatorFactory.system());
         assertThat(rebuilt.getSn()).isNotEqualTo(order.getSn());
-        assertThat(rebuilt.getStatus()).isEqualTo(SettlementOrderStatus.DRAFT);
+        assertThat(rebuilt.getState()).isEqualTo(SettlementOrderState.DRAFT);
     }
 
     @Test
@@ -254,8 +254,8 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
                         .setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system()))
                 .hasMessageContaining("simulated settlement result unknown");
-        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getStatus())
-                .isEqualTo(SettlementOrderStatus.APPROVED);
+        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getState())
+                .isEqualTo(SettlementOrderState.APPROVED);
         assertNoFundsOrLedgerFactsForBusinessSn(order.getSn());
         assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
                 delta(accountId, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
@@ -272,8 +272,8 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
                         .setReconciliationRunResultSn("missing-run-result"), WindOperatorFactory.system()))
                 .hasMessageContaining("对账 Gate 未通过");
-        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getStatus())
-                .isEqualTo(SettlementOrderStatus.APPROVED);
+        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getState())
+                .isEqualTo(SettlementOrderState.APPROVED);
         assertNoFundsOrLedgerFactsForBusinessSn(order.getSn());
     }
 

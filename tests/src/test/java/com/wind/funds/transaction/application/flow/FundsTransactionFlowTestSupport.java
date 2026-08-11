@@ -64,8 +64,8 @@ import com.wind.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -132,7 +132,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.Money;
@@ -290,7 +290,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("flow test funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -322,7 +322,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(role.getLedgerProfileCode());
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("flow test platform funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -408,11 +408,11 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isOne();
     }
 
-    protected void updateAccountStatus(FundsAccountId accountId, FundsAccountStatus status) {
+    protected void updateAccountState(FundsAccountId accountId, FundsAccountState state) {
         String tableName = accountId.type().equals(FundsSubjectType.CREDIT_ACCOUNT.name())
                 ? "t_credit_account" : "t_funding_account";
         int updated = jdbcTemplate.update("UPDATE " + tableName + " SET status = ? WHERE tenant_id = ? AND sn = ?",
-                status.name(), TENANT_ID, accountId.id());
+                state.name(), TENANT_ID, accountId.id());
         assertThat(updated)
                 .as("account status updated for accountId %s", accountId)
                 .isOne();
@@ -828,7 +828,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .as("failed funds transactions for businessSn %s", businessSn)
                 .singleElement()
                 .satisfies(transaction -> {
-                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.FAILED);
+                    assertThat(transaction.getState()).isEqualTo(FundsTransactionState.FAILED);
                     assertReadableRouteSnapshot(transaction.getSn(), businessSn);
                     assertNoLedgerFactsForFundsTransaction(transaction.getSn());
                     assertThat(details)
@@ -841,7 +841,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .as("funds transaction details for businessSn %s", businessSn)
                 .isNotEmpty()
                 .allSatisfy(detail -> {
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.FAILED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.FAILED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                     assertThat(detail.getErrorCode()).isNotBlank();
                     assertThat(detail.getErrorMessage()).isNotBlank();
@@ -892,8 +892,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                     .as("successful funds transactions must have stable status and route snapshot for businessSn %s",
                             businessSn)
                     .allSatisfy(transaction -> {
-                        assertThat(transaction.getStatus())
-                                .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
+                        assertThat(transaction.getState())
+                                .isIn(FundsTransactionState.OPEN, FundsTransactionState.CLOSED);
                         assertReadableRouteSnapshot(transaction.getSn(), businessSn);
                     });
         }
@@ -919,7 +919,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                             .as("funds transaction details must point to ledger transaction for businessSn %s",
                                     businessSn)
                             .allSatisfy(detail -> {
-                                assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+                                assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.SUCCEEDED);
                                 assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
                             });
                     assertThat(postingPlans)

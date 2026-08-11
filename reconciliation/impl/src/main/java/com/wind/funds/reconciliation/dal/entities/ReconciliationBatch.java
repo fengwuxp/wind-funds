@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
@@ -63,7 +63,12 @@ public class ReconciliationBatch implements Serializable, TenantIsolationObject<
     private String previousBatchSn;
 
     @NotNull
-    private ReconciliationBatchStatus status;
+    @Column("status")
+    private ReconciliationBatchState state;
+
+    void setStatus(ReconciliationBatchState state) {
+        this.state = state;
+    }
 
     private String runResultSn;
 

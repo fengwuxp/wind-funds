@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -78,7 +78,12 @@ public class SpendRuleVersion implements Serializable, TenantIsolationObject<Lon
      * 规则版本状态。
      */
     @NotNull
-    private SpendRuleVersionStatus status;
+    @Column("status")
+    private SpendRuleVersionState state;
+
+    void setStatus(SpendRuleVersionState state) {
+        this.state = state;
+    }
 
     /**
      * 操作者。

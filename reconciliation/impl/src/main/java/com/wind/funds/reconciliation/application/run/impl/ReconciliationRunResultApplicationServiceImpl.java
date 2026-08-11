@@ -18,10 +18,10 @@ import com.wind.funds.reconciliation.dal.mapper.ReconciliationMatchResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceSnapshotMapper;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.mapstruct.ReconciliationRunResultConverter;
@@ -86,10 +86,10 @@ public class ReconciliationRunResultApplicationServiceImpl
         ReconciliationBatch batch = reconciliationBatchMapper.selectBySnForUpdate(
                 request.getTenantId(), request.getReconciliationBatchSn());
         AssertUtils.notNull(batch, "对账批次不存在，reconciliationBatchSn = {}", request.getReconciliationBatchSn());
-        AssertUtils.isTrue(batch.getStatus() == ReconciliationBatchStatus.DATA_READY
-                        || batch.getStatus() == ReconciliationBatchStatus.COMPLETED,
+        AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.DATA_READY
+                        || batch.getState() == ReconciliationBatchState.COMPLETED,
                 "对账批次来源尚未冻结完整，reconciliationBatchSn = {}, status = {}",
-                batch.getSn(), batch.getStatus());
+                batch.getSn(), batch.getState());
         SourceSet sourceSet = loadSourceSet(batch);
         String runResultSn = TemporalSequenceFactory.hourNext(RUN_RESULT_SEQUENCE_TYPE);
         List<ReconciliationMatchResult> matchResults = toMatchResults(request, operator, runResultSn);
@@ -101,12 +101,12 @@ public class ReconciliationRunResultApplicationServiceImpl
         ReconciliationRunResult existing = reconciliationRunResultMapper.selectByBatch(
                 request.getTenantId(), request.getReconciliationBatchSn());
         if (existing != null) {
-            AssertUtils.isTrue(batch.getStatus() == ReconciliationBatchStatus.COMPLETED
+            AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.COMPLETED
                             && Objects.equals(batch.getRunResultSn(), existing.getSn()),
                     "对账批次与运行结果绑定不一致，reconciliationBatchSn = {}", batch.getSn());
             return reuseExisting(existing, candidate);
         }
-        AssertUtils.isTrue(batch.getStatus() == ReconciliationBatchStatus.DATA_READY,
+        AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.DATA_READY,
                 "已完成对账批次缺少运行结果，reconciliationBatchSn = {}", batch.getSn());
         reconciliationRunResultMapper.insertSelective(candidate);
         AssertUtils.notNull(candidate.getId(), "记录对账运行结果失败");
@@ -120,7 +120,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         log.info("对账运行结果记录完成，tenantId = {}, reconciliationBatchSn = {}, "
                         + "reconciliationScopeRef = {}, gateObjectType = {}, gateObjectSn = {}, status = {}",
                 batch.getTenantId(), batch.getSn(), batch.getReconciliationScopeRef(),
-                batch.getGateObjectType(), batch.getGateObjectSn(), candidate.getStatus());
+                batch.getGateObjectType(), batch.getGateObjectSn(), candidate.getOutcome());
         return ReconciliationRunResultConverter.INSTANCE.toDTO(saved);
     }
 
@@ -204,9 +204,9 @@ public class ReconciliationRunResultApplicationServiceImpl
                                               String runResultSn) {
         int matchedCount = (int) matchResults.stream().filter(this::isMatched).count();
         int differenceCount = matchResults.size() - matchedCount;
-        ReconciliationRunResultStatus status = differenceCount == 0
-                ? ReconciliationRunResultStatus.BALANCED
-                : ReconciliationRunResultStatus.DIFFERENCE_FOUND;
+        ReconciliationRunOutcome outcome = differenceCount == 0
+                ? ReconciliationRunOutcome.BALANCED
+                : ReconciliationRunOutcome.DIFFERENCE_FOUND;
         String sourceDigest = sourceDigest(sourceSet);
         List<String> matchDigests = matchResults.stream()
                 .map(ReconciliationMatchResult::getMatchDigest)
@@ -219,7 +219,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         result.setReconciliationScopeRef(batch.getReconciliationScopeRef());
         result.setGateObjectType(batch.getGateObjectType());
         result.setGateObjectSn(batch.getGateObjectSn());
-        result.setStatus(status);
+        result.setOutcome(outcome);
         result.setRuleVersion(batch.getRuleVersion());
         result.setReferenceSourceDigest(sourceSet.reference().snapshot().getSourceDigest());
         result.setComparisonSourceDigest(sourceSet.comparison().snapshot().getSourceDigest());
@@ -228,7 +228,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         result.setMatchedCount(matchedCount);
         result.setDifferenceCount(differenceCount);
         result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs));
-        result.setResultDigest(resultDigest(batch, evidenceRefs, sourceSet, sourceDigest, status,
+        result.setResultDigest(resultDigest(batch, evidenceRefs, sourceSet, sourceDigest, outcome,
                 matchedCount, differenceCount, matchDigests));
         result.setCreatedBy(operator.getOperatorAsText());
         return result;
@@ -325,7 +325,7 @@ public class ReconciliationRunResultApplicationServiceImpl
                                 List<String> evidenceRefs,
                                 SourceSet sourceSet,
                                 String sourceDigest,
-                                ReconciliationRunResultStatus status,
+                                ReconciliationRunOutcome outcome,
                                 int matchedCount,
                                 int differenceCount,
                                 List<String> matchDigests) {
@@ -336,7 +336,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         facts.put("reconciliationScopeRef", batch.getReconciliationScopeRef());
         facts.put("gateObjectType", batch.getGateObjectType());
         facts.put("gateObjectSn", batch.getGateObjectSn());
-        facts.put("status", status);
+        facts.put("status", outcome);
         facts.put("ruleVersion", batch.getRuleVersion());
         facts.put("referenceSourceDigest", sourceSet.reference().snapshot().getSourceDigest());
         facts.put("comparisonSourceDigest", sourceSet.comparison().snapshot().getSourceDigest());

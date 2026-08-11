@@ -1,7 +1,7 @@
 package com.wind.funds.governance.projection;
 
 import com.wind.funds.governance.enums.ProjectionReplayMode;
-import com.wind.funds.governance.enums.ProjectionReplayTaskStatus;
+import com.wind.funds.governance.enums.ProjectionReplayTaskState;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -17,7 +17,7 @@ public record FundsProjectionReplayTaskDTO(@NonNull String taskSn,
                                            @NonNull String viewDomain,
                                            @NonNull ProjectionReplayMode mode,
                                            @NonNull FundsTransactionProjectionReplayRange replayRange,
-                                           @NonNull ProjectionReplayTaskStatus status,
+                                           @NonNull ProjectionReplayTaskState state,
                                            @NonNull FundsTransactionProjectionCheckpoint checkpoint,
                                            long successCount,
                                            long failedCount,

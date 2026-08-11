@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.query;
 
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -54,7 +54,7 @@ public class SpendRuleBindingQuery implements Serializable {
     private String scopeId;
 
     @Schema(description = "挂载状态")
-    private SpendRuleBindingStatus status;
+    private SpendRuleBindingState state;
 
     @Schema(description = "创建挂载的审计引用")
     private String auditReferenceSn;

@@ -1,6 +1,7 @@
 package com.wind.funds.reconciliation.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -10,9 +11,10 @@ import lombok.Getter;
  * @author wuxp
  * @since 2026-07-29
  */
+@Schema(description = "结算单生命周期状态")
 @Getter
 @AllArgsConstructor
-public enum SettlementOrderStatus implements DescriptiveEnum {
+public enum SettlementOrderState implements DescriptiveEnum {
 
     /** 结算单草稿。 */
     DRAFT("草稿"),

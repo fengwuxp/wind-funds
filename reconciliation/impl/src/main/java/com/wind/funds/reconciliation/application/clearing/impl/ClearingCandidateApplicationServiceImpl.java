@@ -12,7 +12,7 @@ import com.wind.funds.reconciliation.dal.entities.ClearingSplitResultSnapshot;
 import com.wind.funds.reconciliation.dal.mapper.ClearingCandidateMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingSplitResultSnapshotMapper;
 import com.wind.funds.reconciliation.dal.entities.table.ClearingCandidateNameRefs;
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.funds.reconciliation.model.dto.ClearingCandidateDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingSettlementGateResultDTO;
 import com.wind.funds.reconciliation.model.query.ClearingCandidateQuery;
@@ -95,7 +95,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         }
         AssertUtils.notNull(candidate.getId(), "创建清算候选失败");
         log.info("清算候选生成完成，tenantId = {}, candidateSn = {}, splitResultSn = {}, status = {}",
-                request.getTenantId(), candidate.getSn(), request.getSplitResultSn(), candidate.getStatus());
+                request.getTenantId(), candidate.getSn(), request.getSplitResultSn(), candidate.getState());
         return toDTO(candidate);
     }
 
@@ -107,13 +107,13 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         AssertUtils.notNull(request, "排除清算候选请求不能为空");
         AssertUtils.hasText(request.getReason(), "清算候选排除原因不能为空");
         ClearingCandidate candidate = requiredCandidateForUpdate(request.getTenantId(), request.getCandidateSn());
-        if (candidate.getStatus() == ClearingCandidateStatus.EXCLUDED) {
+        if (candidate.getState() == ClearingCandidateState.EXCLUDED) {
             return toDTO(candidate);
         }
-        AssertUtils.isTrue(candidate.getStatus() != ClearingCandidateStatus.LOCKED
-                        && candidate.getStatus() != ClearingCandidateStatus.CLEARED,
+        AssertUtils.isTrue(candidate.getState() != ClearingCandidateState.LOCKED
+                        && candidate.getState() != ClearingCandidateState.CLEARED,
                 "LOCKED 或 CLEARED 清算候选不能直接排除，candidateSn = {}", candidate.getSn());
-        candidate.setStatus(ClearingCandidateStatus.EXCLUDED);
+        candidate.setState(ClearingCandidateState.EXCLUDED);
         candidate.setActiveSplittableDetailSn(null);
         candidate.setExclusionReason(request.getReason());
         candidate.setBlockReason(null);
@@ -130,9 +130,9 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         validateCommandRequest(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getCandidateSn(), operator);
         ClearingCandidate candidate = requiredCandidateForUpdate(request.getTenantId(), request.getCandidateSn());
-        if (candidate.getStatus() == ClearingCandidateStatus.READY
-                || candidate.getStatus() == ClearingCandidateStatus.LOCKED
-                || candidate.getStatus() == ClearingCandidateStatus.CLEARED) {
+        if (candidate.getState() == ClearingCandidateState.READY
+                || candidate.getState() == ClearingCandidateState.LOCKED
+                || candidate.getState() == ClearingCandidateState.CLEARED) {
             return toDTO(candidate);
         }
         CandidateDecision decision = evaluate(candidate, operator);
@@ -149,14 +149,14 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         AssertUtils.notNull(request, "锁定清算候选请求不能为空");
         AssertUtils.hasText(request.getClearingBatchSn(), "清算批次流水号不能为空");
         ClearingCandidate candidate = requiredCandidateForUpdate(request.getTenantId(), request.getCandidateSn());
-        if (candidate.getStatus() == ClearingCandidateStatus.LOCKED) {
+        if (candidate.getState() == ClearingCandidateState.LOCKED) {
             AssertUtils.equals(request.getClearingBatchSn(), candidate.getLockedClearingBatchSn(),
                     "清算候选已被其他批次锁定，candidateSn = {}", candidate.getSn());
             return toDTO(candidate);
         }
-        AssertUtils.equals(ClearingCandidateStatus.READY, candidate.getStatus(),
-                "只有 READY 清算候选可以锁定，status = {}", candidate.getStatus());
-        candidate.setStatus(ClearingCandidateStatus.LOCKED);
+        AssertUtils.equals(ClearingCandidateState.READY, candidate.getState(),
+                "只有 READY 清算候选可以锁定，status = {}", candidate.getState());
+        candidate.setState(ClearingCandidateState.LOCKED);
         candidate.setLockedClearingBatchSn(request.getClearingBatchSn());
         candidate.setUpdatedBy(operator.getOperatorAsText());
         candidate.setStatusChangedTime(LocalDateTime.now());
@@ -173,14 +173,14 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         AssertUtils.notNull(request, "释放清算候选锁定请求不能为空");
         AssertUtils.hasText(request.getClearingBatchSn(), "清算批次流水号不能为空");
         ClearingCandidate candidate = requiredCandidateForUpdate(request.getTenantId(), request.getCandidateSn());
-        if (candidate.getStatus() == ClearingCandidateStatus.READY) {
+        if (candidate.getState() == ClearingCandidateState.READY) {
             return toDTO(candidate);
         }
-        AssertUtils.equals(ClearingCandidateStatus.LOCKED, candidate.getStatus(),
-                "只有 LOCKED 清算候选可以释放批次锁定，status = {}", candidate.getStatus());
+        AssertUtils.equals(ClearingCandidateState.LOCKED, candidate.getState(),
+                "只有 LOCKED 清算候选可以释放批次锁定，status = {}", candidate.getState());
         AssertUtils.equals(request.getClearingBatchSn(), candidate.getLockedClearingBatchSn(),
                 "清算候选锁定批次不一致，candidateSn = {}", candidate.getSn());
-        candidate.setStatus(ClearingCandidateStatus.READY);
+        candidate.setState(ClearingCandidateState.READY);
         candidate.setLockedClearingBatchSn(null);
         candidate.setBlockReason(null);
         candidate.setExclusionReason(null);
@@ -211,7 +211,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(candidate)
                 .where(candidate.tenantId.eq(tenantId))
-                .and(candidate.status.eq(query.getStatus()))
+                .and(candidate.state.eq(query.getState()))
                 .and(candidate.clearingAvailableTime.le(query.getClearingAvailableTimeMax()))
                 .and(candidate.statusChangedTime.le(query.getStatusChangedTimeMax()))
                 .and(candidate.lockedClearingBatchSn.eq(query.getLockedClearingBatchSn()))
@@ -226,7 +226,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
     private CandidateDecision evaluate(ClearingCandidate candidate, WindOperator operator) {
         LocalDateTime now = LocalDateTime.now();
         if (now.isBefore(candidate.getClearingAvailableTime())) {
-            return new CandidateDecision(ClearingCandidateStatus.WAITING_PERIOD, null);
+            return new CandidateDecision(ClearingCandidateState.WAITING_PERIOD, null);
         }
         ClearingSettlementGateResultDTO gate = clearingSettlementGateConsumerService.inspectGate(
                 new CheckClearingSettlementGateRequest()
@@ -237,14 +237,14 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
                 operator);
         if (gate.isPassed() && Objects.equals(gate.getReconciliationResultDigest(),
                 candidate.getReconciliationResultDigest())) {
-            return new CandidateDecision(ClearingCandidateStatus.READY, null);
+            return new CandidateDecision(ClearingCandidateState.READY, null);
         }
-        return new CandidateDecision(ClearingCandidateStatus.BLOCKED, "RECONCILIATION_BLOCKED");
+        return new CandidateDecision(ClearingCandidateState.BLOCKED, "RECONCILIATION_BLOCKED");
     }
 
     private void applyDecision(ClearingCandidate candidate, CandidateDecision decision, WindOperator operator) {
-        candidate.setStatus(decision.status());
-        candidate.setActiveSplittableDetailSn(decision.status() == ClearingCandidateStatus.EXCLUDED
+        candidate.setState(decision.state());
+        candidate.setActiveSplittableDetailSn(decision.state() == ClearingCandidateState.EXCLUDED
                 ? null : candidate.getSplittableDetailSn());
         candidate.setBlockReason(decision.blockReason());
         candidate.setExclusionReason(null);
@@ -367,7 +367,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
                 .setReconciliationEvidenceRefs(parseEvidenceRefs(source.getReconciliationEvidenceRefs()))
                 .setSourceDigest(source.getSourceDigest())
                 .setCandidateDigest(source.getCandidateDigest())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setBlockReason(source.getBlockReason())
                 .setExclusionReason(source.getExclusionReason())
                 .setLockedClearingBatchSn(source.getLockedClearingBatchSn())
@@ -380,6 +380,6 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 
-    private record CandidateDecision(ClearingCandidateStatus status, String blockReason) {
+    private record CandidateDecision(ClearingCandidateState state, String blockReason) {
     }
 }

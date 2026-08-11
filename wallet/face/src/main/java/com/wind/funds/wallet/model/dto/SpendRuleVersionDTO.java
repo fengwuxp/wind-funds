@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -53,7 +53,7 @@ public class SpendRuleVersionDTO implements Serializable {
     private String ruleDigest;
 
     @Schema(description = "版本状态")
-    private SpendRuleVersionStatus status;
+    private SpendRuleVersionState state;
 
     @Schema(description = "操作者")
     private String operatorId;

@@ -7,11 +7,11 @@ import com.wind.funds.reconciliation.application.recovery.RecoveryOrderApplicati
 import com.wind.funds.reconciliation.application.recovery.impl.RecoveryOrderApplicationServiceImpl;
 import com.wind.funds.reconciliation.dal.mapper.RecoveryOrderMapper;
 import com.wind.funds.reconciliation.dal.mapper.RecoveryResultMapper;
-import com.wind.funds.reconciliation.enums.RecoveryOrderStatus;
+import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.funds.reconciliation.model.dto.RecoveryOrderDTO;
 import com.wind.funds.reconciliation.model.request.CreateRecoveryOrderRequest;
 import com.wind.funds.reconciliation.model.request.RecordRecoveryResultRequest;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
@@ -87,7 +87,7 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 request, WindOperatorFactory.system());
 
         assertThat(replay.getSn()).isEqualTo(created.getSn());
-        assertThat(replay.getStatus()).isEqualTo(RecoveryOrderStatus.CREATED);
+        assertThat(replay.getState()).isEqualTo(RecoveryOrderState.CREATED);
         assertThat(replay.getRemainingAmount()).isEqualTo(150L);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_recovery_order", Integer.class)).isOne();
 
@@ -113,7 +113,7 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
         RecoveryOrderDTO partial = recoveryOrderApplicationService.recordResult(
                 recordRequest(order.getSn(), firstTransactionSn, "partial-1"), WindOperatorFactory.system());
 
-        assertThat(partial.getStatus()).isEqualTo(RecoveryOrderStatus.PARTIALLY_RECOVERED);
+        assertThat(partial.getState()).isEqualTo(RecoveryOrderState.PARTIALLY_RECOVERED);
         assertThat(partial.getRecoveredAmount()).isEqualTo(50L);
         assertThat(partial.getRemainingAmount()).isEqualTo(100L);
         assertThat(snapshot(balances(responsible, collector))).isEqualTo(afterFirstFunds);
@@ -126,7 +126,7 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
         RecoveryOrderDTO replay = recoveryOrderApplicationService.recordResult(
                 secondResult, WindOperatorFactory.system());
 
-        assertThat(recovered.getStatus()).isEqualTo(RecoveryOrderStatus.RECOVERED);
+        assertThat(recovered.getState()).isEqualTo(RecoveryOrderState.RECOVERED);
         assertThat(recovered.getRecoveredAmount()).isEqualTo(150L);
         assertThat(recovered.getRemainingAmount()).isZero();
         assertThat(replay.getRecoveredAmount()).isEqualTo(150L);
@@ -213,21 +213,21 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 recoveryOrderMapper, recoveryResultMapper, queryService);
 
         queryService.put(transaction("open-transaction", TENANT_ID,
-                FundsTransactionStatus.PROCESSING, CURRENCY));
+                FundsTransactionState.PROCESSING, CURRENCY));
         assertThatThrownBy(() -> guardService.recordResult(
                 recordRequest(order.getSn(), "open-transaction", "open"), WindOperatorFactory.system()))
                 .isInstanceOf(BaseException.class)
                 .hasMessageContaining("必须已关闭");
 
         queryService.put(transaction("cross-tenant-transaction", TENANT_ID + 1,
-                FundsTransactionStatus.CLOSED, CURRENCY));
+                FundsTransactionState.CLOSED, CURRENCY));
         assertThatThrownBy(() -> guardService.recordResult(
                 recordRequest(order.getSn(), "cross-tenant-transaction", "tenant"), WindOperatorFactory.system()))
                 .isInstanceOf(BaseException.class)
                 .hasMessageContaining("租户不一致");
 
         queryService.put(transaction("wrong-currency-transaction", TENANT_ID,
-                FundsTransactionStatus.CLOSED, CurrencyIsoCode.EUR));
+                FundsTransactionState.CLOSED, CurrencyIsoCode.EUR));
         assertThatThrownBy(() -> guardService.recordResult(
                 recordRequest(order.getSn(), "wrong-currency-transaction", "currency"),
                 WindOperatorFactory.system()))
@@ -235,7 +235,7 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 .hasMessageContaining("币种不一致");
 
         FundsTransactionDTO missingSubject = transaction(
-                "missing-subject-transaction", TENANT_ID, FundsTransactionStatus.CLOSED, CURRENCY);
+                "missing-subject-transaction", TENANT_ID, FundsTransactionState.CLOSED, CURRENCY);
         queryService.put(missingSubject);
         assertThatThrownBy(() -> guardService.recordResult(
                 recordRequest(order.getSn(), "missing-subject-transaction", "subject"),
@@ -357,13 +357,13 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
 
     private FundsTransactionDTO transaction(String sn,
                                             Long tenantId,
-                                            FundsTransactionStatus status,
+                                            FundsTransactionState state,
                                             CurrencyIsoCode currency) {
         return new FundsTransactionDTO()
                 .setSn(sn)
                 .setTenantId(tenantId)
                 .setBusinessScene("RECOVERY")
-                .setStatus(status)
+                .setState(state)
                 .setAmount(10L)
                 .setCurrency(currency);
     }

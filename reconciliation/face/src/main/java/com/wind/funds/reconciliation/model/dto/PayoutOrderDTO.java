@@ -1,8 +1,8 @@
 package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
-import com.wind.funds.reconciliation.enums.PayoutOperationStatus;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutNextAction;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -48,14 +48,14 @@ public class PayoutOrderDTO implements Serializable {
     @Schema(description = "出款币种")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "出款单事实状态")
-    private PayoutOrderStatus factStatus;
+    @Schema(description = "出款单资金事实生命周期状态")
+    private PayoutOrderState state;
 
     @Schema(description = "面向调用方的出款展示状态")
     private PayoutDisplayStatus displayStatus;
 
-    @Schema(description = "当前出款操作状态")
-    private PayoutOperationStatus operationStatus;
+    @Schema(description = "当前出款下一动作")
+    private PayoutNextAction nextAction;
 
     @Schema(description = "出款账户稳定引用")
     private String payoutAccountRef;

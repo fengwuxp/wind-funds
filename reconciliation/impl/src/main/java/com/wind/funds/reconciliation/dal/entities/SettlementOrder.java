@@ -6,7 +6,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -87,7 +87,12 @@ public class SettlementOrder implements Serializable, TenantIsolationObject<Long
     private Long netAmount;
 
     @NotNull
-    private SettlementOrderStatus status;
+    @Column("status")
+    private SettlementOrderState state;
+
+    void setStatus(SettlementOrderState state) {
+        this.state = state;
+    }
 
     private String settlementApprovalRef;
 

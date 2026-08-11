@@ -10,7 +10,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +61,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testRequireAccountIdShouldResolveUniqueActivePlatformAccountWithoutLedgerMutation() {
-        insertFundingAccount(PLATFORM_ACCOUNT_SN, true, FundsAccountStatus.ACTIVE);
+        insertFundingAccount(PLATFORM_ACCOUNT_SN, true, FundsAccountState.ACTIVE);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         FundsAccountId accountId =
@@ -100,7 +100,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testRequireAccountIdShouldRejectNonPlatformRoleAccountWithoutLedgerMutation() {
-        insertFundingAccount(NON_PLATFORM_ACCOUNT_SN, false, FundsAccountStatus.ACTIVE);
+        insertFundingAccount(NON_PLATFORM_ACCOUNT_SN, false, FundsAccountState.ACTIVE);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> platformFundingAccountService.requireAccountId(TENANT_ID,
@@ -121,7 +121,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testRequireAccountIdShouldRejectSuspendedPlatformAccountWithoutLedgerMutation() {
-        insertFundingAccount(SUSPENDED_PLATFORM_ACCOUNT_SN, true, FundsAccountStatus.SUSPENDED);
+        insertFundingAccount(SUSPENDED_PLATFORM_ACCOUNT_SN, true, FundsAccountState.SUSPENDED);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> platformFundingAccountService.requireAccountId(TENANT_ID,
@@ -155,7 +155,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 SUSPENDED_PLATFORM_ACCOUNT_SN);
     }
 
-    private void insertFundingAccount(String accountSn, boolean platform, FundsAccountStatus status) {
+    private void insertFundingAccount(String accountSn, boolean platform, FundsAccountState state) {
         FundingAccount account = new FundingAccount();
         account.setSn(accountSn);
         account.setTenantId(TENANT_ID);
@@ -167,7 +167,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
         account.setCurrency(CURRENCY);
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_PLATFORM);
         account.setLedgerProfileVersion(1);
-        account.setStatus(status);
+        account.setState(state);
         account.setDescription("platform funding account resolver test");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);

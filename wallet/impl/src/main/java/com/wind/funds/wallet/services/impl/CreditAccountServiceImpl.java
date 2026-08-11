@@ -111,7 +111,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.periodType.eq(query.getPeriodType()))
                 .and(ref.periodId.eq(query.getPeriodId()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.state.eq(query.getState()));
         return MybatisQueryHelper.<CreditAccount, CreditAccountDTO>query(wrapper)
                 .counter(creditAccountMapper::selectCountByQuery)
                 .resultQueryFunc(creditAccountMapper::selectListByQuery)

@@ -9,7 +9,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.FundingResponsibilityDecisionDTO;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
@@ -181,7 +181,7 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -194,7 +194,7 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {

@@ -1,18 +1,20 @@
 package com.wind.funds.reconciliation.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 出款单当前允许的操作状态。
+ * 出款单下一动作。
  *
  * @author wuxp
  * @since 2026-07-30
  */
+@Schema(description = "出款单下一动作")
 @Getter
 @AllArgsConstructor
-public enum PayoutOperationStatus implements DescriptiveEnum {
+public enum PayoutNextAction implements DescriptiveEnum {
 
     /** 允许首次提交到外部通道。 */
     SUBMIT_ALLOWED("允许提交"),

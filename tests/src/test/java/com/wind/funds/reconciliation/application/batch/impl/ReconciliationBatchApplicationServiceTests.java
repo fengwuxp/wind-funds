@@ -3,7 +3,7 @@ package com.wind.funds.reconciliation.application.batch.impl;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
@@ -88,7 +88,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 request, WindOperatorFactory.system());
 
         assertThat(first.getSn()).startsWith("RCB");
-        assertThat(first.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
+        assertThat(first.getState()).isEqualTo(ReconciliationBatchState.CREATED);
         assertThat(first.getBatchDigest()).hasSize(64);
         assertThat(replay.getSn()).isEqualTo(first.getSn());
         assertThat(batchCount()).isOne();
@@ -111,7 +111,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         ReconciliationBatchDTO replay = reconciliationBatchApplicationService.abortBatch(
                 request, WindOperatorFactory.system());
 
-        assertThat(aborted.getStatus()).isEqualTo(ReconciliationBatchStatus.ABORTED);
+        assertThat(aborted.getState()).isEqualTo(ReconciliationBatchState.ABORTED);
         assertThat(aborted.getAbortedBy()).isNotBlank();
         assertThat(aborted.getAbortedTime()).isNotNull();
         assertThat(aborted.getAbortReason()).isEqualTo("来源文件选择错误");
@@ -139,7 +139,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 .hasMessageContaining("已完成对账批次不能终止")
                 .hasMessageContaining("replaceBatch");
 
-        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
     }
 
     /**
@@ -160,8 +160,8 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 WindOperatorFactory.system());
 
         assertThat(replacement.getPreviousBatchSn()).isEqualTo(aborted.getSn());
-        assertThat(replacement.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
-        assertThat(batchStatus(aborted.getSn())).isEqualTo(ReconciliationBatchStatus.ABORTED.name());
+        assertThat(replacement.getState()).isEqualTo(ReconciliationBatchState.CREATED);
+        assertThat(batchStatus(aborted.getSn())).isEqualTo(ReconciliationBatchState.ABORTED.name());
     }
 
     /**
@@ -202,7 +202,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 WindOperatorFactory.system()))
                 .hasMessageContaining("已完成对账批次不能终止");
 
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
     }
 
     /**
@@ -223,12 +223,12 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(replacement.getSn()).isNotEqualTo(completed.getSn());
         assertThat(replacement.getPreviousBatchSn()).isEqualTo(completed.getSn());
-        assertThat(replacement.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
+        assertThat(replacement.getState()).isEqualTo(ReconciliationBatchState.CREATED);
         assertThat(replacement.getRuleVersion()).isEqualTo("recon-rule-v2");
         assertThat(replacement.getReplacementReason()).isEqualTo("外部清算文件解析版本错误");
         assertThat(replacement.getReplacementEvidenceRef()).isEqualTo("evidence:parser-incident-001");
         assertThat(replay.getSn()).isEqualTo(replacement.getSn());
-        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
         assertThat(differenceStatus(completed.getSn() + ":DIFFERENCE")).isEqualTo("INVALIDATED");
         assertThat(lineageCurrentBatchSn()).isEqualTo(replacement.getSn());
         assertThat(batchCount()).isEqualTo(2);
@@ -326,7 +326,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(result.getGateObjectType()).isNull();
         assertThat(result.getGateObjectSn()).isNull();
-        assertThat(result.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
+        assertThat(result.getState()).isEqualTo(ReconciliationBatchState.CREATED);
         assertThat(batchCount()).isOne();
     }
 
@@ -451,7 +451,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
      * 结果：来源引用规范化后不可变复用，批次由 DATA_COLLECTING 推进到 DATA_READY。
      */
     @Test
-    void testRecordSourceSnapshotShouldFreezeFactsAndAdvanceBatchStatus() {
+    void testRecordSourceSnapshotShouldFreezeFactsAndAdvanceBatchState() {
         ReconciliationBatchDTO batch = createBatch("recon-rule-v1");
         RecordReconciliationSourceSnapshotRequest referenceRequest = sourceSnapshotRequest(
                 batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.TRANSACTION,
@@ -472,7 +472,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(reference.getSourceItemRefs()).containsExactly("transaction:001", "transaction:002");
         assertThat(reference.getEvidenceRefs()).containsExactly("report:reference");
         assertThat(replay.getSn()).isEqualTo(reference.getSn());
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.DATA_COLLECTING.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
 
         ReconciliationSourceSnapshotDTO comparison = reconciliationBatchApplicationService.recordSourceSnapshot(
                 sourceSnapshotRequest(batch.getSn(), ReconciliationSourceRole.COMPARISON,
@@ -481,7 +481,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(comparison.getRecordCount()).isZero();
         assertThat(comparison.getSourceItemRefs()).isEmpty();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.DATA_READY.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
         assertThat(snapshotCount()).isEqualTo(2);
         assertThat(sourceItemCount()).isEqualTo(2);
     }
@@ -504,7 +504,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isOne();
         assertThat(sourceItemCount()).isOne();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.DATA_COLLECTING.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
     }
 
     /**
@@ -571,7 +571,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.CREATED.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     @Test
@@ -586,7 +586,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.CREATED.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     @Test
@@ -610,7 +610,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.CREATED.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -629,7 +629,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.CREATED.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -649,14 +649,14 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 .hasMessageContaining("两侧来源不能同时为空");
 
         assertThat(snapshotCount()).isOne();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.DATA_COLLECTING.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
 
         reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
                 batch.getSn(), ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.SETTLEMENT_REPORT,
                 List.of("comparison:001"), List.of("report:comparison")), WindOperatorFactory.system());
 
         assertThat(snapshotCount()).isEqualTo(2);
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.DATA_READY.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
     }
 
     /**
@@ -694,7 +694,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(rerun.getSn()).isNotEqualTo(previous.getSn());
         assertThat(rerun.getPreviousBatchSn()).isEqualTo(previous.getSn());
         assertThat(rerun.getRuleVersion()).isEqualTo("recon-rule-v2");
-        assertThat(rerun.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
+        assertThat(rerun.getState()).isEqualTo(ReconciliationBatchState.CREATED);
         assertThat(batchCount()).isEqualTo(2);
 
         assertThatThrownBy(() -> reconciliationBatchApplicationService.createBatch(

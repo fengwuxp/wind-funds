@@ -4,9 +4,9 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -86,12 +86,22 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
     private String splitRuleVersion;
 
     @NotNull
-    private ClearingSplittableDetailStatus status;
+    @Column("status")
+    private ClearingSplittableAdmissionResult admissionResult;
+
+    void setStatus(ClearingSplittableAdmissionResult admissionResult) {
+        this.admissionResult = admissionResult;
+    }
 
     private ClearingSplittableExclusionReason exclusionReason;
 
     @NotNull
-    private ReconciliationGateDecisionStatus reconciliationDecisionStatus;
+    @Column("reconciliation_decision_status")
+    private ReconciliationGateDecisionResult reconciliationDecisionResult;
+
+    void setReconciliationDecisionStatus(ReconciliationGateDecisionResult reconciliationDecisionResult) {
+        this.reconciliationDecisionResult = reconciliationDecisionResult;
+    }
 
     /**
      * 清分前消费的对账运行结果流水号。

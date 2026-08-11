@@ -5,7 +5,7 @@ import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.wind.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.wind.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
@@ -95,7 +95,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             markUnfreezeSucceeded(order, ledgerTransactionSn);
         } else {
             order.setFreezeLedgerTransactionSn(ledgerTransactionSn);
-            order.setStatus(FundsFrozenOrderStatus.FROZEN);
+            order.setState(FundsFrozenOrderState.FROZEN);
             AssertUtils.isTrue(fundsFrozenOrderMapper.update(order) == 1,
                     "更新资金冻结单生命周期状态失败，sn = {}", order.getSn());
         }
@@ -136,7 +136,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setAmount(instruction.getAmount().getAmount());
         entity.setReleasedAmount(0L);
         entity.setCurrency(instruction.getAmount().getCurrency());
-        entity.setStatus(FundsFrozenOrderStatus.CREATED);
+        entity.setState(FundsFrozenOrderState.CREATED);
         entity.setDescription(instruction.getDescription());
         entity.setContextVariables(toLifecycleContext(instruction, Map.of(
                 FROZEN_ORDER_REQUEST_HASH, computeRequestHash(instruction, routeSnapshot),
@@ -162,7 +162,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setAmount(instruction.getAmount().getAmount());
         entity.setReleasedAmount(0L);
         entity.setCurrency(instruction.getAmount().getCurrency());
-        entity.setStatus(FundsFrozenOrderStatus.CREATED);
+        entity.setState(FundsFrozenOrderState.CREATED);
         entity.setDescription(instruction.getDescription());
         entity.setContextVariables(toLifecycleContext(instruction,
                 Map.of(
@@ -206,12 +206,12 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private boolean isCompleted(FundsFrozenOrder order, FundsTransactionEventType eventType) {
         if (eventType == FundsTransactionEventType.UNFREEZE) {
-            return order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                    || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
+            return order.getState() == FundsFrozenOrderState.RELEASED
+                    || order.getState() == FundsFrozenOrderState.CLOSED;
         }
-        return order.getStatus() == FundsFrozenOrderStatus.FROZEN
-                || order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
+        return order.getState() == FundsFrozenOrderState.FROZEN
+                || order.getState() == FundsFrozenOrderState.RELEASED
+                || order.getState() == FundsFrozenOrderState.CLOSED;
     }
 
     private void assertSameRequest(FundsFrozenOrder order,
@@ -236,7 +236,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                                        @Nullable String ledgerTransactionSn) {
         releaseRecord.setFreezeLedgerTransactionSn(ledgerTransactionSn);
         releaseRecord.setReleaseTime(LocalDateTime.now());
-        releaseRecord.setStatus(FundsFrozenOrderStatus.RELEASED);
+        releaseRecord.setState(FundsFrozenOrderState.RELEASED);
         AssertUtils.isTrue(fundsFrozenOrderMapper.update(releaseRecord) == 1,
                 "更新资金解冻生命周期状态失败，sn = {}", releaseRecord.getSn());
 
@@ -245,9 +245,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         Long releasedAmount = originalOrder.getReleasedAmount() + releaseRecord.getAmount();
         originalOrder.setReleasedAmount(releasedAmount);
         originalOrder.setReleaseTime(releaseRecord.getReleaseTime());
-        originalOrder.setStatus(releasedAmount >= originalOrder.getAmount()
-                ? FundsFrozenOrderStatus.RELEASED
-                : FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+        originalOrder.setState(releasedAmount >= originalOrder.getAmount()
+                ? FundsFrozenOrderState.RELEASED
+                : FundsFrozenOrderState.PARTIALLY_RELEASED);
         AssertUtils.isTrue(fundsFrozenOrderMapper.update(originalOrder) == 1,
                 "更新原冻结单释放金额失败，sn = {}", originalOrder.getSn());
     }

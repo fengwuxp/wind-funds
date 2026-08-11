@@ -10,7 +10,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
@@ -22,7 +22,7 @@ import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplica
 import com.wind.funds.wallet.application.spend.impl.SpendRuleEvaluationApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -208,7 +208,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         assertThat(reserved.getMovementType()).isEqualTo(SpendControlMovementType.RESERVED);
 
         insertFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, DefaultFundsTransactionType.PAY,
-                FundsTransactionStatus.CLOSED, 60L, null);
+                FundsTransactionState.CLOSED, 60L, null);
         SpendControlMovementDTO consumed = spendControlTransactionConsumptionApplicationService.consume(
                 transactionConsumptionRequest(CONSUMED_MOVEMENT_SN, FUNDS_TRANSACTION_SN,
                         "sha256:wallet-spend-controls-consumed", 60L));
@@ -223,7 +223,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         assertThat(afterConsume.getAvailableControlAmount()).isEqualTo(40L);
 
         insertFundsTransaction(REFUND_TRANSACTION_SN, REFUND_BUSINESS_SN, DefaultFundsTransactionType.REFUND,
-                FundsTransactionStatus.CLOSED, 20L, FUNDS_TRANSACTION_SN);
+                FundsTransactionState.CLOSED, 20L, FUNDS_TRANSACTION_SN);
         SpendControlMovementDTO refund = spendControlTransactionConsumptionApplicationService.refund(
                 transactionConsumptionRequest(REFUND_MOVEMENT_SN, REFUND_TRANSACTION_SN,
                         "sha256:wallet-spend-controls-refund", 20L)
@@ -441,7 +441,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest() {
@@ -456,7 +456,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_wallet_spend_controls_7788")
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
@@ -489,7 +489,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
     private void insertFundsTransaction(String transactionSn,
                                         String businessSn,
                                         DefaultFundsTransactionType transactionType,
-                                        FundsTransactionStatus status,
+                                        FundsTransactionState state,
                                         Long amount,
                                         String referenceTransactionSn) {
         jdbcTemplate.update("""
@@ -506,7 +506,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 BUSINESS_SCENE,
                 businessSn,
                 referenceTransactionSn,
-                status.name(),
+                state.name(),
                 amount,
                 CurrencyIsoCode.USD.name(),
                 amount);

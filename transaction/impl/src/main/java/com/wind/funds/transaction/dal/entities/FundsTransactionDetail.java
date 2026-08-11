@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.dal.entities;
 
 import com.wind.funds.transaction.enums.FundsEffectType;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -152,7 +152,12 @@ public class FundsTransactionDetail implements Serializable, TenantIsolationObje
      * 交易明细状态。
      */
     @NotNull
-    private FundsTransactionDetailStatus status;
+    @Column("status")
+    private FundsTransactionDetailState state;
+
+    void setStatus(FundsTransactionDetailState state) {
+        this.state = state;
+    }
 
     /**
      * 失败错误码。

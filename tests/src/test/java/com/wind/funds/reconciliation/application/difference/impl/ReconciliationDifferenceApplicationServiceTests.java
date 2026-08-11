@@ -7,7 +7,7 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
@@ -121,7 +121,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getDifferenceType()).isEqualTo(ReconciliationDifferenceType.AMOUNT_MISMATCH);
         assertThat(result.getSourceQuality()).isEqualTo(ReconciliationSourceQuality.UNVERIFIED);
         assertThat(result.getMatchStrength()).isEqualTo(ReconciliationMatchStrength.CANDIDATE_MATCH);
-        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.BLOCKED);
+        assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.BLOCKED);
         assertThat(result.getRerunCount()).isZero();
         assertThat(result.getCreatedBy()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertThat(replay.getId()).isEqualTo(result.getId());
@@ -292,7 +292,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         ReconciliationDifferenceDTO closedReplay = reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest(runResultSn), WindOperatorFactory.system());
 
-        assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(linked.getState()).isEqualTo(ReconciliationDifferenceState.ADJUSTING);
         assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
         assertThat(linked.getAdjustmentSn()).isEqualTo(ADJUSTMENT_SN);
         assertThat(linked.getAdjustmentIdempotencyKey()).isEqualTo("idem-recon-adjust-001");
@@ -300,7 +300,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(linked.getAdjustmentTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
         assertThat(linkedReplay.getId()).isEqualTo(linked.getId());
         assertThat(countDifferenceActionRows()).isOne();
-        assertThat(closed.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
+        assertThat(closed.getState()).isEqualTo(ReconciliationDifferenceState.RESOLVED);
         assertThat(closed.getLastRerunSn()).isEqualTo(runResultSn);
         assertThat(closed.getRerunCount()).isOne();
         assertThat(closedReplay.getRerunCount()).isOne();
@@ -409,7 +409,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("处理原因长度不能超过");
 
         assertThat(countDifferenceActionRows()).isZero();
-        assertThat(differenceStatus(requiredDifferenceSn())).isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+        assertThat(differenceStatus(requiredDifferenceSn())).isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
     }
 
     @Test
@@ -463,8 +463,8 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                         .setReason("首次调账后仍不平，已由上层发起追偿"),
                 WindOperatorFactory.system());
 
-        assertThat(rerun.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RECONCILING);
-        assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(rerun.getState()).isEqualTo(ReconciliationDifferenceState.RECONCILING);
+        assertThat(linked.getState()).isEqualTo(ReconciliationDifferenceState.ADJUSTING);
         assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.RECOVER);
         assertThat(linked.getAdjustmentSn()).isEqualTo("recovery_recon_002");
         assertThat(countDifferenceActionRows()).isEqualTo(2);
@@ -488,7 +488,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("差错身份");
 
         assertThat(differenceStatus(difference.getDifferenceSn()))
-                .isEqualTo(ReconciliationDifferenceStatus.ADJUSTING.name());
+                .isEqualTo(ReconciliationDifferenceState.ADJUSTING.name());
     }
 
     /**
@@ -507,7 +507,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("处理动作必须在重跑批次创建前回链");
 
         assertThat(differenceStatus(difference.getDifferenceSn()))
-                .isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+                .isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
         assertThat(countDifferenceActionRows()).isZero();
     }
 
@@ -557,7 +557,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("对账差错处理回链操作人不能为空");
 
         assertThat(differenceStatus(difference.getDifferenceSn()))
-                .isEqualTo(ReconciliationDifferenceStatus.BLOCKED.name());
+                .isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
     }
 
     /**
@@ -619,7 +619,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("对账差错重跑操作人不能为空");
 
         assertThat(differenceStatus(difference.getDifferenceSn()))
-                .isEqualTo(ReconciliationDifferenceStatus.ADJUSTING.name());
+                .isEqualTo(ReconciliationDifferenceState.ADJUSTING.name());
     }
 
     /**
@@ -639,7 +639,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
 
         ReconciliationDifferenceDTO unchanged = reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest(), WindOperatorFactory.system());
-        assertThat(unchanged.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(unchanged.getState()).isEqualTo(ReconciliationDifferenceState.ADJUSTING);
         assertThat(unchanged.getLastRerunSn()).isNull();
     }
 
@@ -696,7 +696,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest(latestRunResultSn), WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
+        assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.RESOLVED);
         assertThat(result.getLastRerunSn()).isEqualTo(latestRunResultSn);
         assertThat(result.getLastRerunBatchSn()).isEqualTo(latestBatchSn);
         assertThat(result.getRerunCount()).isEqualTo(2);

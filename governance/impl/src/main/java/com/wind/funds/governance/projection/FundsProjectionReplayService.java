@@ -2,7 +2,7 @@ package com.wind.funds.governance.projection;
 
 import com.wind.funds.governance.enums.ProjectionCheckpointType;
 import com.wind.funds.governance.enums.ProjectionReplayMode;
-import com.wind.funds.governance.enums.ProjectionReplayTaskStatus;
+import com.wind.funds.governance.enums.ProjectionReplayTaskState;
 import com.wind.funds.governance.dal.entities.ProjectionReplayDifference;
 import com.wind.funds.governance.dal.entities.ProjectionReplayTask;
 import com.wind.funds.governance.dal.mapper.ProjectionReplayDifferenceMapper;
@@ -137,7 +137,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         copyRange(request.replayRange(), task);
         task.setCheckpointType(checkpoint.type());
         task.setCheckpointValue(checkpoint.checkpointSn());
-        task.setStatus(ProjectionReplayTaskStatus.CREATED);
+        task.setState(ProjectionReplayTaskState.CREATED);
         task.setSuccessCount(0L);
         task.setFailedCount(0L);
         task.setSkippedCount(0L);
@@ -161,7 +161,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         ProjectionReplayTaskMapper taskMapper = requiredTaskMapper();
         ProjectionReplayTask task = taskMapper.selectBySnForUpdate(request.tenantId(), request.taskSn());
         AssertUtils.notNull(task, "投影重放任务不存在，taskSn = {}", request.taskSn());
-        AssertUtils.isTrue(task.getStatus() != ProjectionReplayTaskStatus.COMPLETED,
+        AssertUtils.isTrue(task.getState() != ProjectionReplayTaskState.COMPLETED,
                 "投影重放任务已经完成，taskSn = {}", request.taskSn());
         FundsTransactionProjectionReplayRange range = toRange(task);
         FundsTransactionProjectionCheckpoint checkpoint = toCheckpoint(task);
@@ -192,8 +192,8 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         task.setCheckpointValue(batch.nextCheckpoint().checkpointSn());
         task.setSuccessCount(task.getSuccessCount() + rebuiltRows.size());
         task.setDifferenceCount(task.getDifferenceCount() + differences.size());
-        task.setStatus(batch.hasMore() ? ProjectionReplayTaskStatus.CREATED
-                : ProjectionReplayTaskStatus.COMPLETED);
+        task.setState(batch.hasMore() ? ProjectionReplayTaskState.CREATED
+                : ProjectionReplayTaskState.COMPLETED);
         task.setOperatorId(operator.getOperatorAsText());
         taskMapper.update(task);
         return FundsTransactionProjectionReplayResult.builder()
@@ -256,7 +256,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
                 request.validatedShadowTaskSn());
         AssertUtils.notNull(shadow, "正式投影重放引用的影子任务不存在");
         AssertUtils.isTrue(shadow.getReplayMode() == ProjectionReplayMode.REBUILD_SHADOW
-                        && shadow.getStatus() == ProjectionReplayTaskStatus.COMPLETED
+                        && shadow.getState() == ProjectionReplayTaskState.COMPLETED
                         && Objects.equals(shadow.getViewDomain(), request.viewDomain())
                         && Objects.equals(toRange(shadow), request.replayRange()),
                 "正式投影重放引用的影子任务与当前范围不一致或尚未完成");
@@ -357,7 +357,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
                 .viewDomain(task.getViewDomain())
                 .mode(task.getReplayMode())
                 .replayRange(toRange(task))
-                .status(task.getStatus())
+                .state(task.getState())
                 .checkpoint(toCheckpoint(task))
                 .successCount(task.getSuccessCount())
                 .failedCount(task.getFailedCount())

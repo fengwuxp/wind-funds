@@ -3,15 +3,15 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -56,9 +56,9 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         Long frozenLedgerId = findLedger(user, LedgerSubjectCode.FROZEN).orElseThrow().getId();
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(frozenLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
 
         unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");
         BalanceSnapshot afterRejected = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -137,12 +137,12 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
         assertThat(postingPlansOf(releaseTransaction)).singleElement().satisfies(plan ->
                 assertThat(plan.getRouteLegId()).isEqualTo(releaseSnapshot.getLegs().getFirst().getLegId()));
 
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getReleasedAmount()).isEqualTo(60L);
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
-        assertThat(ledgerService.getLedgerById(frozenLedgerId).getStatus()).isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
+        assertThat(ledgerService.getLedgerById(frozenLedgerId).getState()).isEqualTo(LedgerState.SUSPENDED);
         LedgerFactSnapshot afterRejectedFacts = ledgerFactSnapshot();
 
         unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");

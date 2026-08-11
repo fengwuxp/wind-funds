@@ -12,7 +12,7 @@ import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.integration.operator.WindOperatorFactory;
@@ -186,7 +186,7 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CURRENCY)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE)
+                .setState(FundsAccountState.ACTIVE)
                 .setDescription("global account ACH business flow"));
         FundsAccountId result = fundingAccount(GLOBAL_ACCOUNT_SN);
         ensureLedger(result, LedgerSubjectCode.AVAILABLE);

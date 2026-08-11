@@ -11,8 +11,8 @@ import com.wind.funds.wallet.dal.entities.PaymentInstrumentBinding;
 import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentBindingNameRefs;
 import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentNameRefs;
 import com.wind.funds.wallet.dal.mapper.PaymentInstrumentBindingMapper;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.funds.wallet.mapstruct.PaymentInstrumentConverter;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
 import com.wind.funds.wallet.model.query.PaymentInstrumentBindingQuery;
@@ -89,8 +89,8 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
                 .and(ref.subjectType.eq(query.getSubjectType()))
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.defaultBinding.eq(query.getDefaultBinding()))
-                .and(ref.status.eq(query.getStatus()));
-        applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
+                .and(ref.state.eq(query.getState()));
+        applyCurrentEffectiveWindow(wrapper, ref, query.getState());
         applyActiveInstrumentWindow(wrapper, query);
         wrapper.orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<PaymentInstrumentBinding, PaymentInstrumentBindingDTO>query(wrapper)
@@ -112,7 +112,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
         UpdateWrapper<PaymentInstrumentBinding> updateWrapper = UpdateWrapper.of(entity);
         updateWrapper.set(ref.priority, request.getPriority(), request.getPriority() != null);
         updateWrapper.set(ref.defaultBinding, request.getDefaultBinding(), request.getDefaultBinding() != null);
-        updateWrapper.set(ref.status, request.getStatus(), request.getStatus() != null);
+        updateWrapper.set(ref.state, request.getState(), request.getState() != null);
         updateWrapper.set(ref.validFrom, request.getValidFrom(), request.getValidFrom() != null);
         updateWrapper.set(ref.validTo, request.getValidTo(), request.getValidTo() != null);
         updateWrapper.set(ref.description, request.getDescription(), request.getDescription() != null);
@@ -147,7 +147,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
     @Override
     public boolean existsOverlappingActiveDefaultBinding(@NonNull PaymentInstrumentBindingDTO binding) {
         if (!Boolean.TRUE.equals(binding.getDefaultBinding())
-                || binding.getStatus() != PaymentInstrumentBindingStatus.ACTIVE) {
+                || binding.getState() != PaymentInstrumentBindingState.ACTIVE) {
             return false;
         }
         PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
@@ -158,7 +158,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
                 .and(ref.bindingRole.eq(binding.getBindingRole()))
                 .and(ref.currency.eq(binding.getCurrency()))
                 .and(ref.defaultBinding.eq(Boolean.TRUE))
-                .and(ref.status.eq(PaymentInstrumentBindingStatus.ACTIVE));
+                .and(ref.state.eq(PaymentInstrumentBindingState.ACTIVE));
         return paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
                 .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
                 .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
@@ -169,7 +169,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
 
     @Override
     public boolean existsOverlappingActivePriorityBinding(@NonNull PaymentInstrumentBindingDTO binding) {
-        if (binding.getStatus() != PaymentInstrumentBindingStatus.ACTIVE) {
+        if (binding.getState() != PaymentInstrumentBindingState.ACTIVE) {
             return false;
         }
         int priority = binding.getPriority() == null ? 0 : binding.getPriority();
@@ -181,7 +181,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
                 .and(ref.bindingRole.eq(binding.getBindingRole()))
                 .and(ref.currency.eq(binding.getCurrency()))
                 .and(ref.priority.eq(priority))
-                .and(ref.status.eq(PaymentInstrumentBindingStatus.ACTIVE));
+                .and(ref.state.eq(PaymentInstrumentBindingState.ACTIVE));
         return paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
                 .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
                 .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
@@ -192,8 +192,8 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
 
     private void applyCurrentEffectiveWindow(QueryWrapper wrapper,
                                              PaymentInstrumentBindingNameRefs ref,
-                                             PaymentInstrumentBindingStatus status) {
-        if (status != PaymentInstrumentBindingStatus.ACTIVE) {
+                                             PaymentInstrumentBindingState state) {
+        if (state != PaymentInstrumentBindingState.ACTIVE) {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
@@ -202,7 +202,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
     }
 
     private void applyActiveInstrumentWindow(QueryWrapper wrapper, PaymentInstrumentBindingQuery query) {
-        if (query.getStatus() != PaymentInstrumentBindingStatus.ACTIVE) {
+        if (query.getState() != PaymentInstrumentBindingState.ACTIVE) {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
@@ -211,7 +211,7 @@ public class PaymentInstrumentBindingServiceImpl implements PaymentInstrumentBin
                 .select(instrumentRef.sn)
                 .from(instrumentRef)
                 .where(instrumentRef.tenantId.eq(query.getTenantId()))
-                .and(instrumentRef.status.eq(FundsAccountStatus.ACTIVE))
+                .and(instrumentRef.state.eq(FundsAccountState.ACTIVE))
                 .and(instrumentRef.validFrom.isNull().or(instrumentRef.validFrom.le(now)))
                 .and(instrumentRef.validTo.isNull().or(instrumentRef.validTo.gt(now)));
         PaymentInstrumentBindingNameRefs bindingRef = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;

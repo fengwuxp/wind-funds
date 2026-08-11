@@ -11,8 +11,8 @@ import com.wind.funds.reconciliation.application.clearing.impl.ClearingCandidate
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ClearingSplitBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -36,7 +36,7 @@ import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchReque
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.operator.WindOperatorFactory;
@@ -98,12 +98,12 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
      * 结果：CONFIRMED 是不可变结果快照形成后的终态，不保留未落地的候选消费关闭状态。
      */
     @Test
-    void testStatusContractShouldUseConfirmedAsTerminalState() {
-        assertThat(ClearingSplitBatchStatus.values()).containsExactly(
-                ClearingSplitBatchStatus.DRAFT,
-                ClearingSplitBatchStatus.REVIEWING,
-                ClearingSplitBatchStatus.CONFIRMED,
-                ClearingSplitBatchStatus.CANCELLED);
+    void testStateContractShouldUseConfirmedAsTerminalState() {
+        assertThat(ClearingSplitBatchState.values()).containsExactly(
+                ClearingSplitBatchState.DRAFT,
+                ClearingSplitBatchState.REVIEWING,
+                ClearingSplitBatchState.CONFIRMED,
+                ClearingSplitBatchState.CANCELLED);
     }
 
     @BeforeEach
@@ -133,7 +133,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         ClearingSplitBatchDTO replay = clearingSplitBatchApplicationService.createBatch(
                 createRequest(second, first), WindOperatorFactory.system());
 
-        assertThat(created.getStatus()).isEqualTo(ClearingSplitBatchStatus.DRAFT);
+        assertThat(created.getState()).isEqualTo(ClearingSplitBatchState.DRAFT);
         assertThat(created.getSubjectType()).isEqualTo("FUNDING_ACCOUNT");
         assertThat(created.getSubjectId()).isEqualTo(SUBJECT_ID);
         assertThat(created.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
@@ -153,7 +153,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
      * 结果：只返回符合条件的当前租户批次。
      */
     @Test
-    void testQueryShouldDiscoverSplitBatchesByStatusAndAge() {
+    void testQueryShouldDiscoverSplitBatchesByStateAndAge() {
         String detail = prepareSplittableDetail("003", SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 1000L);
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(detail), WindOperatorFactory.system());
@@ -174,7 +174,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
 
         WindPagination<ClearingSplitBatchDTO> result = clearingSplitBatchApplicationService.queryBatches(
                 new ClearingSplitBatchQuery()
-                        .setStatus(ClearingSplitBatchStatus.DRAFT)
+                        .setState(ClearingSplitBatchState.DRAFT)
                         .setGmtModifiedMax(LocalDateTime.now().plusMinutes(1)),
                 DefaultPageQueryOptions.defaults(10));
 
@@ -261,7 +261,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         ClearingSplitBatchDTO recreated = clearingSplitBatchApplicationService.createBatch(
                 createRequest(first), WindOperatorFactory.system());
 
-        assertThat(cancelled.getStatus()).isEqualTo(ClearingSplitBatchStatus.CANCELLED);
+        assertThat(cancelled.getState()).isEqualTo(ClearingSplitBatchState.CANCELLED);
         assertThat(recreated.getSn()).isNotEqualTo(original.getSn());
         assertThat(recreated.getDetailCount()).isOne();
         assertThat(batchCount()).isEqualTo(2);
@@ -291,8 +291,8 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         List<ClearingSplitResultSnapshotDTO> snapshots = clearingSplitBatchApplicationService
                 .getResultSnapshots(TENANT_ID, created.getSn());
 
-        assertThat(reviewing.getStatus()).isEqualTo(ClearingSplitBatchStatus.REVIEWING);
-        assertThat(confirmed.getStatus()).isEqualTo(ClearingSplitBatchStatus.CONFIRMED);
+        assertThat(reviewing.getState()).isEqualTo(ClearingSplitBatchState.REVIEWING);
+        assertThat(confirmed.getState()).isEqualTo(ClearingSplitBatchState.CONFIRMED);
         assertThat(replay.getSn()).isEqualTo(confirmed.getSn());
         assertThat(snapshots).hasSize(2)
                 .allSatisfy(snapshot -> {
@@ -350,8 +350,8 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                 new ConfirmClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("来源交易已变化");
-        assertThat(clearingSplitBatchApplicationService.getBatch(TENANT_ID, created.getSn()).getStatus())
-                .isEqualTo(ClearingSplitBatchStatus.REVIEWING);
+        assertThat(clearingSplitBatchApplicationService.getBatch(TENANT_ID, created.getSn()).getState())
+                .isEqualTo(ClearingSplitBatchState.REVIEWING);
         assertThat(snapshotCount()).isZero();
     }
 
@@ -374,7 +374,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                 new ConfirmClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system());
 
-        assertThat(confirmed.getStatus()).isEqualTo(ClearingSplitBatchStatus.CONFIRMED);
+        assertThat(confirmed.getState()).isEqualTo(ClearingSplitBatchState.CONFIRMED);
         assertThat(snapshotCount()).isOne();
     }
 
@@ -396,8 +396,8 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                 new ConfirmClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("批次摘要与当前成员事实不一致");
-        assertThat(clearingSplitBatchApplicationService.getBatch(TENANT_ID, created.getSn()).getStatus())
-                .isEqualTo(ClearingSplitBatchStatus.REVIEWING);
+        assertThat(clearingSplitBatchApplicationService.getBatch(TENANT_ID, created.getSn()).getState())
+                .isEqualTo(ClearingSplitBatchState.REVIEWING);
         assertThat(snapshotCount()).isZero();
     }
 
@@ -417,7 +417,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         ClearingCandidateDTO replay = clearingCandidateApplicationService.createCandidate(
                 request, WindOperatorFactory.system());
 
-        assertThat(created.getStatus()).isEqualTo(ClearingCandidateStatus.READY);
+        assertThat(created.getState()).isEqualTo(ClearingCandidateState.READY);
         assertThat(created.getAmount()).isEqualTo(1000L);
         assertThat(created.getSplittableDetailSn()).isEqualTo(detail);
         assertThat(created.getCandidateDigest()).hasSize(64);
@@ -431,7 +431,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
      * 结果：只返回账期上界内的候选。
      */
     @Test
-    void testQueryShouldDiscoverCandidatesByStatusAndAvailableTime() {
+    void testQueryShouldDiscoverCandidatesByStateAndAvailableTime() {
         String detail = prepareConfirmedSnapshot("074");
         ClearingCandidateDTO created = clearingCandidateApplicationService.createCandidate(
                 createCandidateRequest(snapshotSn(detail), LocalDateTime.now().minusMinutes(1)),
@@ -439,7 +439,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
 
         WindPagination<ClearingCandidateDTO> result = clearingCandidateApplicationService.queryCandidates(
                 new ClearingCandidateQuery()
-                        .setStatus(ClearingCandidateStatus.READY)
+                        .setState(ClearingCandidateState.READY)
                         .setClearingAvailableTimeMax(LocalDateTime.now()),
                 DefaultPageQueryOptions.defaults(10));
 
@@ -475,7 +475,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         ClearingCandidateDTO waiting = clearingCandidateApplicationService.createCandidate(
                 createCandidateRequest(splitResultSn, LocalDateTime.now().plusHours(1)),
                 WindOperatorFactory.system());
-        assertThat(waiting.getStatus()).isEqualTo(ClearingCandidateStatus.WAITING_PERIOD);
+        assertThat(waiting.getState()).isEqualTo(ClearingCandidateState.WAITING_PERIOD);
 
         ClearingCandidateDTO excluded = clearingCandidateApplicationService.excludeCandidate(
                 new ExcludeClearingCandidateRequest()
@@ -483,7 +483,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         .setCandidateSn(waiting.getSn())
                         .setReason("退款核对待人工确认"),
                 WindOperatorFactory.system());
-        assertThat(excluded.getStatus()).isEqualTo(ClearingCandidateStatus.EXCLUDED);
+        assertThat(excluded.getState()).isEqualTo(ClearingCandidateState.EXCLUDED);
 
         jdbcTemplate.update("""
                 UPDATE t_clearing_candidate
@@ -503,8 +503,8 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         .setClearingBatchSn("CLEARING-BATCH-001"),
                 WindOperatorFactory.system());
 
-        assertThat(restored.getStatus()).isEqualTo(ClearingCandidateStatus.READY);
-        assertThat(locked.getStatus()).isEqualTo(ClearingCandidateStatus.LOCKED);
+        assertThat(restored.getState()).isEqualTo(ClearingCandidateState.READY);
+        assertThat(locked.getState()).isEqualTo(ClearingCandidateState.LOCKED);
         assertThat(locked.getLockedClearingBatchSn()).isEqualTo("CLEARING-BATCH-001");
 
         ClearingCandidateDTO unknownResult = clearingCandidateApplicationService.restoreCandidate(
@@ -512,7 +512,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         .setTenantId(TENANT_ID)
                         .setCandidateSn(locked.getSn()),
                 WindOperatorFactory.system());
-        assertThat(unknownResult.getStatus()).isEqualTo(ClearingCandidateStatus.LOCKED);
+        assertThat(unknownResult.getState()).isEqualTo(ClearingCandidateState.LOCKED);
         assertThatThrownBy(() -> clearingCandidateApplicationService.releaseCandidateLock(
                 new ReleaseClearingCandidateLockRequest()
                         .setTenantId(TENANT_ID)
@@ -534,7 +534,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         .setClearingBatchSn("CLEARING-BATCH-001"),
                 WindOperatorFactory.system());
 
-        assertThat(released.getStatus()).isEqualTo(ClearingCandidateStatus.READY);
+        assertThat(released.getState()).isEqualTo(ClearingCandidateState.READY);
         assertThat(released.getLockedClearingBatchSn()).isNull();
         assertThat(replayRelease.getSn()).isEqualTo(released.getSn());
         assertLedgerFactsUnchanged(jdbcTemplate, beforeLock);
@@ -601,7 +601,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0)
                         """,
                 transactionSn, TENANT_ID, FundsTransactionMode.DIRECT.name(), DefaultFundsTransactionType.PAY.name(),
-                businessLine, "split_business_" + suffix, FundsTransactionStatus.CLOSED.name(), amount,
+                businessLine, "split_business_" + suffix, FundsTransactionState.CLOSED.name(), amount,
                 currency.name(), amount, routeSnapshot);
         String referenceSourceRef = "internal:" + transactionDetailSn;
         String comparisonSourceRef = "external:" + transactionDetailSn;

@@ -3,7 +3,7 @@ package com.wind.funds.wallet.model.request;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -61,7 +61,7 @@ public class CreateFundingAccountRequest {
     private LedgerProfileCode ledgerProfileCode;
 
     @Schema(description = "状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 
     @Schema(description = "描述")
     private String description;

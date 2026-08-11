@@ -12,8 +12,8 @@ import com.wind.funds.reconciliation.application.settlement.SettlementOrderAppli
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
-import com.wind.funds.reconciliation.enums.PayoutOperationStatus;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutNextAction;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -109,9 +109,9 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         var beforeReceipts = snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount()));
 
         PayoutOrderDTO accepted = payoutOrderApplicationService.handleReceipt(
-                receipt(payout, PayoutOrderStatus.ACCEPTED, 600L, "accepted", "external-success"),
+                receipt(payout, PayoutOrderState.ACCEPTED, 600L, "accepted", "external-success"),
                 WindOperatorFactory.system());
-        assertThat(accepted.getFactStatus()).isEqualTo(PayoutOrderStatus.ACCEPTED);
+        assertThat(accepted.getState()).isEqualTo(PayoutOrderState.ACCEPTED);
         assertThat(accepted.getDisplayStatus()).isEqualTo(PayoutDisplayStatus.PROCESSING);
         assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
         assertOnlyBalanceDeltas(beforeReceipts, snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount())),
@@ -120,13 +120,13 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         HandlePayoutReceiptRequest successReceipt = receipt(
-                payout, PayoutOrderStatus.SUCCEEDED, 600L, "success", "external-success");
+                payout, PayoutOrderState.SUCCEEDED, 600L, "success", "external-success");
         PayoutOrderDTO succeeded = payoutOrderApplicationService.handleReceipt(
                 successReceipt, WindOperatorFactory.system());
         PayoutOrderDTO replay = payoutOrderApplicationService.handleReceipt(
                 successReceipt, WindOperatorFactory.system());
 
-        assertThat(succeeded.getFactStatus()).isEqualTo(PayoutOrderStatus.SUCCEEDED);
+        assertThat(succeeded.getState()).isEqualTo(PayoutOrderState.SUCCEEDED);
         assertThat(succeeded.getCompletionFundsTransactionSn()).isNotBlank();
         assertThat(replay.getCompletionFundsTransactionSn()).isEqualTo(succeeded.getCompletionFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeReceipts, snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount())),
@@ -138,9 +138,9 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertSingleFundsAndLedgerFactsForBusinessSn(payout.getSn(), 3, 4);
 
         PayoutOrderDTO conflicted = payoutOrderApplicationService.handleReceipt(
-                receipt(payout, PayoutOrderStatus.FAILED, 600L, "late-failure", "external-success"),
+                receipt(payout, PayoutOrderState.FAILED, 600L, "late-failure", "external-success"),
                 WindOperatorFactory.system());
-        assertThat(conflicted.getFactStatus()).isEqualTo(PayoutOrderStatus.MISMATCHED);
+        assertThat(conflicted.getState()).isEqualTo(PayoutOrderState.MISMATCHED);
         assertThat(conflicted.getRollbackFundsTransactionSn()).isNull();
         assertOnlyBalanceDeltas(beforeReceipts, snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount())),
                 delta(accountId, LedgerSubjectCode.SETTLEMENT, -600L, CURRENCY),
@@ -157,7 +157,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         PayoutOrderDTO payout = newSubmittedPayout(accountId, 300L, "failure");
         var beforeReceipt = snapshot(balances(accountId, cashMappingAccount()));
         HandlePayoutReceiptRequest failureReceipt = receipt(
-                payout, PayoutOrderStatus.FAILED, 300L, "failure", "external-failure")
+                payout, PayoutOrderState.FAILED, 300L, "failure", "external-failure")
                 .setFailureCode("DECLINED")
                 .setFailureReason("beneficiary rejected");
 
@@ -166,7 +166,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         PayoutOrderDTO replay = payoutOrderApplicationService.handleReceipt(
                 failureReceipt, WindOperatorFactory.system());
 
-        assertThat(failed.getFactStatus()).isEqualTo(PayoutOrderStatus.FAILED);
+        assertThat(failed.getState()).isEqualTo(PayoutOrderState.FAILED);
         assertThat(failed.getRollbackFundsTransactionSn()).isNotBlank();
         assertThat(replay.getRollbackFundsTransactionSn()).isEqualTo(failed.getRollbackFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeReceipt, snapshot(balances(accountId, cashMappingAccount())),
@@ -186,16 +186,16 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         PayoutOrderDTO second = newSubmittedPayout(secondAccountId, 300L, "external-ref-conflict");
 
         PayoutOrderDTO succeeded = payoutOrderApplicationService.handleReceipt(
-                receipt(first, PayoutOrderStatus.SUCCEEDED, 200L, "external-ref-owner", "shared-reference"),
+                receipt(first, PayoutOrderState.SUCCEEDED, 200L, "external-ref-owner", "shared-reference"),
                 WindOperatorFactory.system());
         var beforeConflict = snapshot(balances(secondAccountId, cashMappingAccount(), prepaymentAccount()));
         PayoutOrderDTO conflicted = payoutOrderApplicationService.handleReceipt(
-                receipt(second, PayoutOrderStatus.SUCCEEDED, 300L, "external-ref-conflict", "shared-reference"),
+                receipt(second, PayoutOrderState.SUCCEEDED, 300L, "external-ref-conflict", "shared-reference"),
                 WindOperatorFactory.system());
 
-        assertThat(succeeded.getFactStatus()).isEqualTo(PayoutOrderStatus.SUCCEEDED);
-        assertThat(conflicted.getFactStatus()).isEqualTo(PayoutOrderStatus.MISMATCHED);
-        assertThat(conflicted.getOperationStatus()).isEqualTo(PayoutOperationStatus.REVIEW_REQUIRED);
+        assertThat(succeeded.getState()).isEqualTo(PayoutOrderState.SUCCEEDED);
+        assertThat(conflicted.getState()).isEqualTo(PayoutOrderState.MISMATCHED);
+        assertThat(conflicted.getNextAction()).isEqualTo(PayoutNextAction.REVIEW_REQUIRED);
         assertSingleFundsAndLedgerFactsForBusinessSn(first.getSn(), 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn(second.getSn());
         assertOnlyBalanceDeltas(beforeConflict,
@@ -212,9 +212,9 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         PayoutOrderDTO first = newSubmittedPayout(firstAccountId, 125L, "receipt-race-first");
         PayoutOrderDTO second = newSubmittedPayout(secondAccountId, 175L, "receipt-race-second");
         HandlePayoutReceiptRequest firstReceipt = receipt(
-                first, PayoutOrderStatus.SUCCEEDED, 125L, "shared-receipt", "external-first");
+                first, PayoutOrderState.SUCCEEDED, 125L, "shared-receipt", "external-first");
         HandlePayoutReceiptRequest secondReceipt = receipt(
-                second, PayoutOrderStatus.SUCCEEDED, 175L, "shared-receipt", "external-second");
+                second, PayoutOrderState.SUCCEEDED, 175L, "shared-receipt", "external-second");
         CountDownLatch startGate = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
@@ -227,14 +227,14 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                     firstAttempt.get(10, TimeUnit.SECONDS), secondAttempt.get(10, TimeUnit.SECONDS));
 
             assertThat(attempts).allSatisfy(attempt -> assertThat(attempt.failure()).isNull());
-            assertThat(attempts).extracting(attempt -> attempt.result().getFactStatus())
-                    .containsExactlyInAnyOrder(PayoutOrderStatus.SUCCEEDED, PayoutOrderStatus.MISMATCHED);
+            assertThat(attempts).extracting(attempt -> attempt.result().getState())
+                    .containsExactlyInAnyOrder(PayoutOrderState.SUCCEEDED, PayoutOrderState.MISMATCHED);
             PayoutOrderDTO firstResult = payoutOrderApplicationService.getOrder(TENANT_ID, first.getSn());
             PayoutOrderDTO secondResult = payoutOrderApplicationService.getOrder(TENANT_ID, second.getSn());
-            PayoutOrderDTO succeeded = firstResult.getFactStatus() == PayoutOrderStatus.SUCCEEDED
+            PayoutOrderDTO succeeded = firstResult.getState() == PayoutOrderState.SUCCEEDED
                     ? firstResult : secondResult;
             PayoutOrderDTO mismatched = succeeded == firstResult ? secondResult : firstResult;
-            assertThat(mismatched.getFactStatus()).isEqualTo(PayoutOrderStatus.MISMATCHED);
+            assertThat(mismatched.getState()).isEqualTo(PayoutOrderState.MISMATCHED);
             assertSingleFundsAndLedgerFactsForBusinessSn(succeeded.getSn(), 3, 4);
             assertNoFundsOrLedgerFactsForBusinessSn(mismatched.getSn());
             assertThat(jdbcTemplate.queryForObject(
@@ -252,10 +252,10 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         var beforeMismatch = snapshot(balance(accountId));
 
         PayoutOrderDTO mismatched = payoutOrderApplicationService.handleReceipt(
-                receipt(mismatchedPayout, PayoutOrderStatus.SUCCEEDED, 199L, "wrong-amount", "external-mismatch"),
+                receipt(mismatchedPayout, PayoutOrderState.SUCCEEDED, 199L, "wrong-amount", "external-mismatch"),
                 WindOperatorFactory.system());
 
-        assertThat(mismatched.getFactStatus()).isEqualTo(PayoutOrderStatus.MISMATCHED);
+        assertThat(mismatched.getState()).isEqualTo(PayoutOrderState.MISMATCHED);
         assertNoFundsOrLedgerFactsForBusinessSn(mismatchedPayout.getSn());
         assertOnlyBalanceDeltas(beforeMismatch, snapshot(balance(accountId)),
                 delta(accountId, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -265,10 +265,10 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         PayoutOrderDTO returnedPayout = newSubmittedPayout(returnedAccountId, 200L, "returned");
         var beforeReturn = snapshot(balance(returnedAccountId));
         PayoutOrderDTO returned = payoutOrderApplicationService.handleReceipt(
-                receipt(returnedPayout, PayoutOrderStatus.RETURNED, 200L, "returned", "external-returned"),
+                receipt(returnedPayout, PayoutOrderState.RETURNED, 200L, "returned", "external-returned"),
                 WindOperatorFactory.system());
-        assertThat(returned.getFactStatus()).isEqualTo(PayoutOrderStatus.RETURNED);
-        assertThat(returned.getOperationStatus()).isEqualTo(PayoutOperationStatus.REVIEW_REQUIRED);
+        assertThat(returned.getState()).isEqualTo(PayoutOrderState.RETURNED);
+        assertThat(returned.getNextAction()).isEqualTo(PayoutNextAction.REVIEW_REQUIRED);
         assertNoFundsOrLedgerFactsForBusinessSn(returnedPayout.getSn());
         assertOnlyBalanceDeltas(beforeReturn, snapshot(balance(returnedAccountId)),
                 delta(returnedAccountId, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -282,8 +282,8 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThatThrownBy(() -> payoutOrderApplicationService.submitOrder(
                 submitRequest(payout, "missing-run-result"), WindOperatorFactory.system()))
                 .hasMessageContaining("出款对账 Gate 未通过");
-        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payout.getSn()).getFactStatus())
-                .isEqualTo(PayoutOrderStatus.CREATED);
+        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payout.getSn()).getState())
+                .isEqualTo(PayoutOrderState.CREATED);
         assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
     }
 
@@ -297,8 +297,8 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThatThrownBy(() -> payoutOrderApplicationService.submitOrder(
                 submitRequest(payout, runResultSn), WindOperatorFactory.system()))
                 .hasMessageContaining("宿主权威出款准入未通过");
-        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payout.getSn()).getFactStatus())
-                .isEqualTo(PayoutOrderStatus.CREATED);
+        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payout.getSn()).getState())
+                .isEqualTo(PayoutOrderState.CREATED);
         assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
     }
 
@@ -307,7 +307,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         String runResultSn = prepareGate(ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-" + suffix);
         PayoutOrderDTO submitted = payoutOrderApplicationService.submitOrder(
                 submitRequest(payout, runResultSn), WindOperatorFactory.system());
-        assertThat(submitted.getFactStatus()).isEqualTo(PayoutOrderStatus.SUBMITTED);
+        assertThat(submitted.getState()).isEqualTo(PayoutOrderState.SUBMITTED);
         assertThat(submitted.getAdmissionDecisionDigest()).hasSize(64);
         assertThat(submitted.getAdmissionEvidenceRefs()).containsExactly("authority:payout-admission");
         assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
@@ -376,7 +376,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
     }
 
     private HandlePayoutReceiptRequest receipt(PayoutOrderDTO payout,
-                                               PayoutOrderStatus status,
+                                               PayoutOrderState state,
                                                long amount,
                                                String suffix,
                                                String externalReference) {
@@ -386,7 +386,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                 .setChannelRef("channel-ref")
                 .setExternalReceiptRef("receipt-" + suffix)
                 .setExternalReference(externalReference)
-                .setStatus(status)
+                .setState(state)
                 .setAmount(amount)
                 .setCurrency(CURRENCY)
                 .setSourceReceiptDigest(FundsStableHashSupport.sha256("receipt:" + suffix))

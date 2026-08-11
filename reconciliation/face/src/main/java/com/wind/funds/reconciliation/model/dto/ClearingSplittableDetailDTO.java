@@ -1,8 +1,8 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -18,7 +18,11 @@ import java.util.List;
 
 /**
  * 可清分明细准入结果。
+ *
+ * @author wuxp
+ * @since 2026-07-21
  */
+@Schema(description = "可清分明细准入结果")
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
@@ -80,14 +84,14 @@ public class ClearingSplittableDetailDTO implements Serializable {
     @Schema(description = "清分规则版本")
     private String splitRuleVersion;
 
-    @Schema(description = "可清分准入状态")
-    private ClearingSplittableDetailStatus status;
+    @Schema(description = "可清分准入结果")
+    private ClearingSplittableAdmissionResult admissionResult;
 
     @Schema(description = "排除原因；可清分时为空")
     private ClearingSplittableExclusionReason exclusionReason;
 
-    @Schema(description = "清分前对账门禁结论")
-    private ReconciliationGateDecisionStatus reconciliationDecisionStatus;
+    @Schema(description = "清分前对账门禁决策结果")
+    private ReconciliationGateDecisionResult reconciliationDecisionResult;
 
     @Schema(description = "清分前消费的对账运行结果流水号")
     private String reconciliationRunResultSn;

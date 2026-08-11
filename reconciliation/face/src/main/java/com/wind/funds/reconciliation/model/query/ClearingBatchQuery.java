@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.query;
 
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,7 +24,7 @@ public class ClearingBatchQuery {
     private Long tenantId;
 
     @Schema(description = "批次状态")
-    private ClearingBatchStatus status;
+    private ClearingBatchState state;
 
     @Schema(description = "最大修改时间，包含边界")
     private LocalDateTime gmtModifiedMax;

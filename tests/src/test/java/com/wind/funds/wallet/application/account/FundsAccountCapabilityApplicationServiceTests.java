@@ -11,7 +11,7 @@ import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.model.dto.FundsAccountCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.request.ResolveFundsAccountCapabilityRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
@@ -88,7 +88,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
         assertThat(decision.getAccountId()).isEqualTo(FundsAccountId.immutable(
                 RECEIVE_ONLY_FUNDING_ACCOUNT_SN,
                 FundsSubjectType.FUNDING_ACCOUNT));
-        assertThat(decision.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(decision.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(decision.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
         assertThat(decision.getCapabilities()).containsExactly(FundsAccountCapability.RECEIVE);
         assertThat(decision.getCanReceive()).isTrue();
@@ -124,7 +124,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
      * 红线：能力来源通过不等于当前状态允许出账。
      */
     @Test
-    void testResolveFrozenFundingAccountCapabilityShouldKeepStatusAdmissionClosed() {
+    void testResolveFrozenFundingAccountCapabilityShouldKeepStateAdmissionClosed() {
         fundingAccountService.createFundingAccount(createFrozenFundingAccountRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -183,15 +183,15 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
     }
 
     private CreateFundingAccountRequest createReceiveOnlyFundingAccountRequest() {
-        return baseFundingAccountRequest(RECEIVE_ONLY_FUNDING_ACCOUNT_SN, FundsAccountStatus.ACTIVE)
+        return baseFundingAccountRequest(RECEIVE_ONLY_FUNDING_ACCOUNT_SN, FundsAccountState.ACTIVE)
                 .setContextVariables("{\"fundsAccountCapabilities\":[\"RECEIVE\"]}");
     }
 
     private CreateFundingAccountRequest createFrozenFundingAccountRequest() {
-        return baseFundingAccountRequest(FROZEN_FUNDING_ACCOUNT_SN, FundsAccountStatus.FROZEN);
+        return baseFundingAccountRequest(FROZEN_FUNDING_ACCOUNT_SN, FundsAccountState.FROZEN);
     }
 
-    private CreateFundingAccountRequest baseFundingAccountRequest(String sn, FundsAccountStatus status) {
+    private CreateFundingAccountRequest baseFundingAccountRequest(String sn, FundsAccountState state) {
         return new CreateFundingAccountRequest()
                 .setSn(sn)
                 .setTenantId(TENANT_ID)
@@ -201,7 +201,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(status);
+                .setState(state);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -213,7 +213,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
                 .setAccountType(CreditFundsAccountType.SHARED_CARD.name())
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     @Configuration

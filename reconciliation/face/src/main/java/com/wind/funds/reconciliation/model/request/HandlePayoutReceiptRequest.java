@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.request;
 
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -48,7 +48,7 @@ public class HandlePayoutReceiptRequest implements Serializable {
 
     @Schema(description = "回执确认的出款事实状态")
     @NotNull
-    private PayoutOrderStatus status;
+    private PayoutOrderState state;
 
     @Schema(description = "回执金额，最小货币单位")
     @NotNull

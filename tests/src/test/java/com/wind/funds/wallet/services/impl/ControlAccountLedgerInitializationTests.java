@@ -19,7 +19,7 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
@@ -131,7 +131,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN);
 
         assertThat(account.getSn()).isEqualTo(CREDIT_ACCOUNT_SN);
-        assertThat(account.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(account.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
         assertThat(account.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.CREDIT_BASIC);
@@ -255,7 +255,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(spendControlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
         assertThat(controlScope.getId()).isEqualTo(spendControlScopeId);
         assertThat(controlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
-        assertThat(spendControlScope.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(spendControlScope.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(spendControlScope.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
         assertThat(spendControlScope.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(ledgers).isEmpty();
@@ -274,7 +274,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         List<LedgerDTO> ledgers = loadLedgers(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE, SPEND_CONTROL_SCOPE_SN);
 
         assertThat(spendControlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
-        assertThat(spendControlScope.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(spendControlScope.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(spendControlScope.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(spendControlScope.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
         assertThat(ledgers).isEmpty();

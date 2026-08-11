@@ -13,7 +13,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.wind.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
@@ -155,7 +155,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectUnavailableFundingAccountWithoutRelation() {
         fundingAccountService.createFundingAccount(createFundingAccountRequest(FUNDING_ACCOUNT_SN)
-                .setStatus(FundsAccountStatus.SUSPENDED));
+                .setState(FundsAccountState.SUSPENDED));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest(
@@ -198,7 +198,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     @Test
     void testCreateSpendSubjectFundingRelationShouldSupportCreditAccountTargetSubject() {
-        creditAccountService.createCreditAccount(createCreditAccountRequest(CREDIT_TARGET_SN, FundsAccountStatus.ACTIVE));
+        creditAccountService.createCreditAccount(createCreditAccountRequest(CREDIT_TARGET_SN, FundsAccountState.ACTIVE));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long relationId = fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest(
@@ -225,7 +225,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectUnavailableCreditAccountTargetWithoutRelation() {
         creditAccountService.createCreditAccount(createCreditAccountRequest(SUSPENDED_CREDIT_TARGET_SN,
-                FundsAccountStatus.SUSPENDED));
+                FundsAccountState.SUSPENDED));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest(
@@ -311,7 +311,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }
 
-    private CreateCreditAccountRequest createCreditAccountRequest(String sn, FundsAccountStatus status) {
+    private CreateCreditAccountRequest createCreditAccountRequest(String sn, FundsAccountState state) {
         return new CreateCreditAccountRequest()
                 .setSn(sn)
                 .setTenantId(TENANT_ID)
@@ -321,7 +321,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(status);
+                .setState(state);
     }
 
     private long countRelations(String spendSubjectId) {

@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.model.dto;
 
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -79,7 +79,7 @@ public class FundsFrozenOrderDTO implements Serializable {
     private CurrencyIsoCode currency;
 
     @Schema(description = "冻结单状态")
-    private FundsFrozenOrderStatus status;
+    private FundsFrozenOrderState state;
 
     @Schema(description = "过期时间")
     private LocalDateTime expireTime;

@@ -14,7 +14,7 @@ import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceSnapshotMapper;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
 import com.wind.funds.reconciliation.model.dto.ReconciliationBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationSourceSnapshotDTO;
 import com.wind.funds.reconciliation.model.request.AbortReconciliationBatchRequest;
@@ -126,18 +126,18 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         ReconciliationBatch batch = lockBatchForAbort(request);
         String abortReason = request.getReason().trim();
         String abortedBy = operator.getOperatorAsText();
-        if (batch.getStatus() == ReconciliationBatchStatus.ABORTED) {
+        if (batch.getState() == ReconciliationBatchState.ABORTED) {
             AssertUtils.isTrue(Objects.equals(batch.getAbortReason(), abortReason)
                             && Objects.equals(batch.getAbortedBy(), abortedBy),
                     "对账批次已由不同终止事实关闭，reconciliationBatchSn = {}", batch.getSn());
             return toBatchDTO(batch);
         }
-        AssertUtils.isTrue(batch.getStatus() != ReconciliationBatchStatus.COMPLETED,
+        AssertUtils.isTrue(batch.getState() != ReconciliationBatchState.COMPLETED,
                 "已完成对账批次不能终止，请使用 replaceBatch 创建替代批次，reconciliationBatchSn = {}",
                 batch.getSn());
         LocalDateTime abortedTime = LocalDateTime.now();
         AssertUtils.isTrue(reconciliationBatchMapper.abort(batch.getTenantId(), batch.getSn(),
-                        batch.getStatus().name(), abortedBy, abortedTime, abortReason) == 1,
+                        batch.getState().name(), abortedBy, abortedTime, abortReason) == 1,
                 "终止对账批次失败，reconciliationBatchSn = {}", batch.getSn());
         ReconciliationBatch result = reconciliationBatchMapper.selectBySn(batch.getTenantId(), batch.getSn());
         AssertUtils.notNull(result, "终止对账批次后未找到持久化事实，reconciliationBatchSn = {}", batch.getSn());
@@ -169,9 +169,9 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
             assertSameReplacement(existing, request);
             return toBatchDTO(existing);
         }
-        AssertUtils.isTrue(replaced.getStatus() == ReconciliationBatchStatus.COMPLETED,
+        AssertUtils.isTrue(replaced.getState() == ReconciliationBatchState.COMPLETED,
                 "只有已完成对账批次可以替代，reconciliationBatchSn = {}, status = {}",
-                replaced.getSn(), replaced.getStatus());
+                replaced.getSn(), replaced.getState());
         if (lineage != null) {
             AssertUtils.isTrue(Objects.equals(lineage.getCurrentBatchSn(), replaced.getSn()),
                     "只有当前批次血缘头可以替代，reconciliationBatchSn = {}, currentBatchSn = {}",
@@ -207,7 +207,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         if (snapshot.getGateObjectType() == null) {
             ReconciliationBatch result = reconciliationBatchMapper.selectBySnForUpdate(
                     request.getTenantId(), request.getReconciliationBatchSn());
-            if (result.getStatus() != ReconciliationBatchStatus.ABORTED) {
+            if (result.getState() != ReconciliationBatchState.ABORTED) {
                 AssertUtils.isTrue(reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
                                 result.getTenantId(), result.getSn()) == null,
                         "只有当前批次血缘头可以终止，reconciliationBatchSn = {}", result.getSn());
@@ -218,7 +218,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                 snapshot.getTenantId(), snapshot.getGateObjectType().name(), snapshot.getGateObjectSn());
         ReconciliationBatch result = reconciliationBatchMapper.selectBySnForUpdate(
                 request.getTenantId(), request.getReconciliationBatchSn());
-        if (result.getStatus() != ReconciliationBatchStatus.ABORTED) {
+        if (result.getState() != ReconciliationBatchState.ABORTED) {
             AssertUtils.isTrue(lineage != null && Objects.equals(lineage.getCurrentBatchSn(), result.getSn()),
                     "只有当前批次血缘头可以终止，reconciliationBatchSn = {}", result.getSn());
         }
@@ -277,16 +277,16 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         if (existing != null) {
             return reuseExistingSourceSnapshot(existing, request, sourceDigest, evidenceRefs);
         }
-        AssertUtils.isTrue(batch.getStatus() == ReconciliationBatchStatus.CREATED
-                        || batch.getStatus() == ReconciliationBatchStatus.DATA_COLLECTING,
+        AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.CREATED
+                        || batch.getState() == ReconciliationBatchState.DATA_COLLECTING,
                 "当前对账批次状态不允许新增来源快照，reconciliationBatchSn = {}, status = {}",
-                batch.getSn(), batch.getStatus());
+                batch.getSn(), batch.getState());
         ReconciliationSourceSnapshot snapshot = toSourceSnapshot(
                 request, operator, sourceDigest, sourceItems.size(), evidenceRefs);
         reconciliationSourceSnapshotMapper.insertSelective(snapshot);
         AssertUtils.notNull(snapshot.getId(), "记录对账来源快照失败");
         sourceItems.forEach(sourceItem -> persistSourceItem(request, operator, snapshot.getSn(), sourceItem));
-        advanceBatchSourceStatus(batch);
+        advanceBatchSourceState(batch);
         ReconciliationSourceSnapshot saved = reconciliationSourceSnapshotMapper.selectByBatchAndRole(
                 request.getTenantId(), request.getReconciliationBatchSn(), request.getSourceRole().name());
         AssertUtils.notNull(saved, "记录对账来源快照后未找到持久化事实");
@@ -374,7 +374,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         result.setWindowEnd(request.getWindowEnd());
         result.setTimezoneId(request.getTimezoneId().trim());
         result.setPreviousBatchSn(normalizedOptionalText(request.getPreviousBatchSn()));
-        result.setStatus(ReconciliationBatchStatus.CREATED);
+        result.setState(ReconciliationBatchState.CREATED);
         result.setBatchDigest(batchDigest(result));
         result.setCreatedBy(operator.getOperatorAsText());
         return result;
@@ -394,7 +394,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         result.setWindowEnd(replaced.getWindowEnd());
         result.setTimezoneId(replaced.getTimezoneId());
         result.setPreviousBatchSn(replaced.getSn());
-        result.setStatus(ReconciliationBatchStatus.CREATED);
+        result.setState(ReconciliationBatchState.CREATED);
         result.setReplacementReason(request.getReason().trim());
         result.setReplacementEvidenceRef(request.getEvidenceRef().trim());
         result.setBatchDigest(batchDigest(result));
@@ -435,11 +435,11 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         ReconciliationBatch previous = reconciliationBatchMapper.selectBySnForUpdate(
                 candidate.getTenantId(), candidate.getPreviousBatchSn());
         AssertUtils.notNull(previous, "上一对账批次不存在，previousBatchSn = {}", candidate.getPreviousBatchSn());
-        AssertUtils.isTrue(previous.getStatus() == ReconciliationBatchStatus.COMPLETED
-                        || previous.getStatus() == ReconciliationBatchStatus.ABORTED,
+        AssertUtils.isTrue(previous.getState() == ReconciliationBatchState.COMPLETED
+                        || previous.getState() == ReconciliationBatchState.ABORTED,
                 "只有已完成或已终止对账批次可以发起重跑，previousBatchSn = {}, status = {}",
-                previous.getSn(), previous.getStatus());
-        if (previous.getStatus() == ReconciliationBatchStatus.COMPLETED) {
+                previous.getSn(), previous.getState());
+        if (previous.getState() == ReconciliationBatchState.COMPLETED) {
             assertGateDifferencesMaterialized(previous);
         }
         AssertUtils.isTrue(Objects.equals(previous.getReconciliationScopeRef(), candidate.getReconciliationScopeRef()),
@@ -622,7 +622,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         return toSourceSnapshotDTO(existing);
     }
 
-    private void advanceBatchSourceStatus(ReconciliationBatch batch) {
+    private void advanceBatchSourceState(ReconciliationBatch batch) {
         List<ReconciliationSourceSnapshot> snapshots = reconciliationSourceSnapshotMapper.selectByBatch(
                 batch.getTenantId(), batch.getSn());
         if (snapshots.size() == 2) {
@@ -632,13 +632,13 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
             AssertUtils.isTrue(totalRecordCount > 0,
                     "对账批次两侧来源不能同时为空，reconciliationBatchSn = {}", batch.getSn());
         }
-        ReconciliationBatchStatus targetStatus = snapshots.size() == 2
-                ? ReconciliationBatchStatus.DATA_READY
-                : ReconciliationBatchStatus.DATA_COLLECTING;
-        AssertUtils.isTrue(reconciliationBatchMapper.updateStatus(batch.getTenantId(), batch.getSn(),
-                        batch.getStatus().name(), targetStatus.name()) == 1,
+        ReconciliationBatchState targetState = snapshots.size() == 2
+                ? ReconciliationBatchState.DATA_READY
+                : ReconciliationBatchState.DATA_COLLECTING;
+        AssertUtils.isTrue(reconciliationBatchMapper.updateState(batch.getTenantId(), batch.getSn(),
+                        batch.getState().name(), targetState.name()) == 1,
                 "推进对账批次来源状态失败，reconciliationBatchSn = {}, currentStatus = {}",
-                batch.getSn(), batch.getStatus());
+                batch.getSn(), batch.getState());
     }
 
     private ReconciliationBatchDTO toBatchDTO(ReconciliationBatch source) {
@@ -653,7 +653,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                 .setWindowEnd(source.getWindowEnd())
                 .setTimezoneId(source.getTimezoneId())
                 .setPreviousBatchSn(source.getPreviousBatchSn())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setRunResultSn(source.getRunResultSn())
                 .setAbortedBy(source.getAbortedBy())
                 .setAbortedTime(source.getAbortedTime())

@@ -10,10 +10,10 @@ import com.wind.funds.reconciliation.dal.entities.SettlementOrderItem;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderMapper;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.SettlementMode;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderDTO;
@@ -27,7 +27,7 @@ import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.funds.transaction.application.FundsSettlementTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsSettlementLockRequest;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -116,12 +116,12 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         validateCommand(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getSettlementOrderSn(), operator);
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
-        if (order.getStatus() == SettlementOrderStatus.REVIEWING) {
+        if (order.getState() == SettlementOrderState.REVIEWING) {
             return toDTO(order);
         }
-        AssertUtils.isTrue(order.getStatus() == SettlementOrderStatus.DRAFT,
-                "只有 DRAFT 结算单可以提交复核，status = {}", order.getStatus());
-        order.setStatus(SettlementOrderStatus.REVIEWING);
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT,
+                "只有 DRAFT 结算单可以提交复核，status = {}", order.getState());
+        order.setState(SettlementOrderState.REVIEWING);
         order.setSubmittedBy(operator.getOperatorAsText());
         order.setSubmittedTime(LocalDateTime.now());
         update(order, "提交结算单复核失败");
@@ -135,12 +135,12 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         validateReason(request.getReason(), ReturnSettlementOrderToDraftRequest.MAX_REASON_LENGTH, "结算单退回原因");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
-        if (order.getStatus() == SettlementOrderStatus.DRAFT) {
+        if (order.getState() == SettlementOrderState.DRAFT) {
             return toDTO(order);
         }
-        AssertUtils.isTrue(order.getStatus() == SettlementOrderStatus.REVIEWING,
-                "只有 REVIEWING 结算单可以退回草稿，status = {}", order.getStatus());
-        order.setStatus(SettlementOrderStatus.DRAFT);
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
+                "只有 REVIEWING 结算单可以退回草稿，status = {}", order.getState());
+        order.setState(SettlementOrderState.DRAFT);
         order.setReturnedBy(operator.getOperatorAsText());
         order.setReturnedTime(LocalDateTime.now());
         order.setReturnReason(request.getReason());
@@ -155,14 +155,14 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         AssertUtils.hasText(request.getSettlementApprovalRef(), "结算审批引用不能为空");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
-        if (order.getStatus() == SettlementOrderStatus.APPROVED) {
+        if (order.getState() == SettlementOrderState.APPROVED) {
             AssertUtils.equals(order.getSettlementApprovalRef(), request.getSettlementApprovalRef(),
                     "结算单已使用不同审批引用完成审批");
             return toDTO(order);
         }
-        AssertUtils.isTrue(order.getStatus() == SettlementOrderStatus.REVIEWING,
-                "只有 REVIEWING 结算单可以审批，status = {}", order.getStatus());
-        order.setStatus(SettlementOrderStatus.APPROVED);
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
+                "只有 REVIEWING 结算单可以审批，status = {}", order.getState());
+        order.setState(SettlementOrderState.APPROVED);
         order.setSettlementApprovalRef(request.getSettlementApprovalRef());
         order.setApprovedBy(operator.getOperatorAsText());
         order.setApprovedTime(LocalDateTime.now());
@@ -177,16 +177,16 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         validateReason(request.getReason(), CancelSettlementOrderRequest.MAX_REASON_LENGTH, "结算单取消原因");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
-        if (order.getStatus() == SettlementOrderStatus.CANCELLED) {
+        if (order.getState() == SettlementOrderState.CANCELLED) {
             return toDTO(order);
         }
-        AssertUtils.isTrue(order.getStatus() == SettlementOrderStatus.DRAFT
-                        || order.getStatus() == SettlementOrderStatus.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 结算单可以取消，status = {}", order.getStatus());
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT
+                        || order.getState() == SettlementOrderState.REVIEWING,
+                "只有 DRAFT 或 REVIEWING 结算单可以取消，status = {}", order.getState());
         List<SettlementOrderItem> items = requiredItems(order);
         AssertUtils.isTrue(settlementOrderItemMapper.releaseActiveSourceClaims(
                 order.getTenantId(), order.getSn()) == items.size(), "释放结算来源占用失败");
-        order.setStatus(SettlementOrderStatus.CANCELLED);
+        order.setState(SettlementOrderState.CANCELLED);
         releaseActiveOrderDigest(order);
         order.setCancelledBy(operator.getOperatorAsText());
         order.setCancelledTime(LocalDateTime.now());
@@ -202,13 +202,13 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         AssertUtils.hasText(request.getReconciliationRunResultSn(), "结算对账运行结果流水号不能为空");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
-        if (order.getStatus() == SettlementOrderStatus.LOCKED) {
+        if (order.getState() == SettlementOrderState.LOCKED) {
             AssertUtils.equals(order.getReconciliationRunResultSn(), request.getReconciliationRunResultSn(),
                     "结算单已使用不同对账运行结果锁定");
             return toDTO(order);
         }
-        AssertUtils.isTrue(order.getStatus() == SettlementOrderStatus.APPROVED,
-                "只有 APPROVED 结算单可以锁定资金，status = {}", order.getStatus());
+        AssertUtils.isTrue(order.getState() == SettlementOrderState.APPROVED,
+                "只有 APPROVED 结算单可以锁定资金，status = {}", order.getState());
         List<SettlementOrderItem> items = requiredItems(order);
         validateCurrentSources(order, items);
         validateDigests(order, items);
@@ -229,7 +229,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                     .setSettlementOrderSn(order.getSn())
                     .setDescription("settlement order funds lock"), operator);
             applyGateEvidence(order, decision);
-            order.setStatus(SettlementOrderStatus.LOCKED);
+            order.setState(SettlementOrderState.LOCKED);
             order.setLockFundsTransactionSn(fundsTransactionSn);
             order.setLockedBy(operator.getOperatorAsText());
             order.setLockedTime(LocalDateTime.now());
@@ -270,7 +270,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         result.setDeductAmount(0L);
         result.setReserveAmount(0L);
         result.setNetAmount(totalAmount);
-        result.setStatus(SettlementOrderStatus.DRAFT);
+        result.setState(SettlementOrderState.DRAFT);
         result.setRuleCode(request.getPolicyCode());
         result.setRuleVersion(request.getPolicyVersion());
         result.setPolicyApprovalRef(request.getPolicyApprovalRef());
@@ -330,7 +330,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         AssertUtils.notEmpty(sources, "结算来源清算批次不能为空");
         ClearingBatch first = sources.getFirst();
         for (ClearingBatch source : sources) {
-            AssertUtils.isTrue(source.getStatus() == ClearingBatchStatus.CONFIRMED,
+            AssertUtils.isTrue(source.getState() == ClearingBatchState.CONFIRMED,
                     "结算来源清算批次必须为 CONFIRMED，clearingBatchSn = {}", source.getSn());
             AssertUtils.isTrue(source.getTotalAmount() != null && source.getTotalAmount() > 0,
                     "结算来源金额必须大于 0，clearingBatchSn = {}", source.getSn());
@@ -404,14 +404,14 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                                             WindOperator operator) {
         FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
                 exception.getFundsTransactionSn()).orElse(null);
-        if (transaction == null || transaction.getStatus() != FundsTransactionStatus.FAILED) {
+        if (transaction == null || transaction.getState() != FundsTransactionState.FAILED) {
             throw new IllegalStateException("结算资金结果未知，不能释放结算来源", exception);
         }
         AssertUtils.isTrue(settlementOrderItemMapper.releaseActiveSourceClaims(
                 order.getTenantId(), order.getSn()) == items.size(), "释放结算来源占用失败");
         applyGateEvidence(order, decision);
         order.setLockFundsTransactionSn(transaction.getSn());
-        order.setStatus(SettlementOrderStatus.FAILED);
+        order.setState(SettlementOrderState.FAILED);
         releaseActiveOrderDigest(order);
         order.setFailedBy(operator.getOperatorAsText());
         order.setFailedTime(LocalDateTime.now());
@@ -506,7 +506,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                         .setAmount(item.getAmount())
                         .setCurrency(item.getCurrency()))
                 .toList();
-        String reason = switch (source.getStatus()) {
+        String reason = switch (source.getState()) {
             case FAILED -> source.getFailureReason();
             case CANCELLED -> source.getCancelReason();
             default -> source.getReturnReason();
@@ -519,7 +519,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 .setCurrency(source.getCurrency())
                 .setSettlementPeriod(source.getSettlementPeriod())
                 .setNetAmount(source.getNetAmount())
-                .setStatus(source.getStatus())
+                .setState(source.getState())
                 .setPolicySnapshot(new SettlementPolicySnapshotDTO()
                         .setPolicyCode(source.getRuleCode())
                         .setPolicyVersion(source.getRuleVersion())

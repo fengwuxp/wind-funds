@@ -11,8 +11,8 @@ import com.wind.funds.reconciliation.application.clearing.impl.ClearingBatchAppl
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -30,7 +30,7 @@ import com.wind.funds.transaction.application.impl.FundsClearingTransactionServi
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.request.FundsClearingConfirmRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -119,17 +119,17 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 .setTenantId(TENANT_ID)
                 .setClearingBatchSn(batch.getSn()), WindOperatorFactory.system());
 
-        assertThat(batch.getStatus()).isEqualTo(ClearingBatchStatus.REVIEWING);
+        assertThat(batch.getState()).isEqualTo(ClearingBatchState.REVIEWING);
         assertThat(batch.getCandidateCount()).isEqualTo(2);
         assertThat(batch.getTotalAmount()).isEqualTo(1_000L);
-        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateStatus.LOCKED.name());
+        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateState.LOCKED.name());
 
         batch = clearingBatchApplicationService.returnToDraft(new ReturnClearingBatchToDraftRequest()
                 .setTenantId(TENANT_ID)
                 .setClearingBatchSn(batch.getSn())
                 .setReason("复核清算范围"), WindOperatorFactory.system());
-        assertThat(batch.getStatus()).isEqualTo(ClearingBatchStatus.DRAFT);
-        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateStatus.READY.name());
+        assertThat(batch.getState()).isEqualTo(ClearingBatchState.DRAFT);
+        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateState.READY.name());
 
         batch = clearingBatchApplicationService.submitBatch(new SubmitClearingBatchRequest()
                 .setTenantId(TENANT_ID)
@@ -139,9 +139,9 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 new ConfirmClearingBatchRequest().setTenantId(TENANT_ID).setClearingBatchSn(batch.getSn()),
                 WindOperatorFactory.system());
 
-        assertThat(confirmed.getStatus()).isEqualTo(ClearingBatchStatus.CONFIRMED);
+        assertThat(confirmed.getState()).isEqualTo(ClearingBatchState.CONFIRMED);
         assertThat(confirmed.getFundsTransactionSn()).isNotBlank();
-        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateStatus.CLEARED.name());
+        assertThat(candidateStatuses(first, second)).containsOnly(ClearingCandidateState.CLEARED.name());
         assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
                 delta(accountId, LedgerSubjectCode.CLEARING, -1_000L, CURRENCY),
                 delta(accountId, LedgerSubjectCode.AVAILABLE, 1_000L, CURRENCY));
@@ -166,12 +166,12 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 .hasMessageContaining("账本余额不足");
 
         ClearingBatchDTO failed = clearingBatchApplicationService.getBatch(TENANT_ID, batch.getSn());
-        assertThat(failed.getStatus()).isEqualTo(ClearingBatchStatus.FAILED);
+        assertThat(failed.getState()).isEqualTo(ClearingBatchState.FAILED);
         assertThat(failed.getFundsTransactionSn()).isNotBlank();
-        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateStatus.BLOCKED.name());
+        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateState.BLOCKED.name());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT status FROM t_funds_transaction WHERE sn = ?", String.class,
-                failed.getFundsTransactionSn())).isEqualTo(FundsTransactionStatus.FAILED.name());
+                failed.getFundsTransactionSn())).isEqualTo(FundsTransactionState.FAILED.name());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_ledger_transaction WHERE funds_transaction_sn = ?", Integer.class,
                 failed.getFundsTransactionSn())).isZero();
@@ -191,9 +191,9 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 WindOperatorFactory.system()))
                 .hasMessageContaining("资金主体不存在");
 
-        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, batch.getSn()).getStatus())
-                .isEqualTo(ClearingBatchStatus.REVIEWING);
-        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateStatus.LOCKED.name());
+        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, batch.getSn()).getState())
+                .isEqualTo(ClearingBatchState.REVIEWING);
+        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateState.LOCKED.name());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_funds_transaction WHERE business_sn = ?", Integer.class,
                 batch.getSn())).isZero();
@@ -213,9 +213,9 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 WindOperatorFactory.system()))
                 .hasMessageContaining("simulated clearing result unknown");
 
-        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, batch.getSn()).getStatus())
-                .isEqualTo(ClearingBatchStatus.REVIEWING);
-        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateStatus.LOCKED.name());
+        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, batch.getSn()).getState())
+                .isEqualTo(ClearingBatchState.REVIEWING);
+        assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateState.LOCKED.name());
         assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
                 delta(accountId, LedgerSubjectCode.CLEARING, 0L, CURRENCY),
                 delta(accountId, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
@@ -238,7 +238,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
     }
 
     @Test
-    void testQueryShouldDiscoverClearingBatchesByStatusAndAge() {
+    void testQueryShouldDiscoverClearingBatchesByStateAndAge() {
         FundsAccountId accountId = fundingAccount("cb_query");
         String candidateSn = prepareCandidate(accountId, 100L, "041");
         ClearingBatchDTO created = clearingBatchApplicationService.createBatch(
@@ -247,7 +247,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
 
         WindPagination<ClearingBatchDTO> result = clearingBatchApplicationService.queryBatches(
                 new ClearingBatchQuery()
-                        .setStatus(ClearingBatchStatus.DRAFT)
+                        .setState(ClearingBatchState.DRAFT)
                         .setGmtModifiedMax(LocalDateTime.now().plusMinutes(1)),
                 DefaultPageQueryOptions.defaults(10));
 
@@ -302,7 +302,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0)
                         """,
                 transactionSn, TENANT_ID, FundsTransactionMode.DIRECT.name(), DefaultFundsTransactionType.PAY.name(),
-                BUSINESS_LINE, "clearing_source_business_" + suffix, FundsTransactionStatus.CLOSED.name(), amount,
+                BUSINESS_LINE, "clearing_source_business_" + suffix, FundsTransactionState.CLOSED.name(), amount,
                 CURRENCY.name(), amount, routeSnapshot);
         String referenceSourceRef = "internal:" + transactionDetailSn;
         String comparisonSourceRef = "external:" + transactionDetailSn;

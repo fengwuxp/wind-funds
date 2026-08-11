@@ -24,7 +24,7 @@ import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResul
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
@@ -54,9 +54,9 @@ import com.wind.funds.transaction.application.impl.FundsTransactionCommandServic
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
@@ -70,7 +70,7 @@ import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest;
@@ -192,10 +192,10 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(transactionSn).isNotBlank();
         FundsSubjectBalanceDTO after = balance(targetAccountId());
         assertBucket(after, LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
-        assertThat(fundsTransactionStatus()).isEqualTo(FundsTransactionStatus.CLOSED.name());
+        assertThat(fundsTransactionState()).isEqualTo(FundsTransactionState.CLOSED.name());
         assertThat(fundsTransactionDetailStatuses())
                 .hasSize(3)
-                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED.name());
+                .containsOnly(FundsTransactionDetailState.SUCCEEDED.name());
         assertThat(ledgerTransactionEvents()).containsExactly(FundsTransactionEventType.TOPUP.name());
         assertThat(ledgerEntrySubjects())
                 .contains(TARGET_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
@@ -228,7 +228,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                         .setEvidenceRef("matcher:global-inbound-001#line-1"));
 
-        assertThat(runResult.getStatus()).isEqualTo(ReconciliationRunResultStatus.BALANCED);
+        assertThat(runResult.getOutcome()).isEqualTo(ReconciliationRunOutcome.BALANCED);
         assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
         assertThat(runResult.getGateObjectType()).isNull();
         assertThat(runResult.getGateObjectSn()).isNull();
@@ -264,7 +264,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                         .setDifferenceAmount(10L)
                         .setEvidenceRef("matcher:global-inbound-001#line-1"));
 
-        assertThat(runResult.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
+        assertThat(runResult.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
         assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
         assertThat(runResult.getGateObjectType()).isNull();
         assertThat(runResult.getGateObjectSn()).isNull();
@@ -522,7 +522,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE));
+                .setState(FundsAccountState.ACTIVE));
     }
 
     private void createPlatformFundingAccount(String accountSn, PlatformFundingAccountRole role) {
@@ -537,7 +537,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         account.setCurrency(CurrencyIsoCode.USD);
         account.setLedgerProfileCode(role.getLedgerProfileCode());
         account.setLedgerProfileVersion(1);
-        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setState(FundsAccountState.ACTIVE);
         account.setDescription("external funds event platform funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
@@ -722,7 +722,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setCurrency(CurrencyIsoCode.USD));
     }
 
-    private String fundsTransactionStatus() {
+    private String fundsTransactionState() {
         return jdbcTemplate.queryForObject("""
                 SELECT status FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?

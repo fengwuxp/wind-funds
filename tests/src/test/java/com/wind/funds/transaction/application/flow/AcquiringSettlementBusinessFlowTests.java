@@ -22,18 +22,18 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
-import com.wind.funds.reconciliation.enums.RecoveryOrderStatus;
+import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.funds.reconciliation.model.dto.ClearingBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingCandidateDTO;
@@ -198,7 +198,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
 
         PayoutOrderDTO payoutOrder = payout(settlementOrder);
 
-        assertThat(payoutOrder.getFactStatus()).isEqualTo(PayoutOrderStatus.SUCCEEDED);
+        assertThat(payoutOrder.getState()).isEqualTo(PayoutOrderState.SUCCEEDED);
         assertThat(payoutOrder.getCompletionFundsTransactionSn()).isNotBlank();
         assertOnlyBalanceDeltas(beforePayout, snapshot(balances(merchant, cashMappingAccount())),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, -CAPTURE_AMOUNT, CURRENCY),
@@ -260,7 +260,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                         .setSplitRuleVersion(RULE_VERSION),
                 WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getAdmissionResult()).isEqualTo(ClearingSplittableAdmissionResult.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.REFUND_EXISTS);
         assertThat(result.getRefundAmount()).isEqualTo(100L);
         assertLedgerTransactionFactsUnchanged(beforeIdentify);
@@ -291,8 +291,8 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 delta(merchant, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
         assertThat(fundsTransaction(capture.transactionSn()).getRefundedAmount()).isZero();
-        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, clearingBatch.getSn()).getStatus())
-                .isEqualTo(ClearingBatchStatus.CONFIRMED);
+        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, clearingBatch.getSn()).getState())
+                .isEqualTo(ClearingBatchState.CONFIRMED);
         assertFailedFundsTransactionWithoutLedgerFacts("ACQUIRING_REFUND_AFTER_CLEARING");
     }
 
@@ -336,9 +336,9 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
-        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payoutOrder.getSn()).getFactStatus())
-                .isEqualTo(PayoutOrderStatus.SUCCEEDED);
-        assertThat(recoveryOrder.getStatus()).isEqualTo(RecoveryOrderStatus.CREATED);
+        assertThat(payoutOrderApplicationService.getOrder(TENANT_ID, payoutOrder.getSn()).getState())
+                .isEqualTo(PayoutOrderState.SUCCEEDED);
+        assertThat(recoveryOrder.getState()).isEqualTo(RecoveryOrderState.CREATED);
         assertThat(recoveryOrder.getRecoveredAmount()).isZero();
         assertThat(recoveryOrder.getLastFundsTransactionSn()).isNull();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_recovery_result", Integer.class)).isZero();
@@ -448,7 +448,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                         .setClearingBatchSn(clearingBatch.getSn()), WindOperatorFactory.system());
 
         assertThat(candidateReplay.getSn()).isEqualTo(candidate.getSn());
-        assertThat(confirmed.getStatus()).isEqualTo(ClearingBatchStatus.CONFIRMED);
+        assertThat(confirmed.getState()).isEqualTo(ClearingBatchState.CONFIRMED);
         assertThat(replay.getFundsTransactionSn()).isEqualTo(confirmed.getFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeClearing, snapshot(balance(capture.merchant())),
                 delta(capture.merchant(), LedgerSubjectCode.CLEARING, -CAPTURE_AMOUNT, CURRENCY),
@@ -490,7 +490,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         SettlementOrderDTO replay = settlementOrderApplicationService.lockOrder(
                 request, WindOperatorFactory.system());
 
-        assertThat(locked.getStatus()).isEqualTo(SettlementOrderStatus.LOCKED);
+        assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
         assertThat(replay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeLock, snapshot(balance(merchant)),
                 delta(merchant, LedgerSubjectCode.AVAILABLE, -CAPTURE_AMOUNT, CURRENCY),
@@ -524,7 +524,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 .setChannelRef("acquiring-payout-channel:001")
                 .setExternalReceiptRef("acquiring-payout-receipt:001")
                 .setExternalReference("external-acquiring-payout:001")
-                .setStatus(PayoutOrderStatus.SUCCEEDED)
+                .setState(PayoutOrderState.SUCCEEDED)
                 .setAmount(CAPTURE_AMOUNT)
                 .setCurrency(CURRENCY)
                 .setSourceReceiptDigest(FundsStableHashSupport.sha256("acquiring-payout-receipt:001"))

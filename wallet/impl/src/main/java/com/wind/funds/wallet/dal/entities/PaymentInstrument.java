@@ -7,7 +7,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -112,7 +112,12 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
      * 支付工具状态。
      */
     @NotNull
-    private FundsAccountStatus status;
+    @Column("status")
+    private FundsAccountState state;
+
+    void setStatus(FundsAccountState state) {
+        this.state = state;
+    }
 
     /**
      * 工具生效时间。

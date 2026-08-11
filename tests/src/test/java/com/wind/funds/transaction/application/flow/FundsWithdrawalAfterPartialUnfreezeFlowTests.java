@@ -3,7 +3,7 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -128,11 +128,11 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 .toList())
                 .containsExactly(LedgerPhaseCode.SETTLEMENT.name(), LedgerPhaseCode.FUND_OUT.name());
 
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.PARTIALLY_RELEASED);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(30L);
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_RELEASE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_RELEASE").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
     }
 
     /**
@@ -201,11 +201,11 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 .isFalse();
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_FREEZE"))
                 .satisfies(order -> {
-                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+                    assertThat(order.getState()).isEqualTo(FundsFrozenOrderState.PARTIALLY_RELEASED);
                     assertThat(order.getReleasedAmount()).isEqualTo(40L);
                 });
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
         assertLedgerTransactionFactsUnchanged(afterReleaseFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_CONFIRM");
     }
@@ -276,11 +276,11 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 .isFalse();
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_FREEZE"))
                 .satisfies(order -> {
-                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.RELEASED);
+                    assertThat(order.getState()).isEqualTo(FundsFrozenOrderState.RELEASED);
                     assertThat(order.getReleasedAmount()).isEqualTo(60L);
                 });
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
         assertLedgerTransactionFactsUnchanged(afterReleaseFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_CONFIRM");
     }
@@ -332,13 +332,13 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 40L, CURRENCY);
         LedgerFactSnapshot afterSecondReleaseFacts = ledgerFactSnapshot();
 
-        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.PARTIALLY_RELEASED);
         assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
-        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_1").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
-        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_2").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_1").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_2").getState())
+                .isEqualTo(FundsFrozenOrderState.RELEASED);
 
         assertThatThrownBy(() -> unfreeze(user, 50L, freezeSn, "BALANCE_MULTI_UNFREEZE_EXCEED"))
                 .hasMessageContaining("冻结单剩余可释放金额不足");

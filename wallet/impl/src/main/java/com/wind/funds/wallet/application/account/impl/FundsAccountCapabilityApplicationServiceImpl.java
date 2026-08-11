@@ -56,7 +56,7 @@ public class FundsAccountCapabilityApplicationServiceImpl implements FundsAccoun
                 .setTenantId(account.getTenantId())
                 .setAccountId(account.getAccountId())
                 .setCurrency(account.getCurrency())
-                .setStatus(account.getStatus())
+                .setState(account.getState())
                 .setCapabilities(account.getCapabilities())
                 .setCanReceive(account.canReceive())
                 .setCanPay(account.canPay())

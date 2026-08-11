@@ -99,7 +99,7 @@ public class SpendControlScopeServiceImpl implements SpendControlScopeService {
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.periodType.eq(query.getPeriodType()))
                 .and(ref.periodId.eq(query.getPeriodId()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.state.eq(query.getState()));
         return MybatisQueryHelper.<SpendControlScope, SpendControlScopeDTO>query(wrapper)
                 .counter(spendControlScopeMapper::selectCountByQuery)
                 .resultQueryFunc(spendControlScopeMapper::selectListByQuery)

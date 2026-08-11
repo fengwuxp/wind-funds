@@ -49,9 +49,9 @@ public class RefundRouteAdmission {
         FundsAccountId accountId = FundsAccountId.immutable(
                 subjectRef.getSubjectId(), subjectRef.getSubjectType().name());
         FundsAccount account = fundsAccountQueryService.getAccount(accountId);
-        AssertUtils.isTrue(account.getStatus().canAcceptRefund(),
+        AssertUtils.isTrue(account.getState().canAcceptRefund(),
                 "关闭账户不允许承接退款，accountId = {}，status = {}",
                 accountId,
-                account.getStatus());
+                account.getState());
     }
 }

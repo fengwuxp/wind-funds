@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.RecoveryOrderStatus;
+import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Data;
@@ -43,7 +43,13 @@ public class RecoveryOrder implements TenantIsolationObject<Long> {
 
     private CurrencyIsoCode currency;
 
-    private RecoveryOrderStatus status;
+    @Column("status")
+
+    private RecoveryOrderState state;
+
+    void setStatus(RecoveryOrderState state) {
+        this.state = state;
+    }
 
     private String sourceDigest;
 

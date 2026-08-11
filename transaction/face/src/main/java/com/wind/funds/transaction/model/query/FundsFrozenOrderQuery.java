@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.model.query;
 
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,7 +48,7 @@ public class FundsFrozenOrderQuery {
     private String transactionSn;
 
     @Schema(description = "冻结单状态")
-    private FundsFrozenOrderStatus status;
+    private FundsFrozenOrderState state;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

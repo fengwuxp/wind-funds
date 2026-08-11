@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
 import com.wind.integration.operator.WindOperatorFactory;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
@@ -205,7 +205,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                     assertThat(order.getSn()).isEqualTo(freezeSn);
                     assertThat(order.getAmount()).isEqualTo(30L);
                     assertThat(order.getReleasedAmount()).isZero();
-                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.FROZEN);
+                    assertThat(order.getState()).isEqualTo(FundsFrozenOrderState.FROZEN);
                 });
     }
 
@@ -259,8 +259,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE", 0, 0, 1, 2);
-        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_CURRENCY_RELEASE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_RELEASE");
@@ -315,8 +315,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE", 0, 0, 1, 2);
-        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_RELEASE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_RELEASE");
@@ -372,8 +372,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE", 0, 0, 1, 2);
-        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_RELEASE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_RELEASE");
@@ -440,8 +440,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE", 0, 0, 1, 2);
-        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE");
@@ -497,8 +497,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE", 0, 0, 1, 2);
-        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE");
@@ -563,13 +563,13 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .satisfies(order -> {
                     assertThat(order.getAmount()).isEqualTo(70L);
                     assertThat(order.getReleasedAmount()).isEqualTo(20L);
-                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+                    assertThat(order.getState()).isEqualTo(FundsFrozenOrderState.PARTIALLY_RELEASED);
                 });
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_RELEASE"))
                 .satisfies(order -> {
                     assertThat(order.getAmount()).isEqualTo(20L);
                     assertThat(order.getReleasedAmount()).isZero();
-                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.RELEASED);
+                    assertThat(order.getState()).isEqualTo(FundsFrozenOrderState.RELEASED);
                 });
     }
 

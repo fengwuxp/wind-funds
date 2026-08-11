@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.model.query;
 
 import com.wind.funds.transaction.enums.FundsEffectType;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -63,7 +63,7 @@ public class FundsTransactionDetailQuery {
     private String ledgerTransactionSn;
 
     @Schema(description = "明细状态")
-    private FundsTransactionDetailStatus status;
+    private FundsTransactionDetailState state;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

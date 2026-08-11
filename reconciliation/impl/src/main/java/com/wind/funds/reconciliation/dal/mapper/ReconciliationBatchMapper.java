@@ -66,7 +66,7 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
               AND sn = #{sn}
               AND status = #{currentStatus}
             """)
-    int updateStatus(@Param("tenantId") Long tenantId,
+    int updateState(@Param("tenantId") Long tenantId,
                      @Param("sn") String sn,
                      @Param("currentStatus") String currentStatus,
                      @Param("targetStatus") String targetStatus);

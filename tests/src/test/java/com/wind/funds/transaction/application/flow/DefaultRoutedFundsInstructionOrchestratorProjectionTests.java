@@ -3,8 +3,8 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublishContext;
@@ -145,10 +145,10 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     .asList()
                     .contains("routeSnapshot:" + context.routeSnapshot().getSnapshotId());
         });
-        assertThat(fundsTransaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(fundsTransaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(details).isNotEmpty()
                 .allSatisfy(detail -> {
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.SUCCEEDED);
                     assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
                 });
         assertPostedTransactions(2);
@@ -282,14 +282,14 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 .as("rejected funds transactions for businessSn PROJECTION_AUTH_DECLINE")
                 .singleElement()
                 .satisfies(transaction -> {
-                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertThat(transaction.getState()).isEqualTo(FundsTransactionState.REJECTED);
                     assertNoLedgerFactsForFundsTransaction(transaction.getSn());
                 });
         assertThat(fundsTransactionDetailsByBusinessSn("PROJECTION_AUTH_DECLINE"))
                 .as("rejected funds transaction details for businessSn PROJECTION_AUTH_DECLINE")
                 .singleElement()
                 .satisfies(detail -> {
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                 });
     }
@@ -395,7 +395,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertThat(projectionPublisher.invocationCount()).isEqualTo(1);
         assertThat(projectionPublisher.contexts()).isEmpty();
-        assertThat(fundsTransaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(fundsTransaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(ledgerTransaction.getFundsTransactionSn()).isEqualTo(transactionSn);
         assertThat(ledgerTransaction.getEventType()).isEqualTo(FundsTransactionEventType.PAY.name());
         assertThat(ledgerTransaction.getBusinessSn()).isEqualTo("PROJECTION_FAILURE_PAY");

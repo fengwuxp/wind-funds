@@ -7,7 +7,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
@@ -267,7 +267,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         transaction.getPostingPlans().forEach(plan -> plan.getEntries().forEach(entry -> {
             LedgerDTO ledger = ledgers.get(entry.getLedgerId());
             AssertUtils.notNull(ledger, "账户账本不存在，ledgerId = {}", entry.getLedgerId());
-            LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), plan.getPostingAccessType());
+            LedgerState.assertPostable(ledger.getId(), ledger.getState(), plan.getPostingAccessType());
             assertEntryMatchesLedger(entry, ledger);
         }));
         return ledgers;

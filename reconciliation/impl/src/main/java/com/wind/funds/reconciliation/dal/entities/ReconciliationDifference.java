@@ -6,7 +6,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
@@ -102,7 +102,12 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
      * 对账差错状态。
      */
     @NotNull
-    private ReconciliationDifferenceStatus status;
+    @Column("status")
+    private ReconciliationDifferenceState state;
+
+    void setStatus(ReconciliationDifferenceState state) {
+        this.state = state;
+    }
 
     /**
      * 金额差异的币种；非金额差异为空。

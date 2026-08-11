@@ -1,7 +1,7 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -70,7 +70,7 @@ public class SpendControlScopeDTO implements Serializable {
     private String periodPolicy;
 
     @Schema(description = "状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 
     @Schema(description = "描述")
     private String description;

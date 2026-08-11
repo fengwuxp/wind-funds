@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -108,7 +108,7 @@ public class ClearingCandidateDTO implements Serializable {
     private String candidateDigest;
 
     @Schema(description = "候选状态")
-    private ClearingCandidateStatus status;
+    private ClearingCandidateState state;
 
     @Schema(description = "阻断原因")
     private String blockReason;

@@ -77,7 +77,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
                 .containsEntry("completedAmount", 30L)
                 .containsEntry("reversedAmount", 0L)
                 .containsEntry("remainingAuthorizationAmount", 50L);
-        assertThat(fundsTransaction(authorizationSn).getStatus().name()).isEqualTo("OPEN");
+        assertThat(fundsTransaction(authorizationSn).getState().name()).isEqualTo("OPEN");
     }
 
     /**

@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.query;
 
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -55,5 +55,5 @@ public class PaymentInstrumentQuery {
     private CurrencyIsoCode currency;
 
     @Schema(description = "状态")
-    private FundsAccountStatus status;
+    private FundsAccountState state;
 }

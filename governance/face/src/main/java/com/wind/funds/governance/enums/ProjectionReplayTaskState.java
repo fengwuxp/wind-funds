@@ -1,6 +1,7 @@
 package com.wind.funds.governance.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -10,9 +11,10 @@ import lombok.Getter;
  * @author wuxp
  * @since 2026-08-04
  */
+@Schema(description = "持久投影重放任务生命周期状态")
 @Getter
 @AllArgsConstructor
-public enum ProjectionReplayTaskStatus implements DescriptiveEnum {
+public enum ProjectionReplayTaskState implements DescriptiveEnum {
 
     /**
      * 已创建，等待执行或继续重放。

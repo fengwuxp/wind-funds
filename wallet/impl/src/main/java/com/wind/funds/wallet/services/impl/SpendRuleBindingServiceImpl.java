@@ -12,7 +12,7 @@ import com.wind.funds.wallet.dal.entities.SpendRuleBinding;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleBindingNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleBindingMapper;
 import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.query.SpendRuleBindingExplainQuery;
@@ -68,10 +68,10 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     public void suspendSpendRuleBinding(@NonNull SuspendSpendRuleBindingRequest request) {
         validateSuspendRequest(request);
         SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
-        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.ACTIVE,
+        AssertUtils.isTrue(entity.getState() == SpendRuleBindingState.ACTIVE,
                 "只有有效的 Spend Rule 挂载可以暂停，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity, SpendRuleBindingStatus.SUSPENDED);
+        updateBindingState(entity, SpendRuleBindingState.SUSPENDED);
     }
 
     @Override
@@ -79,10 +79,10 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     public void resumeSpendRuleBinding(@NonNull ResumeSpendRuleBindingRequest request) {
         validateResumeRequest(request);
         SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
-        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
+        AssertUtils.isTrue(entity.getState() == SpendRuleBindingState.SUSPENDED,
                 "只有已暂停的 Spend Rule 挂载可以恢复，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity, SpendRuleBindingStatus.ACTIVE);
+        updateBindingState(entity, SpendRuleBindingState.ACTIVE);
     }
 
     @Override
@@ -90,11 +90,11 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     public void retireSpendRuleBinding(@NonNull RetireSpendRuleBindingRequest request) {
         validateRetireRequest(request);
         SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
-        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.ACTIVE
-                        || entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
+        AssertUtils.isTrue(entity.getState() == SpendRuleBindingState.ACTIVE
+                        || entity.getState() == SpendRuleBindingState.SUSPENDED,
                 "只有有效或已暂停的 Spend Rule 挂载可以退役，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity, SpendRuleBindingStatus.RETIRED);
+        updateBindingState(entity, SpendRuleBindingState.RETIRED);
     }
 
     @Override
@@ -155,7 +155,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                                                                @NonNull String sn) {
         SpendRuleBindingDTO binding = findSpendRuleBinding(tenantId, sn);
         AssertUtils.notNull(binding, "Spend Rule 挂载不存在，sn = {}", sn);
-        AssertUtils.isTrue(binding.getStatus() == SpendRuleBindingStatus.ACTIVE,
+        AssertUtils.isTrue(binding.getState() == SpendRuleBindingState.ACTIVE,
                 "Spend Rule 挂载不可用，sn = {}",
                 sn);
         return binding;
@@ -187,16 +187,16 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         return entity;
     }
 
-    private void updateBindingStatus(SpendRuleBinding binding,
-                                     SpendRuleBindingStatus status) {
+    private void updateBindingState(SpendRuleBinding binding,
+                                     SpendRuleBindingState state) {
         SpendRuleBindingNameRefs ref = SpendRuleBindingNameRefs.spendRuleBinding;
         SpendRuleBinding entity = UpdateEntity.of(SpendRuleBinding.class);
         UpdateWrapper<SpendRuleBinding> updateWrapper = UpdateWrapper.of(entity);
-        updateWrapper.set(ref.status, status, true);
+        updateWrapper.set(ref.state, state, true);
         AssertUtils.isTrue(spendRuleBindingMapper.updateByQuery(entity, QueryWrapper.create()
                         .where(ref.tenantId.eq(binding.getTenantId()))
                         .and(ref.sn.eq(binding.getSn()))
-                        .and(ref.status.eq(binding.getStatus()))) == 1,
+                        .and(ref.state.eq(binding.getState()))) == 1,
                 "Spend Rule 挂载已变更，请重试，sn = {}",
                 binding.getSn());
     }
@@ -220,11 +220,11 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 .and(ref.ruleVersion.eq(query.getRuleVersion()))
                 .and(ref.scopeType.eq(query.getScopeType()))
                 .and(ref.scopeId.eq(query.getScopeId()))
-                .and(ref.status.eq(query.getStatus()))
+                .and(ref.state.eq(query.getState()))
                 .and(ref.auditReferenceSn.eq(query.getAuditReferenceSn()));
         if (Boolean.TRUE.equals(query.getEffectiveOnly())) {
             LocalDateTime effectiveAt = resolveEvaluationTime(query.getEffectiveAt());
-            wrapper.and(ref.status.eq(SpendRuleBindingStatus.ACTIVE))
+            wrapper.and(ref.state.eq(SpendRuleBindingState.ACTIVE))
                     .and(ref.effectiveFrom.le(effectiveAt))
                     .and(ref.effectiveTo.gt(effectiveAt));
         }
@@ -241,7 +241,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
 
     private SpendRuleBindingExplanationStatus resolveExplanationStatus(SpendRuleBindingDTO binding,
                                                                           LocalDateTime evaluatedAt) {
-        return switch (binding.getStatus()) {
+        return switch (binding.getState()) {
             case SUSPENDED -> SpendRuleBindingExplanationStatus.SUSPENDED;
             case RETIRED -> SpendRuleBindingExplanationStatus.RETIRED;
             case ACTIVE -> {
@@ -276,7 +276,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         result.setConflictPolicy(request.getConflictPolicy());
         result.setEffectiveFrom(request.getEffectiveFrom());
         result.setEffectiveTo(request.getEffectiveTo());
-        result.setStatus(SpendRuleBindingStatus.ACTIVE);
+        result.setState(SpendRuleBindingState.ACTIVE);
         result.setAuditReferenceSn(request.getAuditReferenceSn());
         result.setDescription(request.getDescription());
         return result;
@@ -297,7 +297,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 .setConflictPolicy(entity.getConflictPolicy())
                 .setEffectiveFrom(entity.getEffectiveFrom())
                 .setEffectiveTo(entity.getEffectiveTo())
-                .setStatus(entity.getStatus())
+                .setState(entity.getState())
                 .setAuditReferenceSn(entity.getAuditReferenceSn())
                 .setDescription(entity.getDescription());
     }

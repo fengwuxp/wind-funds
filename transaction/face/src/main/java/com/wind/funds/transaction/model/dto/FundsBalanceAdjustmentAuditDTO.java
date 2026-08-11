@@ -6,7 +6,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.enums.FundsBalanceAdjustmentAuditCompleteness;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -53,7 +53,7 @@ public class FundsBalanceAdjustmentAuditDTO implements Serializable {
     private DefaultFundsTransactionType transactionType;
 
     @Schema(description = "资金交易状态")
-    private FundsTransactionStatus transactionStatus;
+    private FundsTransactionState transactionState;
 
     @Schema(description = "交易金额，单位：最小币种单位")
     private Long amount;

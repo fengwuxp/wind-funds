@@ -4,7 +4,7 @@ import com.wind.funds.wallet.dal.entities.CreditAccount;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
@@ -55,6 +55,6 @@ public interface CreditAccountConverter {
         entity.setLedgerProfileCode(request.getLedgerProfileCode() == null
                 ? LedgerProfileCode.CREDIT_BASIC : request.getLedgerProfileCode());
         entity.setLedgerProfileVersion(1);
-        entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
+        entity.setState(request.getState() == null ? FundsAccountState.ACTIVE : request.getState());
     }
 }

@@ -6,7 +6,7 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -95,7 +95,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                     assertThat(result.getChannelCode()).isEqualTo(CHANNEL_CODE);
                     assertThat(result.getAction()).isEqualTo(PaymentInstrumentAction.AUTHORIZE);
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
-                    assertThat(result.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+                    assertThat(result.getState()).isEqualTo(FundsAccountState.ACTIVE);
                     assertThat(result.getBindingId()).isEqualTo(bindingId);
                     assertThat(result.getBindingSn()).startsWith("PIB");
                     assertThat(result.getBindingRole()).isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT);
@@ -163,7 +163,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
 
         assertThat(decision.getInstrumentSn()).isEqualTo(RECEIVE_INSTRUMENT_SN);
         assertThat(decision.getAction()).isEqualTo(PaymentInstrumentAction.REFUND);
-        assertThat(decision.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(decision.getState()).isEqualTo(FundsAccountState.ACTIVE);
         assertThat(decision.getBindingId()).isNull();
         assertThat(decision.getBindingSn()).isNull();
         assertThat(decision.getBindingRole()).isNull();
@@ -241,7 +241,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {

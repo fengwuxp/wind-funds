@@ -3,9 +3,9 @@ package com.wind.funds.reconciliation.model.dto;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportCompleteness;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -28,7 +28,11 @@ import java.util.List;
  * <p>职责：向运营、财务、风控、研发和测试提供单笔对账差错的只读解释视图。</p>
  *
  * <p>边界：报告字段都是事实引用、状态摘要或解释文本，不代表任何新资金事实已经发生。</p>
+ *
+ * @author wuxp
+ * @since 2026-06-17
  */
+@Schema(description = "对账差异报告")
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
@@ -64,7 +68,7 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     private ReconciliationDifferenceSeverity severity;
 
     @Schema(description = "对账差错状态")
-    private ReconciliationDifferenceStatus status;
+    private ReconciliationDifferenceState state;
 
     @Schema(description = "金额差异的币种；非金额差异为空")
     private CurrencyIsoCode currency;
@@ -135,8 +139,8 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "重跑次数")
     private Integer rerunCount;
 
-    @Schema(description = "准入 gate 决策状态")
-    private ReconciliationGateDecisionStatus gateDecisionStatus;
+    @Schema(description = "准入 Gate 决策结果")
+    private ReconciliationGateDecisionResult gateDecisionResult;
 
     @Schema(description = "准入 gate 解释摘要")
     private String gateExplanation;

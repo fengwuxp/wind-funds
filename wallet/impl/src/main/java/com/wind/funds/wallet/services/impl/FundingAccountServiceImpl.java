@@ -100,7 +100,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                 .and(ref.platform.eq(query.getPlatform()))
                 .and(ref.accountRoleCode.eq(query.getAccountRoleCode()))
                 .and(ref.currency.eq(query.getCurrency()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.state.eq(query.getState()));
         return MybatisQueryHelper.<FundingAccount, FundingAccountDTO>query(wrapper)
                 .counter(fundingAccountMapper::selectCountByQuery)
                 .resultQueryFunc(fundingAccountMapper::selectListByQuery)

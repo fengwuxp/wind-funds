@@ -6,9 +6,9 @@ import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
-import com.wind.funds.reconciliation.enums.PayoutPreflightFactStatus;
-import com.wind.funds.reconciliation.enums.PayoutPreflightOperationStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.PayoutPreflightDecisionResult;
+import com.wind.funds.reconciliation.enums.PayoutPreflightAction;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
@@ -83,9 +83,9 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                 .setBlockingLevel(passed ? PayoutPreflightBlockingLevel.PASSED : PayoutPreflightBlockingLevel.BLOCKED)
                 .setBlockingReasons(List.copyOf(blockingReasons))
                 .setManualReviewRequired(requiresManualReview(blockingReasons))
-                .setFactStatus(resolveFactStatus(passed))
+                .setDecisionResult(resolveDecisionResult(passed))
                 .setDisplayStatus(resolveDisplayStatus(passed, blockingReasons))
-                .setOperationStatus(resolveOperationStatus(passed))
+                .setAction(resolveAction(passed))
                 .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
                 .setReconciliationRunResultSn(reconciliationGateDecision.getReconciliationRunResultSn())
                 .setReconciliationResultDigest(reconciliationGateDecision.getReconciliationResultDigest())
@@ -170,7 +170,7 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
     private void addReconciliationGateBlockingReasonIfBlocked(
             List<PayoutPreflightBlockingReasonDTO> blockingReasons,
             ReconciliationGateDecisionDTO reconciliationGateDecision) {
-        if (reconciliationGateDecision.getDecisionStatus() != ReconciliationGateDecisionStatus.BLOCKED) {
+        if (reconciliationGateDecision.getDecisionResult() != ReconciliationGateDecisionResult.BLOCKED) {
             return;
         }
         List<ReconciliationGateBlockingDifferenceDTO> differences = reconciliationGateDecision.getBlockingDifferences();
@@ -235,9 +235,9 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
         }
     }
 
-    private PayoutPreflightFactStatus resolveFactStatus(boolean passed) {
-        return passed ? PayoutPreflightFactStatus.PREFLIGHT_PASSED
-                : PayoutPreflightFactStatus.PREFLIGHT_BLOCKED;
+    private PayoutPreflightDecisionResult resolveDecisionResult(boolean passed) {
+        return passed ? PayoutPreflightDecisionResult.PREFLIGHT_PASSED
+                : PayoutPreflightDecisionResult.PREFLIGHT_BLOCKED;
     }
 
     private PayoutPreflightDisplayStatus resolveDisplayStatus(
@@ -252,9 +252,9 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                 : PayoutPreflightDisplayStatus.WAITING_EVIDENCE;
     }
 
-    private PayoutPreflightOperationStatus resolveOperationStatus(boolean passed) {
-        return passed ? PayoutPreflightOperationStatus.SUBMISSION_REVALIDATION_REQUIRED
-                : PayoutPreflightOperationStatus.BLOCKED;
+    private PayoutPreflightAction resolveAction(boolean passed) {
+        return passed ? PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED
+                : PayoutPreflightAction.BLOCKED;
     }
 
     private boolean isExternalRuleVerified(@Nullable ExternalRuleVerificationEvidenceDTO evidence) {

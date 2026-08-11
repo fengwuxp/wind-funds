@@ -4,7 +4,7 @@ import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
 import com.wind.funds.wallet.model.query.AccountHierarchyRelationQuery;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
@@ -61,13 +61,13 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
 
     @BeforeEach
     void setUpAccounts() {
-        insertFundingAccount(CHILD, CurrencyIsoCode.USD, FundsAccountStatus.ACTIVE);
-        insertFundingAccount(PARENT, CurrencyIsoCode.USD, FundsAccountStatus.ACTIVE);
-        insertFundingAccount(OTHER_PARENT, CurrencyIsoCode.USD, FundsAccountStatus.ACTIVE);
-        insertFundingAccount(FROZEN_CHILD, CurrencyIsoCode.USD, FundsAccountStatus.FROZEN);
-        insertFundingAccount(SUSPENDED_PARENT, CurrencyIsoCode.USD, FundsAccountStatus.SUSPENDED);
-        insertFundingAccount(CLOSED_CHILD, CurrencyIsoCode.USD, FundsAccountStatus.CLOSED);
-        insertFundingAccount(EUR_PARENT, CurrencyIsoCode.EUR, FundsAccountStatus.ACTIVE);
+        insertFundingAccount(CHILD, CurrencyIsoCode.USD, FundsAccountState.ACTIVE);
+        insertFundingAccount(PARENT, CurrencyIsoCode.USD, FundsAccountState.ACTIVE);
+        insertFundingAccount(OTHER_PARENT, CurrencyIsoCode.USD, FundsAccountState.ACTIVE);
+        insertFundingAccount(FROZEN_CHILD, CurrencyIsoCode.USD, FundsAccountState.FROZEN);
+        insertFundingAccount(SUSPENDED_PARENT, CurrencyIsoCode.USD, FundsAccountState.SUSPENDED);
+        insertFundingAccount(CLOSED_CHILD, CurrencyIsoCode.USD, FundsAccountState.CLOSED);
+        insertFundingAccount(EUR_PARENT, CurrencyIsoCode.EUR, FundsAccountState.ACTIVE);
     }
 
     @AfterEach
@@ -164,14 +164,14 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT);
     }
 
-    private void insertFundingAccount(String sn, CurrencyIsoCode currency, FundsAccountStatus status) {
+    private void insertFundingAccount(String sn, CurrencyIsoCode currency, FundsAccountState state) {
         jdbcTemplate.update("""
                         INSERT INTO t_funding_account
                             (sn, tenant_id, owner_id, owner_type, account_type, is_platform, currency,
                              ledger_profile_code, ledger_profile_version, status, version)
                         VALUES (?, ?, ?, 'USER', 'USER_WALLET', 0, ?, 'FUNDING_BASIC', 1, ?, 0)
                         """,
-                sn, TENANT_ID, "hierarchy_owner", currency.name(), status.name());
+                sn, TENANT_ID, "hierarchy_owner", currency.name(), state.name());
     }
 
     private long countRows(String tableName, String columnName, String value) {

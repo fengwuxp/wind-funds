@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.model.query;
 
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -46,7 +46,7 @@ public class FundsTransactionQuery {
     private String referenceTransactionSn;
 
     @Schema(description = "交易状态")
-    private FundsTransactionStatus status;
+    private FundsTransactionState state;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

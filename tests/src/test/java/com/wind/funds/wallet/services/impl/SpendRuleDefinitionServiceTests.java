@@ -3,13 +3,13 @@ package com.wind.funds.wallet.services.impl;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
+import com.wind.funds.wallet.enums.SpendRuleDefinitionState;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
@@ -116,8 +116,8 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         SpendRuleVersionDTO replayed =
                 spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
 
-        assertThat(definition.getStatus()).isEqualTo(SpendRuleDefinitionStatus.ACTIVE);
-        assertThat(published.getStatus()).isEqualTo(SpendRuleVersionStatus.PUBLISHED);
+        assertThat(definition.getState()).isEqualTo(SpendRuleDefinitionState.ACTIVE);
+        assertThat(published.getState()).isEqualTo(SpendRuleVersionState.PUBLISHED);
         assertThat(replayed.getId()).isEqualTo(published.getId());
         assertThatThrownBy(() -> spendRuleDefinitionService.publishVersion(
                 publishVersionRequest(CHANGED_RULE_DIGEST, "{\"window\":\"MONTHLY\"}")))
@@ -232,9 +232,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 FUTURE_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
         jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
-                SpendRuleBindingStatus.SUSPENDED.name(), TENANT_ID, suspendedBinding.getSn());
+                SpendRuleBindingState.SUSPENDED.name(), TENANT_ID, suspendedBinding.getSn());
         jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
-                SpendRuleBindingStatus.RETIRED.name(), TENANT_ID, retiredBinding.getSn());
+                SpendRuleBindingState.RETIRED.name(), TENANT_ID, retiredBinding.getSn());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendRuleBindingExplanationDTO suspended = explainSpendRuleBinding(suspendedBinding.getSn());

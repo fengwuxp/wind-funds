@@ -73,7 +73,7 @@ public class RouteFeeChargeAppender {
         FundsAccountId feePayerAccountId = FundsAccountId.immutable(
                 feePayer.subjectRef().getSubjectId(),
                 FundsSubjectType.FUNDING_ACCOUNT.name());
-        AssertUtils.isTrue(fundsAccountQueryService.getAccount(feePayerAccountId).getStatus().canDebit(),
+        AssertUtils.isTrue(fundsAccountQueryService.getAccount(feePayerAccountId).getState().canDebit(),
                 "账户状态不允许扣取随交易手续费，accountId = {}",
                 feePayerAccountId);
         FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(

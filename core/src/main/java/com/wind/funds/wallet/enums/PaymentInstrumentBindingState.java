@@ -1,18 +1,20 @@
 package com.wind.funds.wallet.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
  * 支付工具绑定生命周期状态。
  *
- * @author Codex
- * @date 2026-07-15
+ * @author wuxp
+ * @since 2026-07-15
  */
+@Schema(description = "支付工具绑定生命周期状态")
 @Getter
 @AllArgsConstructor
-public enum PaymentInstrumentBindingStatus implements DescriptiveEnum {
+public enum PaymentInstrumentBindingState implements DescriptiveEnum {
 
     ACTIVE("有效"),
 

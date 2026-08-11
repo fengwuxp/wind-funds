@@ -6,7 +6,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.governance.enums.ProjectionCheckpointType;
 import com.wind.funds.governance.enums.ProjectionReplayMode;
-import com.wind.funds.governance.enums.ProjectionReplayTaskStatus;
+import com.wind.funds.governance.enums.ProjectionReplayTaskState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import lombok.Data;
 
@@ -59,7 +59,13 @@ public class ProjectionReplayTask implements TenantIsolationObject<Long> {
 
     private String checkpointValue;
 
-    private ProjectionReplayTaskStatus status;
+    @Column("status")
+
+    private ProjectionReplayTaskState state;
+
+    void setStatus(ProjectionReplayTaskState state) {
+        this.state = state;
+    }
 
     private Long successCount;
 

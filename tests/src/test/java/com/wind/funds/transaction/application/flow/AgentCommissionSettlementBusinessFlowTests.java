@@ -22,16 +22,16 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
-import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
+import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
-import com.wind.funds.reconciliation.enums.PayoutOrderStatus;
+import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementTriggerMode;
 import com.wind.funds.reconciliation.model.dto.ClearingBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingCandidateDTO;
@@ -200,7 +200,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         var beforePayout = snapshot(balances(userAgent, platformEmployee, cashMappingAccount()));
         PayoutOrderDTO payout = payout(agentLocked, "agent");
 
-        assertThat(payout.getFactStatus()).isEqualTo(PayoutOrderStatus.SUCCEEDED);
+        assertThat(payout.getState()).isEqualTo(PayoutOrderState.SUCCEEDED);
         assertThat(payout.getCompletionFundsTransactionSn()).isNotBlank();
         assertOnlyBalanceDeltas(beforePayout,
                 snapshot(balances(userAgent, platformEmployee, cashMappingAccount())),
@@ -230,7 +230,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
                 identifyRequest(allocation, "missing-reconciliation-result"), WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getAdmissionResult()).isEqualTo(ClearingSplittableAdmissionResult.EXCLUDED);
         assertThat(result.getSn()).isNull();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_clearing_splittable_detail", Integer.class)).isZero();
@@ -338,7 +338,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                         .setClearingBatchSn(clearingBatch.getSn()), WindOperatorFactory.system());
 
         assertThat(candidateReplay.getSn()).isEqualTo(candidate.getSn());
-        assertThat(confirmedClearing.getStatus()).isEqualTo(ClearingBatchStatus.CONFIRMED);
+        assertThat(confirmedClearing.getState()).isEqualTo(ClearingBatchState.CONFIRMED);
         assertThat(clearingReplay.getFundsTransactionSn()).isEqualTo(confirmedClearing.getFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeClearing, snapshot(balance(allocation.beneficiary())),
                 delta(allocation.beneficiary(), LedgerSubjectCode.CLEARING, -allocation.amount(), CURRENCY),
@@ -366,7 +366,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                         .setSettlementOrderSn(settlementOrder.getSn())
                         .setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
 
-        assertThat(locked.getStatus()).isEqualTo(SettlementOrderStatus.LOCKED);
+        assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
         assertThat(lockReplay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeLock, snapshot(balance(allocation.beneficiary())),
                 delta(allocation.beneficiary(), LedgerSubjectCode.AVAILABLE, -allocation.amount(), CURRENCY),
@@ -399,7 +399,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setChannelRef("channel:" + suffix)
                 .setExternalReceiptRef("receipt:" + suffix)
                 .setExternalReference("external-payout:" + suffix)
-                .setStatus(PayoutOrderStatus.SUCCEEDED)
+                .setState(PayoutOrderState.SUCCEEDED)
                 .setAmount(commission.allocation().amount())
                 .setCurrency(CURRENCY)
                 .setSourceReceiptDigest(FundsStableHashSupport.sha256("receipt:" + suffix))

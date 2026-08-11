@@ -3,7 +3,7 @@ package com.wind.funds.ledger.service;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 
@@ -35,7 +35,7 @@ public interface LedgerService {
      *
      * @param request 更新请求对象
      */
-    void updateLedgerStatus(@NonNull UpdateLedgerStatusRequest request);
+    void updateLedgerState(@NonNull UpdateLedgerStateRequest request);
 
     /**
      * 根据 id 查询账户账本

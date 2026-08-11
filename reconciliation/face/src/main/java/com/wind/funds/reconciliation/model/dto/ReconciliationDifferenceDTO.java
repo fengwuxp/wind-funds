@@ -2,7 +2,7 @@ package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
@@ -62,7 +62,7 @@ public class ReconciliationDifferenceDTO implements Serializable {
     private ReconciliationDifferenceSeverity severity;
 
     @Schema(description = "对账差错状态")
-    private ReconciliationDifferenceStatus status;
+    private ReconciliationDifferenceState state;
 
     @Schema(description = "金额差异的币种；非金额差异为空")
     private CurrencyIsoCode currency;

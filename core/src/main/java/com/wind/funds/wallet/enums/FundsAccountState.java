@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -8,11 +9,12 @@ import lombok.Getter;
  * 资金账户状态枚举
  *
  * @author wuxp
- * @date 2026-04-13 10:39
+ * @since 2026-04-13
  **/
+@Schema(description = "资金账户生命周期状态")
 @AllArgsConstructor
 @Getter
-public enum FundsAccountStatus implements DescriptiveEnum {
+public enum FundsAccountState implements DescriptiveEnum {
 
     ACTIVE("已激活"),
 

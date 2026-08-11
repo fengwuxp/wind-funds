@@ -9,8 +9,8 @@ import com.wind.funds.reconciliation.dal.entities.ReconciliationDifferenceAction
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceActionMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportCompleteness;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceReportDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceActionDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
@@ -100,7 +100,7 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
                 .setMatchStrength(difference.getMatchStrength())
                 .setDifferenceType(difference.getDifferenceType())
                 .setSeverity(difference.getSeverity())
-                .setStatus(difference.getStatus())
+                .setState(difference.getState())
                 .setCurrency(difference.getCurrency())
                 .setDifferenceAmount(difference.getDifferenceAmount())
                 .setResponsiblePartyRef(difference.getResponsiblePartyRef())
@@ -124,7 +124,7 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
                 .setLastRerunEvidenceRef(difference.getLastRerunEvidenceRef())
                 .setLastRerunResultDigest(difference.getLastRerunResultDigest())
                 .setRerunCount(difference.getRerunCount())
-                .setGateDecisionStatus(resolveGateDecisionStatus(gateDecision))
+                .setGateDecisionResult(resolveGateDecisionResult(gateDecision))
                 .setGateExplanation(resolveGateExplanation(gateDecision))
                 .setCompleteness(resolveCompleteness(difference))
                 .setSecurityWarnings(List.of(SECURITY_WARNING))
@@ -156,11 +156,11 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
     }
 
     @Nullable
-    private ReconciliationGateDecisionStatus resolveGateDecisionStatus(@Nullable ReconciliationGateDecisionDTO gateDecision) {
+    private ReconciliationGateDecisionResult resolveGateDecisionResult(@Nullable ReconciliationGateDecisionDTO gateDecision) {
         if (gateDecision == null) {
             return null;
         }
-        return gateDecision.getDecisionStatus();
+        return gateDecision.getDecisionResult();
     }
 
     @Nullable
@@ -192,8 +192,8 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
     }
 
     private boolean needsRerunResult(ReconciliationDifference difference) {
-        return difference.getStatus() == ReconciliationDifferenceStatus.RECONCILING
-                || difference.getStatus() == ReconciliationDifferenceStatus.RESOLVED;
+        return difference.getState() == ReconciliationDifferenceState.RECONCILING
+                || difference.getState() == ReconciliationDifferenceState.RESOLVED;
     }
 
     private List<String> evidenceRefs(ReconciliationDifference difference,
@@ -216,16 +216,16 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
 
     private String resolveExplanation(ReconciliationDifference difference,
                                       @Nullable ReconciliationGateDecisionDTO gateDecision) {
-        if (gateDecision != null && gateDecision.getDecisionStatus() == ReconciliationGateDecisionStatus.BLOCKED) {
+        if (gateDecision != null && gateDecision.getDecisionResult() == ReconciliationGateDecisionResult.BLOCKED) {
             return "对账差错仍命中阻断对象，当前准入必须阻断";
         }
-        if (difference.getStatus() == ReconciliationDifferenceStatus.RESOLVED) {
+        if (difference.getState() == ReconciliationDifferenceState.RESOLVED) {
             return "对账差错已处理并经当前批次重新对账通过，当前准入按普通通过处理";
         }
-        if (difference.getStatus() == ReconciliationDifferenceStatus.INVALIDATED) {
+        if (difference.getState() == ReconciliationDifferenceState.INVALIDATED) {
             return "对账差错依赖的来源、解析或匹配证据已被替代批次确认无效，不再参与准入或后续处置";
         }
-        return "对账差错处于 " + difference.getStatus().getDesc() + " 状态，需要人工继续处理或复核";
+        return "对账差错处于 " + difference.getState().getDesc() + " 状态，需要人工继续处理或复核";
     }
 
     private boolean includeGateDecision(GetReconciliationDifferenceReportRequest request) {

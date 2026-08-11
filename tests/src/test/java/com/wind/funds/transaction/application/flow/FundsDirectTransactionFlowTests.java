@@ -23,9 +23,9 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
@@ -34,10 +34,10 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
@@ -644,9 +644,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         Long payeeSettlementLedgerId = findLedger(payee, LedgerSubjectCode.SETTLEMENT)
                 .orElseThrow()
                 .getId();
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(payeeSettlementLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
         LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 10L,
@@ -663,8 +663,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
-        assertThat(ledgerService.getLedgerById(payeeSettlementLedgerId).getStatus())
-                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(payeeSettlementLedgerId).getState())
+                .isEqualTo(LedgerState.SUSPENDED);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_CLOSING_REFUND", 2, 2);
     }
 
@@ -683,7 +683,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         topup(payer, 100L, "DIRECT_CLOSED_REFUND_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "DIRECT_CLOSED_REFUND_PAY");
-        updateAccountStatus(payer, FundsAccountStatus.CLOSED);
+        updateAccountState(payer, FundsAccountState.CLOSED);
         BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
         LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
 
@@ -719,7 +719,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         topup(payer, 100L, "DIRECT_REFUND_FROZEN_FEE_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "DIRECT_REFUND_FROZEN_FEE_PAY");
-        updateAccountStatus(payer, FundsAccountStatus.FROZEN);
+        updateAccountState(payer, FundsAccountState.FROZEN);
         BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
         LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
 
@@ -4151,7 +4151,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .satisfies(transaction -> {
                     assertThat(transaction.getBusinessSn()).isEqualTo(businessSn);
                     assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
-                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+                    assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
                     assertThat(transaction.getReferenceTransactionSn()).isEqualTo(payTransactionSn);
                     assertThat(transaction.getRefundedAmount()).isEqualTo(refundAmount);
                 });

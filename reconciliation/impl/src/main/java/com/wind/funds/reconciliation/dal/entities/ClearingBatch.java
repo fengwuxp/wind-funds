@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ClearingBatchStatus;
+import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -79,7 +79,12 @@ public class ClearingBatch implements Serializable, TenantIsolationObject<Long> 
     private String fundsTransactionSn;
 
     @NotNull
-    private ClearingBatchStatus status;
+    @Column("status")
+    private ClearingBatchState state;
+
+    void setStatus(ClearingBatchState state) {
+        this.state = state;
+    }
 
     @NotNull
     private String createdBy;

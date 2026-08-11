@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ClearingCandidateStatus;
+import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -113,7 +113,12 @@ public class ClearingCandidate implements Serializable, TenantIsolationObject<Lo
     private String activeSplittableDetailSn;
 
     @NotNull
-    private ClearingCandidateStatus status;
+    @Column("status")
+    private ClearingCandidateState state;
+
+    void setStatus(ClearingCandidateState state) {
+        this.state = state;
+    }
 
     private String blockReason;
 

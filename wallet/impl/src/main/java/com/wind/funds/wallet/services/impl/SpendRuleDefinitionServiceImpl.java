@@ -5,9 +5,9 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.dal.entities.SpendRuleDefinition;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleDefinitionNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDefinitionMapper;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
-import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
-import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
+import com.wind.funds.wallet.enums.SpendRuleDefinitionState;
+import com.wind.funds.wallet.enums.SpendRuleVersionState;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
@@ -68,7 +68,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         validatePublishVersionRequest(request);
         SpendRuleDefinitionDTO definition = findDefinition(request.getTenantId(), request.getRuleId());
         AssertUtils.notNull(definition, "Spend Rule 定义不存在，ruleId = {}", request.getRuleId());
-        AssertUtils.isTrue(definition.getStatus() == SpendRuleDefinitionStatus.ACTIVE,
+        AssertUtils.isTrue(definition.getState() == SpendRuleDefinitionState.ACTIVE,
                 "Spend Rule 定义不可用，ruleId = {}",
                 request.getRuleId());
         SpendRuleVersionDTO existing = spendRuleVersionService.findVersion(
@@ -219,7 +219,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
 
     private void assertSamePublishedVersion(PublishSpendRuleVersionRequest request,
                                             SpendRuleVersionDTO existing) {
-        AssertUtils.isTrue(existing.getStatus() == SpendRuleVersionStatus.PUBLISHED,
+        AssertUtils.isTrue(existing.getState() == SpendRuleVersionState.PUBLISHED,
                 "Spend Rule 版本状态不可重复发布，ruleId = {}, ruleVersion = {}",
                 request.getRuleId(),
                 request.getRuleVersion());
@@ -232,7 +232,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
 
     private void assertSameBinding(CreateSpendRuleBindingRequest request,
                                       SpendRuleBindingDTO existing) {
-        AssertUtils.isTrue(existing.getStatus() == SpendRuleBindingStatus.ACTIVE
+        AssertUtils.isTrue(existing.getState() == SpendRuleBindingState.ACTIVE
                         && Objects.equals(existing.getRuleId(), request.getRuleId())
                         && Objects.equals(existing.getRuleVersion(), request.getRuleVersion())
                         && existing.getScopeType() == request.getScopeType()
@@ -270,7 +270,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         result.setRuleName(request.getRuleName());
         result.setRuleType(request.getRuleType());
         result.setRuleDomain(request.getRuleDomain());
-        result.setStatus(SpendRuleDefinitionStatus.ACTIVE);
+        result.setState(SpendRuleDefinitionState.ACTIVE);
         result.setDescription(request.getDescription());
         return result;
     }
@@ -285,7 +285,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
                 .setRuleName(entity.getRuleName())
                 .setRuleType(entity.getRuleType())
                 .setRuleDomain(entity.getRuleDomain())
-                .setStatus(entity.getStatus())
+                .setState(entity.getState())
                 .setDescription(entity.getDescription());
     }
 }

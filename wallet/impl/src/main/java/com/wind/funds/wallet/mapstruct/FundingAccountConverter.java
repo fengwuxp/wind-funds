@@ -5,7 +5,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
@@ -50,7 +50,7 @@ public interface FundingAccountConverter {
         entity.setPlatform(Boolean.TRUE.equals(request.getPlatform()));
         entity.setLedgerProfileCode(resolveProfileCode(request));
         entity.setLedgerProfileVersion(1);
-        entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
+        entity.setState(request.getState() == null ? FundsAccountState.ACTIVE : request.getState());
     }
 
     /**

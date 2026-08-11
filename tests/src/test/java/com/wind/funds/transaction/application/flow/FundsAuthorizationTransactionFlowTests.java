@@ -11,18 +11,18 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerStatus;
+import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsEffectType;
-import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
@@ -203,7 +203,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertLedgerTransactionFactsUnchanged(beforeDeclineFacts);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.REJECTED);
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
         assertThat(transaction.getDeclinedAmount()).isZero();
@@ -214,7 +214,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .singleElement()
                 .satisfies(detail -> {
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                     assertThat(contextVariablesOf(detail.getContextVariables()))
                             .containsEntry(FundsInstructionContextKeys.APPROVED, false);
@@ -231,7 +231,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .as("rejected funds transactions for businessSn AUTH_DECLINE_AUTHORIZE")
                 .singleElement()
                 .satisfies(rejectedTransaction -> {
-                    assertThat(rejectedTransaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertThat(rejectedTransaction.getState()).isEqualTo(FundsTransactionState.REJECTED);
                     assertThat(rejectedTransaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
                     assertThat(rejectedTransaction.getAuthorizedAmount()).isZero();
                     assertThat(rejectedTransaction.getReversedAmount()).isZero();
@@ -247,7 +247,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
                     assertThat(detail.getFundsEffectType()).isEqualTo(FundsEffectType.HOLD);
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                 });
     }
@@ -309,7 +309,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(declinedSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.REJECTED);
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getReversedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -322,7 +322,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .singleElement()
                 .satisfies(detail -> {
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                     assertThat(contextVariablesOf(detail.getContextVariables()))
                             .containsEntry(FundsInstructionContextKeys.DECLINE_REASON, "RISK_DECLINED")
@@ -338,14 +338,14 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .singleElement()
                 .satisfies(rejectedTransaction -> {
                     assertThat(rejectedTransaction.getSn()).isEqualTo(declinedSn);
-                    assertThat(rejectedTransaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertThat(rejectedTransaction.getState()).isEqualTo(FundsTransactionState.REJECTED);
                     assertNoLedgerFactsForFundsTransaction(rejectedTransaction.getSn());
                 });
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_DECLINE"))
                 .singleElement()
                 .satisfies(detail -> {
                     assertThat(detail.getTransactionSn()).isEqualTo(declinedSn);
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                 });
     }
@@ -471,7 +471,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
         assertThat(transaction.getReversedAmount()).isEqualTo(60L);
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -526,9 +526,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         Long authorizationLedgerId = findLedger(user, LedgerSubjectCode.AUTHORIZATION)
                 .orElseThrow()
                 .getId();
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(authorizationLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
         LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> authorize(user, 10L, true, "AUTH_CLOSING_COMPLETE_REJECTED_AUTHORIZE"))
@@ -543,8 +543,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
-        assertThat(ledgerService.getLedgerById(authorizationLedgerId).getStatus())
-                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(authorizationLedgerId).getState())
+                .isEqualTo(LedgerState.SUSPENDED);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_CLOSING_COMPLETE_CAPTURE", 0, 2, 1, 2);
     }
 
@@ -669,7 +669,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isEqualTo(30L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(50L);
@@ -784,7 +784,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY));
         FundsTransactionDTO afterFirstCompleteTransaction = fundsTransaction(authorizationSn);
-        assertThat(afterFirstCompleteTransaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(afterFirstCompleteTransaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(afterFirstCompleteTransaction.getAuthorizedAmount()).isEqualTo(100L);
         assertThat(afterFirstCompleteTransaction.getCompletedAmount()).isEqualTo(40L);
         assertThat(afterFirstCompleteTransaction.getReversedAmount()).isZero();
@@ -800,7 +800,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         FundsTransactionDTO afterReleaseTransaction = fundsTransaction(authorizationSn);
-        assertThat(afterReleaseTransaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(afterReleaseTransaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(afterReleaseTransaction.getAuthorizedAmount()).isEqualTo(100L);
         assertThat(afterReleaseTransaction.getCompletedAmount()).isEqualTo(40L);
         assertThat(afterReleaseTransaction.getReversedAmount()).isEqualTo(20L);
@@ -822,7 +822,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 80L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(100L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isEqualTo(20L);
@@ -914,7 +914,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isEqualTo(30L);
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -1213,12 +1213,12 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         Long cardAuthorizationLedgerId = findLedger(cardAccount, LedgerSubjectCode.AUTHORIZATION)
                 .orElseThrow()
                 .getId();
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(cardAvailableLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
-        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setState(LedgerState.SUSPENDED));
+        ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(cardAuthorizationLedgerId)
-                .setStatus(LedgerStatus.SUSPENDED));
+                .setState(LedgerState.SUSPENDED));
         LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> authorizeSharedCard(cardAccount, parentAccount, 10L,
@@ -1234,10 +1234,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cardAccount, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
                 delta(parentAccount, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
                 delta(parentAccount, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY));
-        assertThat(ledgerService.getLedgerById(cardAvailableLedgerId).getStatus())
-                .isEqualTo(LedgerStatus.SUSPENDED);
-        assertThat(ledgerService.getLedgerById(cardAuthorizationLedgerId).getStatus())
-                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(cardAvailableLedgerId).getState())
+                .isEqualTo(LedgerState.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(cardAuthorizationLedgerId).getState())
+                .isEqualTo(LedgerState.SUSPENDED);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_SHARED_CARD_CLOSING_CANCEL", 0, 2, 2, 4);
     }
 
@@ -1304,7 +1304,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
             BalanceSnapshot afterRace = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
             FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-            assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+            assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
             assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
             assertThat(transaction.getRefundedAmount()).isZero();
             assertThat(transaction.getDeclinedAmount()).isZero();
@@ -1383,7 +1383,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(forceCompletionSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isEqualTo(60L);
         assertThat(transaction.getReversedAmount()).isZero();
@@ -1545,7 +1545,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(60L);
         assertThat(transaction.getRefundedAmount()).isEqualTo(60L);
@@ -1633,7 +1633,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(noAuthRefundSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -1838,7 +1838,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(60L);
         assertThat(transaction.getRefundedAmount()).isEqualTo(40L);
@@ -1890,7 +1890,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND);
                     assertThat(detail.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
                     assertThat(detail.getFundsEffectType()).isEqualTo(FundsEffectType.RETURN);
-                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.SUCCEEDED);
                     assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
                     assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
                     assertDisputeRefundContext(detail.getContextVariables());
@@ -2185,7 +2185,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(50L);
         assertThat(transaction.getRefundedAmount()).isZero();
@@ -2313,7 +2313,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getCompletedAmount()).isEqualTo(50L);
         assertThat(transaction.getRefundedAmount()).isZero();
@@ -2397,7 +2397,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
         assertThat(transaction.getReversedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -2526,7 +2526,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
         assertThat(transaction.getReversedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -2613,7 +2613,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isEqualTo(30L);
         assertThat(transaction.getCompletedAmount()).isZero();
@@ -2713,7 +2713,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isEqualTo(30L);
@@ -2821,7 +2821,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
-        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getState()).isEqualTo(FundsTransactionState.OPEN);
         assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
         assertThat(transaction.getReversedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isEqualTo(50L);

@@ -10,7 +10,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccountId;
@@ -20,7 +20,7 @@ import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityA
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -491,7 +491,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FOR_CONSUME_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 60L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -518,7 +518,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(CROSS_SCENE_TRANSACTION_SN, OTHER_BUSINESS_SCENE, BUSINESS_SN,
-                DefaultFundsTransactionType.PAY, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD, null);
+                DefaultFundsTransactionType.PAY, FundsTransactionState.CLOSED, 60L, CurrencyIsoCode.USD, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
@@ -677,7 +677,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-consumed"));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -709,7 +709,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-consumed"));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -754,7 +754,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         insertFundsTransaction(UNLINKED_REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_UNLINKED_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -798,7 +798,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setAmount(40L));
         insertFundsTransaction(MISSING_REFERENCE_REFUND_TRANSACTION_SN,
                 "SPEND_CONTROL_TRANSACTION_REFUND_MISSING_REFERENCE_TX_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -837,7 +837,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setAmount(40L));
         insertFundsTransaction(INCONSISTENT_REFUND_TRANSACTION_SN,
                 "SPEND_CONTROL_TRANSACTION_REFUND_INCONSISTENT_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -875,7 +875,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setAmount(40L));
         insertFundsTransaction(INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN,
                 "SPEND_CONTROL_TRANSACTION_REFUND_INCONSISTENT_REFERENCE_TX_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -921,7 +921,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setAmount(40L));
         insertFundsTransaction(OVER_REFERENCE_REFUND_TRANSACTION_SN,
                 "SPEND_CONTROL_TRANSACTION_REFUND_OVER_REFERENCE_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 SMALL_CONSUME_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -995,7 +995,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-consumed").setAmount(100L));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 40L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         spendControlTransactionConsumptionApplicationService.refund(
                 policyAuthorizedRefundRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
@@ -1058,7 +1058,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-consumed").setAmount(60L));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 20L, CurrencyIsoCode.USD,
+                DefaultFundsTransactionType.REFUND, FundsTransactionState.CLOSED, 20L, CurrencyIsoCode.USD,
                 FUNDS_TRANSACTION_SN);
         spendControlTransactionConsumptionApplicationService.refund(
                 policyAuthorizedRefundRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
@@ -1263,7 +1263,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest() {
@@ -1278,7 +1278,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_sctc_2468")
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
@@ -1309,17 +1309,17 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                                                  Long amount,
                                                  CurrencyIsoCode currency) {
         insertFundsTransaction(transactionSn, businessSn, DefaultFundsTransactionType.PAY,
-                FundsTransactionStatus.CLOSED, amount, currency, null);
+                FundsTransactionState.CLOSED, amount, currency, null);
     }
 
     private void insertFundsTransaction(String transactionSn,
                                         String businessSn,
                                         DefaultFundsTransactionType transactionType,
-                                        FundsTransactionStatus status,
+                                        FundsTransactionState state,
                                         Long amount,
                                         CurrencyIsoCode currency,
                                         String referenceTransactionSn) {
-        insertFundsTransaction(transactionSn, BUSINESS_SCENE, businessSn, transactionType, status, amount, currency,
+        insertFundsTransaction(transactionSn, BUSINESS_SCENE, businessSn, transactionType, state, amount, currency,
                 referenceTransactionSn);
     }
 
@@ -1327,7 +1327,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                                         String businessScene,
                                         String businessSn,
                                         DefaultFundsTransactionType transactionType,
-                                        FundsTransactionStatus status,
+                                        FundsTransactionState state,
                                         Long amount,
                                         CurrencyIsoCode currency,
                                         String referenceTransactionSn) {
@@ -1345,7 +1345,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 businessScene,
                 businessSn,
                 referenceTransactionSn,
-                status.name(),
+                state.name(),
                 amount,
                 currency.name(),
                 amount);

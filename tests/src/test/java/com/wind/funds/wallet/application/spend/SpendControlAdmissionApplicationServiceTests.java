@@ -16,7 +16,7 @@ import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
@@ -880,7 +880,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreateFundingAccountRequest createParentFundingAccountRequest() {
@@ -893,7 +893,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest() {
@@ -908,7 +908,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_spend_control_2468")
                 .setCurrency(CurrencyIsoCode.USD)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setState(FundsAccountState.ACTIVE);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {

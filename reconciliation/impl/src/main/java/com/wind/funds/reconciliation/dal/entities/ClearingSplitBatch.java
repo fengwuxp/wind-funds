@@ -4,7 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ClearingSplitBatchStatus;
+import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -80,7 +80,12 @@ public class ClearingSplitBatch implements Serializable, TenantIsolationObject<L
     private String activeBatchDigest;
 
     @NotNull
-    private ClearingSplitBatchStatus status;
+    @Column("status")
+    private ClearingSplitBatchState state;
+
+    void setStatus(ClearingSplitBatchState state) {
+        this.state = state;
+    }
 
     @NotNull
     private String createdBy;

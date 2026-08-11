@@ -4,7 +4,7 @@ import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
@@ -96,8 +96,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .toList())
                 .containsExactly(LedgerPhaseCode.SETTLEMENT.name(), LedgerPhaseCode.FUND_OUT.name());
 
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_SUCCESS_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_SUCCESS_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_SUCCESS_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_SUCCESS_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_SUCCESS_FREEZE", 0, 0, 1, 2);
@@ -168,8 +168,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         LedgerPhaseCode.FUND_OUT.name(),
                         LedgerPhaseCode.FEE.name());
 
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_WITH_FEE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_WITH_FEE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_WITH_FEE_FREEZE").getReleasedAmount()).isZero();
 
         withdrawWithFixedFee(user, 60L, 5L, freezeSn, "WITHDRAW_WITH_FEE_CONFIRM");
@@ -249,8 +249,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE", 0, 0, 1, 2);
@@ -316,8 +316,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_ACCOUNT_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_ACCOUNT_FREEZE", 0, 0, 1, 2);
@@ -381,8 +381,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_FREEZE", 0, 0, 1, 2);
@@ -449,8 +449,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_FREEZE_REF_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_FREEZE_REF_FREEZE", 0, 0, 1, 2);
@@ -514,8 +514,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_FREEZE")
                 .getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_TOPUP", 3, 4);
@@ -581,8 +581,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_PAYEE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE", 0, 0, 1, 2);
@@ -649,8 +649,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_CURRENCY_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_CURRENCY_FREEZE", 0, 0, 1, 2);
@@ -709,8 +709,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNKNOWN_REF_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE", 0, 0, 1, 2);
@@ -808,11 +808,11 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE").getReleasedAmount()).isZero();
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE", 0, 0, 1, 2);
@@ -890,8 +890,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_INTERNAL_PAYEE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE", 0, 0, 1, 2);
@@ -970,8 +970,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE", 0, 0, 1, 2);
@@ -1038,8 +1038,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE", 0, 0, 1, 2);
@@ -1217,11 +1217,11 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.WITHDRAW.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_1").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_1").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_1").getReleasedAmount()).isZero();
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_1", 0, 0, 1, 2);
@@ -1290,8 +1290,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.WITHDRAW.name());
-        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE").getStatus())
-                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE").getState())
+                .isEqualTo(FundsFrozenOrderState.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE").getReleasedAmount()).isZero();
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE", 0, 0, 1, 2);

@@ -114,7 +114,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
     private void resolveAndValidateCreditAccountTarget(CreateSpendSubjectFundingRelationRequest request) {
         CreditAccountDTO creditAccount =
                 creditAccountService.getCreditAccount(request.getTenantId(), request.getTargetSubjectId());
-        AssertUtils.isTrue(creditAccount.getStatus().canDebit(),
+        AssertUtils.isTrue(creditAccount.getState().canDebit(),
                 "资金责任目标主体不可用，targetSubjectType = {}, targetSubjectId = {}",
                 request.getTargetSubjectType(), request.getTargetSubjectId());
         AssertUtils.equals(creditAccount.getCurrency(), request.getCurrency(),
@@ -124,7 +124,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
 
     private void assertFundingAccountCanBind(FundingAccountDTO fundingAccount,
                                              CreateSpendSubjectFundingRelationRequest request) {
-        AssertUtils.isTrue(fundingAccount.getStatus().canDebit(),
+        AssertUtils.isTrue(fundingAccount.getState().canDebit(),
                 "资金账户不可作为资金责任目标主体，targetSubjectId = {}", request.getTargetSubjectId());
         AssertUtils.equals(fundingAccount.getCurrency(), request.getCurrency(),
                 "资金账户币种与资金责任解析关系币种不一致，targetSubjectId = {}", request.getTargetSubjectId());

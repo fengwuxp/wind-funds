@@ -15,9 +15,9 @@ import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceActionMa
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationMatchResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
-import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
+import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
@@ -129,7 +129,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         AssertUtils.isTrue(Objects.equals(matchResult.getReconciliationRunResultSn(), runResult.getSn())
                         && Objects.equals(matchResult.getReconciliationBatchSn(), runResult.getReconciliationBatchSn()),
                 "对账匹配结果与运行结果绑定不一致，reconciliationMatchResultSn = {}", matchResult.getSn());
-        AssertUtils.isTrue(batch.getStatus() == ReconciliationBatchStatus.COMPLETED
+        AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.COMPLETED
                         && Objects.equals(batch.getRunResultSn(), runResult.getSn()),
                 "对账匹配结果关联批次尚未完成或运行结果不一致，reconciliationMatchResultSn = {}",
                 matchResult.getSn());
@@ -138,7 +138,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                         && batch.getGateObjectType() == runResult.getGateObjectType()
                         && Objects.equals(batch.getGateObjectSn(), runResult.getGateObjectSn()),
                 "对账批次与运行结果事实不一致，reconciliationMatchResultSn = {}", matchResult.getSn());
-        AssertUtils.isTrue(runResult.getStatus() == ReconciliationRunResultStatus.DIFFERENCE_FOUND,
+        AssertUtils.isTrue(runResult.getOutcome() == ReconciliationRunOutcome.DIFFERENCE_FOUND,
                 "只有发现差异的运行结果可以物化 Gate 差错，reconciliationMatchResultSn = {}", matchResult.getSn());
         AssertUtils.isTrue(!isAutomaticMatch(matchResult.getMatchStrength())
                         && matchResult.getDifferenceType() != null
@@ -203,9 +203,9 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         AssertUtils.isTrue(reconciliationDifferenceActionMapper.selectByIdempotencyKeyForUpdate(
                         request.getTenantId(), request.getIdempotencyKey()) == null,
                 "对账差错处理动作幂等键已被其他动作使用，idempotencyKey = {}", request.getIdempotencyKey());
-        AssertUtils.isTrue(entity.getStatus() != ReconciliationDifferenceStatus.RESOLVED,
+        AssertUtils.isTrue(entity.getState() != ReconciliationDifferenceState.RESOLVED,
                 "对账差错已关闭，不允许追加新的处理动作，differenceSn = {}", request.getDifferenceSn());
-        AssertUtils.isTrue(entity.getStatus() != ReconciliationDifferenceStatus.ADJUSTING,
+        AssertUtils.isTrue(entity.getState() != ReconciliationDifferenceState.ADJUSTING,
                 "上一处理动作尚未完成重新对账，不允许追加新的处理动作，differenceSn = {}", request.getDifferenceSn());
         ReconciliationDifferenceAction action = toDifferenceAction(request, operator);
         reconciliationDifferenceActionMapper.insertSelective(action);
@@ -220,7 +220,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         entity.setAdjustmentReason(request.getReason());
         entity.setAdjustedBy(operatorId(operator));
         entity.setAdjustedTime(LocalDateTime.now());
-        entity.setStatus(ReconciliationDifferenceStatus.ADJUSTING);
+        entity.setState(ReconciliationDifferenceState.ADJUSTING);
         AssertUtils.isTrue(reconciliationDifferenceMapper.update(entity) == 1,
                 "更新对账差错处理回链失败，differenceSn = {}", request.getDifferenceSn());
         logActionLinked(entity, action, false);
@@ -267,11 +267,11 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
             return toDTO(entity);
         }
         assertDifferenceEvidenceValid(entity);
-        AssertUtils.isTrue(entity.getStatus() != ReconciliationDifferenceStatus.RESOLVED,
+        AssertUtils.isTrue(entity.getState() != ReconciliationDifferenceState.RESOLVED,
                 "对账差错已关闭，不允许追加新的重跑结果，differenceSn = {}", request.getDifferenceSn());
         int rerunIncrement = assertCurrentRerunLineage(entity, batch);
         assertSameBlockingObject(entity, runResult);
-        boolean balanced = runResult.getStatus() == ReconciliationRunResultStatus.BALANCED;
+        boolean balanced = runResult.getOutcome() == ReconciliationRunOutcome.BALANCED;
         if (balanced) {
             AssertUtils.hasText(entity.getAdjustmentSn(), "差错关闭必须先关联处理动作或调账结果");
         } else {
@@ -285,11 +285,11 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         entity.setLastRerunResultDigest(runResult.getResultDigest());
         entity.setRerunCount(entity.getRerunCount() + rerunIncrement);
         if (balanced) {
-            entity.setStatus(ReconciliationDifferenceStatus.RESOLVED);
+            entity.setState(ReconciliationDifferenceState.RESOLVED);
             entity.setResolvedBy(operatorId(operator));
             entity.setResolvedTime(LocalDateTime.now());
         } else {
-            entity.setStatus(ReconciliationDifferenceStatus.RECONCILING);
+            entity.setState(ReconciliationDifferenceState.RECONCILING);
         }
         AssertUtils.isTrue(reconciliationDifferenceMapper.update(entity) == 1,
                 "更新对账差错重跑结果失败，differenceSn = {}", request.getDifferenceSn());
@@ -298,7 +298,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     }
 
     private void assertDifferenceEvidenceValid(ReconciliationDifference difference) {
-        AssertUtils.isTrue(difference.getStatus() != ReconciliationDifferenceStatus.INVALIDATED,
+        AssertUtils.isTrue(difference.getState() != ReconciliationDifferenceState.INVALIDATED,
                 "对账差错依赖证据已失效，不允许继续处置，differenceSn = {}",
                 difference.getDifferenceSn());
     }
@@ -317,7 +317,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     private void logDifferenceCreated(ReconciliationDifference difference, boolean reused) {
         log.info("对账差错物化完成，tenantId = {}, differenceSn = {}, batchSn = {}, gateObjectType = {}, gateObjectSn = {}, status = {}, reused = {}",
                 difference.getTenantId(), difference.getDifferenceSn(), difference.getReconciliationBatchSn(),
-                difference.getBlockingObjectType(), difference.getBlockingObjectSn(), difference.getStatus(), reused);
+                difference.getBlockingObjectType(), difference.getBlockingObjectSn(), difference.getState(), reused);
     }
 
     private void logActionLinked(ReconciliationDifference difference,
@@ -325,15 +325,15 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                                  boolean reused) {
         log.info("对账差错处理动作回链完成，tenantId = {}, differenceSn = {}, actionSn = {}, actionType = {}, adjustmentSn = {}, status = {}, reused = {}",
                 difference.getTenantId(), difference.getDifferenceSn(), action.getSn(), action.getActionType(),
-                action.getAdjustmentSn(), difference.getStatus(), reused);
+                action.getAdjustmentSn(), difference.getState(), reused);
     }
 
     private void logRerunLinked(ReconciliationDifference difference,
                                 ReconciliationRunResult runResult,
                                 boolean reused) {
         log.info("对账差错重跑结果回链完成，tenantId = {}, differenceSn = {}, runResultSn = {}, status = {}, balanced = {}, reused = {}",
-                difference.getTenantId(), difference.getDifferenceSn(), runResult.getSn(), difference.getStatus(),
-                runResult.getStatus() == ReconciliationRunResultStatus.BALANCED, reused);
+                difference.getTenantId(), difference.getDifferenceSn(), runResult.getSn(), difference.getState(),
+                runResult.getOutcome() == ReconciliationRunOutcome.BALANCED, reused);
     }
 
     private ReconciliationDifference selectRequiredDifferenceForUpdate(Long tenantId, String differenceSn) {
@@ -357,7 +357,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         result.setMatchStrength(matchResult.getMatchStrength());
         result.setDifferenceType(matchResult.getDifferenceType());
         result.setSeverity(matchResult.getSeverity());
-        result.setStatus(ReconciliationDifferenceStatus.BLOCKED);
+        result.setState(ReconciliationDifferenceState.BLOCKED);
         result.setCurrency(matchResult.getCurrency());
         result.setDifferenceAmount(matchResult.getDifferenceAmount());
         result.setResponsiblePartyRef(request.getResponsiblePartyRef().trim());
@@ -383,7 +383,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 .setMatchStrength(entity.getMatchStrength())
                 .setDifferenceType(entity.getDifferenceType())
                 .setSeverity(entity.getSeverity())
-                .setStatus(entity.getStatus())
+                .setState(entity.getState())
                 .setCurrency(entity.getCurrency())
                 .setDifferenceAmount(entity.getDifferenceAmount())
                 .setResponsiblePartyRef(entity.getResponsiblePartyRef())
@@ -525,7 +525,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 tenantId, runResult.getReconciliationBatchSn());
         AssertUtils.notNull(result, "对账运行结果关联批次不存在，reconciliationBatchSn = {}",
                 runResult.getReconciliationBatchSn());
-        AssertUtils.isTrue(result.getStatus() == ReconciliationBatchStatus.COMPLETED
+        AssertUtils.isTrue(result.getState() == ReconciliationBatchState.COMPLETED
                         && Objects.equals(result.getRunResultSn(), runResult.getSn()),
                 "对账运行结果与完成批次绑定不一致，reconciliationBatchSn = {}", result.getSn());
         AssertUtils.isTrue(Objects.equals(result.getRuleVersion(), runResult.getRuleVersion()),
@@ -573,7 +573,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     }
 
     private void assertSameRerunResult(ReconciliationDifference existing, ReconciliationRunResult runResult) {
-        boolean balanced = runResult.getStatus() == ReconciliationRunResultStatus.BALANCED;
+        boolean balanced = runResult.getOutcome() == ReconciliationRunOutcome.BALANCED;
         AssertUtils.isTrue(Objects.equals(existing.getLastRerunBatchSn(), runResult.getReconciliationBatchSn())
                         && Objects.equals(existing.getLastRerunRuleVersion(), runResult.getRuleVersion())
                         && Objects.equals(existing.getLastRerunBalanced(), balanced)

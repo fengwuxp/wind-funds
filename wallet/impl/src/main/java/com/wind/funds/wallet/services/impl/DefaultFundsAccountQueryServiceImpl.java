@@ -18,7 +18,7 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.ImmutableFundsAccount;
 import com.wind.funds.wallet.ImmutableFundsBalanceView;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
@@ -78,7 +78,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .tenantId(subject.tenantId())
                 .accountId(accountId)
                 .owner(FundsAccountOwner.of(subject.ownerId(), subject.ownerType()))
-                .status(subject.status())
+                .state(subject.state())
                 .currency(subject.currency())
                 .capabilities(capabilityResolution.capabilities())
                 .capabilitySource(capabilityResolution.source())
@@ -364,7 +364,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             FundsSubjectType subjectType,
             String ownerId,
             FundsAccountOwnerType ownerType,
-            FundsAccountStatus status,
+            FundsAccountState state,
             CurrencyIsoCode currency,
             LedgerProfileCode ledgerProfileCode,
             AccountBalancePeriodType periodType,
@@ -381,7 +381,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     FundsSubjectType.FUNDING_ACCOUNT,
                     account.getOwnerId(),
                     account.getOwnerType(),
-                    account.getStatus(),
+                    account.getState(),
                     account.getCurrency(),
                     account.getLedgerProfileCode(),
                     AccountBalancePeriodType.LIFETIME,
@@ -399,7 +399,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     FundsSubjectType.CREDIT_ACCOUNT,
                     account.getOwnerId(),
                     account.getOwnerType(),
-                    account.getStatus(),
+                    account.getState(),
                     account.getCurrency(),
                     account.getLedgerProfileCode(),
                     account.getPeriodType(),

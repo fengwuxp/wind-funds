@@ -253,18 +253,18 @@ com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds
 com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_BASIC;
 com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_MERCHANT;
 com.wind.funds.ledger.enums.LedgerProfileCode	public static final com.wind.funds.ledger.enums.LedgerProfileCode FUNDING_PLATFORM;
-com.wind.funds.ledger.enums.LedgerStatus	public boolean isOpenForClosingPosting();
-com.wind.funds.ledger.enums.LedgerStatus	public boolean isOpenForNewPosting();
-com.wind.funds.ledger.enums.LedgerStatus	public final class com.wind.funds.ledger.enums.LedgerStatus extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.ledger.enums.LedgerStatus	public java.lang.String getDesc();
-com.wind.funds.ledger.enums.LedgerStatus	public static com.wind.funds.ledger.enums.LedgerStatus valueOf(java.lang.String);
-com.wind.funds.ledger.enums.LedgerStatus	public static com.wind.funds.ledger.enums.LedgerStatus[] values();
-com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus ACTIVE;
-com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus CLOSED;
-com.wind.funds.ledger.enums.LedgerStatus	public static final com.wind.funds.ledger.enums.LedgerStatus SUSPENDED;
-com.wind.funds.ledger.enums.LedgerStatus	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus);
-com.wind.funds.ledger.enums.LedgerStatus	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus, com.wind.funds.ledger.enums.LedgerPostingAccessType);
-com.wind.funds.ledger.enums.LedgerStatus	public static void assertTransitionAllowed(java.lang.Long, com.wind.funds.ledger.enums.LedgerStatus, com.wind.funds.ledger.enums.LedgerStatus);
+com.wind.funds.ledger.enums.LedgerState	public boolean isOpenForClosingPosting();
+com.wind.funds.ledger.enums.LedgerState	public boolean isOpenForNewPosting();
+com.wind.funds.ledger.enums.LedgerState	public final class com.wind.funds.ledger.enums.LedgerState extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.ledger.enums.LedgerState	public java.lang.String getDesc();
+com.wind.funds.ledger.enums.LedgerState	public static com.wind.funds.ledger.enums.LedgerState valueOf(java.lang.String);
+com.wind.funds.ledger.enums.LedgerState	public static com.wind.funds.ledger.enums.LedgerState[] values();
+com.wind.funds.ledger.enums.LedgerState	public static final com.wind.funds.ledger.enums.LedgerState ACTIVE;
+com.wind.funds.ledger.enums.LedgerState	public static final com.wind.funds.ledger.enums.LedgerState CLOSED;
+com.wind.funds.ledger.enums.LedgerState	public static final com.wind.funds.ledger.enums.LedgerState SUSPENDED;
+com.wind.funds.ledger.enums.LedgerState	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerState);
+com.wind.funds.ledger.enums.LedgerState	public static void assertPostable(java.lang.Long, com.wind.funds.ledger.enums.LedgerState, com.wind.funds.ledger.enums.LedgerPostingAccessType);
+com.wind.funds.ledger.enums.LedgerState	public static void assertTransitionAllowed(java.lang.Long, com.wind.funds.ledger.enums.LedgerState, com.wind.funds.ledger.enums.LedgerState);
 com.wind.funds.ledger.enums.LedgerSubjectCategory	public com.wind.funds.ledger.enums.EntrySide getNormalBalance();
 com.wind.funds.ledger.enums.LedgerSubjectCategory	public final class com.wind.funds.ledger.enums.LedgerSubjectCategory extends java.lang.Enum<com.wind.funds.ledger.enums.LedgerSubjectCategory> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.ledger.enums.LedgerSubjectCategory	public java.lang.String getDesc();
@@ -801,7 +801,7 @@ com.wind.funds.transaction.support.FundsStableHashSupport	public static java.uti
 com.wind.funds.wallet.FundsAccount	public abstract boolean isAvailable();
 com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.FundsAccountId getAccountId();
 com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.FundsAccountOwner getOwner();
-com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.enums.FundsAccountStatus getStatus();
+com.wind.funds.wallet.FundsAccount	public abstract com.wind.funds.wallet.enums.FundsAccountState getState();
 com.wind.funds.wallet.FundsAccount	public abstract com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
 com.wind.funds.wallet.FundsAccount	public abstract java.lang.Integer getVersion();
 com.wind.funds.wallet.FundsAccount	public abstract java.lang.String getCapabilitySource();
@@ -896,17 +896,17 @@ com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.f
 com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType PLATFORM;
 com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType TENANT;
 com.wind.funds.wallet.enums.FundsAccountOwnerType	public static final com.wind.funds.wallet.enums.FundsAccountOwnerType USER;
-com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canAcceptRefund();
-com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canCredit();
-com.wind.funds.wallet.enums.FundsAccountStatus	public boolean canDebit();
-com.wind.funds.wallet.enums.FundsAccountStatus	public final class com.wind.funds.wallet.enums.FundsAccountStatus extends java.lang.Enum<com.wind.funds.wallet.enums.FundsAccountStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.wallet.enums.FundsAccountStatus	public java.lang.String getDesc();
-com.wind.funds.wallet.enums.FundsAccountStatus	public static com.wind.funds.wallet.enums.FundsAccountStatus valueOf(java.lang.String);
-com.wind.funds.wallet.enums.FundsAccountStatus	public static com.wind.funds.wallet.enums.FundsAccountStatus[] values();
-com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus ACTIVE;
-com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus CLOSED;
-com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus FROZEN;
-com.wind.funds.wallet.enums.FundsAccountStatus	public static final com.wind.funds.wallet.enums.FundsAccountStatus SUSPENDED;
+com.wind.funds.wallet.enums.FundsAccountState	public boolean canAcceptRefund();
+com.wind.funds.wallet.enums.FundsAccountState	public boolean canCredit();
+com.wind.funds.wallet.enums.FundsAccountState	public boolean canDebit();
+com.wind.funds.wallet.enums.FundsAccountState	public final class com.wind.funds.wallet.enums.FundsAccountState extends java.lang.Enum<com.wind.funds.wallet.enums.FundsAccountState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.FundsAccountState	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.FundsAccountState	public static com.wind.funds.wallet.enums.FundsAccountState valueOf(java.lang.String);
+com.wind.funds.wallet.enums.FundsAccountState	public static com.wind.funds.wallet.enums.FundsAccountState[] values();
+com.wind.funds.wallet.enums.FundsAccountState	public static final com.wind.funds.wallet.enums.FundsAccountState ACTIVE;
+com.wind.funds.wallet.enums.FundsAccountState	public static final com.wind.funds.wallet.enums.FundsAccountState CLOSED;
+com.wind.funds.wallet.enums.FundsAccountState	public static final com.wind.funds.wallet.enums.FundsAccountState FROZEN;
+com.wind.funds.wallet.enums.FundsAccountState	public static final com.wind.funds.wallet.enums.FundsAccountState SUSPENDED;
 com.wind.funds.wallet.enums.PaymentInstrumentAction	public final class com.wind.funds.wallet.enums.PaymentInstrumentAction extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentAction> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.wallet.enums.PaymentInstrumentAction	public java.lang.String getDesc();
 com.wind.funds.wallet.enums.PaymentInstrumentAction	public static com.wind.funds.wallet.enums.PaymentInstrumentAction valueOf(java.lang.String);
@@ -932,12 +932,12 @@ com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com
 com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole FUNDING_SUBJECT;
 com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole PAYMENT_SUBJECT;
 com.wind.funds.wallet.enums.PaymentInstrumentBindingRole	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingRole RECEIVE_SUBJECT;
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public final class com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public java.lang.String getDesc();
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus valueOf(java.lang.String);
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus[] values();
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus ACTIVE;
-com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingStatus SUSPENDED;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public final class com.wind.funds.wallet.enums.PaymentInstrumentBindingState extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentBindingState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingState valueOf(java.lang.String);
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public static com.wind.funds.wallet.enums.PaymentInstrumentBindingState[] values();
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingState ACTIVE;
+com.wind.funds.wallet.enums.PaymentInstrumentBindingState	public static final com.wind.funds.wallet.enums.PaymentInstrumentBindingState SUSPENDED;
 com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public final class com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection extends java.lang.Enum<com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public java.lang.String getDesc();
 com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection	public static com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection valueOf(java.lang.String);
@@ -987,13 +987,13 @@ com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static fina
 com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus NOT_YET_EFFECTIVE;
 com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus RETIRED;
 com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus SUSPENDED;
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public final class com.wind.funds.wallet.enums.SpendRuleBindingStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleBindingStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public java.lang.String getDesc();
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingStatus valueOf(java.lang.String);
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static com.wind.funds.wallet.enums.SpendRuleBindingStatus[] values();
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus ACTIVE;
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus RETIRED;
-com.wind.funds.wallet.enums.SpendRuleBindingStatus	public static final com.wind.funds.wallet.enums.SpendRuleBindingStatus SUSPENDED;
+com.wind.funds.wallet.enums.SpendRuleBindingState	public final class com.wind.funds.wallet.enums.SpendRuleBindingState extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleBindingState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleBindingState	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleBindingState	public static com.wind.funds.wallet.enums.SpendRuleBindingState valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleBindingState	public static com.wind.funds.wallet.enums.SpendRuleBindingState[] values();
+com.wind.funds.wallet.enums.SpendRuleBindingState	public static final com.wind.funds.wallet.enums.SpendRuleBindingState ACTIVE;
+com.wind.funds.wallet.enums.SpendRuleBindingState	public static final com.wind.funds.wallet.enums.SpendRuleBindingState RETIRED;
+com.wind.funds.wallet.enums.SpendRuleBindingState	public static final com.wind.funds.wallet.enums.SpendRuleBindingState SUSPENDED;
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public final class com.wind.funds.wallet.enums.SpendRuleConflictPolicy extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleConflictPolicy> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public java.lang.String getDesc();
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static com.wind.funds.wallet.enums.SpendRuleConflictPolicy valueOf(java.lang.String);
@@ -1001,12 +1001,12 @@ com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static com.wind.funds
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy DENY_OVERRIDES;
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy FIRST_MATCH;
 com.wind.funds.wallet.enums.SpendRuleConflictPolicy	public static final com.wind.funds.wallet.enums.SpendRuleConflictPolicy MOST_RESTRICTIVE;
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public final class com.wind.funds.wallet.enums.SpendRuleDefinitionStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleDefinitionStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public java.lang.String getDesc();
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static com.wind.funds.wallet.enums.SpendRuleDefinitionStatus valueOf(java.lang.String);
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static com.wind.funds.wallet.enums.SpendRuleDefinitionStatus[] values();
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionStatus ACTIVE;
-com.wind.funds.wallet.enums.SpendRuleDefinitionStatus	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionStatus DISABLED;
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public final class com.wind.funds.wallet.enums.SpendRuleDefinitionState extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleDefinitionState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public static com.wind.funds.wallet.enums.SpendRuleDefinitionState valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public static com.wind.funds.wallet.enums.SpendRuleDefinitionState[] values();
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionState ACTIVE;
+com.wind.funds.wallet.enums.SpendRuleDefinitionState	public static final com.wind.funds.wallet.enums.SpendRuleDefinitionState DISABLED;
 com.wind.funds.wallet.enums.SpendRuleDomain	public final class com.wind.funds.wallet.enums.SpendRuleDomain extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleDomain> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.wallet.enums.SpendRuleDomain	public java.lang.String getDesc();
 com.wind.funds.wallet.enums.SpendRuleDomain	public static com.wind.funds.wallet.enums.SpendRuleDomain valueOf(java.lang.String);
@@ -1043,12 +1043,12 @@ com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wal
 com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType POINT_OF_SERVICE_CATEGORY;
 com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType POSTAL_CODE_VERIFICATION;
 com.wind.funds.wallet.enums.SpendRuleType	public static final com.wind.funds.wallet.enums.SpendRuleType TIME_WINDOW;
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public final class com.wind.funds.wallet.enums.SpendRuleVersionStatus extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleVersionStatus> implements com.wind.common.enums.DescriptiveEnum {
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public java.lang.String getDesc();
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static com.wind.funds.wallet.enums.SpendRuleVersionStatus valueOf(java.lang.String);
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static com.wind.funds.wallet.enums.SpendRuleVersionStatus[] values();
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static final com.wind.funds.wallet.enums.SpendRuleVersionStatus PUBLISHED;
-com.wind.funds.wallet.enums.SpendRuleVersionStatus	public static final com.wind.funds.wallet.enums.SpendRuleVersionStatus RETIRED;
+com.wind.funds.wallet.enums.SpendRuleVersionState	public final class com.wind.funds.wallet.enums.SpendRuleVersionState extends java.lang.Enum<com.wind.funds.wallet.enums.SpendRuleVersionState> implements com.wind.common.enums.DescriptiveEnum {
+com.wind.funds.wallet.enums.SpendRuleVersionState	public java.lang.String getDesc();
+com.wind.funds.wallet.enums.SpendRuleVersionState	public static com.wind.funds.wallet.enums.SpendRuleVersionState valueOf(java.lang.String);
+com.wind.funds.wallet.enums.SpendRuleVersionState	public static com.wind.funds.wallet.enums.SpendRuleVersionState[] values();
+com.wind.funds.wallet.enums.SpendRuleVersionState	public static final com.wind.funds.wallet.enums.SpendRuleVersionState PUBLISHED;
+com.wind.funds.wallet.enums.SpendRuleVersionState	public static final com.wind.funds.wallet.enums.SpendRuleVersionState RETIRED;
 com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public final class com.wind.funds.wallet.enums.SpendSubjectFundingRelationType extends java.lang.Enum<com.wind.funds.wallet.enums.SpendSubjectFundingRelationType> implements com.wind.common.enums.DescriptiveEnum {
 com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public java.lang.String getDesc();
 com.wind.funds.wallet.enums.SpendSubjectFundingRelationType	public static com.wind.funds.wallet.enums.SpendSubjectFundingRelationType valueOf(java.lang.String);

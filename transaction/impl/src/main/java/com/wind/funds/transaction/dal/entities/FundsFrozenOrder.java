@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.dal.entities;
 
-import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
@@ -125,7 +125,12 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
      * 冻结订单状态。
      */
     @NotNull
-    private FundsFrozenOrderStatus status;
+    @Column("status")
+    private FundsFrozenOrderState state;
+
+    void setStatus(FundsFrozenOrderState state) {
+        this.state = state;
+    }
 
     /**
      * 冻结过期时间。

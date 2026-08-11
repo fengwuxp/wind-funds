@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -20,7 +20,11 @@ import java.util.List;
  * <p>职责：返回清算或结算对象的对账 gate 时点状态，以及阻断差错、证据引用和解释摘要。</p>
  *
  * <p>边界：结果不是最终放行凭证，不代表清算候选、清算批次、结算单或账务事实已经产生。</p>
+ *
+ * @author wuxp
+ * @since 2026-06-18
  */
+@Schema(description = "清算或结算对账准入消费结果")
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
@@ -38,10 +42,10 @@ public class ClearingSettlementGateResultDTO implements Serializable {
     private boolean passed;
 
     /**
-     * 准入决策状态。
+     * 准入决策结果。
      */
-    @Schema(description = "准入决策状态")
-    private ReconciliationGateDecisionStatus decisionStatus;
+    @Schema(description = "准入决策结果")
+    private ReconciliationGateDecisionResult decisionResult;
 
     /**
      * 准入消费对象类型。

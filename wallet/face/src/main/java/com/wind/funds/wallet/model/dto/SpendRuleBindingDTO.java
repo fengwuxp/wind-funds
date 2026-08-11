@@ -1,7 +1,7 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -70,7 +70,7 @@ public class SpendRuleBindingDTO implements Serializable {
     private LocalDateTime effectiveTo;
 
     @Schema(description = "挂载状态")
-    private SpendRuleBindingStatus status;
+    private SpendRuleBindingState state;
 
     @Schema(description = "创建挂载的审计引用")
     private String auditReferenceSn;

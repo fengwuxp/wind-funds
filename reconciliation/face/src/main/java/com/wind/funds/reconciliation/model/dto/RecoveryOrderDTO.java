@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.RecoveryOrderStatus;
+import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -55,7 +55,7 @@ public class RecoveryOrderDTO implements Serializable {
     private CurrencyIsoCode currency;
 
     @Schema(description = "追偿单状态")
-    private RecoveryOrderStatus status;
+    private RecoveryOrderState state;
 
     @Schema(description = "最近一次追偿资金交易流水号")
     private String lastFundsTransactionSn;

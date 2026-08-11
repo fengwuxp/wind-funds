@@ -11,9 +11,9 @@ import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResul
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportCompleteness;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
@@ -114,14 +114,14 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
 
         assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(result.getDifferenceSn()).isEqualTo(requiredDifferenceSn());
-        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.BLOCKED);
+        assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.BLOCKED);
         assertThat(result.getDifferenceType()).isEqualTo(ReconciliationDifferenceType.AMOUNT_MISMATCH);
         assertThat(result.getSeverity()).isEqualTo(ReconciliationDifferenceSeverity.S1_MAJOR);
         assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
         assertThat(result.getDifferenceAmount()).isEqualTo(50L);
         assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
         assertThat(result.getBlockingObjectSn()).isEqualTo(CLEARING_OBJECT_SN);
-        assertThat(result.getGateDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getGateDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
         assertThat(result.getEvidenceRefs())
                 .containsExactly("processor-report-file-digest-001", RUN_RESULT_EVIDENCE_REF);
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
@@ -146,7 +146,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
                 reportRequest().setIncludeGateDecision(false), WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.INVALIDATED);
+        assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.INVALIDATED);
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
         assertThat(result.getExplanation()).contains("证据").contains("无效").contains("不再参与准入");
     }
@@ -172,7 +172,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         assertThat(result.getDifferenceSn()).isEqualTo(requiredDifferenceSn());
         assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
         assertThat(result.getBlockingObjectSn()).isEqualTo(CLEARING_OBJECT_SN);
-        assertThat(result.getGateDecisionStatus()).isNull();
+        assertThat(result.getGateDecisionResult()).isNull();
         assertThat(result.getGateExplanation()).isNull();
         assertThat(result.getEvidenceRefs()).isEmpty();
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
@@ -238,12 +238,12 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 SET status = ?
                 WHERE tenant_id = ?
                   AND difference_sn = ?
-                """, ReconciliationDifferenceStatus.RESOLVED.name(), TENANT_ID, requiredDifferenceSn());
+                """, ReconciliationDifferenceState.RESOLVED.name(), TENANT_ID, requiredDifferenceSn());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
                 reportRequest(), WindOperatorFactory.system());
 
-        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
+        assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.RESOLVED);
         assertThat(result.getLastRerunSn()).isNull();
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.MISSING_RERUN_RESULT);
         assertLedgerFactsUnchanged(jdbcTemplate, before);

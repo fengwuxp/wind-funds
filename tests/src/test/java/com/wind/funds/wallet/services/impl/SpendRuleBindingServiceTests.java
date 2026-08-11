@@ -2,7 +2,7 @@ package com.wind.funds.wallet.services.impl;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
-import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingState;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
@@ -75,14 +75,14 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
         SpendRuleBindingDTO retired = spendRuleBindingService.getSpendRuleBindingById(bindingId);
 
-        assertThat(binding.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
-        assertThat(suspended.getStatus()).isEqualTo(SpendRuleBindingStatus.SUSPENDED);
+        assertThat(binding.getState()).isEqualTo(SpendRuleBindingState.ACTIVE);
+        assertThat(suspended.getState()).isEqualTo(SpendRuleBindingState.SUSPENDED);
         assertThat(suspended.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(suspended.getDescription()).isEqualTo("挂载 Spend Rule 版本");
-        assertThat(resumed.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
+        assertThat(resumed.getState()).isEqualTo(SpendRuleBindingState.ACTIVE);
         assertThat(resumed.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(resumed.getDescription()).isEqualTo("挂载 Spend Rule 版本");
-        assertThat(retired.getStatus()).isEqualTo(SpendRuleBindingStatus.RETIRED);
+        assertThat(retired.getState()).isEqualTo(SpendRuleBindingState.RETIRED);
         assertThat(retired.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(retired.getDescription()).isEqualTo("挂载 Spend Rule 版本");
         assertNoTransactionFacts();
@@ -103,22 +103,22 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
 
         assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn())))
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
-                .isEqualTo(SpendRuleBindingStatus.ACTIVE);
+        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+                .isEqualTo(SpendRuleBindingState.ACTIVE);
 
         spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn()));
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn())))
                 .hasMessageContaining("只有有效的 Spend Rule 挂载可以暂停");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
-                .isEqualTo(SpendRuleBindingStatus.SUSPENDED);
+        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+                .isEqualTo(SpendRuleBindingState.SUSPENDED);
 
         spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
         assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn())))
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
         assertThatThrownBy(() -> spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn())))
                 .hasMessageContaining("只有有效或已暂停的 Spend Rule 挂载可以退役");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
-                .isEqualTo(SpendRuleBindingStatus.RETIRED);
+        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+                .isEqualTo(SpendRuleBindingState.RETIRED);
     }
 
     /**
@@ -135,8 +135,8 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
                 suspendRequest(null)))
                 .hasMessageContaining("Spend Rule 挂载流水号不能为空");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
-                .isEqualTo(SpendRuleBindingStatus.ACTIVE);
+        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+                .isEqualTo(SpendRuleBindingState.ACTIVE);
     }
 
     @BeforeEach

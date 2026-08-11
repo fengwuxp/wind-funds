@@ -7,7 +7,7 @@ import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
@@ -583,8 +583,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             return;
         }
         Map<String, Object> summary = new LinkedHashMap<>();
-        if (transaction.getStatus() != null) {
-            summary.put(STATUS_FIELD, transaction.getStatus().name());
+        if (transaction.getState() != null) {
+            summary.put(STATUS_FIELD, transaction.getState().name());
         }
         putIfNotNull(summary, AMOUNT_FIELD, transaction.getAmount());
         if (transaction.getCurrency() != null) {
@@ -605,7 +605,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private boolean hasOutstandingAuthorization(@Nullable FundsTransactionDTO transaction) {
         return transaction != null
                 && transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
-                && transaction.getStatus() == FundsTransactionStatus.OPEN
+                && transaction.getState() == FundsTransactionState.OPEN
                 && remainingAuthorizationAmount(transaction) > 0;
     }
 

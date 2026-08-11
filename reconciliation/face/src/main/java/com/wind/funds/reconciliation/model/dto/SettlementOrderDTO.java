@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.SettlementOrderStatus;
+import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -47,7 +47,7 @@ public class SettlementOrderDTO implements Serializable {
     private Long netAmount;
 
     @Schema(description = "结算单状态")
-    private SettlementOrderStatus status;
+    private SettlementOrderState state;
 
     @Schema(description = "结算策略快照")
     private SettlementPolicySnapshotDTO policySnapshot;
