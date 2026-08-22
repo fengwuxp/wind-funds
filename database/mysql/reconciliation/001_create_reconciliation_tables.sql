@@ -28,8 +28,7 @@ CREATE TABLE `t_clearing_splittable_detail`
     `status`                          VARCHAR(50)  NOT NULL COMMENT 'SPLIT_READY/EXCLUDED',
     `exclusion_reason`                VARCHAR(64)           DEFAULT NULL COMMENT '稳定排除原因',
     `reconciliation_decision_status` VARCHAR(50)  NOT NULL COMMENT '清分前对账门禁结论',
-    `reconciliation_run_result_sn`    VARCHAR(64)  NOT NULL COMMENT '清分前对账运行结果流水号',
-    `reconciliation_result_digest`    VARCHAR(64)           DEFAULT NULL COMMENT '清分前对账运行结果 SHA-256；结果缺失并阻断时为空',
+    `gate_evidence_ref`               VARCHAR(64)  NOT NULL COMMENT '清分准入消费的 Stage Gate evidence 流水号',
     `reconciliation_evidence_refs`    MEDIUMTEXT   NOT NULL COMMENT '清分前对账证据引用 JSON',
     `route_snapshot_digest`           VARCHAR(64)           DEFAULT NULL COMMENT '来源 RouteSnapshot SHA-256；来源不完整被排除时为空',
     `source_digest`                   VARCHAR(64)  NOT NULL COMMENT '来源事实与规则快照 SHA-256',
@@ -124,8 +123,7 @@ CREATE TABLE `t_clearing_split_result_snapshot`
     `route_snapshot_digest`        VARCHAR(64) NOT NULL COMMENT '来源 RouteSnapshot SHA-256',
     `split_rule_code`              VARCHAR(64) NOT NULL COMMENT '清分规则编码',
     `split_rule_version`           VARCHAR(64) NOT NULL COMMENT '清分规则版本',
-    `reconciliation_run_result_sn` VARCHAR(64) NOT NULL COMMENT '确认时消费的对账运行结果流水号',
-    `reconciliation_result_digest` VARCHAR(64) NOT NULL COMMENT '确认时消费的对账运行结果 SHA-256',
+    `gate_evidence_ref`            VARCHAR(64) NOT NULL COMMENT '清分确认消费的 Stage Gate evidence 流水号',
     `reconciliation_evidence_refs` MEDIUMTEXT  NOT NULL COMMENT '确认时冻结的对账证据引用 JSON',
     `source_digest`                VARCHAR(64) NOT NULL COMMENT '可清分来源事实 SHA-256',
     `snapshot_digest`              VARCHAR(64) NOT NULL COMMENT '清分结果快照 SHA-256',
@@ -167,8 +165,7 @@ CREATE TABLE `t_clearing_candidate`
     `clearing_available_time`         DATETIME     NOT NULL COMMENT '最早可进入清算批次的时间',
     `clearing_rule_code`              VARCHAR(64)  NOT NULL COMMENT '清算规则编码',
     `clearing_rule_version`           VARCHAR(64)  NOT NULL COMMENT '清算规则版本',
-    `reconciliation_run_result_sn`    VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
-    `reconciliation_result_digest`    VARCHAR(64)  NOT NULL COMMENT '对账结果 SHA-256',
+    `gate_evidence_ref`               VARCHAR(64)  NOT NULL COMMENT '清算候选消费的 Stage Gate evidence 流水号',
     `reconciliation_evidence_refs`   MEDIUMTEXT   NOT NULL COMMENT '对账证据引用 JSON',
     `source_digest`                   VARCHAR(64)  NOT NULL COMMENT '来源事实摘要',
     `candidate_digest`                VARCHAR(64)  NOT NULL COMMENT '候选事实摘要',
@@ -268,34 +265,39 @@ CREATE TABLE `t_clearing_batch_detail`
 -- ----------------------------
 CREATE TABLE `t_reconciliation_batch`
 (
-    `id`                   BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `gmt_create`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `gmt_modified`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `sn`                   VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
-    `tenant_id`            BIGINT(20)   NOT NULL COMMENT '租户 ID',
-    `reconciliation_scope_ref` VARCHAR(128) NOT NULL COMMENT '本次对账作业范围的稳定业务引用',
-    `gate_object_type`     VARCHAR(50)           DEFAULT NULL COMMENT '准入对象类型；纯对账时为空',
-    `gate_object_sn`       VARCHAR(64)           DEFAULT NULL COMMENT '准入对象流水号；纯对账时为空',
-    `rule_version`         VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
-    `window_start`         DATETIME     NOT NULL COMMENT '对账窗口开始时间，含',
-    `window_end`           DATETIME     NOT NULL COMMENT '对账窗口结束时间，不含',
-    `timezone_id`          VARCHAR(64)  NOT NULL COMMENT '对账窗口时区 ID',
-    `previous_batch_sn`    VARCHAR(64)           DEFAULT NULL COMMENT '重跑引用的上一批次流水号',
-    `status`               VARCHAR(50)  NOT NULL COMMENT 'CREATED/DATA_COLLECTING/DATA_READY/COMPLETED/ABORTED',
-    `run_result_sn`        VARCHAR(64)           DEFAULT NULL COMMENT '完成态运行结果流水号',
-    `aborted_by`           VARCHAR(64)           DEFAULT NULL COMMENT '终止操作人',
-    `aborted_time`         DATETIME              DEFAULT NULL COMMENT '终止时间',
-    `abort_reason`         VARCHAR(512)          DEFAULT NULL COMMENT '终止原因',
-    `replacement_reason`   VARCHAR(512)          DEFAULT NULL COMMENT '替代上一已完成批次的原因',
-    `replacement_evidence_ref` VARCHAR(256)      DEFAULT NULL COMMENT '证明上一已完成批次证据失效的安全引用',
-    `batch_digest`         VARCHAR(64)  NOT NULL COMMENT '对账范围、重跑关系与替代事实 SHA-256',
-    `created_by`           VARCHAR(64)  NOT NULL COMMENT '创建人',
+    `id`                         BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                 DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                         VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
+    `tenant_id`                  BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `scope_owner_namespace`      VARCHAR(64)  NOT NULL COMMENT '对账 scope 身份 Owner namespace',
+    `scope_identity_value`       VARCHAR(128) NOT NULL COMMENT '对账 scope 稳定身份',
+    `pair_owner_namespace`       VARCHAR(64)  NOT NULL COMMENT '对账 pair 身份 Owner namespace',
+    `pair_identity_value`        VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
+    `currency`                   VARCHAR(10)  NOT NULL COMMENT '对账币种',
+    `rule_namespace`             VARCHAR(64)  NOT NULL COMMENT '比较规则 namespace',
+    `rule_identity`              VARCHAR(128) NOT NULL COMMENT '比较规则稳定身份',
+    `rule_version`               VARCHAR(64)  NOT NULL COMMENT '比较规则版本',
+    `window_start`               DATETIME     NOT NULL COMMENT '对账窗口开始时间，含',
+    `window_end`                 DATETIME     NOT NULL COMMENT '对账窗口结束时间，不含',
+    `time_semantics`             VARCHAR(64)  NOT NULL COMMENT '窗口时间语义',
+    `timezone_id`                VARCHAR(64)  NOT NULL COMMENT '对账窗口时区 ID',
+    `previous_batch_sn`          VARCHAR(64)           DEFAULT NULL COMMENT '重跑引用的上一批次流水号',
+    `status`                     VARCHAR(50)  NOT NULL COMMENT 'CREATED/DATA_COLLECTING/DATA_READY/COMPLETED/ABORTED',
+    `run_result_sn`              VARCHAR(64)           DEFAULT NULL COMMENT '完成态运行结果流水号',
+    `aborted_by`                 VARCHAR(64)           DEFAULT NULL COMMENT '终止操作人',
+    `aborted_time`               DATETIME              DEFAULT NULL COMMENT '终止时间',
+    `abort_reason`               VARCHAR(512)          DEFAULT NULL COMMENT '终止原因',
+    `replacement_reason`         VARCHAR(512)          DEFAULT NULL COMMENT '替代上一已完成批次的原因',
+    `replacement_evidence_ref`   VARCHAR(256)          DEFAULT NULL COMMENT '证明上一批次证据失效的安全引用',
+    `batch_digest`               VARCHAR(64)  NOT NULL COMMENT '对账范围、规则与血缘事实 SHA-256',
+    `created_by`                 VARCHAR(64)  NOT NULL COMMENT '创建人',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_batch_digest` (`tenant_id`, `batch_digest`),
     UNIQUE KEY `uk_reconciliation_batch_previous` (`tenant_id`, `previous_batch_sn`),
-    KEY `idx_reconciliation_batch_scope` (`tenant_id`, `reconciliation_scope_ref`, `status`),
-    KEY `idx_reconciliation_batch_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
+    KEY `idx_reconciliation_batch_scope_pair`
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
     KEY `idx_reconciliation_batch_status` (`tenant_id`, `status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账批次表';
@@ -309,13 +311,14 @@ CREATE TABLE `t_reconciliation_batch_lineage`
     `gmt_create`               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `gmt_modified`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `tenant_id`                BIGINT(20)   NOT NULL COMMENT '租户 ID',
-    `reconciliation_scope_ref` VARCHAR(128) NOT NULL COMMENT '对账作业范围稳定业务引用',
-    `gate_object_type`         VARCHAR(50)  NOT NULL COMMENT '准入对象类型',
-    `gate_object_sn`           VARCHAR(64)  NOT NULL COMMENT '准入对象流水号',
+    `scope_owner_namespace`    VARCHAR(64)  NOT NULL COMMENT '对账 scope 身份 Owner namespace',
+    `scope_identity_value`     VARCHAR(128) NOT NULL COMMENT '对账 scope 稳定身份',
+    `pair_owner_namespace`     VARCHAR(64)  NOT NULL COMMENT '对账 pair 身份 Owner namespace',
+    `pair_identity_value`      VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
     `current_batch_sn`         VARCHAR(64)  NOT NULL COMMENT '当前批次血缘头流水号',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_reconciliation_batch_lineage_object`
-        (`tenant_id`, `gate_object_type`, `gate_object_sn`),
+    UNIQUE KEY `uk_reconciliation_batch_lineage_pair`
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`),
     KEY `idx_reconciliation_batch_lineage_current` (`tenant_id`, `current_batch_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = 'Gate 对账批次当前血缘头';
@@ -331,14 +334,23 @@ CREATE TABLE `t_reconciliation_source_snapshot`
     `tenant_id`                BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `reconciliation_batch_sn`  VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
     `source_role`              VARCHAR(50)  NOT NULL COMMENT 'REFERENCE/COMPARISON',
-    `source_type`              VARCHAR(50)  NOT NULL COMMENT '来源事实类型',
+    `source_namespace`         VARCHAR(64)  NOT NULL COMMENT '归一来源逻辑 namespace，不绑定载体',
+    `snapshot_owner_namespace` VARCHAR(64)  NOT NULL COMMENT '来源快照身份 Owner namespace',
+    `snapshot_identity_value`  VARCHAR(128) NOT NULL COMMENT '来源快照稳定身份',
+    `snapshot_version`         VARCHAR(64)  NOT NULL COMMENT '来源快照版本',
+    `coverage_complete`        TINYINT(1)   NOT NULL COMMENT 'coverage 是否完整',
+    `coverage_watermark`       VARCHAR(128)          DEFAULT NULL COMMENT 'coverage watermark',
+    `coverage_member_count`    INT(11)      NOT NULL COMMENT 'coverage 成员数',
     `source_digest`            VARCHAR(64)  NOT NULL COMMENT '来源成员集合 SHA-256',
-    `record_count`             INT(11)      NOT NULL COMMENT '来源成员数',
-    `evidence_refs`            MEDIUMTEXT   NOT NULL COMMENT '来源文件或报表稳定证据引用 JSON',
+    `semantic_digest`          VARCHAR(64)  NOT NULL COMMENT '来源快照语义 SHA-256',
+    `evidence_bundle_digest`   VARCHAR(64)  NOT NULL COMMENT '证据引用集合 SHA-256',
+    `evidence_refs`            MEDIUMTEXT   NOT NULL COMMENT '稳定证据引用 JSON',
     `created_by`               VARCHAR(64)  NOT NULL COMMENT '记录人',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_source_snapshot_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_source_snapshot_role` (`tenant_id`, `reconciliation_batch_sn`, `source_role`),
+    UNIQUE KEY `uk_reconciliation_source_snapshot_identity`
+        (`tenant_id`, `snapshot_owner_namespace`, `snapshot_identity_value`, `snapshot_version`),
     KEY `idx_reconciliation_source_snapshot_digest` (`tenant_id`, `source_digest`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账来源快照表';
@@ -353,13 +365,32 @@ CREATE TABLE `t_reconciliation_source_item`
     `sn`                  VARCHAR(64)  NOT NULL COMMENT '来源成员流水号',
     `tenant_id`           BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `source_snapshot_sn`  VARCHAR(64)  NOT NULL COMMENT '来源快照流水号',
-    `source_item_ref`     VARCHAR(128) NOT NULL COMMENT '不可变来源事实稳定引用',
-    `content_digest`      VARCHAR(64)  NOT NULL COMMENT '规范化不可变来源事实内容 SHA-256',
+    `source_fact_owner_namespace` VARCHAR(64)  NOT NULL COMMENT '来源事实身份 Owner namespace',
+    `source_fact_identity_value`  VARCHAR(128) NOT NULL COMMENT '来源事实稳定身份',
+    `comparison_owner_namespace`  VARCHAR(64)  NOT NULL COMMENT 'comparison identity Owner namespace',
+    `comparison_identity_value`   VARCHAR(128) NOT NULL COMMENT 'comparison identity value',
+    `amount`                      BIGINT(20)   NOT NULL COMMENT '归一金额，最小货币单位',
+    `currency`                    VARCHAR(10)  NOT NULL COMMENT '归一币种',
+    `rule_namespace`              VARCHAR(64)  NOT NULL COMMENT '比较规则 namespace',
+    `rule_identity`               VARCHAR(128) NOT NULL COMMENT '比较规则稳定身份',
+    `rule_version`                VARCHAR(64)  NOT NULL COMMENT '比较规则版本',
+    `comparison_status_code`      VARCHAR(64)  NOT NULL COMMENT '规则域内归一比较状态',
+    `comparison_proven`           TINYINT(1)   NOT NULL COMMENT '比较状态是否已证明',
+    `claim_kind`                  VARCHAR(64)  NOT NULL COMMENT '归一 claim kind',
+    `economic_component`          VARCHAR(64)  NOT NULL COMMENT '归一经济组成',
+    `direction`                   VARCHAR(64)  NOT NULL COMMENT '归一资金方向',
+    `normalization_version`       VARCHAR(64)  NOT NULL COMMENT '归一规则版本',
+    `semantic_digest`             VARCHAR(64)  NOT NULL COMMENT '归一事实语义 SHA-256',
+    `evidence_bundle_digest`      VARCHAR(64)  NOT NULL COMMENT '证据引用集合 SHA-256',
+    `evidence_refs`               MEDIUMTEXT   NOT NULL COMMENT '稳定证据引用 JSON',
     `created_by`          VARCHAR(64)  NOT NULL COMMENT '记录人',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_source_item_sn` (`tenant_id`, `sn`),
-    UNIQUE KEY `uk_reconciliation_source_item_ref` (`tenant_id`, `source_snapshot_sn`, `source_item_ref`),
-    KEY `idx_reconciliation_source_content_digest` (`tenant_id`, `source_snapshot_sn`, `content_digest`)
+    UNIQUE KEY `uk_reconciliation_source_item_fact`
+        (`tenant_id`, `source_snapshot_sn`, `source_fact_owner_namespace`, `source_fact_identity_value`),
+    KEY `idx_reconciliation_source_item_comparison`
+        (`tenant_id`, `source_snapshot_sn`, `comparison_owner_namespace`, `comparison_identity_value`),
+    KEY `idx_reconciliation_source_item_semantic_digest` (`tenant_id`, `source_snapshot_sn`, `semantic_digest`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账来源成员表';
 
@@ -373,11 +404,17 @@ CREATE TABLE `t_reconciliation_run_result`
     `sn`                       VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
     `tenant_id`                BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `reconciliation_batch_sn`  VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
-    `reconciliation_scope_ref` VARCHAR(128) NOT NULL COMMENT '本次对账作业范围的稳定业务引用',
-    `gate_object_type`         VARCHAR(50)           DEFAULT NULL COMMENT '准入对象类型；纯对账时为空',
-    `gate_object_sn`           VARCHAR(64)           DEFAULT NULL COMMENT '准入对象流水号；纯对账时为空',
+    `scope_owner_namespace`    VARCHAR(64)  NOT NULL COMMENT '对账 scope 身份 Owner namespace',
+    `scope_identity_value`     VARCHAR(128) NOT NULL COMMENT '对账 scope 稳定身份',
+    `pair_owner_namespace`     VARCHAR(64)  NOT NULL COMMENT '对账 pair 身份 Owner namespace',
+    `pair_identity_value`      VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
+    `currency`                 VARCHAR(10)  NOT NULL COMMENT '对账币种',
     `status`                   VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND',
+    `rule_namespace`           VARCHAR(64)  NOT NULL COMMENT '比较规则 namespace',
+    `rule_identity`            VARCHAR(128) NOT NULL COMMENT '比较规则稳定身份',
     `rule_version`             VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
+    `reference_snapshot_sn`    VARCHAR(64)  NOT NULL COMMENT '基准侧来源快照流水号',
+    `comparison_snapshot_sn`   VARCHAR(64)  NOT NULL COMMENT '核对侧来源快照流水号',
     `reference_source_digest`  VARCHAR(64)  NOT NULL COMMENT '基准侧来源成员集合 SHA-256',
     `comparison_source_digest` VARCHAR(64)  NOT NULL COMMENT '核对侧来源成员集合 SHA-256',
     `source_digest`            VARCHAR(64)  NOT NULL COMMENT '基准侧与核对侧来源摘要的组合 SHA-256',
@@ -390,8 +427,8 @@ CREATE TABLE `t_reconciliation_run_result`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_run_result_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_run_result_business` (`tenant_id`, `reconciliation_batch_sn`),
-    KEY `idx_reconciliation_run_result_scope` (`tenant_id`, `reconciliation_scope_ref`, `status`),
-    KEY `idx_reconciliation_run_result_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
+    KEY `idx_reconciliation_run_result_scope_pair`
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
     KEY `idx_reconciliation_run_result_digest` (`tenant_id`, `result_digest`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账运行结果表';
@@ -407,22 +444,26 @@ CREATE TABLE `t_reconciliation_match_result`
     `tenant_id`                     BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `reconciliation_run_result_sn`  VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
     `reconciliation_batch_sn`       VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
-    `reference_source_ref`          VARCHAR(128)          DEFAULT NULL COMMENT '基准侧事实稳定引用',
-    `comparison_source_ref`         VARCHAR(128)          DEFAULT NULL COMMENT '核对侧事实稳定引用',
-    `source_quality`                VARCHAR(50)  NOT NULL COMMENT '来源质量',
-    `match_strength`                VARCHAR(50)  NOT NULL COMMENT '匹配强度',
-    `difference_type`               VARCHAR(50)           DEFAULT NULL COMMENT '差错类型',
-    `severity`                      VARCHAR(50)           DEFAULT NULL COMMENT '差错严重等级',
-    `currency`                      VARCHAR(10)           DEFAULT NULL COMMENT '差异币种',
-    `difference_amount`             BIGINT(20)            DEFAULT NULL COMMENT '金额差异，最小货币单位；非金额差异可空',
-    `evidence_ref`                  VARCHAR(256) NOT NULL COMMENT '匹配结论证据引用',
+    `reference_fact_owner_namespace` VARCHAR(64)           DEFAULT NULL COMMENT '基准侧事实 Owner namespace',
+    `reference_fact_identity_value`  VARCHAR(128)          DEFAULT NULL COMMENT '基准侧事实稳定身份',
+    `comparison_fact_owner_namespace` VARCHAR(64)          DEFAULT NULL COMMENT '核对侧事实 Owner namespace',
+    `comparison_fact_identity_value` VARCHAR(128)          DEFAULT NULL COMMENT '核对侧事实稳定身份',
+    `comparison_owner_namespace`     VARCHAR(64)  NOT NULL COMMENT 'comparison identity Owner namespace',
+    `comparison_identity_value`      VARCHAR(128) NOT NULL COMMENT 'comparison identity value',
+    `result_kind`                    VARCHAR(50)  NOT NULL COMMENT 'strict-exact 有限结果类型',
+    `absolute_difference_currency`   VARCHAR(10)           DEFAULT NULL COMMENT '同币金额差异币种',
+    `absolute_difference_amount`     BIGINT(20)            DEFAULT NULL COMMENT '同币绝对金额差异',
+    `larger_side`                    VARCHAR(50)           DEFAULT NULL COMMENT 'REFERENCE/COMPARISON',
+    `evidence_refs`                  MEDIUMTEXT   NOT NULL COMMENT '匹配结论证据引用 JSON',
     `match_identity_digest`         VARCHAR(64)  NOT NULL COMMENT '基准侧与核对侧来源对身份 SHA-256',
-    `match_digest`                  VARCHAR(64)  NOT NULL COMMENT '匹配结果 SHA-256',
+    `result_digest`                 VARCHAR(64)  NOT NULL COMMENT '匹配结果 SHA-256',
     `created_by`                    VARCHAR(64)  NOT NULL COMMENT '记录人',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_match_result_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_match_result_identity` (`tenant_id`, `reconciliation_run_result_sn`, `match_identity_digest`),
-    KEY `idx_reconciliation_match_result_digest` (`tenant_id`, `reconciliation_run_result_sn`, `match_digest`),
+    KEY `idx_reconciliation_match_result_digest` (`tenant_id`, `reconciliation_run_result_sn`, `result_digest`),
+    KEY `idx_reconciliation_match_result_comparison`
+        (`tenant_id`, `reconciliation_run_result_sn`, `comparison_owner_namespace`, `comparison_identity_value`),
     KEY `idx_reconciliation_match_result_batch` (`tenant_id`, `reconciliation_batch_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账匹配结果明细表';
@@ -439,17 +480,20 @@ CREATE TABLE `t_reconciliation_difference`
     `tenant_id`                 BIGINT(20)  NOT NULL COMMENT '租户 ID',
     `reconciliation_batch_sn`   VARCHAR(64) NOT NULL COMMENT '对账批次流水号',
     `reconciliation_match_result_sn` VARCHAR(64) NOT NULL COMMENT '对账逐笔匹配结果流水号',
-    `source_quality`            VARCHAR(50) NOT NULL COMMENT '对账来源质量',
-    `match_strength`            VARCHAR(50) NOT NULL COMMENT '对账匹配强度',
+    `scope_owner_namespace`     VARCHAR(64) NOT NULL COMMENT '对账 scope 身份 Owner namespace',
+    `scope_identity_value`      VARCHAR(128) NOT NULL COMMENT '对账 scope 稳定身份',
+    `pair_owner_namespace`      VARCHAR(64) NOT NULL COMMENT '对账 pair 身份 Owner namespace',
+    `pair_identity_value`       VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
     `difference_type`           VARCHAR(50) NOT NULL COMMENT '对账差错类型',
     `severity`                  VARCHAR(50) NOT NULL COMMENT '对账差错严重等级',
     `status`                    VARCHAR(50) NOT NULL COMMENT '对账差错状态',
     `currency`                  VARCHAR(10)          DEFAULT NULL COMMENT '差异币种，金额差异时必填',
     `difference_amount`         BIGINT(20)           DEFAULT NULL COMMENT '差异金额，最小货币单位；非金额差异可空',
     `responsible_party_ref`     VARCHAR(128) NOT NULL COMMENT '责任方引用',
-    `blocking_object_type`      VARCHAR(50)          NOT NULL COMMENT '阻断对象类型',
-    `blocking_object_sn`        VARCHAR(64)          NOT NULL COMMENT '阻断对象流水号',
+    `rule_namespace`            VARCHAR(64) NOT NULL COMMENT '比较规则 namespace',
+    `rule_identity`             VARCHAR(128) NOT NULL COMMENT '比较规则稳定身份',
     `rule_version`              VARCHAR(64) NOT NULL COMMENT '匹配或对账规则版本',
+    `current_lineage_ref`       VARCHAR(128) NOT NULL COMMENT 'current scope+pair lineage 稳定引用',
     `evidence_ref`              VARCHAR(256) NOT NULL COMMENT '来源证据引用，与逐笔匹配证据宽度一致',
     `action_type`               VARCHAR(50)          DEFAULT NULL COMMENT '差错处理动作类型',
     `adjustment_sn`             VARCHAR(64)          DEFAULT NULL COMMENT '关联处理动作或调账单号',
@@ -478,7 +522,9 @@ CREATE TABLE `t_reconciliation_difference`
     UNIQUE KEY `uk_reconciliation_difference_match_result` (`tenant_id`, `reconciliation_match_result_sn`),
     KEY `idx_reconciliation_difference_batch` (`tenant_id`, `reconciliation_batch_sn`),
     KEY `idx_reconciliation_difference_status` (`tenant_id`, `status`),
-    KEY `idx_reconciliation_difference_blocking_object` (`tenant_id`, `blocking_object_type`, `blocking_object_sn`, `status`),
+    KEY `idx_reconciliation_difference_scope_pair`
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
+    KEY `idx_reconciliation_difference_lineage` (`tenant_id`, `current_lineage_ref`, `status`),
     KEY `idx_reconciliation_difference_adjustment` (`tenant_id`, `adjustment_sn`),
     KEY `idx_reconciliation_difference_rerun` (`tenant_id`, `last_rerun_sn`),
     KEY `idx_reconciliation_difference_rerun_batch` (`tenant_id`, `last_rerun_batch_sn`)
@@ -512,6 +558,113 @@ CREATE TABLE `t_reconciliation_difference_action`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账差错处理动作事实表';
 
+-- immutable Gate Requirement header
+CREATE TABLE `t_reconciliation_gate_requirement`
+(
+    `id`                                      BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                              DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `tenant_id`                               BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `stage_kind`                              VARCHAR(50)  NOT NULL COMMENT 'exact Stage action kind',
+    `stage_identity_owner_namespace`          VARCHAR(64)  NOT NULL COMMENT 'Stage identity Owner namespace',
+    `stage_identity_value`                    VARCHAR(128) NOT NULL COMMENT 'Stage stable identity',
+    `requirement_identity_owner_namespace`    VARCHAR(64)  NOT NULL COMMENT 'Requirement identity Owner namespace',
+    `requirement_identity_value`              VARCHAR(128) NOT NULL COMMENT 'Requirement stable identity',
+    `requirement_version`                     VARCHAR(64)  NOT NULL COMMENT 'Requirement version',
+    `semantic_digest`                         VARCHAR(64)  NOT NULL COMMENT 'Requirement semantic SHA-256',
+    `evidence_refs`                           MEDIUMTEXT   NOT NULL COMMENT 'Requirement evidence refs JSON',
+    `evidence_bundle_digest`                  VARCHAR(64)  NOT NULL COMMENT 'Evidence bundle SHA-256',
+    `previous_requirement_identity_owner_namespace` VARCHAR(64)  DEFAULT NULL COMMENT 'Previous Requirement identity Owner namespace',
+    `previous_requirement_identity_value`     VARCHAR(128)         DEFAULT NULL COMMENT 'Previous Requirement stable identity',
+    `previous_requirement_version`            VARCHAR(64)          DEFAULT NULL COMMENT 'Previous Requirement version',
+    `previous_semantic_digest`                VARCHAR(64)          DEFAULT NULL COMMENT 'Previous semantic SHA-256',
+    `previous_evidence_bundle_digest`         VARCHAR(64)          DEFAULT NULL COMMENT 'Previous evidence bundle SHA-256',
+    `created_by`                              VARCHAR(64)  NOT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_gate_requirement_identity`
+        (`tenant_id`, `requirement_identity_owner_namespace`, `requirement_identity_value`),
+    UNIQUE KEY `uk_reconciliation_gate_requirement_stage_version`
+        (`tenant_id`, `stage_kind`, `stage_identity_owner_namespace`, `stage_identity_value`, `requirement_version`),
+    KEY `idx_reconciliation_gate_requirement_previous`
+        (`tenant_id`, `previous_requirement_identity_owner_namespace`, `previous_requirement_identity_value`, `previous_requirement_version`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '不可变 Gate Requirement header';
+
+-- mandatory scope+pair rows of one immutable Requirement
+CREATE TABLE `t_reconciliation_gate_requirement_pair`
+(
+    `id`                                   BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `tenant_id`                            BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `requirement_identity_owner_namespace` VARCHAR(64)  NOT NULL COMMENT 'Requirement identity Owner namespace',
+    `requirement_identity_value`           VARCHAR(128) NOT NULL COMMENT 'Requirement stable identity',
+    `scope_owner_namespace`                VARCHAR(64)  NOT NULL COMMENT 'Required scope Owner namespace',
+    `scope_identity_value`                 VARCHAR(128) NOT NULL COMMENT 'Required scope stable identity',
+    `pair_owner_namespace`                 VARCHAR(64)  NOT NULL COMMENT 'Required pair Owner namespace',
+    `pair_identity_value`                  VARCHAR(128) NOT NULL COMMENT 'Required pair stable identity',
+    `rule_namespace`                       VARCHAR(64)  NOT NULL COMMENT 'Comparison rule namespace',
+    `rule_identity`                        VARCHAR(128) NOT NULL COMMENT 'Comparison rule stable identity',
+    `rule_version`                         VARCHAR(64)  NOT NULL COMMENT 'Comparison rule version',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_gate_requirement_pair`
+        (`tenant_id`, `requirement_identity_owner_namespace`, `requirement_identity_value`,
+         `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`),
+    KEY `idx_reconciliation_gate_requirement_pair_requirement`
+        (`tenant_id`, `requirement_identity_owner_namespace`, `requirement_identity_value`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = 'Gate Requirement mandatory scope and pair';
+
+-- one current Requirement pointer per exact Stage action
+CREATE TABLE `t_reconciliation_gate_requirement_head`
+(
+    `id`                                           BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                                   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`                                 DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `tenant_id`                                    BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `stage_kind`                                   VARCHAR(50)  NOT NULL COMMENT 'exact Stage action kind',
+    `stage_identity_owner_namespace`               VARCHAR(64)  NOT NULL COMMENT 'Stage identity Owner namespace',
+    `stage_identity_value`                         VARCHAR(128) NOT NULL COMMENT 'Stage stable identity',
+    `current_requirement_identity_owner_namespace` VARCHAR(64)  NOT NULL COMMENT 'Current Requirement identity Owner namespace',
+    `current_requirement_identity_value`           VARCHAR(128) NOT NULL COMMENT 'Current Requirement stable identity',
+    `current_requirement_version`                  VARCHAR(64)  NOT NULL COMMENT 'Current Requirement version',
+    `current_semantic_digest`                      VARCHAR(64)  NOT NULL COMMENT 'Current Requirement semantic SHA-256',
+    `current_evidence_bundle_digest`               VARCHAR(64)  NOT NULL COMMENT 'Current evidence bundle SHA-256',
+    `version`                                      INT(11)      NOT NULL DEFAULT 0 COMMENT 'CAS version',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_gate_requirement_head_stage`
+        (`tenant_id`, `stage_kind`, `stage_identity_owner_namespace`, `stage_identity_value`),
+    KEY `idx_reconciliation_gate_requirement_head_current`
+        (`tenant_id`, `current_requirement_identity_owner_namespace`, `current_requirement_identity_value`, `current_requirement_version`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = 'exact Stage current Gate Requirement head';
+
+-- consumed Gate evidence written with one successful exact Stage action
+CREATE TABLE `t_reconciliation_stage_gate_evidence`
+(
+    `id`                                   BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                                   VARCHAR(64)  NOT NULL COMMENT 'Stage Gate evidence 流水号',
+    `tenant_id`                            BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `stage_kind`                           VARCHAR(50)  NOT NULL COMMENT 'exact Stage action kind',
+    `stage_identity_owner_namespace`       VARCHAR(64)  NOT NULL COMMENT 'Stage identity Owner namespace',
+    `stage_identity_value`                 VARCHAR(128) NOT NULL COMMENT 'Stage stable identity',
+    `requirement_identity_owner_namespace` VARCHAR(64)  NOT NULL COMMENT 'Consumed Requirement identity Owner namespace',
+    `requirement_identity_value`           VARCHAR(128) NOT NULL COMMENT 'Consumed Requirement stable identity',
+    `requirement_version`                  VARCHAR(64)  NOT NULL COMMENT 'Consumed Requirement version',
+    `requirement_semantic_digest`          VARCHAR(64)  NOT NULL COMMENT 'Consumed Requirement semantic SHA-256',
+    `requirement_evidence_bundle_digest`   VARCHAR(64)  NOT NULL COMMENT 'Consumed Requirement evidence bundle SHA-256',
+    `consumed_pair_evidence`               MEDIUMTEXT   NOT NULL COMMENT 'Sorted required pair run/lineage/result evidence JSON',
+    `decision_digest`                      VARCHAR(64)  NOT NULL COMMENT 'Gate decision SHA-256',
+    `evidence_refs`                        MEDIUMTEXT   NOT NULL COMMENT 'Consumed Gate evidence refs JSON',
+    `created_by`                           VARCHAR(64)  NOT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_stage_gate_evidence_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_stage_gate_evidence_stage`
+        (`tenant_id`, `stage_kind`, `stage_identity_owner_namespace`, `stage_identity_value`),
+    KEY `idx_reconciliation_stage_gate_evidence_requirement`
+        (`tenant_id`, `requirement_identity_owner_namespace`, `requirement_identity_value`, `requirement_version`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = 'Stage 成功事务消费的 Gate evidence';
+
 
 -- 结算单表：只表达内部结算锁定，不表达外部出款状态
 CREATE TABLE `t_settlement_order`
@@ -542,10 +695,8 @@ CREATE TABLE `t_settlement_order`
     `release_freeze_order_sn`     VARCHAR(64)           DEFAULT NULL COMMENT '释放后受保护冻结单流水号',
     `release_disposition`         VARCHAR(30)           DEFAULT NULL COMMENT '释放处置；当前仅 FROZEN',
     `release_digest`              VARCHAR(64)           DEFAULT NULL COMMENT '释放请求幂等 SHA-256',
-    `release_reconciliation_run_result_sn` VARCHAR(64)  DEFAULT NULL COMMENT '释放消费的对账运行结果流水号',
-    `release_reconciliation_result_digest` VARCHAR(64)  DEFAULT NULL COMMENT '释放消费的对账结果 SHA-256',
+    `release_gate_evidence_ref`       VARCHAR(64)        DEFAULT NULL COMMENT '释放消费的 Stage Gate evidence 流水号',
     `release_current_lineage_batch_sn` VARCHAR(64)      DEFAULT NULL COMMENT '释放时当前对账血缘批次流水号',
-    `release_gate_evidence_digest` VARCHAR(64)          DEFAULT NULL COMMENT '释放时 Gate 证据引用 SHA-256',
     `release_source_closure_digest` VARCHAR(64)         DEFAULT NULL COMMENT '来源关闭事实 SHA-256',
     `release_authority_decision_digest` VARCHAR(64)     DEFAULT NULL COMMENT '释放授权决策 SHA-256',
     `release_authority_evidence_refs` TEXT              DEFAULT NULL COMMENT '释放授权证据引用 JSON',
@@ -573,9 +724,7 @@ CREATE TABLE `t_settlement_order`
     `cancelled_by`                VARCHAR(64)           DEFAULT NULL COMMENT '取消人',
     `cancelled_time`              DATETIME              DEFAULT NULL COMMENT '取消时间',
     `cancel_reason`               VARCHAR(512)          DEFAULT NULL COMMENT '取消原因',
-    `reconciliation_run_result_sn` VARCHAR(64)           DEFAULT NULL COMMENT '锁定时消费的对账运行结果流水号',
-    `reconciliation_result_digest` VARCHAR(64)           DEFAULT NULL COMMENT '锁定时对账结果 SHA-256',
-    `reconciliation_evidence_digest` VARCHAR(64)         DEFAULT NULL COMMENT '锁定时对账证据引用 SHA-256',
+    `lock_gate_evidence_ref`       VARCHAR(64)           DEFAULT NULL COMMENT '锁定消费的 Stage Gate evidence 流水号',
     `active_order_digest`         VARCHAR(64)           DEFAULT NULL COMMENT '活动创建幂等占用；取消或明确失败后置 NULL',
     `failed_by`                   VARCHAR(64)           DEFAULT NULL COMMENT '明确失败记录人',
     `failed_time`                 DATETIME              DEFAULT NULL COMMENT '明确失败时间',
@@ -635,8 +784,7 @@ CREATE TABLE `t_payout_order`
     `channel_ref`                    VARCHAR(128)          DEFAULT NULL COMMENT '宿主通道引用',
     `approval_ref`                   VARCHAR(128)          DEFAULT NULL COMMENT '出款审批引用',
     `external_rule_evidence_digest`  VARCHAR(64)           DEFAULT NULL COMMENT '外部规则核验证据 SHA-256',
-    `reconciliation_run_result_sn`   VARCHAR(64)           DEFAULT NULL COMMENT '提交消费的对账运行结果流水号',
-    `reconciliation_result_digest`   VARCHAR(64)           DEFAULT NULL COMMENT '提交消费的对账结果 SHA-256',
+    `payout_gate_evidence_ref`       VARCHAR(64)           DEFAULT NULL COMMENT '提交消费的 Stage Gate evidence 流水号',
     `admission_decision_digest`      VARCHAR(64)           DEFAULT NULL COMMENT '宿主权威准入决策 SHA-256',
     `admission_evidence_refs`        TEXT                  DEFAULT NULL COMMENT '宿主权威准入证据引用 JSON',
     `submit_digest`                  VARCHAR(64)           DEFAULT NULL COMMENT '提交请求幂等摘要',

@@ -16,9 +16,6 @@ import com.wind.funds.reconciliation.enums.PayoutPreflightAction;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
@@ -26,7 +23,6 @@ import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.service.PayoutPreflightService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -93,9 +89,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
         com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         reconciliationMatchResultSn = recordDifferenceMatchResultSn();
-        payoutRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.PAYOUT, PAYOUT_SN,
+        payoutRunResultSn = recordBalancedRunResult("PAYOUT_SUBMIT", PAYOUT_SN,
                 RERUN_BATCH_SN, RECONCILIATION_BATCH_SN, "report:payout-recon-run-001");
-        preCreateRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT, SETTLEMENT_SN,
+        preCreateRunResultSn = recordBalancedRunResult("PAYOUT_CREATE_PREFLIGHT", SETTLEMENT_SN,
                 "recon_payout_precreate_batch_001", null, "report:payout-precreate-recon-run-001");
     }
 
@@ -194,10 +190,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getAction())
                 .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
-        assertThat(result.getReconciliationRunResultSn()).isEqualTo(payoutRunResultSn);
-        assertThat(result.getReconciliationResultDigest()).hasSize(64);
+        assertThat(result.getStageRef()).isNotNull();
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
+                .contains("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
+        assertThat(result.getEvidenceRefs()).anyMatch(evidence -> evidence.startsWith("run:"));
         assertThat(result.getCheckedAt()).isNotNull();
         assertThat(result.getExpiresAt()).isAfter(result.getCheckedAt());
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -215,8 +211,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
         PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest()
-                        .setPayoutSn(null)
-                        .setReconciliationRunResultSn(preCreateRunResultSn),
+                        .setPayoutSn(null),
                 WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
@@ -262,7 +257,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     @Test
     void testCheckPayoutPreflightShouldBlockWhenPayoutReconciliationGateBlocked() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        createHistoricalDifference();
+        createCurrentDifference();
 
         PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
                 readyPayoutPreflightRequest(), WindOperatorFactory.system());
@@ -277,28 +272,26 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .containsExactly(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
         PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
         assertThat(blockingReason.getGuardName()).isEqualTo("reconciliationGate");
-        assertThat(blockingReason.getMessage()).contains("对账差错");
-        assertThat(blockingReason.getEvidenceRef()).isEqualTo("processor-payout-file-digest-001");
-        assertThat(blockingReason.getRelatedDifferenceSn()).isEqualTo(requiredDifferenceSn());
+        assertThat(blockingReason.getMessage()).contains("mandatory pair");
+        assertThat(blockingReason.getEvidenceRef()).isEqualTo("report:payout-recon-run-001");
+        assertThat(blockingReason.getRelatedDifferenceSn()).isNull();
         assertThat(blockingReason.getConfirmationOwner()).isEqualTo("OPERATIONS");
-        assertThat(blockingReason.getResponsiblePartyRef()).isEqualTo("processor:issuer-ledger");
+        assertThat(blockingReason.getResponsiblePartyRef()).isNull();
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
+                .contains("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
                         "processor-payout-file-digest-001");
+        assertThat(result.getEvidenceRefs()).anyMatch(evidence -> evidence.startsWith("run:"));
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testCheckPayoutPreflightShouldNotInventResponsiblePartyWhenGateHasNoDifference() {
+    void testCheckPayoutPreflightShouldNotInventBlockingReasonWhenGatePasses() {
         PayoutPreflightResultDTO result = payoutPreflightService.checkPayoutPreflight(
-                readyPayoutPreflightRequest().setReconciliationRunResultSn("missing-run-result"),
+                readyPayoutPreflightRequest(),
                 WindOperatorFactory.system());
 
-        PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
-        assertThat(blockingReason.getCode())
-                .isEqualTo(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
-        assertThat(blockingReason.getConfirmationOwner()).isEqualTo("OPERATIONS");
-        assertThat(blockingReason.getResponsiblePartyRef()).isNull();
+        assertThat(result.isPassed()).isTrue();
+        assertThat(result.getBlockingReasons()).isEmpty();
     }
 
     /**
@@ -323,7 +316,8 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getAction())
                 .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
+                .contains("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
+        assertThat(result.getEvidenceRefs()).anyMatch(evidence -> evidence.startsWith("run:"));
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -334,7 +328,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         createHistoricalDifference();
         reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 payoutAdjustmentRequest(), WindOperatorFactory.system());
-        payoutRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.PAYOUT, PAYOUT_SN,
+        payoutRunResultSn = recordBalancedRunResult("PAYOUT_SUBMIT", PAYOUT_SN,
                 RERUN_BATCH_SN, RECONCILIATION_BATCH_SN, "report:payout-recon-run-001");
     }
 
@@ -342,8 +336,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         return new CheckPayoutPreflightRequest()
                 .setTenantId(TENANT_ID)
                 .setSettlementSn(SETTLEMENT_SN)
-                .setPayoutSn(PAYOUT_SN)
-                .setReconciliationRunResultSn(payoutRunResultSn);
+                .setPayoutSn(PAYOUT_SN);
     }
 
     private CheckPayoutPreflightRequest readyPayoutPreflightRequest() {
@@ -382,6 +375,12 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                         payoutDifferenceRequest(), WindOperatorFactory.system()));
     }
 
+    private void createCurrentDifference() {
+        createHistoricalDifference();
+        com.wind.funds.reconciliation.ReconciliationTestFixture.setMatchBatchAsCurrentHead(
+                jdbcTemplate, TENANT_ID, reconciliationMatchResultSn);
+    }
+
     private LinkReconciliationDifferenceAdjustmentRequest payoutAdjustmentRequest() {
         return new LinkReconciliationDifferenceAdjustmentRequest()
                 .setTenantId(TENANT_ID)
@@ -407,25 +406,15 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         String referenceSourceRef = "internal-difference:" + PAYOUT_SN;
         String comparisonSourceRef = "external-difference:" + PAYOUT_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, ReconciliationGateObjectType.PAYOUT,
+                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, "PAYOUT_SUBMIT",
                 PAYOUT_SN, "recon-rule-v1", "processor-payout-file-digest-001",
-                referenceSourceRef, comparisonSourceRef);
-        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                referenceSourceRef, comparisonSourceRef, null, 2L, "CONFIRMED");
+        reconciliationRunResultApplicationService.executeStrictExact(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(referenceSourceRef)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
-                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setCurrency(CurrencyIsoCode.USD)
-                        .setDifferenceAmount(50L)
-                        .setEvidenceRef("processor-payout-file-digest-001"))), WindOperatorFactory.system());
+                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN), WindOperatorFactory.system());
         return jdbcTemplate.queryForObject("""
                 SELECT sn FROM t_reconciliation_match_result
-                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND difference_type IS NOT NULL
+                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND result_kind <> 'MATCHED'
                 """, String.class, TENANT_ID, RECONCILIATION_BATCH_SN);
     }
 
@@ -436,7 +425,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 """, String.class, TENANT_ID, reconciliationMatchResultSn);
     }
 
-    private String recordBalancedRunResult(ReconciliationGateObjectType gateObjectType,
+    private String recordBalancedRunResult(String stageKind,
                                            String gateObjectSn,
                                            String reconciliationBatchSn,
                                            String previousBatchSn,
@@ -444,18 +433,12 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         String referenceSourceRef = "internal:" + gateObjectSn;
         String comparisonSourceRef = "external:" + gateObjectSn;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, reconciliationBatchSn, gateObjectType,
+                jdbcTemplate, TENANT_ID, reconciliationBatchSn, stageKind,
                 gateObjectSn, "recon-rule-v1", evidenceRef, referenceSourceRef, comparisonSourceRef,
                 previousBatchSn);
-        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+        return reconciliationRunResultApplicationService.executeStrictExact(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(reconciliationBatchSn)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(referenceSourceRef)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef(evidenceRef + "#line-1"))), WindOperatorFactory.system()).getSn();
+                .setReconciliationBatchSn(reconciliationBatchSn), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration

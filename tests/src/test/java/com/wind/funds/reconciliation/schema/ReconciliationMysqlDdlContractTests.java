@@ -61,7 +61,11 @@ class ReconciliationMysqlDdlContractTests {
             "t_reconciliation_run_result",
             "t_reconciliation_match_result",
             "t_reconciliation_difference",
-            "t_reconciliation_difference_action");
+            "t_reconciliation_difference_action",
+            "t_reconciliation_gate_requirement",
+            "t_reconciliation_gate_requirement_pair",
+            "t_reconciliation_gate_requirement_head",
+            "t_reconciliation_stage_gate_evidence");
 
     private static final List<String> GOVERNANCE_TABLE_NAMES = List.of(
             "t_projection_replay_task",
@@ -187,7 +191,7 @@ class ReconciliationMysqlDdlContractTests {
                 .doesNotContain("WIND_FUNDS_TEST_SQL_INIT_MODE=always");
         assertThat(integrationTest)
                 .contains("database/mysql/core", "database/mysql/governance",
-                        "001_create_core_tables.sql", "001_create_governance_tables.sql", "hasSize(44)",
+                        "001_create_core_tables.sql", "001_create_governance_tables.sql", "hasSize(48)",
                         "verifyTargetTables", "verifyTableStructures",
                         "information_schema.columns", "information_schema.statistics")
                 .contains("verifyRecoveryConflictRecoveryUsesCurrentRead",
@@ -202,7 +206,7 @@ class ReconciliationMysqlDdlContractTests {
         String readme = readDatabaseFile("README.md");
 
         assertThat(readme)
-                .contains("二十一张表", "三张治理", "四十四张表", "just test-mysql-reconciliation",
+                .contains("二十五张表", "三张治理", "四十八张表", "just test-mysql-reconciliation",
                         "支付工具授权", "支出控制")
                 .doesNotContain("十九张表");
     }

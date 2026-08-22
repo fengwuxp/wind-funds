@@ -14,8 +14,11 @@ import com.wind.funds.reconciliation.model.request.RecordRecoveryResultRequest;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -430,6 +433,16 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
 
         private void put(FundsTransactionDTO transaction) {
             transactions.put(transaction.getSn(), transaction);
+        }
+
+        @Override
+        public List<FundsActionFactDTO> queryFundsActionFacts(FundsActionFactQuery query) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<FundsActionFactDTO> findFundsActionFact(FundsActionFactRef ref) {
+            return Optional.empty();
         }
 
         @Override

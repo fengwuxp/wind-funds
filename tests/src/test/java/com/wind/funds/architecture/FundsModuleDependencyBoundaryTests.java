@@ -27,6 +27,42 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class FundsModuleDependencyBoundaryTests {
 
+    @Test
+    void testTransactionLedgerReferenceResolutionShouldNotKeepWalletBridgeOrAuditSurface() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (String converter : List.of(
+                "transaction/impl/src/main/java/com/wind/funds/transaction/converter/"
+                        + "FundsDirectTransactionInstructionConverter.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/converter/"
+                        + "FundsAuthorizationInstructionConverter.java")) {
+            String source = Files.readString(workspaceRoot().resolve(converter));
+            if (source.contains("LedgerQueryService") || source.contains("ledgerQueryService")) {
+                violations.add(converter + " still queries Ledger through Wallet");
+            }
+        }
+        for (String retiredPath : List.of(
+                "wallet/face/src/main/java/com/wind/funds/wallet/service/LedgerQueryService.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/dto/LedgerTransactionFactDTO.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/dto/LedgerEntryFactDTO.java",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/DefaultLedgerQueryService.java",
+                "transaction/face/src/main/java/com/wind/funds/transaction/application/"
+                        + "FundsBalanceAdjustmentAuditApplicationService.java",
+                "transaction/face/src/main/java/com/wind/funds/transaction/model/dto/"
+                        + "FundsBalanceAdjustmentAuditDTO.java",
+                "transaction/face/src/main/java/com/wind/funds/transaction/model/query/"
+                        + "FundsBalanceAdjustmentAuditQuery.java",
+                "transaction/face/src/main/java/com/wind/funds/transaction/enums/"
+                        + "FundsBalanceAdjustmentAuditCompleteness.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/impl/"
+                        + "DefaultFundsBalanceAdjustmentAuditApplicationService.java")) {
+            if (Files.exists(workspaceRoot().resolve(retiredPath))) {
+                violations.add(retiredPath + " still exists");
+            }
+        }
+
+        assertThat(violations).isEmpty();
+    }
+
     private static final List<String> PRODUCTION_MODULE_POMS = List.of(
             "core/pom.xml",
             "fx/impl/pom.xml",
@@ -293,6 +329,10 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> PAYOUT_TRANSACTION_PRIMITIVE_TOKENS = List.of(
             "FundsPayoutTransactionService",
             "FundsPayoutRequest");
+
+    private static final List<String> DIRECT_TRANSACTION_COMMAND_TOKENS = List.of(
+            "FundsDirectTransactionService",
+            "FundsTransactionPayRequest");
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
@@ -631,15 +671,80 @@ class FundsModuleDependencyBoundaryTests {
      * 红线：任何调用方都不能绕过 posting 与 projection 链路改写账本事实。
      */
     @Test
-    void testLedgerServiceShouldNotExposeDirectBalanceMutationOrDeletion() {
+    void testLedgerServiceShouldNotExposeDirectBalanceMutationOrDeletion() throws IOException {
+        List<String> violations = new ArrayList<>();
         List<String> methodNames = Stream.of(LedgerService.class.getDeclaredMethods())
                 .map(java.lang.reflect.Method::getName)
                 .toList();
 
-        assertThat(methodNames).doesNotContain(
-                "updateLedgerBalance",
-                "deleteLedgerById",
-                "deleteLedgerByIds");
+        for (String forbiddenMethod : List.of("updateLedgerBalance", "deleteLedgerById", "deleteLedgerByIds")) {
+            if (methodNames.contains(forbiddenMethod)) {
+                violations.add("LedgerService still exposes " + forbiddenMethod);
+            }
+        }
+        if (methodNames.stream().filter("initializeRequiredLedgers"::equals).count() != 1) {
+            violations.add("LedgerService must expose exactly one controlled initialization command");
+        }
+
+        for (String retiredPath : List.of(
+                "core/src/main/java/com/wind/funds/ledger/spec/LedgerProfileSpec.java",
+                "core/src/main/java/com/wind/funds/ledger/spec/LedgerProfileItemSpec.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/service/LedgerProfileService.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/service/SubjectLedgerInitializer.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/dto/LedgerProfileDTO.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/dto/LedgerProfileItemDTO.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/InitializeSubjectLedgerRequest.java",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/DefaultLedgerProfileServiceImpl.java",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/DefaultSubjectLedgerInitializer.java")) {
+            if (Files.exists(workspaceRoot().resolve(retiredPath))) {
+                violations.add(retiredPath + " still exists");
+            }
+        }
+
+        String stableApi = Files.readString(workspaceRoot().resolve("core/api-baseline/stable-api.txt"));
+        for (String retiredType : List.of("LedgerProfileSpec", "LedgerProfileItemSpec")) {
+            if (stableApi.contains(retiredType)) {
+                violations.add("core stable API still exposes " + retiredType);
+            }
+        }
+
+        List<String> productionPaths = List.of(
+                "core/src/main/java",
+                "ledger/face/src/main/java",
+                "ledger/impl/src/main/java",
+                "wallet/face/src/main/java",
+                "wallet/impl/src/main/java",
+                "transaction/face/src/main/java",
+                "transaction/impl/src/main/java");
+        for (Path source : javaSourceFiles(productionPaths)) {
+            String content = Files.readString(source);
+            for (String retiredToken : List.of(
+                    "LedgerProfileService",
+                    "SubjectLedgerInitializer",
+                    "com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest")) {
+                if (content.contains(retiredToken)) {
+                    violations.add(workspaceRoot().relativize(source) + " still references " + retiredToken);
+                }
+            }
+            if (source.startsWith(workspaceRoot().resolve("transaction"))
+                    && (content.contains("com.wind.funds.ledger.service")
+                    || content.contains("com.wind.funds.ledger.request"))) {
+                violations.add(workspaceRoot().relativize(source) + " introduces forbidden transaction -> ledger-face dependency");
+            }
+            for (String compatibilityToken : List.of(
+                    "LedgerProfileAdmissionService",
+                    "LedgerProfileServiceV2",
+                    "SubjectLedgerInitializerAdapter",
+                    "LegacyLedgerProfile")) {
+                if (content.contains(compatibilityToken)) {
+                    violations.add(workspaceRoot().relativize(source) + " introduces " + compatibilityToken);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("Ledger profile ownership must migrate once without compatibility surfaces")
+                .isEmpty();
     }
 
     /**
@@ -698,6 +803,29 @@ class FundsModuleDependencyBoundaryTests {
     void testPayoutFundsPrimitiveShouldOnlyBeUsedByPayoutOrderOrchestration() throws Exception {
         assertFundsPrimitiveAllowlist(PAYOUT_TRANSACTION_PRIMITIVE_SOURCE_ALLOWLIST,
                 PAYOUT_TRANSACTION_PRIMITIVE_TOKENS, "payout");
+    }
+
+    /**
+     * 场景：reconciliation 编排清分、清算、结算和出款事实。
+     * 预期：只消费对应阶段的专用资金原语，不直接发起普通支付。
+     * 红线：清算模块不得绕过宿主清分事实和标准交易入口创建初始支付。
+     */
+    @Test
+    void testReconciliationShouldNotUseGenericDirectTransactionCommands() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : javaSourceFiles(List.of("reconciliation/impl/src/main/java"))) {
+            String content = Files.readString(javaFile);
+            for (String forbiddenToken : DIRECT_TRANSACTION_COMMAND_TOKENS) {
+                if (content.contains(forbiddenToken)) {
+                    violations.add(workspaceRoot().relativize(javaFile)
+                            + " contains generic direct transaction command " + forbiddenToken);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("reconciliation must consume existing funds facts or stage-specific transaction primitives")
+                .isEmpty();
     }
 
     /**

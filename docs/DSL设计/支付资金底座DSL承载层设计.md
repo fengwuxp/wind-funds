@@ -1010,7 +1010,7 @@ com.wind.funds.fx
   汇率快照、选择和换算端口
 ```
 
-默认不可变 route/instruction 实现归 `transaction-impl`，不进入 Core 公共构件。Core 禁止恢复无归属的顶层 `com.wind.funds.spec`、`com.wind.funds.model`，也不新增 `com.wind.funds.dsl` facade、fluent builder、兼容桥或 V2 平行类型图。本项目当前为未冻结的 `1.0.0-SNAPSHOT`，本轮包名和请求契约直接切换，不保留旧 FQN、旧访问器、双写、双读或 deprecated 适配层；资金平衡、幂等、回放依据和拒绝无副作用等业务不变量仍必须完整验证。
+默认不可变 route/instruction 实现归 `transaction-impl`，不进入 Core 公共构件。Core 禁止恢复无归属的顶层 `com.wind.funds.spec`、`com.wind.funds.model`，也不新增 `com.wind.funds.dsl` facade、fluent builder、兼容桥或 V2 平行类型图。本项目当前为未冻结的 `1.0.1-SNAPSHOT`，本轮包名和请求契约直接切换，不保留旧 FQN、旧访问器、双写、双读或 deprecated 适配层；资金平衡、幂等、回放依据和拒绝无副作用等业务不变量仍必须完整验证。
 
 ## 八、DSL 不变量
 

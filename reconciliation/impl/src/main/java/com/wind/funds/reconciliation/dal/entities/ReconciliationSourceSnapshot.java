@@ -5,7 +5,6 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -46,13 +45,33 @@ public class ReconciliationSourceSnapshot implements Serializable, TenantIsolati
     private ReconciliationSourceRole sourceRole;
 
     @NotNull
-    private ReconciliationSourceType sourceType;
+    private String sourceNamespace;
+
+    @NotNull
+    private String snapshotOwnerNamespace;
+
+    @NotNull
+    private String snapshotIdentityValue;
+
+    @NotNull
+    private String snapshotVersion;
+
+    @NotNull
+    private Boolean coverageComplete;
+
+    private String coverageWatermark;
+
+    @NotNull
+    private Integer coverageMemberCount;
 
     @NotNull
     private String sourceDigest;
 
     @NotNull
-    private Integer recordCount;
+    private String semanticDigest;
+
+    @NotNull
+    private String evidenceBundleDigest;
 
     @NotNull
     private String evidenceRefs;

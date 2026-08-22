@@ -5,6 +5,7 @@ import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDecisionResult;
 import com.wind.funds.reconciliation.enums.PayoutPreflightAction;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -62,11 +63,8 @@ public class PayoutPreflightResultDTO implements Serializable {
     @Schema(description = "外部规则核验状态")
     private ExternalRuleVerificationStatus externalRuleVerificationStatus;
 
-    @Schema(description = "本次准入消费的对账运行结果流水号")
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "对账运行结果 SHA-256")
-    private String reconciliationResultDigest;
+    @Schema(description = "本次只读预检解释的精确阶段引用")
+    private GateStageRef stageRef;
 
     @Schema(description = "检查时间")
     private LocalDateTime checkedAt;

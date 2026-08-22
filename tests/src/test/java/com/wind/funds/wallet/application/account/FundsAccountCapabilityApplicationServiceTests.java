@@ -18,8 +18,7 @@ import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
@@ -124,7 +123,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
      * 红线：能力来源通过不等于当前状态允许出账。
      */
     @Test
-    void testResolveFrozenFundingAccountCapabilityShouldKeepStateAdmissionClosed() {
+    void testResolveFrozenFundingAccountCapabilityShouldKeepStatusAdmissionClosed() {
         fundingAccountService.createFundingAccount(createFrozenFundingAccountRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -219,8 +218,7 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

@@ -93,11 +93,8 @@ public class ClearingSplittableDetailDTO implements Serializable {
     @Schema(description = "清分前对账门禁决策结果")
     private ReconciliationGateDecisionResult reconciliationDecisionResult;
 
-    @Schema(description = "清分前消费的对账运行结果流水号")
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "清分前消费的对账运行结果 SHA-256")
-    private String reconciliationResultDigest;
+    @Schema(description = "清分成功消费的阶段门禁证据引用")
+    private String gateEvidenceRef;
 
     @Schema(description = "清分前对账证据引用")
     private List<String> reconciliationEvidenceRefs;

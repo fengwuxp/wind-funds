@@ -2,6 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.payout.PayoutOrderApplicationService;
@@ -14,9 +15,6 @@ import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutNextAction;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.SettlementReleaseCoverageStatus;
 import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
 import com.wind.funds.reconciliation.enums.SettlementReleaseLateDataStatus;
@@ -36,7 +34,6 @@ import com.wind.funds.reconciliation.model.request.CreatePayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.HandlePayoutReceiptRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
@@ -140,7 +137,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThat(replay.getCompletionFundsTransactionSn()).isEqualTo(succeeded.getCompletionFundsTransactionSn());
         assertOnlyBalanceDeltas(beforeReceipts, snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount())),
                 delta(accountId, LedgerSubjectCode.SETTLEMENT, -600L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 600L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -600L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertThat(ledgerTransactionByBusinessSn(payout.getSn()).getEventType())
                 .isEqualTo(FundsTransactionEventType.PAYOUT_SUCCEEDED.name());
@@ -153,7 +150,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThat(conflicted.getRollbackFundsTransactionSn()).isNull();
         assertOnlyBalanceDeltas(beforeReceipts, snapshot(balances(accountId, cashMappingAccount(), prepaymentAccount())),
                 delta(accountId, LedgerSubjectCode.SETTLEMENT, -600L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 600L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -600L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_payout_receipt WHERE payout_order_sn = ?", Integer.class, payout.getSn()))
@@ -300,7 +297,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
     void testSubmitShouldFailClosedWhenHostAuthorityRejects() {
         FundsAccountId accountId = fundingAccount("payout_auth_merchant");
         PayoutOrderDTO payout = newCreatedPayout(accountId, 100L, "authority");
-        String runResultSn = prepareGate(ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-authority");
+        String runResultSn = prepareGate("PAYOUT_SUBMIT", payout.getSn(), "payout-authority");
         payoutSubmissionAuthority.reject();
 
         assertThatThrownBy(() -> payoutOrderApplicationService.submitOrder(
@@ -315,7 +312,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
     void testFirstSubmitShouldRequireWithdrawCapability() {
         FundsAccountId accountId = fundingAccount("payout_cap_merchant");
         PayoutOrderDTO payout = newCreatedPayout(accountId, 100L, "capability");
-        String runResultSn = prepareGate(ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-capability");
+        String runResultSn = prepareGate("PAYOUT_SUBMIT", payout.getSn(), "payout-capability");
         setCapabilities(accountId, "RECEIVE", "PAY");
 
         assertThatThrownBy(() -> payoutOrderApplicationService.submitOrder(
@@ -334,7 +331,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         setCapabilities(accountId, "RECEIVE", "PAY");
 
         PayoutOrderDTO replay = payoutOrderApplicationService.submitOrder(
-                submitRequest(submitted, submitted.getReconciliationRunResultSn()), WindOperatorFactory.system());
+                submitRequest(submitted, "capability-replay"), WindOperatorFactory.system());
         PayoutOrderDTO succeeded = payoutOrderApplicationService.handleReceipt(
                 receipt(submitted, PayoutOrderState.SUCCEEDED, 100L,
                         "capability-replay", "external-capability-replay"),
@@ -366,7 +363,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         SettlementOrderDTO settlement = settlementOrderApplicationService.getOrder(
                 TENANT_ID, payout.getSettlementOrderSn());
         String payoutRunResultSn = prepareGate(
-                ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-release-submit");
+                "PAYOUT_SUBMIT", payout.getSn(), "payout-release-submit");
         ReleaseSettlementOrderRequest releaseRequest = releaseRequest(settlement, "release-submit");
         var before = snapshot(balance(accountId));
         CountDownLatch startGate = new CountDownLatch(1);
@@ -406,7 +403,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
 
     private PayoutOrderDTO newSubmittedPayout(FundsAccountId accountId, long amount, String suffix) {
         PayoutOrderDTO payout = newCreatedPayout(accountId, amount, suffix);
-        String runResultSn = prepareGate(ReconciliationGateObjectType.PAYOUT, payout.getSn(), "payout-" + suffix);
+        String runResultSn = prepareGate("PAYOUT_SUBMIT", payout.getSn(), "payout-" + suffix);
         PayoutOrderDTO submitted = payoutOrderApplicationService.submitOrder(
                 submitRequest(payout, runResultSn), WindOperatorFactory.system());
         assertThat(submitted.getState()).isEqualTo(PayoutOrderState.SUBMITTED);
@@ -417,7 +414,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
     }
 
     private PayoutOrderDTO newCreatedPayout(FundsAccountId accountId, long amount, String suffix) {
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 1_000L, "PAYOUT_TOPUP_" + suffix);
@@ -442,10 +439,9 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                 .setTenantId(TENANT_ID).setSettlementOrderSn(created.getSn())
                 .setSettlementApprovalRef("SETTLEMENT_APPROVAL_" + suffix), WindOperatorFactory.system());
         String settlementRunResultSn = prepareGate(
-                ReconciliationGateObjectType.SETTLEMENT, created.getSn(), "settlement-" + suffix);
+                "SETTLEMENT_LOCK", created.getSn(), "settlement-" + suffix);
         settlementOrderApplicationService.lockOrder(new LockSettlementOrderRequest()
-                .setTenantId(TENANT_ID).setSettlementOrderSn(created.getSn())
-                .setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
+                .setTenantId(TENANT_ID).setSettlementOrderSn(created.getSn()), WindOperatorFactory.system());
         PayoutOrderDTO payout = payoutOrderApplicationService.createOrder(
                 new CreatePayoutOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(created.getSn()),
                 WindOperatorFactory.system());
@@ -473,20 +469,15 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                         .setJurisdiction("TEST")
                         .setVerifiedAt(LocalDate.now())
                         .setConfirmedBy("test-owner")
-                        .setStatus(ExternalRuleVerificationStatus.VERIFIED))
-                .setReconciliationRunResultSn(runResultSn);
+                        .setStatus(ExternalRuleVerificationStatus.VERIFIED));
     }
 
     private ReleaseSettlementOrderRequest releaseRequest(SettlementOrderDTO settlement, String suffix) {
-        String batchSn = jdbcTemplate.queryForObject(
-                "SELECT reconciliation_batch_sn FROM t_reconciliation_run_result WHERE sn = ?",
-                String.class, settlement.getReconciliationRunResultSn());
+        String batchSn = "settlement_recon_batch_" + suffix;
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(1);
         return new ReleaseSettlementOrderRequest()
                 .setTenantId(TENANT_ID)
                 .setSettlementOrderSn(settlement.getSn())
-                .setReconciliationRunResultSn(settlement.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(settlement.getReconciliationResultDigest())
                 .setCoverageStatus(SettlementReleaseCoverageStatus.COMPLETE)
                 .setCoverageDigest(FundsStableHashSupport.sha256("coverage:" + suffix))
                 .setWatermark(cutoff)
@@ -578,22 +569,16 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         };
     }
 
-    private String prepareGate(ReconciliationGateObjectType objectType, String objectSn, String suffix) {
+    private String prepareGate(String stageKind, String objectSn, String suffix) {
         String batchSn = "recon_batch_" + suffix;
         String referenceSourceRef = "internal:" + suffix;
         String comparisonSourceRef = "external:" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, batchSn,
-                objectType, objectSn, "recon-rule-v1", "report:" + suffix,
+                stageKind, objectSn, "recon-rule-v1", "report:" + suffix,
                 referenceSourceRef, comparisonSourceRef);
-        return reconciliationRunResultApplicationService.recordRunResult(
+        return reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest().setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef("report:" + suffix + "#line-1"))),
+                        .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
     }
 

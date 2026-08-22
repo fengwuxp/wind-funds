@@ -84,6 +84,14 @@
 | 账务验收 | 交易状态、route、posting、ledger transaction、ledger entry、余额桶变化。 |
 | 失败验收 | 准入失败、幂等冲突、余额不足、路由失败、外部非终态不得留下错误资金事实。 |
 
+### 5.1 余额与摘要约定
+
+余额查询以 `FundsAccountBalanceView#getBalanceBuckets()` 和 `getBalance(LedgerSubjectCode)` 返回的原始 bucket 为准。`getLedgerProfileCode()` 标明当前视图的账本 Profile，`getAuthorizationBalance()` 精确返回授权占用，`getTotalBalance()` 由具体 View 按 Profile 定义。当前默认实现只支持 `FUNDING_BASIC`，返回 `AVAILABLE + FROZEN + AUTHORIZATION`；其他 Profile 尚未定义总余额口径，调用时会失败，不得由查询服务或接入方自行套用该公式。`getTotalBalance()` 不进入通用 JSON；对外需要“总余额”字段时，必须由已明确 Profile 口径的 DTO 显式映射。
+
+`pending` 虽是业内常见说法，但可能分别表示待结算入账、待 capture 授权或 pending ledger entry，不是跨产品统一口径，因此公共 View 不提供 `getPendingBalance()`。本项目不得用它推断 `CLEARING`、`SETTLEMENT`、退款在途、信用额度或可用余额；商户、信用和平台账户必须按各自 `LedgerProfileCode + LedgerSubjectCode` 查询原始 bucket，新增 Profile 总余额实现需由对应能力 Owner 裁决。
+
+资金底座在账本请求、交易明细、冻结单、外部资金事实和支出控制流水等持久边界内部生成请求摘要。新事实写入带业务 domain 的 canonical v1 摘要，幂等重放在迁移期精确接受 canonical v1 或历史 legacy 摘要；业务流水、金额、主体或其他摘要事实变化仍会被拒绝。接入方继续提供稳定业务流水和来源引用，不自行计算、覆盖或解释内部摘要，也不能把摘要当成交易、账本或审计事实。
+
 ## 6. 常用接入路径
 
 ### 6.1 用户或商户入金
@@ -319,6 +327,68 @@ flowchart LR
 
 宿主必须自行完成权限判断、审批真实性、任务触发与调度、差异审阅、告警和 Runbook。仓内服务只校验当前租户与稳定操作者身份，不替代 IAM；三张治理表的 H2 和生产 DDL 静态契约已验证。仓库不持有独立目标数据库接入，实际数据库兼容性由宿主验证。验证锚点：`FundsHostCompositionContractTests`、`FundsProjectionReplayServiceTests`、`ReconciliationMysqlDdlContractTests`。
 
+### 6.10 五类业务与跨域治理 Core DSL cookbook
+
+#### 责任边界
+
+| Owner | 必须持有 | 不得代判 |
+| --- | --- | --- |
+| 业务源 | 原业务事实、外部事件终态、版本、更正链、watermark/cutoff。 | 不判断资金、账本或外部出款完成。 |
+| Fincone | 订单/VCC/全球账户生命周期；Fact/Attribution/Eligibility/Rule；`basisAmount`、`commissionPoolAmount`、allocation、ClearingItem/SettlementItem、审批、handoff 和经营对账。 | 不解释 ledger 状态，不把提交/受理当 Paid。 |
+| wind-funds | 账户/Profile/capability、FundsTransaction/RouteSnapshot、Ledger/Balance、资金 CLEARING/AVAILABLE/SETTLEMENT、payout/recovery，以及通用对账证据链和资金 Gate。 | 不计算分佣池、受益人、KPI、订单履约或外部 rail 终态；不负责来源归一、业务匹配规则、任务调度或 rail 对账关闭。 |
+| issuer / 通道 / Payroll / AP / Finance | 各自协议事实、专业规则、审批、回执、核销和最终状态。 | 不把自身中间态强行映射为 wind-funds 完成。 |
+
+#### 场景调用表
+
+| 场景 | 推荐公共链路 | 接入方必须保留的边界 |
+| --- | --- | --- |
+| VCC | PaymentInstrument/资金责任初始化 -> authorization hold -> completion 或 reversal -> 原路 refund；强制完成或无关联贷记只在上游确认资金责任后提交标准动作。 | Card、issuer 事件、PCI 数据、乱序归一、未关联贷记和关卡后的负余额处置留在 Fincone/issuer；找不到原 RouteSnapshot 时不得伪造原路。 |
+| 全球账户 / ACH | confirmed credit -> `ExternalFundsEventApplicationService.consume`；出金在上游预检后锁定/提交，外部终态再关闭；return/NOC/reversal 先进入差错归因。 | `Submitted/Accepted/Processing` 不是到账；通道状态 Unknown、错币种、NOC 或无法证明原交易时 fail-closed/manual。 |
+| 收单 / 订单交易 | 每笔成立的 pay 调用标准直接交易；部分/原路退款使用唯一原 `fundsTransactionSn`；订单只保存资金结果引用。 | 订单/账单/收单状态、迟到成功、退款范围、费用和履约属于 Fincone/收单 owner；VCC 开卡费和首次入金是两笔独立事实，不得净额合并。 |
+| 分佣 / 返利 / KPI | Fincone 冻结规则与 allocation 后，为每个 `FUNDS_ACCOUNT` 受益人提交标准 pay 到 `CLEARING`；wind-funds 清算到 `AVAILABLE`，按需锁定 `SETTLEMENT` 并出款。 | `sum(ClearingItem.amount)=commissionPoolAmount`、RETAINED/RESIDUAL、Payroll/AP 分流由 Fincone；`FundsBenefitContributionTransactionService` 不承接 commission/rebate/revenue share。 |
+| 优惠让利结算 | 业务 owner 已完成优惠资格、分摊和出资责任决策后，使用 `FundsBenefitContributionTransactionService` 记录单笔让利出资及原路冲回。 | 不在 funds 计算券、折扣、营销归因或多出资方分摊；commission/rebate/revenue share 不得映射为 Benefit。 |
+| 跨域治理 | canonical 交易检查 account/action/Money/idempotency/original reference；随后按 `FundsTransaction -> RouteSnapshot -> Ledger -> Balance -> clearing/settlement/payout` 回链，并由宿主把标准化 rail 证据送入通用对账链。 | `Unknown`、部分成功、映射漂移和无法证明守恒时停止自动推进；投影重放不补写资金事实。 |
+
+Fincone `ClearingBatch.CONFIRMED` 与 wind-funds 清算批次不是同一状态。前者只冻结经营应得，不动资金；标准 handoff 是：
+
+```text
+Fincone ClearingBatch.CONFIRMED
+-> SettlementItem / APPROVED FUNDS_ACCOUNT handoff
+-> standard pay to CLEARING
+-> wind-funds clearing confirm
+-> AVAILABLE
+-> optional SETTLEMENT lock
+-> payout external final state
+```
+
+#### 最小准入事实
+
+Fincone `FundsHandoffRecord` 至少保存：`tenantId/handoffRef`、事实/规则版本与摘要、`factSnapshotRef`、`allocationGroupRef`、`clearingItemRef`、`settlementItemRef`、beneficiary、已解析 `targetType/ref`、payer/funding source、Money/currency、账期/timezone/cutoff、approvalRef、`gateRef`、canonical action、`predecessorHandoffRef`、`requestVersion/idempotencyKey/requestDigest`，以及 `resultRef`、`fundsTransactionSn/referenceTransactionSn`、后续 `clearingBatchSn/settlementOrderSn/payoutOrderSn`、对账/关闭证据和状态。同一动作重试不得更换 handoffRef、业务号或幂等键。这些经营字段不进入 core，也不得塞入 `contextVariables`。
+
+提交 wind-funds 的标准请求只携带该动作已有的强字段：tenant、资金账户主体、action、Money、`businessScene + businessSn`/幂等摘要和必要的原交易引用。逆向必须使用 handoff 保存的实际 `fundsTransactionSn` 作为 `referenceTransactionSn`；不得用 `allocationGroupRef` 猜测原交易。
+
+首次 canonical 动作的能力矩阵为：`TOPUP=target RECEIVE`；`TRANSFER/PAY=payer PAY + payee RECEIVE`；无原交易的业务确认 `REFUND=payer PAY + target RECEIVE`；`WITHDRAW=account WITHDRAW`；独立 `FEE_CHARGE=account PAY`；`AUTHORIZE=account PAY`，存在不同 linked funding account 时再查其 `PAY`。拒绝保留稳定 `FAILED` 资金审计事实和 `RouteSnapshot`，但不产生 posting、ledger transaction/entry 或余额变化。已完成幂等重放、原交易逆向、授权 successor、控制/纠错、清算/结算动作和 payout receipt 不因当前 capability 漂移重判；PayoutOrder 只在首次 submit 检查结算账户 `WITHDRAW`。
+
+#### Gate、状态与对账
+
+`gateRef` 是上游审批时的快照证据，不是最终授权。当前 Provider 本仓稳定证据覆盖 clearing confirm、settlement lock、锁定后全额 release 和首次 payout submit 在最终事务内 fresh `checkGate`。普通 direct pay、balance adjust 和 Recovery 登记不消费 Gate；初始 pay 是否需要前置 Gate 属于宿主资金政策，不能借清算模块反向调用通用支付服务实现。`ReconciliationGate` 当前只有 `PASSED/BLOCKED`，尚无 `CONDITIONAL`、有效期或条件放行权威语义。上述本仓证据不代表 Fincone adapter、跨仓 L3、目标数据库或生产准出已经完成。
+
+当前通用对账证据链为：宿主先完成来源验签、归一和匹配，再调用 `createBatch` 固化 `reconciliationScopeRef`、可选 Gate 对象、规则版本与 `[windowStart, windowEnd)`；分别记录 `REFERENCE/COMPARISON` 来源成员及内容摘要；`recordRunResult` 校验两侧来源完整覆盖后原子封版运行结果；差异按逐笔结果物化，先回链 `SUPPLEMENT_FACT/REVERSE/ADJUST/SUSPENSE/RECOVER/WRITE_OFF` 等已完成动作，再创建新批次重跑。完成态运行结果不覆盖；重跑或证据替代通过新批次推进当前 lineage，历史批次保留。
+
+当前匹配项只支持 1:1；1:N/N:1、显式 fee/timing/跨日差异、容差策略、watermark/coverage mode、owner 分派、SLA/aging/escalation、条件放行和独立 `closeEvidence` 都未形成公共契约。`responsiblePartyRef`、金额/币种/状态等基础差异类型、动作审批/证据引用、重跑结果和替代批次可复用；来源真实性、业务规则、容差、账期归属、核销政策和工单生命周期由对应业务/Finance/rail Owner 持有。缺失时不得用 `RULE_MATCH` 或自由文本冒充已经对平。
+
+`checkGate` 的 `PASSED` 只证明：指定 tenant 与 `gateObjectType + gateObjectSn` 下，请求的运行结果属于当前 lineage 头、批次已完成且为 `BALANCED`，并且当前 lineage 没有阻断中的对象级差异。冻结成员完整覆盖由 `recordRunResult` 在不可变结果封版时校验；Gate 当次只消费该结果，不重新采集或重算来源。`PASSED` 不证明外部来源真实性、业务窗口应到数据已经收齐、某个业务 scene 或当前对象摘要已被重新读取，也不提供 watermark/cutoff、TTL、容差、SLA、外部 Paid 或单独关闭凭证。当前差错关闭证据是“差错动作证据 + 后继不可变 batch/run/resultDigest + lineage”的组合，不是一个独立 `closeEvidence` 对象；Gate decision 是下游即时准入证据，不参与 `RESOLVED` 关闭。
+
+除 `checkGate` 外，写入口使用本地 Spring `REQUIRED` 事务，查询入口使用 `readOnly` 事务；Fincone handoff、来源采集与 wind-funds 之间没有跨仓事务。`checkGate` 使用 `MANDATORY` 加入 clearing confirm、settlement lock、锁定后全额 release 或首次 payout submit 的最终写事务并锁定当前 lineage/batch，不能脱离调用方事务独立执行；`inspectGate` 仅供解释，不能授权资金动作。
+
+标准接入由宿主先冻结真实 `ClearingItem/SettlementItem/FundsHandoffRecord`，再逐笔调用 `FundsDirectTransactionService#pay` 进入 `CLEARING`；后续清算、结算和出款只消费已存在的资金事实及各阶段专用资金原语。当前没有“初始 pay 必须消费 fresh Gate”的稳定公共入口：仓内清分对象在资金交易之后形成，普通 `pay` 也没有不可绕过的 Gate 动作分类，因此 `CLR-GATE-003` 保持 `PENDING_BUSINESS_PREMISE`。宿主不得用“先查 Gate、再调用 pay”宣称原子准入，Provider 也不得以包装器、内部 `created` 标志或 `contextVariables` 补造准入证据。
+
+Fincone 的 `Calculated/Confirmed`、wind-funds 的 `CLEARING/AVAILABLE/SETTLEMENT`、PayoutOrder 的 `SUBMITTED` 和外部 Paid 是不同层级，不得互相替代。Fincone 对账链 `Fact -> accrual/pool -> ClearingItem -> SettlementItem -> handoff/adjustment`，通过 `fundsTransactionSn` 连接 wind-funds 的 `FundsTransaction -> RouteSnapshot -> Ledger/Balance -> clearing/settlement/payout`；外部 executor/rail 形成标准化证据后再进入通用对账链，Fincone 保存 `clearingBatchSn`、`settlementOrderSn`、`payoutOrderSn` 与外部 `resultRef`。
+
+清算前可取消并重算；已入 `CLEARING` 且原交易、金额范围和责任唯一可证时，使用 `FundsDirectTransactionService.refund` 携带实际 `fundsTransactionSn` 逐笔原路退款，不能用 freeze 或 adjust 代替 `CLEARING` 逆向；已到 `AVAILABLE` 追加受控 adjustment。release 已完成 Provider 本仓 fresh build、H2、完整门禁和独立 Checker；其稳定边界为：已锁 `SETTLEMENT` 的全额释放只能调用 `SettlementOrderApplicationService#releaseOrder`，结算单必须为 `LOCKED`，payout 不存在或仍为 `CREATED`，最终事务内 fresh SETTLEMENT Gate 必须匹配 current lineage/run/resultDigest，来源 coverage/rule/迟到/替代事实必须完整，并由唯一 `SettlementReleaseAuthority` 返回未过期的 `FROZEN` 决策。成功后以两笔可追踪资金事实原子完成 `SETTLEMENT -> AVAILABLE -> FROZEN`，保存 `releaseFundsTransactionSn + releaseFreezeOrderSn`；`CREATED` payout 同事务转 `CANCELLED`，该状态只表示提交前草稿取消，不表示外部失败或已付款。Fincone adapter、跨仓 L3、目标 MySQL、外部 rail 和生产并发验收关闭前，不得把该 Provider 本仓证据称为生产准出。
+
+`SETTLEMENT_RELEASE_HOLD` 是受保护冻结，通用 unfreeze、withdraw 和其他 `FREEZE_ORDER` 消费会在资金生命周期事实创建前被拒绝；接入方不得直接调用底层 release primitive、使用 `releaseFundsTransactionSn` 冒充冻结单，或把中间 `AVAILABLE` 当成可用余额。payout 已提交/处理中/终态、部分或累计 release、SettlementItem 级范围、多受益人回收及后续解冻/扣划尚未闭环时继续 fail-closed/manual。出款成功后只追加 Recovery、后续抵扣或人工收款，不回滚历史出款；`RecoveryOrderApplicationService` 只登记已确认责任和已完成资金结果，不自动执行追偿。H2 只证明本地事务与账务不变量，不替代目标 MySQL、宿主 Authority、外部 rail 或生产并发验收。
+
 ## 7. 禁止路径
 
 | 禁止项 | 原因 |
@@ -328,6 +398,7 @@ flowchart LR
 | 把支付工具、外部账户、VA、卡号、SpendControlScope、Spend Rule 当作 ledger subject。 | 它们只是引用或控制范围。 |
 | 把冻结当消费、扣款或提现成功。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`。 |
 | 授权拒绝后继续生成 `RouteLeg`、posting、`LedgerTransaction/LedgerEntry` 或余额变化。 | 拒绝只保留 `REJECTED` FundsTransaction/detail 与 `legs` 为空的 `RouteSnapshotSpec`。 |
+| 把 commission、rebate 或 revenue share 映射成 Benefit，或新增 ACH/VCC/Commission 场景专用 core DSL。 | 现有标准资金原语已足够；业务规则与协议状态属于宿主。 |
 | 用 `contextVariables` 承载核心金额、分摊、账户或规则事实。 | 核心事实必须是强字段或稳定引用。 |
 | 外部 pending、审批中、通道处理中直接入账。 | 还没有成立资金事实。 |
 

@@ -5,10 +5,8 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportComplet
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
+import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -55,11 +53,11 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "对账逐笔匹配结果流水号")
     private String reconciliationMatchResultSn;
 
-    @Schema(description = "对账来源质量")
-    private ReconciliationSourceQuality sourceQuality;
+    @Schema(description = "对账范围稳定身份")
+    private StableIdentity scopeIdentity;
 
-    @Schema(description = "对账匹配强度")
-    private ReconciliationMatchStrength matchStrength;
+    @Schema(description = "对账双方关系稳定身份")
+    private StableIdentity pairIdentity;
 
     @Schema(description = "对账差错类型")
     private ReconciliationDifferenceType differenceType;
@@ -79,14 +77,11 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "责任方引用")
     private String responsiblePartyRef;
 
-    @Schema(description = "阻断对象类型")
-    private ReconciliationGateObjectType blockingObjectType;
+    @Schema(description = "结构化比较规则引用")
+    private ComparisonRuleRef comparisonRuleRef;
 
-    @Schema(description = "阻断对象流水号")
-    private String blockingObjectSn;
-
-    @Schema(description = "匹配或对账规则版本")
-    private String ruleVersion;
+    @Schema(description = "差错所属当前血缘")
+    private String currentLineageRef;
 
     @Schema(description = "来源证据引用")
     private String evidenceRef;
@@ -115,7 +110,7 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
     @Schema(description = "处理原因")
     private String adjustmentReason;
 
-    @Schema(description = "按发生顺序排列的 append-only 差错处理动作事实")
+    @Schema(description = "按发生顺序排列的只追加式差错处理动作事实")
     private List<ReconciliationDifferenceActionDTO> actionHistory;
 
     @Schema(description = "最后一次重跑对账运行结果流水号")
@@ -138,12 +133,6 @@ public class ReconciliationDifferenceReportDTO implements Serializable {
 
     @Schema(description = "重跑次数")
     private Integer rerunCount;
-
-    @Schema(description = "准入 Gate 决策结果")
-    private ReconciliationGateDecisionResult gateDecisionResult;
-
-    @Schema(description = "准入 gate 解释摘要")
-    private String gateExplanation;
 
     @Schema(description = "证据引用列表，只包含安全引用，不包含外部账户、卡号或上下文原文")
     private List<String> evidenceRefs;

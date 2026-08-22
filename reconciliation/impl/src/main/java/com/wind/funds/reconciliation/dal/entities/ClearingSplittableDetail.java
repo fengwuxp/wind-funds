@@ -103,16 +103,7 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
         this.reconciliationDecisionResult = reconciliationDecisionResult;
     }
 
-    /**
-     * 清分前消费的对账运行结果流水号。
-     */
-    @NotNull
-    private String reconciliationRunResultSn;
-
-    /**
-     * 清分前消费的对账运行结果 SHA-256。
-     */
-    private String reconciliationResultDigest;
+    private String gateEvidenceRef;
 
     @NotNull
     private String reconciliationEvidenceRefs;

@@ -8,9 +8,9 @@ import com.wind.funds.wallet.mapstruct.FundingAccountConverter;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.query.FundingAccountQuery;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
+import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -35,7 +35,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
 
     private final FundingAccountMapper fundingAccountMapper;
 
-    private final SubjectLedgerInitializer subjectLedgerInitializer;
+    private final LedgerService ledgerService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -45,12 +45,13 @@ public class FundingAccountServiceImpl implements FundingAccountService {
         FundingAccount entity = FundingAccountConverter.INSTANCE.convertToFundingAccount(request);
         fundingAccountMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金账户失败");
-        subjectLedgerInitializer.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
+        ledgerService.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
                 .setTenantId(entity.getTenantId())
                 .setSubjectId(entity.getSn())
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(entity.getCurrency())
-                .setLedgerProfileCode(entity.getLedgerProfileCode()));
+                .setLedgerProfileCode(entity.getLedgerProfileCode())
+                .setLedgerProfileVersion(entity.getLedgerProfileVersion()));
         return entity.getId();
     }
 

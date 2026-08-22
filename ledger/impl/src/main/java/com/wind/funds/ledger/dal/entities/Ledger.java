@@ -130,10 +130,6 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
     @Column("status")
     private LedgerState state;
 
-    void setStatus(LedgerState state) {
-        this.state = state;
-    }
-
     /**
      * 币种
      */

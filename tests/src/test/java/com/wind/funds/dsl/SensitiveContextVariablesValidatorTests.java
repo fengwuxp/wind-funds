@@ -99,6 +99,27 @@ class SensitiveContextVariablesValidatorTests {
     }
 
     /**
+     * 场景：内部来源交易号偶然满足 IBAN 校验规则。
+     * 预期：仅 sourceSn 语义下允许该稳定引用，普通字段下仍按敏感值拒绝。
+     * 红线：内部引用白名单不得放宽其他扩展字段的外部账号检测。
+     */
+    @Test
+    void testSourceSnShouldNotBeMisclassifiedAsExternalAccountNumber() {
+        String sourceSn = "FT2000000000000027";
+
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("sourceSn", sourceSn))).isFalse();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("networkReference", sourceSn))).isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("sourceSn", "GB82WEST12345698765432"))).isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("authorizationTransactionSn", "GB82WEST12345698765432"))).isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("referenceFreezeSn", "GB82WEST12345698765432"))).isTrue();
+    }
+
+    /**
      * 场景：调用方提交畸形 JSON，但内容不包含敏感字段名或敏感值。
      * 预期：校验器不把所有解析失败都归类为敏感。
      * 红线：敏感值治理要精准阻断旁路存储，不能无差别拒绝无敏感信息的扩展文本。

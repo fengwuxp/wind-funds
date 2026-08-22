@@ -92,11 +92,8 @@ public class ClearingCandidateDTO implements Serializable {
     @Schema(description = "清算规则版本")
     private String clearingRuleVersion;
 
-    @Schema(description = "对账运行结果流水号")
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "对账结果 SHA-256")
-    private String reconciliationResultDigest;
+    @Schema(description = "门禁消费证据引用")
+    private String gateEvidenceRef;
 
     @Schema(description = "对账证据引用")
     private List<String> reconciliationEvidenceRefs;

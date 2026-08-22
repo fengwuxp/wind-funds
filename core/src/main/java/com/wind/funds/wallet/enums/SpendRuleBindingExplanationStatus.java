@@ -1,15 +1,17 @@
 package com.wind.funds.wallet.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * Spend Rule 挂载解释状态。
+ * 支出规则挂载解释状态。
  *
- * @author Codex
- * @date 2026-06-22
+ * @author wuxp
+ * @since 2026-06-22
  */
+@Schema(description = "支出规则挂载解释展示状态")
 @AllArgsConstructor
 @Getter
 public enum SpendRuleBindingExplanationStatus implements DescriptiveEnum {

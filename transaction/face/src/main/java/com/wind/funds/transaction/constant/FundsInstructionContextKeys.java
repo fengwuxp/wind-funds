@@ -106,23 +106,11 @@ public final class FundsInstructionContextKeys {
 
     public static final String RESPONSIBILITY_REF = "responsibilityRef";
 
-    public static final String ALLOW_NEGATIVE_BALANCE = FundsContextVariables.ALLOW_NEGATIVE_BALANCE;
-
-    public static final String NEGATIVE_AVAILABLE_POLICY_CODE = "negativeAvailablePolicyCode";
-
     public static final String APPROVAL_REF = "approvalRef";
 
     public static final String RECONCILIATION_EXCEPTION_REF = "reconciliationExceptionRef";
 
     public static final String RECONCILIATION_RERUN_REF = "reconciliationRerunRef";
-
-    public static final String NEGATIVE_AVAILABLE_RISK_STATUS = "negativeAvailableRiskStatus";
-
-    public static final String NEGATIVE_AVAILABLE_SINGLE_LIMIT = "negativeAvailableSingleLimit";
-
-    public static final String NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT = "negativeAvailableCumulativeLimit";
-
-    public static final String NEGATIVE_AVAILABLE_AGING_STARTED_AT = "negativeAvailableAgingStartedAt";
 
     public static final String BUDGET_PERIOD_ID = "budgetPeriodId";
 

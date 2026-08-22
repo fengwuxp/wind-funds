@@ -217,18 +217,6 @@ public class FundsBalanceControlInstructionConverter {
         }
         putIfPresent(result, FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
                 request.getReconciliationRerunRef());
-        putIfPresent(result, FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE,
-                request.getAllowNegativeBalance());
-        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
-                request.getNegativeAvailablePolicyCode());
-        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
-                request.getNegativeAvailableRiskStatus());
-        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT,
-                request.getNegativeAvailableSingleLimit());
-        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT,
-                request.getNegativeAvailableCumulativeLimit());
-        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
-                request.getNegativeAvailableAgingStartedAt());
         return result;
     }
 

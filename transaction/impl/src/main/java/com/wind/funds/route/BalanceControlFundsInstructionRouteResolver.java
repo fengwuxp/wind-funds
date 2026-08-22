@@ -31,7 +31,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,35 +47,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private static final String UNSUPPORTED_ADJUST_SUBJECT_TYPE_MESSAGE = "unsupported adjust subject type: ";
 
-    private static final String ALLOW_NEGATIVE_BALANCE_POLICY_REQUIRED_MESSAGE =
-            "受控负余额调账缺少策略编码";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_APPROVAL_REQUIRED_MESSAGE =
-            "受控负余额调账缺少审批或风控依据";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE =
-            "受控负余额调账缺少原因";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_RISK_STATUS_REQUIRED_MESSAGE =
-            "受控负余额调账缺少风险状态";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_SINGLE_LIMIT_REQUIRED_MESSAGE =
-            "受控负余额调账缺少单笔上限";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_CUMULATIVE_LIMIT_REQUIRED_MESSAGE =
-            "受控负余额调账缺少累计上限";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE =
-            "受控负余额调账缺少账龄起点";
-
     private static final String SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE =
             "支出控制范围额度调整已迁移到预算控制活动，不允许通过余额控制路由入账";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE =
-            "受控负余额调账上限币种必须与本次金额币种一致";
-
-    private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_AMOUNT_MESSAGE =
-            "受控负余额调账上限必须大于 0";
 
     private static final String FREEZE_AVAILABLE_BALANCE_NOT_ENOUGH_MESSAGE =
             "账本余额不足，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, beforeBalance = {}, balanceDelta = {}, afterBalance = {}";
@@ -164,9 +136,6 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private ResolvedRouteSpec resolveFundingBalanceAdjust(FundsInstructionSpec instruction, FundsAccountId accountId) {
         boolean increase = FundsInstructionContextReader.requireBoolean(instruction, FundsInstructionContextKeys.INCREASE);
-        if (!increase) {
-            validateAvailableBalanceConstraint(instruction);
-        }
         FundsAccountId adjustmentAccount = platformAccountRouteSupport.requireAccount(
                 instruction.getAmount().getCurrency(), PlatformFundingAccountRole.ADJUSTMENT);
         RouteLegSpec leg = increase
@@ -201,9 +170,6 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                                                          FundsAccountId accountId,
                                                          String routeCode) {
         boolean increase = FundsInstructionContextReader.requireBoolean(instruction, FundsInstructionContextKeys.INCREASE);
-        if (!increase) {
-            validateAvailableBalanceConstraint(instruction);
-        }
         RouteLegSpec leg = increase
                 ? RouteSpecSupport.routeLeg(FundsRouteLegIds.LIMIT_ADJUST, 1, RouteLegType.ADJUST, instruction)
                 .sourceNode(RouteSpecSupport.sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
@@ -274,11 +240,6 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         putContextIfPresent(result, instruction, FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
                 String.class);
         putContextIfPresent(result, instruction, FundsInstructionContextKeys.RESPONSIBILITY_REF, String.class);
-        putContextIfPresent(result, instruction, FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.class);
-        putContextIfPresent(result, instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
-                String.class);
-        putContextIfPresent(result, instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
-                String.class);
         return Collections.unmodifiableMap(result);
     }
 
@@ -297,58 +258,6 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 routeSubjectSupport.createSubjectRef(accountId),
                 routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),
                 instruction.getDescription(), Map.of());
-    }
-
-    private void validateAvailableBalanceConstraint(FundsInstructionSpec instruction) {
-        if (!Boolean.TRUE.equals(FundsInstructionContextReader.getValue(
-                instruction,
-                FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE,
-                Boolean.class))) {
-            return;
-        }
-        AssertUtils.hasText(FundsInstructionContextReader.getValue(
-                        instruction,
-                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
-                        String.class),
-                ALLOW_NEGATIVE_BALANCE_POLICY_REQUIRED_MESSAGE);
-        AssertUtils.hasText(FundsInstructionContextReader.getValue(
-                        instruction,
-                        FundsInstructionContextKeys.APPROVAL_REF,
-                        String.class),
-                ALLOW_NEGATIVE_BALANCE_APPROVAL_REQUIRED_MESSAGE);
-        AssertUtils.hasText(FundsInstructionContextReader.getValue(
-                        instruction,
-                        FundsInstructionContextKeys.ADJUST_REASON,
-                        String.class),
-                ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE);
-        AssertUtils.hasText(FundsInstructionContextReader.getValue(
-                        instruction,
-                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
-                        String.class),
-                ALLOW_NEGATIVE_BALANCE_RISK_STATUS_REQUIRED_MESSAGE);
-        requireLimitEvidence(instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT);
-        requireLimitEvidence(instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT);
-        AssertUtils.notNull(FundsInstructionContextReader.getValue(
-                        instruction,
-                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
-                        LocalDateTime.class),
-                ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE);
-    }
-
-    private void requireLimitEvidence(FundsInstructionSpec instruction, String key) {
-        Money limit = FundsInstructionContextReader.getValue(instruction, key, Money.class);
-        AssertUtils.notNull(limit, limitRequiredMessage(key));
-        AssertUtils.isTrue(limit.getAmount() > 0,
-                ALLOW_NEGATIVE_BALANCE_LIMIT_AMOUNT_MESSAGE + "，key = {}", key);
-        AssertUtils.isTrue(limit.getCurrency() == instruction.getAmount().getCurrency(),
-                ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE + "，key = {}", key);
-    }
-
-    private String limitRequiredMessage(String key) {
-        if (FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT.equals(key)) {
-            return ALLOW_NEGATIVE_BALANCE_SINGLE_LIMIT_REQUIRED_MESSAGE;
-        }
-        return ALLOW_NEGATIVE_BALANCE_CUMULATIVE_LIMIT_REQUIRED_MESSAGE;
     }
 
     @Override

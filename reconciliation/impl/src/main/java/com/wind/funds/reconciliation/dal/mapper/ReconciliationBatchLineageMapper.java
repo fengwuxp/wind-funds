@@ -17,36 +17,48 @@ public interface ReconciliationBatchLineageMapper extends BaseMapper<Reconciliat
             SELECT *
             FROM t_reconciliation_batch_lineage
             WHERE tenant_id = #{tenantId}
-              AND gate_object_type = #{gateObjectType}
-              AND gate_object_sn = #{gateObjectSn}
+              AND scope_owner_namespace = #{scopeOwnerNamespace}
+              AND scope_identity_value = #{scopeIdentityValue}
+              AND pair_owner_namespace = #{pairOwnerNamespace}
+              AND pair_identity_value = #{pairIdentityValue}
             """)
-    ReconciliationBatchLineage selectByGateObject(@Param("tenantId") Long tenantId,
-                                                   @Param("gateObjectType") String gateObjectType,
-                                                   @Param("gateObjectSn") String gateObjectSn);
+    ReconciliationBatchLineage selectByScopeAndPair(@Param("tenantId") Long tenantId,
+                                                     @Param("scopeOwnerNamespace") String scopeOwnerNamespace,
+                                                     @Param("scopeIdentityValue") String scopeIdentityValue,
+                                                     @Param("pairOwnerNamespace") String pairOwnerNamespace,
+                                                     @Param("pairIdentityValue") String pairIdentityValue);
 
     @Select("""
             SELECT *
             FROM t_reconciliation_batch_lineage
             WHERE tenant_id = #{tenantId}
-              AND gate_object_type = #{gateObjectType}
-              AND gate_object_sn = #{gateObjectSn}
+              AND scope_owner_namespace = #{scopeOwnerNamespace}
+              AND scope_identity_value = #{scopeIdentityValue}
+              AND pair_owner_namespace = #{pairOwnerNamespace}
+              AND pair_identity_value = #{pairIdentityValue}
             FOR UPDATE
             """)
     ReconciliationBatchLineage selectForUpdate(@Param("tenantId") Long tenantId,
-                                               @Param("gateObjectType") String gateObjectType,
-                                               @Param("gateObjectSn") String gateObjectSn);
+                                               @Param("scopeOwnerNamespace") String scopeOwnerNamespace,
+                                               @Param("scopeIdentityValue") String scopeIdentityValue,
+                                               @Param("pairOwnerNamespace") String pairOwnerNamespace,
+                                               @Param("pairIdentityValue") String pairIdentityValue);
 
     @Update("""
             UPDATE t_reconciliation_batch_lineage
             SET current_batch_sn = #{currentBatchSn}
             WHERE tenant_id = #{tenantId}
-              AND gate_object_type = #{gateObjectType}
-              AND gate_object_sn = #{gateObjectSn}
+              AND scope_owner_namespace = #{scopeOwnerNamespace}
+              AND scope_identity_value = #{scopeIdentityValue}
+              AND pair_owner_namespace = #{pairOwnerNamespace}
+              AND pair_identity_value = #{pairIdentityValue}
               AND current_batch_sn = #{previousBatchSn}
             """)
     int advance(@Param("tenantId") Long tenantId,
-                @Param("gateObjectType") String gateObjectType,
-                @Param("gateObjectSn") String gateObjectSn,
+                @Param("scopeOwnerNamespace") String scopeOwnerNamespace,
+                @Param("scopeIdentityValue") String scopeIdentityValue,
+                @Param("pairOwnerNamespace") String pairOwnerNamespace,
+                @Param("pairIdentityValue") String pairIdentityValue,
                 @Param("previousBatchSn") String previousBatchSn,
                 @Param("currentBatchSn") String currentBatchSn);
 }

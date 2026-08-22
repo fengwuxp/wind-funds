@@ -20,9 +20,6 @@ public final class FundsContextVariables {
     /** 调账增加方向。 */
     public static final String INCREASE = "increase";
 
-    /** 允许调账后出现负余额。 */
-    public static final String ALLOW_NEGATIVE_BALANCE = "allowNegativeBalance";
-
     private FundsContextVariables() {
     }
 

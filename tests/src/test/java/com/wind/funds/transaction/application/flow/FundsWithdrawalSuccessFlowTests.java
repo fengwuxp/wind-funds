@@ -50,7 +50,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_SUCCESS_FREEZE");
@@ -66,11 +66,11 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -121,7 +121,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
 
@@ -139,12 +139,12 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, -5L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY));
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 35L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
 
@@ -204,7 +204,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_SENSITIVE_CONTEXT_FREEZE");
@@ -239,7 +239,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -274,7 +274,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_MISSING_ACCOUNT_FREEZE");
@@ -306,7 +306,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -341,7 +341,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_FREEZE");
@@ -371,7 +371,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -406,7 +406,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(user, 60L, "WITHDRAW_MISSING_FREEZE_REF_FREEZE");
@@ -439,7 +439,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -474,7 +474,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(user, 60L, "WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_FREEZE");
@@ -504,7 +504,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -540,7 +540,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_MISSING_PAYEE_FREEZE");
@@ -571,7 +571,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -606,7 +606,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_CURRENCY_FREEZE");
@@ -639,7 +639,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -674,7 +674,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(user, 60L, "WITHDRAW_UNKNOWN_REF_FREEZE");
@@ -699,7 +699,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -741,7 +741,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_ACCOUNT_REF_FREEZE");
@@ -763,7 +763,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(anotherUser, 60L, "WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE");
@@ -796,7 +796,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(4);
@@ -843,7 +843,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(internalPayee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_INTERNAL_PAYEE_FREEZE");
@@ -880,7 +880,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
         assertBucket(balance(internalPayee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -921,7 +921,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_EXTERNAL_ACCOUNT_FREEZE");
@@ -960,7 +960,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -995,7 +995,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE");
@@ -1028,7 +1028,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1063,7 +1063,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_IDEMPOTENT_FREEZE");
@@ -1087,7 +1087,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterFirstWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
@@ -1130,7 +1130,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -1165,7 +1165,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 160L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -160L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 160L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstFreezeSn = freeze(user, 60L, "WITHDRAW_DUP_SOURCE_FREEZE_1");
@@ -1189,7 +1189,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterSecondFreeze, afterFirstWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
@@ -1205,7 +1205,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(4);
@@ -1247,7 +1247,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 120L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_SOURCE_FREEZE");
@@ -1263,7 +1263,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterFirstWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
@@ -1279,7 +1279,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_920L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_080L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -1316,7 +1316,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 120L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_CLOSE_FREEZE");
@@ -1332,7 +1332,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
@@ -1348,7 +1348,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_920L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_080L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -1385,7 +1385,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE");
@@ -1401,7 +1401,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
@@ -1418,7 +1418,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);

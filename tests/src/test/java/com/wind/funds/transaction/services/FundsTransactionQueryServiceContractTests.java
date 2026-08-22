@@ -3,8 +3,11 @@ package com.wind.funds.transaction.services;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,16 @@ class FundsTransactionQueryServiceContractTests {
     }
 
     private static final class MinimalFundsTransactionQueryService implements FundsTransactionQueryService {
+
+        @Override
+        public List<FundsActionFactDTO> queryFundsActionFacts(FundsActionFactQuery query) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<FundsActionFactDTO> findFundsActionFact(FundsActionFactRef ref) {
+            return Optional.empty();
+        }
 
         @Override
         public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {

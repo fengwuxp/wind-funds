@@ -6,15 +6,12 @@ import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
-import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
@@ -23,16 +20,11 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.funds.reconciliation.model.dto.ReconciliationBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
-import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
@@ -81,9 +73,7 @@ import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -100,7 +90,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
@@ -117,6 +106,8 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnap
 import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.wind.funds.reconciliation.ReconciliationTestFixture.identity;
+import static com.wind.funds.reconciliation.ReconciliationTestFixture.rule;
 
 /**
  * 外部资金事件消费应用服务流程测试。
@@ -248,18 +239,10 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         String ledgerTransactionSn = ledgerTransactionSn();
         LedgerFactSnapshot postedFacts = ledgerFactSnapshot(jdbcTemplate);
 
-        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn,
-                new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(externalSourceRef())
-                        .setComparisonSourceRef(internalSourceRef(ledgerTransactionSn))
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef("matcher:global-inbound-001#line-1"));
+        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn, 1L);
 
         assertThat(runResult.getOutcome()).isEqualTo(ReconciliationRunOutcome.BALANCED);
-        assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
-        assertThat(runResult.getGateObjectType()).isNull();
-        assertThat(runResult.getGateObjectSn()).isNull();
+        assertThat(runResult.getScopeIdentity().getValue()).isEqualTo(externalSourceRef());
         assertThat(fundsTransactionSn()).isEqualTo(transactionSn);
         assertThat(fundsTransactionCount()).isOne();
         assertThat(ledgerEntryCount()).isEqualTo(4);
@@ -280,22 +263,10 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         String ledgerTransactionSn = ledgerTransactionSn();
         LedgerFactSnapshot postedFacts = ledgerFactSnapshot(jdbcTemplate);
 
-        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn,
-                new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(externalSourceRef())
-                        .setComparisonSourceRef(internalSourceRef(ledgerTransactionSn))
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
-                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setCurrency(CurrencyIsoCode.USD)
-                        .setDifferenceAmount(10L)
-                        .setEvidenceRef("matcher:global-inbound-001#line-1"));
+        ReconciliationRunResultDTO runResult = recordReconciliationResult(ledgerTransactionSn, 2L);
 
         assertThat(runResult.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
-        assertThat(runResult.getReconciliationScopeRef()).isEqualTo(externalSourceRef());
-        assertThat(runResult.getGateObjectType()).isNull();
-        assertThat(runResult.getGateObjectSn()).isNull();
+        assertThat(runResult.getScopeIdentity().getValue()).isEqualTo(externalSourceRef());
         assertThat(fundsTransactionSn()).isEqualTo(transactionSn);
         assertThat(fundsTransactionCount()).isOne();
         assertThat(ledgerEntryCount()).isEqualTo(4);
@@ -574,25 +545,22 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     private void createTestLedger(FundsAccountId accountId,
                                   LedgerSubjectCode subjectCode,
                                   long initialBalance) {
-        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+        ledgerService.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
                 .setTenantId(TENANT_ID)
                 .setSubjectId(accountId.id())
-                .setSubjectType(accountId.type())
-                .setLedgerProfileCode("TEST")
-                .setLedgerProfileVersion(1)
-                .setLedgerSubjectCode(subjectCode)
-                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
-                .setNormalBalanceSide(EntrySide.CREDIT)
-                .setAllowNegative(Boolean.FALSE)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setSettlementPolicy("RT")
-                .setCutOffTime(LocalTime.MIDNIGHT)
-                .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_PLATFORM)
+                .setLedgerProfileVersion(1));
+        Long ledgerId = jdbcTemplate.queryForObject("""
+                SELECT id FROM t_ledger
+                WHERE tenant_id = ? AND subject_id = ? AND ledger_subject_code = ?
+                """, Long.class, TENANT_ID, accountId.id(), subjectCode.name());
         if (initialBalance != 0L) {
+            var ledger = ledgerService.getLedgerById(ledgerId);
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
-                    ledgerService.getLedgerById(ledgerId),
-                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    ledger,
+                    initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
                     Math.abs(initialBalance))));
         }
     }
@@ -632,63 +600,45 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         }
     }
 
-    private ReconciliationRunResultDTO recordReconciliationResult(
-            String ledgerTransactionSn,
-            ReconciliationMatchResultItem matchResult) {
+    private ReconciliationRunResultDTO recordReconciliationResult(String ledgerTransactionSn,
+                                                                   long comparisonAmount) {
         ReconciliationBatchDTO batch = reconciliationBatchApplicationService.createBatch(
                 new CreateReconciliationBatchRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationScopeRef(externalSourceRef())
-                        .setRuleVersion(RECONCILIATION_RULE_VERSION)
+                        .setScopeIdentity(identity("external.funds", externalSourceRef()))
+                        .setPairIdentity(identity("external-ledger", externalSourceRef()))
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setComparisonRuleRef(rule(RECONCILIATION_RULE_VERSION))
                         .setWindowStart(LocalDateTime.of(2026, 7, 24, 0, 0))
                         .setWindowEnd(LocalDateTime.of(2026, 7, 25, 0, 0))
+                        .setTimeSemantics("occurredAt")
                         .setTimezoneId("Asia/Shanghai"),
                 WindOperatorFactory.system());
         reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
-                batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.EXTERNAL_STATEMENT,
-                externalSourceRef(), "bank-statement:global-inbound-001"), WindOperatorFactory.system());
+                batch.getSn(), ReconciliationSourceRole.REFERENCE, "external.statement",
+                externalSourceRef(), "bank-statement:global-inbound-001", 1L), WindOperatorFactory.system());
         reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
-                batch.getSn(), ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.LEDGER,
-                internalSourceRef(ledgerTransactionSn), "ledger-transaction:" + ledgerTransactionSn),
+                batch.getSn(), ReconciliationSourceRole.COMPARISON, "ledger",
+                internalSourceRef(ledgerTransactionSn), "ledger-transaction:" + ledgerTransactionSn,
+                comparisonAmount),
                 WindOperatorFactory.system());
-        return reconciliationRunResultApplicationService.recordRunResult(
+        return reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batch.getSn())
-                        .setMatchResults(List.of(matchResult)),
+                        .setReconciliationBatchSn(batch.getSn()),
                 WindOperatorFactory.system());
     }
 
     private RecordReconciliationSourceSnapshotRequest sourceSnapshotRequest(
             String batchSn,
             ReconciliationSourceRole sourceRole,
-            ReconciliationSourceType sourceType,
+            String sourceNamespace,
             String sourceItemRef,
-            String evidenceRef) {
-        return new RecordReconciliationSourceSnapshotRequest()
-                .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batchSn)
-                .setSourceRole(sourceRole)
-                .setSourceType(sourceType)
-                .setSourceItems(List.of(new ReconciliationSourceItemInput()
-                        .setSourceItemRef(sourceItemRef)
-                        .setContentDigest(sourceContentDigest(sourceType, sourceItemRef))))
-                .setEvidenceRefs(List.of(evidenceRef));
-    }
-
-    private String sourceContentDigest(ReconciliationSourceType sourceType, String sourceItemRef) {
-        if (sourceType == ReconciliationSourceType.LEDGER) {
-            return ledgerSourceContentDigest(sourceItemRef);
-        }
-        TreeMap<String, Object> facts = new TreeMap<>();
-        facts.put("sourceType", sourceType.name());
-        facts.put("sourceItemRef", sourceItemRef);
-        facts.put("businessScene", BUSINESS_SCENE);
-        facts.put("externalSourceCode", EXTERNAL_SOURCE_CODE);
-        facts.put("externalFundsFactSn", EXTERNAL_FUNDS_FACT_SN);
-        facts.put("amount", 90L);
-        facts.put("currency", CurrencyIsoCode.USD);
-        return FundsStableHashSupport.sha256Json(facts);
+            String evidenceRef,
+            long amount) {
+        return com.wind.funds.reconciliation.ReconciliationTestFixture.sourceSnapshotRequest(
+                TENANT_ID, batchSn, sourceRole, sourceNamespace, List.of(sourceItemRef), List.of(evidenceRef),
+                externalSourceRef(), amount, "CONFIRMED");
     }
 
     private String ledgerSourceContentDigest(String sourceItemRef) {
@@ -702,7 +652,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                         """,
                 (resultSet, rowNum) -> {
                     TreeMap<String, Object> result = new TreeMap<>();
-                    result.put("sourceType", ReconciliationSourceType.LEDGER.name());
+                    result.put("sourceType", "LEDGER");
                     result.put("sourceItemRef", sourceItemRef);
                     result.put("sn", resultSet.getString("sn"));
                     result.put("fundsTransactionSn", resultSet.getString("funds_transaction_sn"));
@@ -906,9 +856,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
-            DefaultLedgerQueryService.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,

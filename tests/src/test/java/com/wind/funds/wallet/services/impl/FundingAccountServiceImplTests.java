@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.common.exception.BaseException;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.dto.LedgerDTO;
@@ -10,6 +11,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
@@ -30,23 +32,25 @@ import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.SoftAssertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -63,6 +67,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnap
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         FundingAccountServiceImplTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
@@ -96,9 +101,6 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     @Autowired
     private FundsAccountQueryService fundsAccountQueryService;
-
-    @Autowired
-    private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
@@ -218,23 +220,60 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     @Test
     void testInitializeRequiredLedgersShouldReuseExistingLedgers() {
-        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(2)
+                .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.TRUE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Map<LedgerSubjectCode, Long> reusedLedgerIds =
-                subjectLedgerInitializer.initializeRequiredLedgers(initializeSubjectLedgerRequest());
-        List<LedgerDTO> ledgers = loadLedgers();
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()))
+                .isInstanceOf(BaseException.class);
 
-        assertThat(reusedLedgerIds).containsOnlyKeys(EXPECTED_ALLOW_NEGATIVE_RULES.keySet());
-        assertThat(reusedLedgerIds.values()).containsExactlyInAnyOrderElementsOf(
-                ledgers.stream().map(LedgerDTO::getId).toList());
-        assertThat(ledgers).hasSize(3);
-        Integer ledgerCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM t_ledger WHERE subject_id = ?",
-                Integer.class,
-                ACCOUNT_SN);
-        assertThat(ledgerCount).isEqualTo(3);
+        List<LedgerDTO> ledgers = loadLedgers();
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(ledgers).singleElement().satisfies(ledger -> {
+            assertThat(ledger.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+            assertThat(ledger.getLedgerProfileVersion()).isEqualTo(2);
+        });
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+
+        assertLedgerControlledInitializationOwner(FundingAccountServiceImpl.class);
+        assertLedgerControlledInitializationOwner(CreditAccountServiceImpl.class);
+    }
+
+    @Test
+    void testCreateFundingAccountShouldRollbackRequiredLedgerGroupAfterLaterDrift() {
+        createFundingLedger(LedgerSubjectCode.AVAILABLE, 1, true);
+        createFundingLedger(LedgerSubjectCode.FROZEN, 2, false);
+        List<LedgerDTO> beforeLedgers = loadLedgers();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()))
+                .isInstanceOf(BaseException.class);
+
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(countFundingAccounts()).isZero();
+        softly.assertThat(loadLedgers()).containsExactlyInAnyOrderElementsOf(beforeLedgers);
+        softly.assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(before);
+        softly.assertAll();
+    }
+
+    private void assertLedgerControlledInitializationOwner(Class<?> serviceType) {
+        List<Class<?>> dependencies = Arrays.stream(serviceType.getDeclaredFields())
+                .map(Field::getType)
+                .toList();
+        assertThat(dependencies).contains(LedgerService.class);
     }
 
     /**
@@ -389,15 +428,6 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
     }
 
-    private InitializeSubjectLedgerRequest initializeSubjectLedgerRequest() {
-        return new InitializeSubjectLedgerRequest()
-                .setTenantId(TENANT_ID)
-                .setSubjectId(ACCOUNT_SN)
-                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
-    }
-
     private List<LedgerDTO> loadLedgers() {
         return ledgerService.queryLedgers(new LedgerQuery()
                         .setTenantId(TENANT_ID)
@@ -443,6 +473,24 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .setPeriodId(MONTHLY_PERIOD_ID));
     }
 
+    private Long createFundingLedger(LedgerSubjectCode subjectCode, int profileVersion, boolean allowNegative) {
+        return ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(profileVersion)
+                .setLedgerSubjectCode(subjectCode)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(allowNegative)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+    }
+
     private void assertFundingBasicLedger(LedgerDTO ledger) {
         assertThat(ledger.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(ledger.getSubjectId()).isEqualTo(ACCOUNT_SN);
@@ -466,8 +514,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             FundingAccountServiceImpl.class

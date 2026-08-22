@@ -1,7 +1,9 @@
 package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
+import com.wind.funds.reconciliation.model.request.NormalizedComparisonFactInput;
+import com.wind.funds.reconciliation.model.value.SnapshotCoverage;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -39,17 +41,29 @@ public class ReconciliationSourceSnapshotDTO implements Serializable {
     @Schema(description = "来源角色")
     private ReconciliationSourceRole sourceRole;
 
-    @Schema(description = "来源事实类型")
-    private ReconciliationSourceType sourceType;
+    @Schema(description = "逻辑来源命名空间")
+    private String sourceNamespace;
+
+    @Schema(description = "不可变来源快照身份")
+    private StableIdentity snapshotIdentity;
+
+    @Schema(description = "来源快照版本")
+    private String snapshotVersion;
+
+    @Schema(description = "来源快照覆盖范围")
+    private SnapshotCoverage coverage;
 
     @Schema(description = "来源成员集合 SHA-256")
     private String sourceDigest;
 
-    @Schema(description = "来源成员数")
-    private Integer recordCount;
+    @Schema(description = "归一化比较事实")
+    private List<NormalizedComparisonFactInput> facts;
 
-    @Schema(description = "来源成员稳定引用")
-    private List<String> sourceItemRefs;
+    @Schema(description = "来源事实语义 SHA-256")
+    private String semanticDigest;
+
+    @Schema(description = "来源证据集合 SHA-256")
+    private String evidenceBundleDigest;
 
     @Schema(description = "来源证据引用")
     private List<String> evidenceRefs;

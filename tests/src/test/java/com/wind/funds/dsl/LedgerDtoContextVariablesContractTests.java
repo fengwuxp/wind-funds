@@ -98,18 +98,18 @@ class LedgerDtoContextVariablesContractTests {
     }
 
     /**
-     * 场景：账务审计上下文携带金额型值对象，例如受控负可用单笔限额。
+     * 场景：账务审计上下文携带普通金额型值对象。
      * 预期：标准 Money JSON 形态可作为普通审计值读取，但权益核心金额字段仍被拒绝。
      * 红线：不能因为允许 Money 值对象而让 orderAmount 或自定义权益金额对象绕过校验。
      */
     @Test
     void testLedgerDtoContextShouldAllowMoneyValueObjectButRejectBenefitAmountFacts() {
         LedgerTransactionDTO transaction = new LedgerTransactionDTO()
-                .setContextVariables(Map.of("negativeAvailableSingleLimit",
+                .setContextVariables(Map.of("auditMoneyLimit",
                         Map.of("amount", 100L, "currency", "USD")));
 
         assertThat(transaction.getContextVariables())
-                .containsKey("negativeAvailableSingleLimit");
+                .containsKey("auditMoneyLimit");
         assertThatThrownBy(() -> new LedgerTransactionDTO()
                 .setContextVariables(Map.of("orderAmount",
                         Map.of("amount", 100L, "currency", "USD"))))

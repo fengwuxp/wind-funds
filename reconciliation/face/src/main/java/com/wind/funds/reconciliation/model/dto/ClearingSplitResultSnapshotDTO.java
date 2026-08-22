@@ -65,9 +65,7 @@ public class ClearingSplitResultSnapshotDTO implements Serializable {
 
     private String splitRuleVersion;
 
-    private String reconciliationRunResultSn;
-
-    private String reconciliationResultDigest;
+    private String gateEvidenceRef;
 
     private List<String> reconciliationEvidenceRefs;
 

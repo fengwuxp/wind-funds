@@ -81,10 +81,6 @@ public class SpendRuleVersion implements Serializable, TenantIsolationObject<Lon
     @Column("status")
     private SpendRuleVersionState state;
 
-    void setStatus(SpendRuleVersionState state) {
-        this.state = state;
-    }
-
     /**
      * 操作者。
      */

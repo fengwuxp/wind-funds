@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.common.exception.BaseException;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -23,6 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.assertj.core.api.SoftAssertions;
+
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
@@ -30,6 +34,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 @TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSupport {
@@ -290,6 +295,58 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     @Test
+    void testReleaseShouldRejectWhenAvailableLedgerIsMissingWithoutNewFacts() {
+        FundsAccountId accountId = fundingAccount("release_no_available");
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(accountId, LedgerSubjectCode.FROZEN);
+        topup(accountId, 1_000L, "SETTLEMENT_RELEASE_MISSING_AVAILABLE_TOPUP");
+        String settlementOrderSn = "SETTLEMENT_ORDER_MISSING_AVAILABLE_LEDGER";
+        String lockTransactionSn = settlementTransactionService.lock(
+                request(accountId, 600L, settlementOrderSn), WindOperatorFactory.system());
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE tenant_id = ? AND subject_id = ?"
+                        + " AND ledger_subject_code = ?",
+                TENANT_ID, accountId.id(), LedgerSubjectCode.AVAILABLE.name());
+        var beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> settlementTransactionService.release(new FundsSettlementReleaseRequest()
+                .setLockFundsTransactionSn(lockTransactionSn)
+                .setSettlementOrderSn(settlementOrderSn), WindOperatorFactory.system()))
+                .hasMessageContaining("账本");
+
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":RELEASE");
+        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":HOLD");
+    }
+
+    @Test
+    void testReleaseShouldRejectWhenSettlementLedgerIsMissingWithoutNewFacts() {
+        FundsAccountId accountId = fundingAccount("release_no_settlement");
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(accountId, LedgerSubjectCode.FROZEN);
+        topup(accountId, 1_000L, "SETTLEMENT_RELEASE_MISSING_SETTLEMENT_TOPUP");
+        String settlementOrderSn = "SETTLEMENT_ORDER_MISSING_SETTLEMENT_LEDGER";
+        String lockTransactionSn = settlementTransactionService.lock(
+                request(accountId, 600L, settlementOrderSn), WindOperatorFactory.system());
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE tenant_id = ? AND subject_id = ?"
+                        + " AND ledger_subject_code = ?",
+                TENANT_ID, accountId.id(), LedgerSubjectCode.SETTLEMENT.name());
+        var beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> settlementTransactionService.release(new FundsSettlementReleaseRequest()
+                .setLockFundsTransactionSn(lockTransactionSn)
+                .setSettlementOrderSn(settlementOrderSn), WindOperatorFactory.system()))
+                .hasMessageContaining("账本");
+
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":RELEASE");
+        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":HOLD");
+    }
+
+    @Test
     void testReleaseShouldRejectWrongOriginalTransactionAndProfileDriftWithoutSideEffects() {
         FundsAccountId wrongOriginalAccount = fundingAccount("release_wrong_original");
         ensureFundingAccount(wrongOriginalAccount, LedgerProfileCode.FUNDING_MERCHANT);
@@ -316,18 +373,28 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
                 request(driftedAccount, 600L, settlementOrderSn), WindOperatorFactory.system());
         BalanceSnapshot beforeRelease = snapshot(balance(driftedAccount));
         var beforeProfileFacts = ledgerFactSnapshot();
-        jdbcTemplate.update("UPDATE t_funding_account SET ledger_profile_code = ? WHERE tenant_id = ? AND sn = ?",
-                LedgerProfileCode.FUNDING_BASIC.name(), TENANT_ID, driftedAccount.id());
+        jdbcTemplate.update("UPDATE t_ledger SET ledger_profile_version = 2"
+                        + " WHERE tenant_id = ? AND subject_id = ? AND ledger_subject_code = ?",
+                TENANT_ID, driftedAccount.id(), LedgerSubjectCode.SETTLEMENT.name());
 
-        assertThatThrownBy(() -> settlementTransactionService.release(new FundsSettlementReleaseRequest()
+        Throwable rejection = catchThrowable(() -> settlementTransactionService.release(new FundsSettlementReleaseRequest()
                 .setLockFundsTransactionSn(lockTransactionSn)
-                .setSettlementOrderSn(settlementOrderSn), WindOperatorFactory.system()))
-                .hasMessageContaining("SETTLEMENT");
+                .setSettlementOrderSn(settlementOrderSn), WindOperatorFactory.system()));
 
-        assertThat(snapshot(balance(driftedAccount))).isEqualTo(beforeRelease);
-        assertLedgerTransactionFactsUnchanged(beforeProfileFacts);
-        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":RELEASE");
-        assertNoFundsOrLedgerFactsForBusinessSn(settlementOrderSn + ":HOLD");
+        var afterProfileFacts = ledgerFactSnapshot();
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(rejection).isInstanceOf(BaseException.class);
+        softly.assertThat(snapshot(balance(driftedAccount))).isEqualTo(beforeRelease);
+        softly.assertThat(afterProfileFacts.transactions()).isEqualTo(beforeProfileFacts.transactions());
+        softly.assertThat(afterProfileFacts.postingPlans()).isEqualTo(beforeProfileFacts.postingPlans());
+        softly.assertThat(afterProfileFacts.entries()).isEqualTo(beforeProfileFacts.entries());
+        for (String businessSn : List.of(settlementOrderSn + ":RELEASE", settlementOrderSn + ":HOLD")) {
+            softly.assertThat(fundsTransactionsByBusinessSn(businessSn)).isEmpty();
+            softly.assertThat(fundsTransactionDetailsByBusinessSn(businessSn)).isEmpty();
+            softly.assertThat(ledgerTransactionsForBusinessSn(businessSn)).isEmpty();
+            softly.assertThat(entriesByBusinessSn(businessSn)).isEmpty();
+        }
+        softly.assertAll();
     }
 
     private FundsSettlementLockRequest request(FundsAccountId accountId, long amount, String settlementOrderSn) {

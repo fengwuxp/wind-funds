@@ -109,10 +109,6 @@ public class SpendControlScope implements Serializable, TenantIsolationObject<Lo
     @Column("status")
     private FundsAccountState state;
 
-    void setStatus(FundsAccountState state) {
-        this.state = state;
-    }
-
     /**
      * 支出控制范围说明。
      */

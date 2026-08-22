@@ -74,17 +74,11 @@ public class SettlementOrderDTO implements Serializable {
     @Schema(description = "结算释放事实摘要")
     private String releaseDigest;
 
-    @Schema(description = "释放消费的对账运行结果流水号")
-    private String releaseReconciliationRunResultSn;
-
-    @Schema(description = "释放消费的对账结果摘要")
-    private String releaseReconciliationResultDigest;
+    @Schema(description = "结算释放成功消费的阶段门禁证据引用")
+    private String releaseGateEvidenceRef;
 
     @Schema(description = "释放消费的当前谱系批次流水号")
     private String releaseCurrentLineageBatchSn;
-
-    @Schema(description = "释放时权威 Gate 证据摘要")
-    private String releaseGateEvidenceDigest;
 
     @Schema(description = "释放来源闭合摘要")
     private String releaseSourceClosureDigest;
@@ -98,14 +92,8 @@ public class SettlementOrderDTO implements Serializable {
     @Schema(description = "释放审批引用")
     private String releaseApprovalRef;
 
-    @Schema(description = "结算锁定消费的对账运行结果流水号")
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "结算锁定消费的对账结果摘要")
-    private String reconciliationResultDigest;
-
-    @Schema(description = "结算锁定对账证据摘要")
-    private String reconciliationEvidenceDigest;
+    @Schema(description = "结算锁定成功消费的阶段门禁证据引用")
+    private String lockGateEvidenceRef;
 
     @Schema(description = "结算金额摘要")
     private String amountDigest;

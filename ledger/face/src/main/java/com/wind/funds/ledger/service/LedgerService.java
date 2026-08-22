@@ -3,11 +3,10 @@ package com.wind.funds.ledger.service;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
-
-
 import com.wind.common.query.supports.QueryOrderField;
 import org.jspecify.annotations.NonNull;
 
@@ -21,6 +20,13 @@ import java.util.List;
  * @since 2026-04-24
  */
 public interface LedgerService {
+
+    /**
+     * 按账本内部配置初始化主体必需账本。
+     *
+     * @param request 初始化请求
+     */
+    void initializeRequiredLedgers(@NonNull InitializeSubjectLedgerRequest request);
 
     /**
      * 创建 账户账本

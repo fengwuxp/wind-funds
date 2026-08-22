@@ -43,10 +43,6 @@ public class IdentifyClearingSplittableDetailRequest implements Serializable {
     @NotBlank
     private String ledgerEntrySn;
 
-    @Schema(description = "清分前必须消费的对账运行结果流水号")
-    @NotBlank
-    private String reconciliationRunResultSn;
-
     @Schema(description = "上层清分策略已经确认的业务线")
     @NotBlank
     private String businessLine;

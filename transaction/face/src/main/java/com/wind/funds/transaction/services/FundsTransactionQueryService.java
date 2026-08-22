@@ -3,8 +3,11 @@ package com.wind.funds.transaction.services;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -21,6 +24,29 @@ import java.util.Optional;
  * <p>职责：读取已经落库的资金交易事实，为 replay 和运营查询提供稳定输入。</p>
  */
 public interface FundsTransactionQueryService {
+
+    /**
+     * 查询同一业务关联的规范化资金动作事实。
+     *
+     * <p>返回空列表只表示当前没有可证明的动作事实，不能据此推断资金效果为零，也不授权重试、
+     * 逆向或补单。</p>
+     *
+     * @param query 业务关联查询条件
+     * @return 已证明的动作事实
+     */
+    @NonNull
+    List<FundsActionFactDTO> queryFundsActionFacts(@NonNull FundsActionFactQuery query);
+
+    /**
+     * 按稳定动作引用查询规范化资金动作事实。
+     *
+     * <p>该查询只读取已保存事实，不生成新动作、不修复原动作，也不把领域失败标签推断为零效果。</p>
+     *
+     * @param ref 资金动作事实稳定引用
+     * @return 已证明的动作事实；不存在或尚未终结时返回空结果
+     */
+    @NonNull
+    Optional<FundsActionFactDTO> findFundsActionFact(@NonNull FundsActionFactRef ref);
 
     /**
      * 查询主交易事实。

@@ -11,11 +11,11 @@ import com.wind.funds.reconciliation.dal.entities.SettlementOrder;
 import com.wind.funds.reconciliation.dal.entities.SettlementOrderItem;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.PayoutOrderMapper;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationStageGateEvidenceMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderMapper;
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.SettlementMode;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.enums.SettlementReleaseCoverageStatus;
@@ -39,6 +39,8 @@ import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
 import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.reconciliation.service.SettlementReleaseAuthority;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
@@ -103,6 +105,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     private final ClearingBatchMapper clearingBatchMapper;
 
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
+
+    private final ReconciliationStageGateEvidenceMapper stageGateEvidenceMapper;
 
     private final FundsSettlementTransactionService fundsSettlementTransactionService;
 
@@ -227,11 +231,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     public SettlementOrderDTO lockOrder(LockSettlementOrderRequest request, WindOperator operator) {
         validateCommand(request == null ? null : request.getTenantId(),
                 request == null ? null : request.getSettlementOrderSn(), operator);
-        AssertUtils.hasText(request.getReconciliationRunResultSn(), "结算对账运行结果流水号不能为空");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
         if (order.getState() == SettlementOrderState.LOCKED) {
-            AssertUtils.equals(order.getReconciliationRunResultSn(), request.getReconciliationRunResultSn(),
-                    "结算单已使用不同对账运行结果锁定");
             return toDTO(order);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.APPROVED,
@@ -242,9 +243,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         ReconciliationGateDecisionDTO decision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(order.getTenantId())
-                        .setGateObjectType(ReconciliationGateObjectType.SETTLEMENT)
-                        .setGateObjectSn(order.getSn())
-                        .setReconciliationRunResultSn(request.getReconciliationRunResultSn()),
+                        .setStageRef(stageRef("SETTLEMENT_LOCK", order.getSn())),
                 operator);
         AssertUtils.isTrue(decision.isPassed(), "结算锁定时对账 Gate 未通过");
         AssertUtils.notEmpty(decision.getEvidenceRefs(), "结算锁定对账证据引用不能为空");
@@ -263,7 +262,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             update(order, "锁定结算单资金失败");
             return toDTO(order);
         } catch (LedgerPostingRejectedException exception) {
-            recordDeterministicFailure(order, items, decision, exception, operator);
+            recordDeterministicFailure(order, items, exception, operator);
             throw exception;
         }
     }
@@ -293,9 +292,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         ReconciliationGateDecisionDTO gateDecision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(order.getTenantId())
-                        .setGateObjectType(ReconciliationGateObjectType.SETTLEMENT)
-                        .setGateObjectSn(order.getSn())
-                        .setReconciliationRunResultSn(request.getReconciliationRunResultSn()),
+                        .setStageRef(stageRef("SETTLEMENT_RELEASE", order.getSn())),
                 operator);
         validateReleaseGate(request, gateDecision);
         String routeSnapshotDigest = validateOriginalLock(order);
@@ -339,11 +336,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setReleaseFreezeOrderSn(fundsResult.getReleaseFreezeOrderSn());
         order.setReleaseDisposition(SettlementReleaseDisposition.FROZEN);
         order.setReleaseDigest(releaseDigest);
-        order.setReleaseReconciliationRunResultSn(gateDecision.getReconciliationRunResultSn());
-        order.setReleaseReconciliationResultDigest(gateDecision.getReconciliationResultDigest());
-        order.setReleaseCurrentLineageBatchSn(gateDecision.getReconciliationBatchSn());
-        order.setReleaseGateEvidenceDigest(FundsStableHashSupport.sha256CanonicalJson(
-                "settlement-release-gate-evidence", gateDecision.getEvidenceRefs().stream().sorted().toList()));
+        order.setReleaseGateEvidenceRef(requiredStageEvidenceRef(gateDecision));
         order.setReleaseSourceClosureDigest(sourceClosureDigest(request));
         order.setReleaseAuthorityDecisionDigest(authorityDecision.getDecisionDigest());
         order.setReleaseAuthorityEvidenceRefs(WindJson.toJsonString(
@@ -383,15 +376,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     private void validateReleaseGate(ReleaseSettlementOrderRequest request,
                                      ReconciliationGateDecisionDTO decision) {
         AssertUtils.isTrue(decision.isPassed(), "结算释放时对账 Gate 未通过：{}", decision.getExplanation());
-        AssertUtils.isTrue(decision.getGateObjectType() == ReconciliationGateObjectType.SETTLEMENT
-                        && Objects.equals(decision.getGateObjectSn(), request.getSettlementOrderSn()),
-                "结算释放 Gate 对象不一致");
-        AssertUtils.equals(decision.getReconciliationRunResultSn(), request.getReconciliationRunResultSn(),
-                "结算释放 Gate 运行结果不一致");
-        AssertUtils.equals(decision.getReconciliationResultDigest(), request.getReconciliationResultDigest(),
-                "结算释放对账结果摘要不一致");
-        AssertUtils.equals(decision.getReconciliationBatchSn(), request.getCurrentLineageBatchSn(),
-                "结算释放请求不是当前对账批次血缘头");
+        AssertUtils.equals(stageRef("SETTLEMENT_RELEASE", request.getSettlementOrderSn()),
+                decision.getStageRef(), "结算释放 Gate Stage 不一致");
         AssertUtils.notEmpty(decision.getEvidenceRefs(), "结算释放 Gate 证据引用不能为空");
         AssertUtils.isTrue(decision.getEvidenceRefs().stream().allMatch(StringUtils::hasText),
                 "结算释放 Gate 证据引用不能为空");
@@ -488,8 +474,6 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         Map<String, Object> facts = new TreeMap<>();
         facts.put("tenantId", request.getTenantId());
         facts.put("settlementOrderSn", request.getSettlementOrderSn());
-        facts.put("reconciliationRunResultSn", request.getReconciliationRunResultSn());
-        facts.put("reconciliationResultDigest", request.getReconciliationResultDigest());
         facts.put("coverageStatus", request.getCoverageStatus());
         facts.put("coverageDigest", request.getCoverageDigest());
         facts.put("watermark", request.getWatermark());
@@ -509,9 +493,6 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     private void validateReleaseRequest(ReleaseSettlementOrderRequest request, WindOperator operator) {
         AssertUtils.notNull(request, "结算释放请求不能为空");
         validateCommand(request.getTenantId(), request.getSettlementOrderSn(), operator);
-        AssertUtils.hasText(request.getReconciliationRunResultSn(), "结算释放对账运行结果流水号不能为空");
-        AssertUtils.isTrue(isSha256(request.getReconciliationResultDigest()),
-                "结算释放对账结果摘要必须是 SHA-256");
         AssertUtils.isTrue(request.getCoverageStatus() == SettlementReleaseCoverageStatus.COMPLETE,
                 "结算释放来源覆盖状态必须为 COMPLETE");
         AssertUtils.isTrue(isSha256(request.getCoverageDigest()), "结算释放来源覆盖摘要必须是 SHA-256");
@@ -697,15 +678,24 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     }
 
     private void applyGateEvidence(SettlementOrder order, ReconciliationGateDecisionDTO decision) {
-        order.setReconciliationRunResultSn(decision.getReconciliationRunResultSn());
-        order.setReconciliationResultDigest(decision.getReconciliationResultDigest());
-        order.setReconciliationEvidenceDigest(FundsStableHashSupport.sha256Json(
-                decision.getEvidenceRefs().stream().sorted().toList()));
+        order.setLockGateEvidenceRef(requiredStageEvidenceRef(decision));
+    }
+
+    private String requiredStageEvidenceRef(ReconciliationGateDecisionDTO decision) {
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "Gate 通过时必须持有消费证据");
+        return decision.getEvidenceRefs().getFirst();
+    }
+
+    private GateStageRef stageRef(String stageKind, String settlementOrderSn) {
+        return new GateStageRef()
+                .setStageKind(stageKind)
+                .setStageIdentity(new StableIdentity()
+                        .setOwnerNamespace("settlement-order")
+                        .setValue(settlementOrderSn));
     }
 
     private void recordDeterministicFailure(SettlementOrder order,
                                             List<SettlementOrderItem> items,
-                                            ReconciliationGateDecisionDTO decision,
                                             LedgerPostingRejectedException exception,
                                             WindOperator operator) {
         FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
@@ -715,7 +705,9 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         }
         AssertUtils.isTrue(settlementOrderItemMapper.releaseActiveSourceClaims(
                 order.getTenantId(), order.getSn()) == items.size(), "释放结算来源占用失败");
-        applyGateEvidence(order, decision);
+        AssertUtils.isTrue(stageGateEvidenceMapper.deleteByStage(order.getTenantId(),
+                        "SETTLEMENT_LOCK", "settlement-order", order.getSn()) == 1,
+                "删除失败结算动作的 Gate 成功消费证据失败");
         order.setLockFundsTransactionSn(transaction.getSn());
         order.setState(SettlementOrderState.FAILED);
         releaseActiveOrderDigest(order);
@@ -844,17 +836,13 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 .setReleaseFreezeOrderSn(source.getReleaseFreezeOrderSn())
                 .setReleaseDisposition(source.getReleaseDisposition())
                 .setReleaseDigest(source.getReleaseDigest())
-                .setReleaseReconciliationRunResultSn(source.getReleaseReconciliationRunResultSn())
-                .setReleaseReconciliationResultDigest(source.getReleaseReconciliationResultDigest())
+                .setReleaseGateEvidenceRef(source.getReleaseGateEvidenceRef())
                 .setReleaseCurrentLineageBatchSn(source.getReleaseCurrentLineageBatchSn())
-                .setReleaseGateEvidenceDigest(source.getReleaseGateEvidenceDigest())
                 .setReleaseSourceClosureDigest(source.getReleaseSourceClosureDigest())
                 .setReleaseAuthorityDecisionDigest(source.getReleaseAuthorityDecisionDigest())
                 .setReleaseAuthorityEvidenceRefs(parseEvidenceRefs(source.getReleaseAuthorityEvidenceRefs()))
                 .setReleaseApprovalRef(source.getReleaseApprovalRef())
-                .setReconciliationRunResultSn(source.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(source.getReconciliationResultDigest())
-                .setReconciliationEvidenceDigest(source.getReconciliationEvidenceDigest())
+                .setLockGateEvidenceRef(source.getLockGateEvidenceRef())
                 .setAmountDigest(source.getAmountDigest())
                 .setSourceDigest(source.getSourceDigest())
                 .setPolicySnapshotDigest(source.getPolicySnapshotDigest())

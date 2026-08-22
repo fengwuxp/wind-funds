@@ -15,7 +15,6 @@ import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutNextAction;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
@@ -26,6 +25,8 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.CreatePayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.HandlePayoutReceiptRequest;
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
 import com.wind.funds.transaction.application.FundsPayoutTransactionService;
 import com.wind.funds.transaction.model.request.FundsPayoutRequest;
@@ -126,9 +127,11 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         ReconciliationGateDecisionDTO gateDecision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(order.getTenantId())
-                        .setGateObjectType(ReconciliationGateObjectType.PAYOUT)
-                        .setGateObjectSn(order.getSn())
-                        .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
+                        .setStageRef(new GateStageRef()
+                                .setStageKind("PAYOUT_SUBMIT")
+                                .setStageIdentity(new StableIdentity()
+                                        .setOwnerNamespace("payout-order")
+                                        .setValue(order.getSn()))), operator);
         AssertUtils.isTrue(gateDecision.isPassed(), "出款对账 Gate 未通过：{}", gateDecision.getExplanation());
 
         PayoutSubmissionAuthority authority = payoutSubmissionAuthorityProvider.getIfUnique();
@@ -143,8 +146,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setApprovalRef(request.getApprovalRef());
         order.setExternalRuleEvidenceDigest(FundsStableHashSupport.sha256Json(
                 externalRuleEvidenceValues(request.getExternalRuleVerificationEvidence())));
-        order.setReconciliationRunResultSn(gateDecision.getReconciliationRunResultSn());
-        order.setReconciliationResultDigest(gateDecision.getReconciliationResultDigest());
+        order.setPayoutGateEvidenceRef(requiredStageEvidenceRef(gateDecision));
         order.setAdmissionDecisionDigest(admission.getDecisionDigest());
         order.setAdmissionEvidenceRefs(WindJson.toJsonString(admission.getEvidenceRefs()));
         order.setSubmitDigest(submitDigest);
@@ -370,8 +372,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 "payeeEndpointRef", request.getPayeeEndpointRef(),
                 "channelRef", request.getChannelRef(),
                 "approvalRef", request.getApprovalRef(),
-                "externalRuleEvidence", externalRuleEvidenceValues(request.getExternalRuleVerificationEvidence()),
-                "reconciliationRunResultSn", request.getReconciliationRunResultSn()));
+                "externalRuleEvidence", externalRuleEvidenceValues(request.getExternalRuleVerificationEvidence())));
     }
 
     private Map<String, Object> externalRuleEvidenceValues(ExternalRuleVerificationEvidenceDTO evidence) {
@@ -401,7 +402,6 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         AssertUtils.hasText(request.getPayeeEndpointRef(), "收款端点引用不能为空");
         AssertUtils.hasText(request.getChannelRef(), "出款通道引用不能为空");
         AssertUtils.hasText(request.getApprovalRef(), "出款审批引用不能为空");
-        AssertUtils.hasText(request.getReconciliationRunResultSn(), "出款对账运行结果流水号不能为空");
         validateExternalRuleEvidence(request.getExternalRuleVerificationEvidence());
     }
 
@@ -522,8 +522,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 .setPayeeEndpointRef(source.getPayeeEndpointRef())
                 .setChannelRef(source.getChannelRef())
                 .setExternalReference(source.getExternalReference())
-                .setReconciliationRunResultSn(source.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(source.getReconciliationResultDigest())
+                .setPayoutGateEvidenceRef(source.getPayoutGateEvidenceRef())
                 .setAdmissionDecisionDigest(source.getAdmissionDecisionDigest())
                 .setAdmissionEvidenceRefs(parseEvidenceRefs(source.getAdmissionEvidenceRefs()))
                 .setCompletionFundsTransactionSn(source.getCompletionFundsTransactionSn())
@@ -539,6 +538,11 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
 
     private List<String> parseEvidenceRefs(String value) {
         return StringUtils.hasText(value) ? WindJson.parseArray(value, String.class) : List.of();
+    }
+
+    private String requiredStageEvidenceRef(ReconciliationGateDecisionDTO decision) {
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "Gate 通过时必须持有消费证据");
+        return decision.getEvidenceRefs().getFirst();
     }
 
     private PayoutDisplayStatus displayStatus(PayoutOrderState state) {

@@ -115,10 +115,6 @@ public class CreditAccount implements Serializable, TenantIsolationObject<Long> 
     @Column("status")
     private FundsAccountState state;
 
-    void setStatus(FundsAccountState state) {
-        this.state = state;
-    }
-
     /**
      * 账户说明。
      */

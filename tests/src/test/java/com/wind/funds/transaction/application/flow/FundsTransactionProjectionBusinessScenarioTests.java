@@ -2,6 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
@@ -46,7 +47,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(account, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(account, 80L, true, "PROJECTION_VCC_AUTHORIZE");
@@ -96,7 +97,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(account, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(account, 80L, true, "PROJECTION_VCC_REFUND_AUTHORIZE");
@@ -174,7 +175,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         transfer(payer, payee, 40L, "PROJECTION_WALLET_TRANSFER");
@@ -209,7 +210,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(before, afterCollection,
                 delta(globalAccount, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
                 delta(globalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 120L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(globalAccount, 70L, "PROJECTION_GLOBAL_PAYOUT_FREEZE");
@@ -225,7 +226,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(afterFreeze, afterPayout,
                 delta(globalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(globalAccount, LedgerSubjectCode.FROZEN, -70L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -70L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         FundsTransactionProjectionExplanation collection = explainByBusinessSn("PROJECTION_GLOBAL_COLLECTION");
@@ -247,6 +248,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
     void testAcquiringPaymentAndPartialRefundShouldKeepSeparateExplanations() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId merchant = fundingAccount("acq_merchant");
+        ensureFundingAccount(merchant, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(merchant, LedgerSubjectCode.CLEARING);
         var before = snapshot(balances(payer, merchant, cashMappingAccount(), prepaymentAccount()));
 
@@ -255,7 +257,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(merchant, LedgerSubjectCode.CLEARING, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String paymentSn = pay(payer, merchant, LedgerSubjectCode.CLEARING, 70L,

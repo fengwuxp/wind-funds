@@ -8,9 +8,9 @@ import com.wind.funds.wallet.mapstruct.CreditAccountConverter;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.query.CreditAccountQuery;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
+import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -36,7 +36,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private final CreditAccountMapper creditAccountMapper;
 
-    private final SubjectLedgerInitializer subjectLedgerInitializer;
+    private final LedgerService ledgerService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -46,12 +46,13 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         CreditAccount entity = CreditAccountConverter.INSTANCE.convertToCreditAccount(request);
         creditAccountMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建信用账户失败");
-        subjectLedgerInitializer.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
+        ledgerService.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
                 .setTenantId(entity.getTenantId())
                 .setSubjectId(entity.getSn())
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(entity.getCurrency())
                 .setLedgerProfileCode(entity.getLedgerProfileCode())
+                .setLedgerProfileVersion(entity.getLedgerProfileVersion())
                 .setPeriodType(entity.getPeriodType())
                 .setPeriodId(request.getPeriodId()));
         return entity.getId();

@@ -2,6 +2,7 @@ package com.wind.funds.wallet.services.impl;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundsAccountState;
@@ -9,7 +10,6 @@ import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
 import com.wind.funds.wallet.model.query.AccountHierarchyRelationQuery;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.funds.wallet.service.AccountHierarchyRelationService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -24,7 +24,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
+import java.lang.reflect.Proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -190,8 +190,11 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
     static class Config {
 
         @Bean
-        SubjectLedgerInitializer subjectLedgerInitializer() {
-            return request -> Map.of();
+        LedgerService ledgerService() {
+            return (LedgerService) Proxy.newProxyInstance(
+                    LedgerService.class.getClassLoader(),
+                    new Class<?>[]{LedgerService.class},
+                    (proxy, method, args) -> null);
         }
     }
 }

@@ -20,8 +20,7 @@ import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
@@ -217,8 +216,7 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,

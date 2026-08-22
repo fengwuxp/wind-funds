@@ -45,7 +45,7 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 60L, "WITHDRAW_REJECTED_FREEZE");
@@ -69,7 +69,7 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -154,7 +154,7 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertPostedTransactions(3);
         assertLedgerTransactionFactsUnchanged(afterRejectedFacts);

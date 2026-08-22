@@ -87,10 +87,7 @@ public class ClearingSplitResultSnapshot implements Serializable, TenantIsolatio
     private String splitRuleVersion;
 
     @NotNull
-    private String reconciliationRunResultSn;
-
-    @NotNull
-    private String reconciliationResultDigest;
+    private String gateEvidenceRef;
 
     @NotNull
     private String reconciliationEvidenceRefs;

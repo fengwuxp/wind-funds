@@ -19,7 +19,6 @@ import com.wind.funds.reconciliation.dal.mapper.ClearingSplittableDetailMapper;
 import com.wind.funds.reconciliation.dal.entities.table.ClearingSplitBatchNameRefs;
 import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
 import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitResultSnapshotDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
@@ -29,6 +28,8 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.ConfirmClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchRequest;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
@@ -148,11 +149,12 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.REVIEWING,
                 "只有 REVIEWING 清分批次可以确认，status = {}", batch.getState());
         List<ClearingSplittableDetail> details = batchDetails(batch);
-        for (ClearingSplittableDetail detail : details) {
-            validateCurrentSource(batch, detail, operator);
-        }
-        for (ClearingSplittableDetail detail : details) {
-            clearingSplitResultSnapshotMapper.insertSelective(toSnapshot(batch, detail, operator));
+        List<ReconciliationGateDecisionDTO> gateDecisions = details.stream()
+                .map(detail -> validateCurrentSource(batch, detail, operator))
+                .toList();
+        for (int index = 0; index < details.size(); index++) {
+            clearingSplitResultSnapshotMapper.insertSelective(toSnapshot(
+                    batch, details.get(index), requiredStageEvidenceRef(gateDecisions.get(index)), operator));
         }
         batch.setState(ClearingSplitBatchState.CONFIRMED);
         batch.setConfirmedBy(operator.getOperatorAsText());
@@ -273,6 +275,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
 
     private ClearingSplitResultSnapshot toSnapshot(ClearingSplitBatch batch,
                                                     ClearingSplittableDetail detail,
+                                                    String gateEvidenceRef,
                                                     WindOperator operator) {
         TreeMap<String, Object> facts = new TreeMap<>();
         facts.put("splitBatchSn", batch.getSn());
@@ -291,8 +294,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         facts.put("routeSnapshotDigest", detail.getRouteSnapshotDigest());
         facts.put("splitRuleCode", detail.getSplitRuleCode());
         facts.put("splitRuleVersion", detail.getSplitRuleVersion());
-        facts.put("reconciliationRunResultSn", detail.getReconciliationRunResultSn());
-        facts.put("reconciliationResultDigest", detail.getReconciliationResultDigest());
+        facts.put("gateEvidenceRef", gateEvidenceRef);
         facts.put("reconciliationEvidenceRefs", parseEvidenceRefs(detail.getReconciliationEvidenceRefs()));
         facts.put("sourceDigest", detail.getSourceDigest());
         ClearingSplitResultSnapshot result = new ClearingSplitResultSnapshot();
@@ -314,8 +316,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         result.setRouteSnapshotDigest(detail.getRouteSnapshotDigest());
         result.setSplitRuleCode(detail.getSplitRuleCode());
         result.setSplitRuleVersion(detail.getSplitRuleVersion());
-        result.setReconciliationRunResultSn(detail.getReconciliationRunResultSn());
-        result.setReconciliationResultDigest(detail.getReconciliationResultDigest());
+        result.setGateEvidenceRef(gateEvidenceRef);
         result.setReconciliationEvidenceRefs(detail.getReconciliationEvidenceRefs());
         result.setSourceDigest(detail.getSourceDigest());
         result.setSnapshotDigest(FundsStableHashSupport.sha256Json(facts));
@@ -375,9 +376,9 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         return FundsStableHashSupport.sha256Json(facts);
     }
 
-    private void validateCurrentSource(ClearingSplitBatch batch,
-                                       ClearingSplittableDetail detail,
-                                       WindOperator operator) {
+    private ReconciliationGateDecisionDTO validateCurrentSource(ClearingSplitBatch batch,
+                                                                ClearingSplittableDetail detail,
+                                                                WindOperator operator) {
         FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
                 detail.getFundsTransactionSn()).orElse(null);
         AssertUtils.notNull(transaction, "清分来源交易不存在，fundsTransactionSn = {}", detail.getFundsTransactionSn());
@@ -397,14 +398,20 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         ReconciliationGateDecisionDTO decision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(batch.getTenantId())
-                        .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                        .setGateObjectSn(detail.getFundsTransactionDetailSn())
-                        .setReconciliationRunResultSn(detail.getReconciliationRunResultSn()),
+                        .setStageRef(new GateStageRef()
+                                .setStageKind("CLEARING_SPLIT_CONFIRM_ITEM")
+                                .setStageIdentity(new StableIdentity()
+                                        .setOwnerNamespace("clearing-split-item")
+                                        .setValue(batch.getSn() + ":" + detail.getSn()))),
                 operator);
-        AssertUtils.isTrue(decision.isPassed()
-                        && Objects.equals(decision.getReconciliationResultDigest(),
-                        detail.getReconciliationResultDigest()),
-                "清分确认时对账 Gate 未通过或证据已变化，splittableDetailSn = {}", detail.getSn());
+        AssertUtils.isTrue(decision.isPassed(),
+                "清分确认时对账 Gate 未通过，splittableDetailSn = {}", detail.getSn());
+        return decision;
+    }
+
+    private String requiredStageEvidenceRef(ReconciliationGateDecisionDTO decision) {
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "Gate 通过时必须持有消费证据");
+        return decision.getEvidenceRefs().getFirst();
     }
 
     private void validateBatchBoundary(List<ClearingSplittableDetail> details) {
@@ -511,8 +518,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
                 .setRouteSnapshotDigest(source.getRouteSnapshotDigest())
                 .setSplitRuleCode(source.getSplitRuleCode())
                 .setSplitRuleVersion(source.getSplitRuleVersion())
-                .setReconciliationRunResultSn(source.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(source.getReconciliationResultDigest())
+                .setGateEvidenceRef(source.getGateEvidenceRef())
                 .setReconciliationEvidenceRefs(parseEvidenceRefs(source.getReconciliationEvidenceRefs()))
                 .setSourceDigest(source.getSourceDigest())
                 .setSnapshotDigest(source.getSnapshotDigest())

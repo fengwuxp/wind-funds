@@ -14,10 +14,10 @@ import com.wind.funds.reconciliation.dal.entities.ClearingCandidate;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchDetailMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ClearingCandidateMapper;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationStageGateEvidenceMapper;
 import com.wind.funds.reconciliation.dal.entities.table.ClearingBatchNameRefs;
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ClearingCandidateState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ClearingBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.query.ClearingBatchQuery;
@@ -28,6 +28,8 @@ import com.wind.funds.reconciliation.model.request.CreateClearingBatchRequest;
 import com.wind.funds.reconciliation.model.request.ReplaceClearingBatchCandidatesRequest;
 import com.wind.funds.reconciliation.model.request.ReturnClearingBatchToDraftRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingBatchRequest;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.transaction.application.FundsClearingTransactionService;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionState;
@@ -80,6 +82,8 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
     private final ClearingCandidateMapper clearingCandidateMapper;
 
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
+
+    private final ReconciliationStageGateEvidenceMapper stageGateEvidenceMapper;
 
     private final FundsClearingTransactionService fundsClearingTransactionService;
 
@@ -184,9 +188,9 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.REVIEWING,
                 "只有 REVIEWING 清算批次可以确认，status = {}", batch.getState());
         List<ClearingCandidate> candidates = validateReviewingBatch(batch);
-        for (ClearingCandidate candidate : candidates) {
-            validateCurrentCandidate(batch, candidate, operator);
-        }
+        List<ReconciliationGateDecisionDTO> gateDecisions = candidates.stream()
+                .map(candidate -> validateCurrentCandidate(batch, candidate, operator))
+                .toList();
         try {
             String fundsTransactionSn = fundsClearingTransactionService.confirm(new FundsClearingConfirmRequest()
                     .setAccountId(FundsAccountId.immutable(batch.getSubjectId(), batch.getSubjectType()))
@@ -198,7 +202,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                             .sorted()
                             .toList())
                     .setDescription("clearing batch confirmation"), operator);
-            markCandidatesCleared(batch, candidates, operator);
+            markCandidatesCleared(batch, candidates, gateDecisions, operator);
             batch.setFundsTransactionSn(fundsTransactionSn);
             batch.setState(ClearingBatchState.CONFIRMED);
             batch.setActiveAmountDigest(null);
@@ -347,10 +351,10 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         return candidates;
     }
 
-    private void validateCurrentCandidate(ClearingBatch batch,
-                                          ClearingCandidate candidate,
-                                          WindOperator operator) {
-        AssertUtils.isTrue(!candidate.getClearingAvailableTime().isAfter(LocalDateTime.now()),
+    private ReconciliationGateDecisionDTO validateCurrentCandidate(ClearingBatch batch,
+                                                                   ClearingCandidate candidate,
+                                                                   WindOperator operator) {
+        AssertUtils.isTrue(!candidate.getClearingAvailableTime().isAfter(LocalDateTime.now().plusSeconds(1)),
                 "清算候选尚未到可清算时间，candidateSn = {}", candidate.getSn());
         FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
                 candidate.getFundsTransactionSn()).orElse(null);
@@ -371,14 +375,15 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         ReconciliationGateDecisionDTO decision = reconciliationGateApplicationService.checkGate(
                 new CheckReconciliationGateRequest()
                         .setTenantId(batch.getTenantId())
-                        .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                        .setGateObjectSn(candidate.getFundsTransactionDetailSn())
-                        .setReconciliationRunResultSn(candidate.getReconciliationRunResultSn()),
+                        .setStageRef(new GateStageRef()
+                                .setStageKind("CLEARING_CONFIRM_ITEM")
+                                .setStageIdentity(new StableIdentity()
+                                        .setOwnerNamespace("clearing-candidate")
+                                        .setValue(candidate.getSn()))),
                 operator);
-        AssertUtils.isTrue(decision.isPassed()
-                        && Objects.equals(decision.getReconciliationResultDigest(),
-                        candidate.getReconciliationResultDigest()),
-                "清算确认时对账 Gate 未通过或证据已变化，candidateSn = {}", candidate.getSn());
+        AssertUtils.isTrue(decision.isPassed(),
+                "清算确认时对账 Gate 未通过，candidateSn = {}", candidate.getSn());
+        return decision;
     }
 
     private void recordDeterministicFailure(ClearingBatch batch,
@@ -393,6 +398,9 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         LocalDateTime now = LocalDateTime.now();
         String updatedBy = operator.getOperatorAsText();
         for (ClearingCandidate candidate : candidates) {
+            AssertUtils.isTrue(stageGateEvidenceMapper.deleteByStage(batch.getTenantId(),
+                            "CLEARING_CONFIRM_ITEM", "clearing-candidate", candidate.getSn()) == 1,
+                    "删除失败清算动作的 Gate 成功消费证据失败，candidateSn = {}", candidate.getSn());
             AssertUtils.isTrue(clearingCandidateMapper.blockLockedCandidate(batch.getTenantId(), candidate.getSn(),
                             batch.getSn(), FUNDS_REJECTED_BLOCK_REASON, updatedBy, now) == 1,
                     "阻断明确失败的清算候选失败，candidateSn = {}", candidate.getSn());
@@ -409,14 +417,24 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
 
     private void markCandidatesCleared(ClearingBatch batch,
                                        List<ClearingCandidate> candidates,
+                                       List<ReconciliationGateDecisionDTO> gateDecisions,
                                        WindOperator operator) {
         LocalDateTime now = LocalDateTime.now();
         String updatedBy = operator.getOperatorAsText();
-        for (ClearingCandidate candidate : candidates) {
+        for (int index = 0; index < candidates.size(); index++) {
+            ClearingCandidate candidate = candidates.get(index);
+            candidate.setGateEvidenceRef(requiredStageEvidenceRef(gateDecisions.get(index)));
+            AssertUtils.isTrue(clearingCandidateMapper.update(candidate) == 1,
+                    "记录清算候选 Gate 消费证据失败，candidateSn = {}", candidate.getSn());
             AssertUtils.isTrue(clearingCandidateMapper.markLockedCandidateCleared(batch.getTenantId(),
                             candidate.getSn(), batch.getSn(), updatedBy, now) == 1,
                     "推进清算候选完成失败，candidateSn = {}", candidate.getSn());
         }
+    }
+
+    private String requiredStageEvidenceRef(ReconciliationGateDecisionDTO decision) {
+        AssertUtils.notEmpty(decision.getEvidenceRefs(), "Gate 通过时必须持有消费证据");
+        return decision.getEvidenceRefs().getFirst();
     }
 
     private void releaseCandidates(ClearingBatch batch, WindOperator operator) {

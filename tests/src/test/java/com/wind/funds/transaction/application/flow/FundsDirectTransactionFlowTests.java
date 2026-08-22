@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.common.exception.BaseException;
 import com.wind.integration.operator.OperationActorType;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -12,6 +13,8 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.funds.transaction.enums.FundsTransactionDetailState;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -23,10 +26,13 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
+import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
@@ -35,6 +41,7 @@ import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionState;
+import com.wind.funds.transaction.support.FundsRouteLegIds;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountState;
@@ -43,6 +50,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +81,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertSubjectB
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -122,7 +131,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterFirst,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertThat(detailRequestHashes(CORE1B_BUSINESS_SN))
                 .isEqualTo(CORE1B_CANONICAL_DETAIL_DIGESTS)
@@ -268,7 +277,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, after,
                 delta(account, LedgerSubjectCode.AVAILABLE, 95L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertThat(postingPlansOf(ledgerTransactionByBusinessSn("DIRECT_TOPUP_FEE")).stream()
                 .map(LedgerPostingPlan::getPhaseCode)
@@ -403,6 +412,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPartialFxRefundShouldPropagateCurrentAmountFactsToLedger() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fx_refund_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 325L, "FX_PARTIAL_REFUND_TOPUP");
         String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
@@ -446,6 +456,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPartialFxRefundWithChangedRateShouldRejectWithoutFundsSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fx_refund_rate_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 325L, "FX_REFUND_RATE_TOPUP");
         String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
@@ -477,6 +488,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CurrencyIsoCode.USD));
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("FX_REFUND_RATE_CHANGED");
+        assertNoActionFacts("REFUND", "FX_REFUND_RATE_CHANGED");
     }
 
     /**
@@ -490,6 +502,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testTopupPayThenPartialRefundShouldPostLedgerFacts() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("ordinary_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -500,7 +513,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_PAY_REFUND_PAY");
@@ -524,7 +537,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -559,6 +572,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_PAY", 2, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_REFUND", 2, 2);
+        assertNoActionFacts("REFUND", "DIRECT_PAY_REFUND_REFUND");
     }
 
     /**
@@ -572,6 +586,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithInsufficientPayerBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_low_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -581,7 +596,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_INSUFFICIENT_PAY");
@@ -611,7 +626,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -636,6 +651,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testSuspendedPayeeLedgerShouldRejectNormalPayAndAllowRefundClosingPosting() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("closing_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         topup(payer, 100L, "DIRECT_CLOSING_TOPUP");
@@ -679,6 +695,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testReferencedRefundToClosedAccountShouldRejectWithoutLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("closed_refund_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "DIRECT_CLOSED_REFUND_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -708,13 +725,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
      * 场景：冻结账户仍可承接既有退款，但本次退款同时要求从该账户收取新手续费。
      * 输入：付款完成后冻结原付款账户，再发起关联退款 30 并收取手续费 5。
      * 输出：整笔退款被拒绝，退款本金和手续费均不入账。
-     * 预期：退款入账义务不等于允许账户出账；手续费扣款必须满足 ACTIVE 借记准入。
-     * 红线：不得借退款流程绕过冻结或挂起账户的出账控制。
+     * 预期：关联退款只恢复原资金效果，不接纳新的手续费动作。
+     * 红线：不得把退款与新增费用合并成一个恢复动作。
      */
     @Test
     void testReferencedRefundWithFeeChargeSpecToFrozenAccountShouldRejectWithoutSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_frozen_fee_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "DIRECT_REFUND_FROZEN_FEE_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -733,7 +751,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_FROZEN_FEE_REFUND")
                 .setDescription("referenced refund with fee to frozen account"), WindOperatorFactory.system()))
-                .hasMessageContaining("账户状态不允许扣取随交易手续费");
+                .hasMessageContaining("关联退款不支持新增手续费");
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(beforeRefund, afterRefund,
@@ -743,6 +761,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_FROZEN_FEE_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_FROZEN_FEE_REFUND");
     }
 
     /**
@@ -756,6 +775,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithMissingReferenceTransactionShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_missing_ref_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -765,7 +785,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_MISSING_REFERENCE_PAY");
@@ -799,30 +819,37 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_PAY", 2, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_MISSING_REFERENCE_REFUND");
     }
 
     /**
-     * 场景：原支付交易存在，但其账本流水缺失或不唯一。
-     * 输入：完成充值和付款后，测试边界将原支付账本流水调整为 0 条或 2 条，再发起关联退款。
-     * 输出：退款在账本来源唯一性校验处失败，余额和既有账务事实保持不变。
-     * 红线：退款不得猜测账本来源，也不得在来源不唯一时写入任何资金或账务事实。
+     * 场景：原支付交易已选择账本引用，但按资金交易号查询的账本流水缺失或出现额外未引用行。
+     * 输入：完成充值和付款后，测试边界删除已选账本事实或增加一条未被 detail 引用的账本行。
+     * 输出：已选账本事实缺失时由 Ledger 拒绝；额外未引用行不影响关联退款。
+     * 红线：Transaction 不得改用按资金交易号扫描 Ledger 全表的方式重新选择引用。
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void testReferencedRefundWithoutUniqueLedgerTransactionShouldRejectWithoutSideEffects(boolean duplicate) {
+    void testReferencedRefundShouldUseSelectedLedgerReferenceAndFailClosedWhenMissing(boolean duplicate) {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_source_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "DIRECT_REFUND_LEDGER_SOURCE_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "DIRECT_REFUND_LEDGER_SOURCE_PAY");
+        String selectedLedgerTransactionSn = fundsTransactionDetails(payTransactionSn).getFirst()
+                .getLedgerTransactionSn();
+        assertThat(selectedLedgerTransactionSn).isNotBlank();
+        assertThat(fundsTransactionDetails(payTransactionSn)).allSatisfy(detail ->
+                assertThat(detail.getLedgerTransactionSn()).isEqualTo(selectedLedgerTransactionSn));
 
         if (duplicate) {
             int inserted = core1bJdbcTemplate.update("""
@@ -849,20 +876,53 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String refundBusinessSn = duplicate
                 ? "DIRECT_REFUND_DUPLICATE_LEDGER_SOURCE"
                 : "DIRECT_REFUND_MISSING_LEDGER_SOURCE";
-
-        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+        FundsTransactionRefundRequest request = new FundsTransactionRefundRequest()
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn(refundBusinessSn)
-                .setDescription("refund without unique ledger source"), WindOperatorFactory.system()))
-                .hasMessageContaining("原资金交易账本流水不存在或不唯一");
+                .setDescription("refund with selected ledger source");
+
+        if (duplicate) {
+            String refundTransactionSn = directTransactionService.refund(request, WindOperatorFactory.system());
+            assertOnlyBalanceDeltas(beforeFailure,
+                    snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount())),
+                    delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                    delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                    delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                    delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+            assertReferenceRefundFacts(refundBusinessSn, refundTransactionSn, payTransactionSn, 30L);
+            assertThat(ledgerTransactionByBusinessSn(refundBusinessSn).getReferenceLedgerTransactionSn())
+                    .isEqualTo(selectedLedgerTransactionSn);
+            return;
+        }
+
+        assertThatThrownBy(() -> directTransactionService.refund(request, WindOperatorFactory.system()))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原账本交易与引用资金交易不一致");
 
         assertThat(snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount())))
                 .isEqualTo(beforeFailure);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
-        assertNoPersistedTransactionFactsForBusinessSn(refundBusinessSn);
+        assertThat(fundsTransactionsByBusinessSn(refundBusinessSn))
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getState()).isEqualTo(FundsTransactionState.FAILED);
+                    assertThat(transaction.getReferenceTransactionSn()).isEqualTo(payTransactionSn);
+                    assertThat(transaction.getCompletedAmount()).isZero();
+                    assertThat(transaction.getRefundedAmount()).isZero();
+                });
+        assertThat(fundsTransactionDetailsByBusinessSn(refundBusinessSn))
+                .isNotEmpty()
+                .allSatisfy(detail -> {
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.FAILED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                    assertThat(detail.getErrorCode()).isNotBlank();
+                    assertThat(detail.getErrorMessage()).contains("原账本交易与引用资金交易不一致");
+                });
+        assertThat(ledgerTransactionsForBusinessSn(refundBusinessSn)).isEmpty();
+        assertThat(entriesByBusinessSn(refundBusinessSn)).isEmpty();
     }
 
     /**
@@ -876,6 +936,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithMissingReferenceRouteSnapshotShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_snap_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -885,7 +946,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -927,11 +988,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND");
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
     }
 
@@ -946,6 +1008,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testReferencedRefundWithExplicitAccountShouldRejectWithoutSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_conflict_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "DIRECT_REFUND_CONFLICT_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -969,6 +1032,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_CONFLICT_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_CONFLICT_REFUND");
     }
 
     /**
@@ -982,6 +1046,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithReferenceTransactionShouldReplayOriginalRouteAndKeepIndependentRefundFact() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_reference_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -991,11 +1056,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "DIRECT_REFUND_REFERENCE_PAY");
+        List<FundsActionFactDTO> originalPayActionFacts = actionFactsByBusiness(
+                "PAY", "DIRECT_REFUND_REFERENCE_PAY");
+        assertThat(originalPayActionFacts).singleElement();
         BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterPay,
                 delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
@@ -1021,13 +1089,21 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_PAY", 2, 2);
         assertReferenceRefundFacts("DIRECT_REFUND_REFERENCE_REFUND", refundTransactionSn, payTransactionSn, 30L);
+        assertActionFactQueryBoundary("REFUND", "DIRECT_REFUND_REFERENCE_REFUND");
+        assertRecoveryActionFact("REFUND", "DIRECT_REFUND_REFERENCE_REFUND",
+                originalPayActionFacts.getFirst(), 30L);
+        assertActionFactReferenceBoundary(actionFactsByBusiness(
+                        "REFUND", "DIRECT_REFUND_REFERENCE_REFUND").getFirst(),
+                "REFUND", "DIRECT_REFUND_REFERENCE_REFUND");
+        assertThat(actionFactsByBusiness("PAY", "DIRECT_REFUND_REFERENCE_PAY"))
+                .containsExactlyElementsOf(originalPayActionFacts);
 
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
@@ -1048,7 +1124,474 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_REFERENCE_EXCEED_REFUND");
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(30L);
+        assertThat(actionFactsByBusiness("PAY", "DIRECT_REFUND_REFERENCE_PAY"))
+                .containsExactlyElementsOf(originalPayActionFacts);
+
+        String finalRefundTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_REFERENCE_FINAL_REFUND")
+                .setDescription("refund original transaction remaining amount"), WindOperatorFactory.system());
+        BalanceSnapshot afterFinalRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRejectedRefund, afterFinalRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(fundsTransaction(payTransactionSn)).satisfies(transaction -> {
+            assertThat(transaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
+            assertThat(transaction.getRefundedAmount()).isEqualTo(70L);
+        });
+        assertThat(fundsTransaction(finalRefundTransactionSn).getReferenceTransactionSn())
+                .isEqualTo(payTransactionSn);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_FINAL_REFUND", 2, 2);
+        assertRecoveryActionFact("REFUND", "DIRECT_REFUND_REFERENCE_FINAL_REFUND",
+                originalPayActionFacts.getFirst(), 40L);
+        assertThat(actionFactsByBusiness("PAY", "DIRECT_REFUND_REFERENCE_PAY"))
+                .containsExactlyElementsOf(originalPayActionFacts);
+    }
+
+    @Test
+    void testReferencedRecoveryActionFactsShouldBeIndependentIdempotentAndCumulative() {
+        FundsAccountId payer = fundingAccount("recovery_action_payer");
+        FundsAccountId payee = fundingAccount("recovery_action_payee");
+        FundsAccountId alternatePayee = fundingAccount("recovery_alt_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        ensureFundingAccount(alternatePayee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(alternatePayee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 200L, "RECOVERY_ACTION_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "RECOVERY_ACTION_PAY");
+        String alternatePayTransactionSn = pay(payer, alternatePayee, LedgerSubjectCode.SETTLEMENT, 50L,
+                "RECOVERY_ACTION_ALTERNATE_PAY");
+        FundsActionFactDTO originalActionFact = actionFactsByBusiness("PAY", "RECOVERY_ACTION_PAY")
+                .getFirst();
+
+        FundsTransactionRefundRequest firstRequest = new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ACTION_FIRST")
+                .setContextVariables(WritableContextVariables.of(Map.of("recoveryRuleVersion", "V1")))
+                .setDescription("first direct primary recovery");
+        String firstTransactionSn = directTransactionService.refund(firstRequest, WindOperatorFactory.system());
+        BalanceSnapshot afterFirst = snapshot(balances(payer, payee, alternatePayee));
+        LedgerFactSnapshot afterFirstFacts = ledgerFactSnapshot();
+        assertReferenceRefundFacts("RECOVERY_ACTION_FIRST", firstTransactionSn, payTransactionSn, 30L);
+
+        assertThat(directTransactionService.refund(firstRequest, WindOperatorFactory.system()))
+                .isEqualTo(firstTransactionSn);
+        assertOnlyBalanceDeltas(afterFirst, snapshot(balances(payer, payee, alternatePayee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(alternatePayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFacts);
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(31L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ACTION_FIRST")
+                .setContextVariables(WritableContextVariables.of(Map.of("recoveryRuleVersion", "V1")))
+                .setDescription("conflicting direct primary recovery"), WindOperatorFactory.system()))
+                .hasMessageContaining("请求参数不一致");
+        assertOnlyBalanceDeltas(afterFirst, snapshot(balances(payer, payee, alternatePayee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(alternatePayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFacts);
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ACTION_FIRST")
+                .setContextVariables(WritableContextVariables.of(Map.of("recoveryRuleVersion", "V2")))
+                .setDescription("conflicting recovery context"), WindOperatorFactory.system()))
+                .hasMessageContaining("请求参数不一致");
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(alternatePayTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ACTION_FIRST")
+                .setContextVariables(WritableContextVariables.of(Map.of("recoveryRuleVersion", "V1")))
+                .setDescription("conflicting recovery original fact"), WindOperatorFactory.system()))
+                .hasMessageContaining("请求参数不一致");
+        assertThat(fundsTransaction(alternatePayTransactionSn).getRefundedAmount()).isZero();
+        assertOnlyBalanceDeltas(afterFirst, snapshot(balances(payer, payee, alternatePayee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(alternatePayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFacts);
+
+        String secondTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(20L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ACTION_SECOND")
+                .setDescription("second direct primary recovery"), WindOperatorFactory.system());
+        assertThat(fundsTransaction(secondTransactionSn).getReferenceTransactionSn()).isEqualTo(payTransactionSn);
+        assertSingleFundsAndLedgerFactsForBusinessSn("RECOVERY_ACTION_SECOND", 2, 2);
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(50L);
+
+        FundsActionFactDTO firstRecovery = assertRecoveryActionFact("REFUND", "RECOVERY_ACTION_FIRST",
+                originalActionFact, 30L);
+        assertThat(actionFactsByBusiness("REFUND", "RECOVERY_ACTION_FIRST"))
+                .containsExactly(firstRecovery);
+        assertRecoveryActionFact("REFUND", "RECOVERY_ACTION_SECOND", originalActionFact, 20L);
+        assertThat(actionFactsByBusiness("PAY", "RECOVERY_ACTION_PAY")).containsExactly(originalActionFact);
+    }
+
+    @Test
+    void testReferencedRecoveryActionFactShouldFailClosedForDurableRouteAmountAndCumulativeTamper() {
+        FundsAccountId payer = fundingAccount("recovery_tamper_payer");
+        FundsAccountId payee = fundingAccount("recovery_tamper_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "RECOVERY_TAMPER_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "RECOVERY_TAMPER_PAY");
+        String recoveryTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_TAMPER_REFUND")
+                .setDescription("durable recovery tamper boundary"), WindOperatorFactory.system());
+        FundsActionFactDTO recoveryFact = actionFactsByBusiness("REFUND", "RECOVERY_TAMPER_REFUND").getFirst();
+        String recoveryRoute = fundsTransaction(recoveryTransactionSn).getRouteSnapshot();
+        List<String> acceptedTamper = new ArrayList<>();
+
+        updateRecoveryRouteDirection(recoveryTransactionSn, recoveryRoute, true);
+        collectRecoveryProjectionLeak(acceptedTamper, "route", recoveryFact);
+        updateRecoveryRouteDirection(recoveryTransactionSn, recoveryRoute, false);
+        assertThat(actionFactsByBusiness("REFUND", "RECOVERY_TAMPER_REFUND")).containsExactly(recoveryFact);
+
+        updateRecoveryMoney(recoveryTransactionSn, recoveryRoute, 110L);
+        collectRecoveryProjectionLeak(acceptedTamper, "amount", recoveryFact);
+        updateRecoveryMoney(recoveryTransactionSn, recoveryRoute, 30L);
+        assertThat(actionFactsByBusiness("REFUND", "RECOVERY_TAMPER_REFUND")).containsExactly(recoveryFact);
+
+        updateFundsTransactionRefundedAmount(payTransactionSn, 29L);
+        collectRecoveryProjectionLeak(acceptedTamper, "cumulative", recoveryFact);
+        updateFundsTransactionRefundedAmount(payTransactionSn, 30L);
+        assertThat(actionFactsByBusiness("REFUND", "RECOVERY_TAMPER_REFUND")).containsExactly(recoveryFact);
+
+        assertThat(acceptedTamper).isEmpty();
+    }
+
+    @Test
+    void testReferencedRecoveryShouldRefundOnlyPrincipalFromFeeBearingOriginalPay() {
+        FundsAccountId payer = fundingAccount("recovery_fee_payer");
+        FundsAccountId payee = fundingAccount("recovery_fee_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 110L, "RECOVERY_FEE_TOPUP");
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L, 10L,
+                "RECOVERY_FEE_PAY");
+        FundsTransaction payTransaction = fundsTransactionsByBusinessSn("RECOVERY_FEE_PAY").getFirst();
+        List<FundsActionFactDTO> originalActionFacts = actionFactsByBusiness("PAY", "RECOVERY_FEE_PAY");
+        assertThat(originalActionFacts).hasSize(2);
+        BalanceSnapshot before = snapshot(balances(payer, payee, feeAccount()));
+        FundsTransactionRefundRequest request = new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransaction.getSn())
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_FEE_REFUND")
+                .setDescription("refund principal from fee-bearing pay");
+        assertThatCode(() -> directTransactionService.refund(request, WindOperatorFactory.system()))
+                .doesNotThrowAnyException();
+        String refundTransactionSn = directTransactionService.refund(request, WindOperatorFactory.system());
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(payer, payee, feeAccount())),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertReferenceRefundFacts("RECOVERY_FEE_REFUND", refundTransactionSn, payTransaction.getSn(), 30L);
+        assertThat(actionFactsByBusiness("PAY", "RECOVERY_FEE_PAY"))
+                .containsExactlyElementsOf(originalActionFacts);
+        assertThat(fundsTransaction(payTransaction.getSn()).getRefundedAmount()).isEqualTo(30L);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 10L, CURRENCY);
+    }
+
+    @Test
+    void testStandaloneFeeRefundShouldRejectIncompleteTransactionOwnedSourceFacts() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        topup(payer, 50L, "MIG05_STANDALONE_FEE_TOPUP");
+        fee(payer, 10L, "MIG05_STANDALONE_FEE_CHARGE");
+        String feeTransactionSn = fundsTransactionsByBusinessSn("MIG05_STANDALONE_FEE_CHARGE").getFirst().getSn();
+        assertThat(fundsTransactionDetailsByBusinessSn("MIG05_STANDALONE_FEE_CHARGE")).hasSize(2);
+        assertThat(entriesOf(ledgerTransactionByBusinessSn("MIG05_STANDALONE_FEE_CHARGE"))).hasSize(2);
+        assertThat(routeSnapshot("MIG05_STANDALONE_FEE_CHARGE").getLegs()).singleElement();
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 10L, CURRENCY);
+
+        FundsTransactionDetail sourceDetail = fundsTransactionDetailsByBusinessSn(
+                "MIG05_STANDALONE_FEE_CHARGE").getFirst();
+        updateFundsTransactionDetailState(sourceDetail.getSn(), FundsTransactionDetailState.PROCESSING);
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> refundFee(payer, 10L, feeTransactionSn,
+                "MIG05_STANDALONE_FEE_REFUND"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原资金交易账本引用无法唯一解析");
+        assertOnlyBalanceDeltas(beforeRefund, snapshot(balances(payer, feeAccount())),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("MIG05_STANDALONE_FEE_REFUND");
+        assertNoActionFacts("REFUND", "MIG05_STANDALONE_FEE_REFUND");
+    }
+
+    @Test
+    void testEmbeddedFeeRefundShouldRejectBlankTransactionOwnedLedgerReference() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("mig05_embedded_fee_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "MIG05_EMBEDDED_FEE_TOPUP");
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
+                "MIG05_EMBEDDED_FEE_PAY");
+        String payTransactionSn = fundsTransactionsByBusinessSn("MIG05_EMBEDDED_FEE_PAY").getFirst().getSn();
+        assertSingleFundsAndLedgerFactsForBusinessSn("MIG05_EMBEDDED_FEE_PAY", 3, 4);
+        assertThat(routeSnapshot("MIG05_EMBEDDED_FEE_PAY").getLegs()).hasSize(2);
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 25L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+
+        FundsTransactionDetail feeReceiver = fundsTransactionDetailsByBusinessSn("MIG05_EMBEDDED_FEE_PAY")
+                .stream()
+                .filter(detail -> detail.getParticipantRole() == RouteParticipantRole.FEE_RECEIVER)
+                .findFirst()
+                .orElseThrow();
+        updateFundsTransactionDetailLedgerRef(feeReceiver.getSn(), null);
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> refundFee(payer, 5L, payTransactionSn,
+                "MIG05_EMBEDDED_FEE_REFUND"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原资金交易账本引用无法唯一解析");
+        assertOnlyBalanceDeltas(beforeRefund, snapshot(balances(payer, payee, feeAccount())),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("MIG05_EMBEDDED_FEE_REFUND");
+        assertNoActionFacts("REFUND", "MIG05_EMBEDDED_FEE_REFUND");
+    }
+
+    @Test
+    void testFeeRefundShouldRejectParticipantThatNoLongerMatchesFrozenRoute() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("mig05_route_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "MIG05_ROUTE_TOPUP");
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L, "MIG05_ROUTE_PAY");
+        String payTransactionSn = fundsTransactionsByBusinessSn("MIG05_ROUTE_PAY").getFirst().getSn();
+        assertSingleFundsAndLedgerFactsForBusinessSn("MIG05_ROUTE_PAY", 3, 4);
+        assertThat(routeSnapshot("MIG05_ROUTE_PAY").getParticipants()).hasSize(3);
+        assertThat(entriesOf(ledgerTransactionByBusinessSn("MIG05_ROUTE_PAY"))).hasSize(4);
+
+        FundsTransactionDetail payerDetail = fundsTransactionDetailsByBusinessSn("MIG05_ROUTE_PAY").stream()
+                .filter(detail -> detail.getParticipantRole() == RouteParticipantRole.PAYER)
+                .findFirst()
+                .orElseThrow();
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET subject_id = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, "tampered_route_subject", TENANT_ID, payerDetail.getSn())).isOne();
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> refundFee(payer, 5L, payTransactionSn,
+                "MIG05_ROUTE_FEE_REFUND"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原资金交易账本引用无法唯一解析");
+        assertOnlyBalanceDeltas(beforeRefund, snapshot(balances(payer, payee, feeAccount())),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("MIG05_ROUTE_FEE_REFUND");
+        assertNoActionFacts("REFUND", "MIG05_ROUTE_FEE_REFUND");
+    }
+
+    @Test
+    void testFeeRefundShouldFailClosedWhenSourceFactCoverageCrossesTenantBoundary() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        topup(payer, 50L, "MIG05_TENANT_TOPUP");
+        fee(payer, 10L, "MIG05_TENANT_FEE_CHARGE");
+        String feeTransactionSn = fundsTransactionsByBusinessSn("MIG05_TENANT_FEE_CHARGE").getFirst().getSn();
+        assertThat(fundsTransactionDetailsByBusinessSn("MIG05_TENANT_FEE_CHARGE")).hasSize(2);
+        assertThat(routeSnapshot("MIG05_TENANT_FEE_CHARGE").getParticipants()).hasSize(2);
+        assertThat(entriesOf(ledgerTransactionByBusinessSn("MIG05_TENANT_FEE_CHARGE"))).hasSize(2);
+
+        FundsTransactionDetail sourceDetail = fundsTransactionDetailsByBusinessSn(
+                "MIG05_TENANT_FEE_CHARGE").getFirst();
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET tenant_id = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID + 1, TENANT_ID, sourceDetail.getSn())).isOne();
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> refundFee(payer, 10L, feeTransactionSn,
+                "MIG05_TENANT_FEE_REFUND"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原资金交易账本引用无法唯一解析");
+        assertOnlyBalanceDeltas(beforeRefund, snapshot(balances(payer, feeAccount())),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("MIG05_TENANT_FEE_REFUND");
+        assertNoActionFacts("REFUND", "MIG05_TENANT_FEE_REFUND");
+    }
+
+    @Test
+    void testReferencedRecoveryShouldProjectProvenZeroAndFailClosedForUnknown() {
+        FundsAccountId payer = fundingAccount("recovery_zero_payer");
+        FundsAccountId payee = fundingAccount("recovery_zero_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "RECOVERY_ZERO_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "RECOVERY_ZERO_PAY");
+        FundsActionFactDTO originalActionFact = actionFactsByBusiness("PAY", "RECOVERY_ZERO_PAY").getFirst();
+        refund(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "RECOVERY_ZERO_BALANCE_DEPLETION");
+        BalanceSnapshot before = snapshot(balances(payer, payee));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(50L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_ZERO_FAILED")
+                .setDescription("recovery posting rejection"), WindOperatorFactory.system()))
+                .hasMessageContaining("账本余额不足");
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(payer, payee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertFailedFundsTransactionWithoutLedgerFacts("RECOVERY_ZERO_FAILED");
+        assertThat(fundsTransactionDetailsByBusinessSn("RECOVERY_ZERO_FAILED"))
+                .extracting(FundsTransactionDetail::getErrorCode)
+                .containsOnly("LEDGER_POSTING_REJECTED");
+        FundsTransaction failedTransaction = fundsTransactionsByBusinessSn("RECOVERY_ZERO_FAILED").getFirst();
+        FundsTransactionDetail failedDetail = fundsTransactionDetailsByBusinessSn("RECOVERY_ZERO_FAILED").getFirst();
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+        assertThat(actionFactsByBusiness("PAY", "RECOVERY_ZERO_PAY")).containsExactly(originalActionFact);
+
+        updateFundsTransactionState(failedTransaction.getSn(), FundsTransactionState.PROCESSING);
+        assertNoActionFacts("REFUND", "RECOVERY_ZERO_FAILED");
+        updateFundsTransactionState(failedTransaction.getSn(), FundsTransactionState.FAILED);
+
+        updateFundsTransactionDetailErrorCode(failedDetail.getSn(), "FUNDS_INSTRUCTION_EXECUTION_FAILED");
+        assertNoActionFacts("REFUND", "RECOVERY_ZERO_FAILED");
+        updateFundsTransactionDetailErrorCode(failedDetail.getSn(), "LEDGER_POSTING_REJECTED");
+
+        FundsActionFactDTO failedRecovery = assertRecoveryActionFact("REFUND", "RECOVERY_ZERO_FAILED",
+                originalActionFact, 50L, "failed", "proven-zero");
+        updateFundsTransactionState(failedTransaction.getSn(), FundsTransactionState.PROCESSING);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(failedRecovery.getIdentity())).isEmpty();
+        updateFundsTransactionState(failedTransaction.getSn(), FundsTransactionState.FAILED);
+        updateFundsTransactionDetailErrorCode(failedDetail.getSn(), "FUNDS_INSTRUCTION_EXECUTION_FAILED");
+        assertThat(fundsTransactionQueryService.findFundsActionFact(failedRecovery.getIdentity())).isEmpty();
+        updateFundsTransactionDetailErrorCode(failedDetail.getSn(), "LEDGER_POSTING_REJECTED");
+    }
+
+    @Test
+    void testReferencedRecoveryShouldRejectDifferentCurrencyWithoutSideEffects() {
+        FundsAccountId payer = fundingAccount("recovery_currency_payer");
+        FundsAccountId payee = fundingAccount("recovery_currency_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "RECOVERY_CURRENCY_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
+                "RECOVERY_CURRENCY_PAY");
+        BalanceSnapshot before = snapshot(balances(payer, payee));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CurrencyIsoCode.CNY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_CURRENCY_REJECTED")
+                .setDescription("wrong currency recovery"), WindOperatorFactory.system()));
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(payer, payee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("RECOVERY_CURRENCY_REJECTED");
+        assertNoActionFacts("REFUND", "RECOVERY_CURRENCY_REJECTED");
+    }
+
+    @Test
+    void testReferencedRecoveryShouldRejectNonPayOriginalWithoutSideEffects() {
+        FundsAccountId account = fundingAccount("recovery_non_pay_account");
+        ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        topup(account, 100L, "RECOVERY_NON_PAY_TOPUP");
+        String topupTransactionSn = fundsTransactionsByBusinessSn("RECOVERY_NON_PAY_TOPUP").getFirst().getSn();
+        BalanceSnapshot before = snapshot(balances(account));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(topupTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_NON_PAY_REJECTED")
+                .setDescription("non-pay original recovery"), WindOperatorFactory.system()));
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(account)),
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("RECOVERY_NON_PAY_REJECTED");
+        assertNoActionFacts("REFUND", "RECOVERY_NON_PAY_REJECTED");
+    }
+
+    @Test
+    void testReferencedRecoveryShouldRejectOriginalWithoutProvenFullEffect() {
+        FundsAccountId payer = fundingAccount("recovery_unproven_payer");
+        FundsAccountId payee = fundingAccount("recovery_unproven_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 30L,
+                "RECOVERY_UNPROVEN_PAY"))
+                .hasMessageContaining("账本余额不足");
+        FundsTransaction failedPay = fundsTransactionsByBusinessSn("RECOVERY_UNPROVEN_PAY").getFirst();
+        assertPrimaryActionFacts("PAY", "RECOVERY_UNPROVEN_PAY", "failed", "proven-zero", 30L);
+        BalanceSnapshot before = snapshot(balances(payer, payee));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(20L, CURRENCY)))
+                .setReferenceTransactionSn(failedPay.getSn())
+                .setBusinessScene("REFUND")
+                .setBusinessSn("RECOVERY_UNPROVEN_REJECTED")
+                .setDescription("unproven original recovery"), WindOperatorFactory.system()));
+
+        assertOnlyBalanceDeltas(before, snapshot(balances(payer, payee)),
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("RECOVERY_UNPROVEN_REJECTED");
+        assertNoActionFacts("REFUND", "RECOVERY_UNPROVEN_REJECTED");
     }
 
     /**
@@ -1063,11 +1606,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId reservePayer = fundingAccount("refund_reserve_payer");
         FundsAccountId payee = fundingAccount("refund_race_payee");
         ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "DIRECT_REFUND_CONCURRENT_TOPUP");
         topup(reservePayer, 100L, "DIRECT_REFUND_CONCURRENT_RESERVE_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
                 "DIRECT_REFUND_CONCURRENT_PAY");
+        FundsActionFactDTO originalPayActionFact = actionFactsByBusiness(
+                "PAY", "DIRECT_REFUND_CONCURRENT_PAY").getFirst();
         pay(reservePayer, payee, LedgerSubjectCode.SETTLEMENT, 100L,
                 "DIRECT_REFUND_CONCURRENT_RESERVE_PAY");
         BalanceSnapshot beforeRace = snapshot(balances(payer, reservePayer, payee));
@@ -1104,31 +1650,31 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(60L);
             assertReferenceRefundFacts(successes.getFirst().businessSn(), successes.getFirst().transactionSn(),
                     payTransactionSn, 60L);
+            assertRecoveryActionFact("REFUND", successes.getFirst().businessSn(), originalPayActionFact, 60L);
             assertNoFundsOrLedgerFactsForBusinessSn(failures.getFirst().businessSn());
+            assertNoActionFacts("REFUND", failures.getFirst().businessSn());
+            assertThat(actionFactsByBusiness("PAY", "DIRECT_REFUND_CONCURRENT_PAY"))
+                    .containsExactly(originalPayActionFact);
         } finally {
             executor.shutdownNow();
         }
     }
 
-    /**
-     * 场景：关联原支付的退款已由上层确认同时收取退款处理费。
-     * 输入：付款 70 后按原 RouteSnapshot 退款 30，并传入固定手续费 5；请求不重复传入退款路由字段。
-     * 输出：原付款方 AVAILABLE 回补 30 后扣费 5，原收款方 SETTLEMENT 减少 30，平台 FEE 增加 5。
-     * 预期：退款本金腿和新增手续费腿在同一账本交易中原子入账。
-     * 红线：关联退款不得忽略收费规则，也不得按当前请求重新选择退款路径。
-     */
+    /** 关联原支付的 recovery 不得在本切片同时引入新的手续费动作。 */
     @Test
-    void testReferencedRefundWithFeeChargeSpecShouldChargeUniqueFundingBeneficiaryAtomically() {
+    void testReferencedRecoveryWithFeeChargeSpecShouldFailClosedWithoutSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_fee_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         topup(payer, 100L, "DIRECT_REFUND_FEE_TOPUP");
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "DIRECT_REFUND_FEE_PAY");
         BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
 
-        directTransactionService.refund(new FundsTransactionRefundRequest()
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setFeeChargeSpec(FeeSpec.builder()
                         .feeType("REFUND_PROCESSING_FEE")
@@ -1137,21 +1683,18 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_FEE_REFUND")
-                .setDescription("referenced refund with processing fee"), WindOperatorFactory.system());
+                .setDescription("referenced refund with processing fee"), WindOperatorFactory.system()));
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(beforeRefund, afterRefund,
-                delta(payer, LedgerSubjectCode.AVAILABLE, 25L, CURRENCY),
-                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
-                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY));
-        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("DIRECT_REFUND_FEE_REFUND");
-        assertThat(fundsTransaction(ledgerTransaction.getFundsTransactionSn()).getFeeAmount()).isEqualTo(5L);
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
         assertThat(fundsTransaction(payTransactionSn).getFeeAmount()).isZero();
-        assertThat(postingPlansOf(ledgerTransaction).stream()
-                .map(LedgerPostingPlan::getPhaseCode)
-                .toList())
-                .containsExactlyInAnyOrder(LedgerPhaseCode.REFUND.name(), LedgerPhaseCode.FEE.name());
-        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_FEE_REFUND", 3, 4);
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_FEE_REFUND");
+        assertNoActionFacts("REFUND", "DIRECT_REFUND_FEE_REFUND");
     }
 
     /**
@@ -1166,6 +1709,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId refundPayer = fundingAccount("refund_credit_fee_payer");
         FundsAccountId creditAccount = creditAccount("refund_credit_fee_target");
+        ensureFundingAccount(refundPayer, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(refundPayer, LedgerSubjectCode.SETTLEMENT);
         ensureCreditAccount(creditAccount);
         topup(payer, 100L, "DIRECT_REFUND_CREDIT_FEE_TOPUP");
@@ -1207,6 +1751,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithReferenceTransactionShouldReuseOriginalInstrumentAndRouteDecision() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_replay_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1216,7 +1761,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -1260,7 +1805,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -1283,6 +1828,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_ctx_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1292,7 +1838,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_SENSITIVE_CONTEXT_PAY");
@@ -1330,7 +1876,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1356,6 +1902,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithoutAccountShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_miss_acc_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1365,7 +1912,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_MISSING_ACCOUNT_PAY");
@@ -1400,7 +1947,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1454,6 +2001,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("refund_ext_payee");
         FundsAccountId externalAccount = FundsAccountId.immutable("external_refund_account",
                 DefaultFundsAccountType.EXTERNAL_BANK);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1463,7 +2011,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_EXTERNAL_ACCOUNT_PAY");
@@ -1499,7 +2047,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1527,6 +2075,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("refund_ext_payer_payee");
         FundsAccountId externalPayer = FundsAccountId.immutable("external_refund_payer",
                 DefaultFundsAccountType.EXTERNAL_BANK);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1536,7 +2085,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_EXTERNAL_PAYER_PAY");
@@ -1572,7 +2121,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1598,6 +2147,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testRefundWithoutPayerShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_miss_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1607,7 +2157,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_MISSING_PAYER_PAY");
@@ -1642,7 +2192,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1674,7 +2224,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -1691,7 +2241,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -1745,6 +2295,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     @Test
     void testPayToSameAccountShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId account = fundingAccount("funding_user");
+        ensureFundingAccount(account, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(account, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -1754,7 +2305,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(account, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(account, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -1774,7 +2325,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -1798,6 +2349,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId account = fundingAccount("same_refund_account");
         ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(account, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(account, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, account, cashMappingAccount(), prepaymentAccount()));
@@ -1808,7 +2360,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(account, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, account, LedgerSubjectCode.SETTLEMENT, 40L, "DIRECT_SAME_ACCOUNT_REFUND_PAY");
@@ -1841,7 +2393,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -1875,7 +2427,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -1898,7 +2450,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2096,7 +2648,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2122,7 +2674,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2456,7 +3008,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2484,7 +3036,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2628,7 +3180,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_980L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_020L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2651,6 +3203,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPayWithInsufficientBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("insufficient_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2677,6 +3230,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertPostedTransactions(0);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_INSUFFICIENT_PAY");
+        assertPrimaryActionFacts("PAY", "DIRECT_INSUFFICIENT_PAY",
+                "failed", "proven-zero", 10L);
     }
 
     /**
@@ -2690,6 +3245,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPayWithDifferentCurrencyShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("different_currency_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2699,7 +3255,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2725,7 +3281,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2748,6 +3304,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPayWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("sensitive_context_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2757,7 +3314,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2796,7 +3353,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2826,7 +3383,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2849,7 +3406,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2881,7 +3438,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2901,7 +3458,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertThat(balance(payee).getBalanceBuckets()).doesNotContainKey(LedgerSubjectCode.SETTLEMENT);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2911,6 +3468,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_LEDGER_TOPUP", 3, 4);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_PAY_MISSING_LEDGER");
+        assertNoActionFacts("PAY", "DIRECT_PAY_MISSING_LEDGER");
     }
 
     /**
@@ -2932,7 +3490,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -2956,7 +3514,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -2980,6 +3538,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId externalPayer = FundsAccountId.immutable("external_bank_payer",
                 DefaultFundsAccountType.EXTERNAL_BANK);
         FundsAccountId payee = fundingAccount("external_payer_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot before = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
@@ -3022,6 +3581,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId budget = spendControlScope("direct_pay_spend_control_scope");
         FundsAccountId payee = fundingAccount("budget_pay_payee");
         ensureSpendControlScopeWithoutLedgers(budget);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforePay = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
@@ -3076,7 +3636,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
         RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_ONLY");
@@ -3124,7 +3684,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -3165,7 +3725,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
         RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_EVENT");
@@ -3193,7 +3753,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(balance(payee).isInitialized())
                 .as("rejected transfer should not initialize payee ledger")
                 .isFalse();
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -3232,7 +3792,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
         RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_TRACE");
@@ -3261,7 +3821,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertThat(fundsTransactionDetails(firstTopupSn)).hasSize(3);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP_TRACE", 3, 4);
@@ -3294,7 +3854,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
         RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_CONTEXT");
@@ -3345,7 +3905,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_040L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertThat(fundsTransactionDetails(firstTopupSn)).hasSize(3);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT", 3, 4);
@@ -3362,6 +3922,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testDirectPaySameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("direct_idempotent_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -3371,7 +3932,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
@@ -3418,7 +3979,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -3431,6 +3992,155 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP", 3, 4);
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY", 2, 2);
+        assertPrimaryActionFacts("PAY", "DIRECT_IDEMPOTENT_PAY",
+                "succeeded", "proven-full", 40L);
+        assertActionFactReferenceBoundary(actionFactsByBusiness("PAY", "DIRECT_IDEMPOTENT_PAY").getFirst(),
+                "PAY", "DIRECT_IDEMPOTENT_PAY");
+    }
+
+    /**
+     * canonical ActionFact 必须由完整一致的 root/detail/route/ledger 引用事实组支撑。
+     */
+    @Test
+    void testPayActionFactQueryShouldFailClosedForInconsistentFactGroup() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("af_consistency_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "ACTION_FACT_CONSISTENCY_TOPUP");
+        String transactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
+                "ACTION_FACT_CONSISTENCY_PAY");
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn("ACTION_FACT_CONSISTENCY_PAY");
+        FundsTransactionDetail firstDetail = details.getFirst();
+        String ledgerTransactionSn = firstDetail.getLedgerTransactionSn();
+        String routeSnapshot = fundsTransactionsByBusinessSn("ACTION_FACT_CONSISTENCY_PAY")
+                .getFirst()
+                .getRouteSnapshot();
+        assertPrimaryActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY",
+                "succeeded", "proven-full", 40L);
+
+        updateFundsTransactionState(transactionSn, FundsTransactionState.PROCESSING);
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionState(transactionSn, FundsTransactionState.CLOSED);
+
+        updateFundsTransactionCompletedAmount(transactionSn, 39L);
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionCompletedAmount(transactionSn, 40L);
+
+        updateFundsTransactionDetailState(firstDetail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionDetailState(firstDetail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+
+        updateFundsTransactionDetailLedgerRef(firstDetail.getSn(), null);
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionDetailLedgerRef(firstDetail.getSn(), ledgerTransactionSn);
+
+        updateFundsTransactionRouteSnapshot(transactionSn, "{}");
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionRouteSnapshot(transactionSn, routeSnapshot);
+
+        ObjectNode reversedRoute = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode payLeg = (ObjectNode) ((ArrayNode) reversedRoute.get("legs")).get(0);
+        ObjectNode sourceNode = ((ObjectNode) payLeg.get("sourceNode")).deepCopy();
+        ObjectNode targetNode = ((ObjectNode) payLeg.get("targetNode")).deepCopy();
+        payLeg.set("sourceNode", targetNode);
+        payLeg.set("targetNode", sourceNode);
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(reversedRoute));
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionRouteSnapshot(transactionSn, routeSnapshot);
+
+        ObjectNode crossTenantRoute = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode participant = (ObjectNode) ((ArrayNode) crossTenantRoute.get("participants")).get(0);
+        ((ObjectNode) participant.get("subjectRef")).put("tenantId", TENANT_ID + 1);
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(crossTenantRoute));
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        updateFundsTransactionRouteSnapshot(transactionSn, routeSnapshot);
+
+        List<FundsActionFactDTO> originalFacts = actionFactsByBusiness("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        ObjectNode missingSubjectRoute = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode missingSubjectParticipant =
+                (ObjectNode) ((ArrayNode) missingSubjectRoute.get("participants")).get(0);
+        missingSubjectParticipant.remove("subjectRef");
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(missingSubjectRoute));
+        assertNoActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY");
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFacts.getFirst().getIdentity())).isEmpty();
+        updateFundsTransactionRouteSnapshot(transactionSn, routeSnapshot);
+        assertPrimaryActionFacts("PAY", "ACTION_FACT_CONSISTENCY_PAY",
+                "succeeded", "proven-full", 40L);
+    }
+
+    /**
+     * ActionFact 使用自己的 canonical 投影摘要，不把历史 detail requestHash 编码冒充为字段版本。
+     */
+    @Test
+    void testPayActionFactDigestShouldNotDependOnDetailHashEncodingVersion() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("af_digest_version_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "ACTION_FACT_DIGEST_VERSION_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L, "ACTION_FACT_DIGEST_VERSION_PAY");
+        List<FundsActionFactDTO> originalFacts = actionFactsByBusiness("PAY", "ACTION_FACT_DIGEST_VERSION_PAY");
+
+        updateFundsTransactionDetailRequestHash(
+                fundsTransactionDetailsByBusinessSn("ACTION_FACT_DIGEST_VERSION_PAY").getFirst().getSn(),
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        assertThat(actionFactsByBusiness("PAY", "ACTION_FACT_DIGEST_VERSION_PAY"))
+                .containsExactlyElementsOf(originalFacts);
+    }
+
+    /**
+     * RouteSnapshot 声明的任一 participant/detail sibling 缺失时不得投影不完整 ActionFact。
+     */
+    @Test
+    void testPayActionFactQueryShouldFailClosedWhenSiblingDetailIsMissing() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("af_missing_sibling_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "ACTION_FACT_MISSING_SIBLING_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L, "ACTION_FACT_MISSING_SIBLING_PAY");
+
+        deleteFundsTransactionDetail(fundsTransactionDetailsByBusinessSn("ACTION_FACT_MISSING_SIBLING_PAY")
+                .getLast()
+                .getSn());
+
+        assertNoActionFacts("PAY", "ACTION_FACT_MISSING_SIBLING_PAY");
+    }
+
+    /**
+     * FAILED 只有叠加本地入账拒绝码、全部 sibling 终结、零 ledger 引用和零累计才可证明零效果。
+     */
+    @Test
+    void testPayActionFactQueryShouldNotInferZeroFromFailedLabelAlone() {
+        FundsAccountId payer = fundingAccount("action_fact_failed_payer");
+        FundsAccountId payee = fundingAccount("action_fact_failed_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        FundsTransactionPayRequest request = new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("ACTION_FACT_FAILED_ZERO_PROOF")
+                .setDescription("action fact zero proof");
+        assertThatThrownBy(() -> directTransactionService.pay(request, WindOperatorFactory.system()))
+                .hasMessageContaining("账本余额不足");
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(
+                "ACTION_FACT_FAILED_ZERO_PROOF");
+        FundsTransactionDetail firstDetail = details.getFirst();
+        assertPrimaryActionFacts("PAY", "ACTION_FACT_FAILED_ZERO_PROOF",
+                "failed", "proven-zero", 10L);
+
+        updateFundsTransactionDetailErrorCode(firstDetail.getSn(), "FUNDS_INSTRUCTION_EXECUTION_FAILED");
+        assertNoActionFacts("PAY", "ACTION_FACT_FAILED_ZERO_PROOF");
+        updateFundsTransactionDetailErrorCode(firstDetail.getSn(), "LEDGER_POSTING_REJECTED");
+
+        updateFundsTransactionDetailLedgerRef(firstDetail.getSn(), "unexpected-ledger-transaction");
+        assertNoActionFacts("PAY", "ACTION_FACT_FAILED_ZERO_PROOF");
     }
 
     /**
@@ -3444,6 +4154,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testDirectPaySameBusinessSnWithDifferentBusinessContextShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("idem_pay_ctx_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -3453,7 +4164,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstPaySn = directTransactionService.pay(new FundsTransactionPayRequest()
@@ -3522,7 +4233,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY_CONTEXT_TOPUP", 3, 4);
@@ -3544,7 +4255,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId anotherPayee = fundingAccount("idem_payee2");
         ensureLedger(anotherPayer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(anotherPayer, LedgerSubjectCode.FROZEN);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        ensureFundingAccount(anotherPayee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(anotherPayee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeFirstTopup = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
@@ -3559,7 +4272,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         topup(anotherPayer, 100L, "DIRECT_IDEMPOTENT_PARTICIPANT_ANOTHER_TOPUP");
@@ -3572,7 +4285,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
@@ -3613,7 +4326,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(anotherPayer), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
         assertBucket(balance(anotherPayee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -3650,7 +4363,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
@@ -3712,7 +4425,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -3747,7 +4460,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
@@ -3813,7 +4526,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertThat(fundsTransactionDetails(firstTransferSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT_TOPUP", 3, 4);
@@ -3831,6 +4544,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testDirectRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("idem_refund_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -3840,7 +4554,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_IDEMPOTENT_REFUND_PAY");
@@ -3914,7 +4628,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -3942,6 +4656,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testDirectRefundSameBusinessSnWithDifferentBusinessContextShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("idem_refund_ctx_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -3951,7 +4666,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_IDEMPOTENT_REFUND_CONTEXT_PAY");
@@ -4029,7 +4744,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT_TOPUP", 3, 4);
@@ -4161,25 +4876,33 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         RouteSnapshotSpec payRouteSnapshot = fundsTransactionQueryService
                 .findRouteSnapshotByTransactionSn(payTransactionSn)
                 .orElseThrow();
-        assertThat(payRouteSnapshot.getLegs()).singleElement();
+        List<RouteLegSpec> replayablePrincipalLegs = payRouteSnapshot.getLegs().stream()
+                .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
+                .filter(leg -> !FundsRouteLegIds.FEE.equals(leg.getLegId()))
+                .toList();
+        assertThat(replayablePrincipalLegs).singleElement();
         RouteSnapshotSpec refundRouteSnapshot = routeSnapshot(businessSn);
         assertThat(refundRouteSnapshot.getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
         assertThat(refundRouteSnapshot.getLegs()).singleElement().satisfies(refundLeg -> {
-            String sourceLegId = payRouteSnapshot.getLegs().getFirst().getLegId();
+            String sourceLegId = replayablePrincipalLegs.getFirst().getLegId();
             assertThat(refundLeg.getReplayRefLegId()).isEqualTo(sourceLegId);
             assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(payTransactionSn,
                     FundsTransactionEventType.REFUND, sourceLegId, refundLeg.getAmount().getCurrency()).getAmount())
                     .isEqualTo(refundAmount);
         });
         LedgerTransaction refundLedgerTransaction = ledgerTransactionByBusinessSn(businessSn);
-        assertThat(ledgerTransactionsByFundsTransactionSn(payTransactionSn)).singleElement().satisfies(
-                payLedgerTransaction -> {
-                    assertThat(refundLedgerTransaction.getReferenceLedgerTransactionSn())
-                            .isEqualTo(payLedgerTransaction.getSn());
-                    assertThat(fundsTransactionDetailsByBusinessSn(businessSn)).allSatisfy(detail ->
-                            assertThat(detail.getReferenceLedgerTransactionSn())
-                                    .isEqualTo(payLedgerTransaction.getSn()));
-                });
+        String selectedLedgerTransactionSn = fundsTransactionDetails(payTransactionSn).getFirst()
+                .getLedgerTransactionSn();
+        assertThat(selectedLedgerTransactionSn).isNotBlank();
+        assertThat(fundsTransactionDetails(payTransactionSn)).allSatisfy(detail ->
+                assertThat(detail.getLedgerTransactionSn()).isEqualTo(selectedLedgerTransactionSn));
+        assertThat(ledgerTransactionsByFundsTransactionSn(payTransactionSn))
+                .filteredOn(item -> selectedLedgerTransactionSn.equals(item.getSn()))
+                .singleElement();
+        assertThat(refundLedgerTransaction.getReferenceLedgerTransactionSn())
+                .isEqualTo(selectedLedgerTransactionSn);
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn)).allSatisfy(detail ->
+                assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(selectedLedgerTransactionSn));
         assertThat(refundLedgerTransaction.getFundsTransactionSn()).isEqualTo(refundTransactionSn);
         assertThat(postingPlansOf(refundLedgerTransaction)).singleElement().satisfies(plan -> {
             assertThat(plan.getRouteLegId()).isEqualTo(refundRouteSnapshot.getLegs().getFirst().getLegId());
@@ -4191,6 +4914,74 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
         });
         assertLedgerFactsFollowRouteSnapshot(businessSn);
+    }
+
+    private void collectRecoveryProjectionLeak(List<String> leaks,
+                                               String boundary,
+                                               FundsActionFactDTO recoveryFact) {
+        if (!actionFactsByBusiness("REFUND", "RECOVERY_TAMPER_REFUND").isEmpty()) {
+            leaks.add(boundary + ":business");
+        }
+        if (fundsTransactionQueryService.findFundsActionFact(recoveryFact.getIdentity()).isPresent()) {
+            leaks.add(boundary + ":identity");
+        }
+    }
+
+    private void updateRecoveryRouteDirection(String transactionSn, String routeSnapshot, boolean reverse) {
+        ObjectNode route = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        if (reverse) {
+            ((ArrayNode) route.get("participants")).forEach(participant -> {
+                ObjectNode value = (ObjectNode) participant;
+                String role = value.get("participantRole").asText();
+                value.put("participantRole", RouteParticipantRole.PAYER.name().equals(role)
+                        ? RouteParticipantRole.PAYEE.name() : RouteParticipantRole.PAYER.name());
+            });
+            ObjectNode leg = (ObjectNode) ((ArrayNode) route.get("legs")).get(0);
+            ObjectNode source = ((ObjectNode) leg.get("sourceNode")).deepCopy();
+            ObjectNode target = ((ObjectNode) leg.get("targetNode")).deepCopy();
+            target.put("nodeRole", RouteNodeRole.SOURCE.name());
+            source.put("nodeRole", RouteNodeRole.TARGET.name());
+            leg.set("sourceNode", target);
+            leg.set("targetNode", source);
+        }
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET participant_role = CASE participant_role
+                    WHEN 'PAYER' THEN 'PAYEE'
+                    WHEN 'PAYEE' THEN 'PAYER'
+                    ELSE participant_role
+                END
+                WHERE tenant_id = ? AND transaction_sn = ?
+                """, TENANT_ID, transactionSn)).isEqualTo(2);
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(route));
+    }
+
+    private void updateRecoveryMoney(String transactionSn, String routeSnapshot, long amount) {
+        ObjectNode route = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ((ArrayNode) route.get("participants")).forEach(participant ->
+                ((ObjectNode) ((ObjectNode) participant).get("amount")).put("amount", amount));
+        ObjectNode leg = (ObjectNode) ((ArrayNode) route.get("legs")).get(0);
+        ((ObjectNode) leg.get("amount")).put("amount", amount);
+        ((ObjectNode) leg.get("originalAmount")).put("amount", amount);
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET amount = ?, refunded_amount = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, amount, amount, TENANT_ID, transactionSn)).isOne();
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET amount = ?
+                WHERE tenant_id = ? AND transaction_sn = ?
+                """, amount, TENANT_ID, transactionSn)).isEqualTo(2);
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(route));
+    }
+
+    private void updateFundsTransactionRefundedAmount(String transactionSn, long refundedAmount) {
+        assertThat(core1bJdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET refunded_amount = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, refundedAmount, TENANT_ID, transactionSn)).isOne();
     }
 
     private FundsTransactionTopupRequest core1bTopupRequest(long amount) {
@@ -4596,7 +5387,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     private long signedEntryAmount(LedgerEntry entry) {
-        return entry.getEntrySide() == EntrySide.CREDIT ? entry.getAmount() : -entry.getAmount();
+        DirectBalanceKey key = DirectBalanceKey.from(entry);
+        EntrySide normalBalanceSide = findLedger(key.accountId(), key.ledgerSubjectCode())
+                .orElseThrow()
+                .getNormalBalanceSide();
+        long rawDelta = entry.getEntrySide() == EntrySide.DEBIT ? entry.getAmount() : -entry.getAmount();
+        return normalBalanceSide == EntrySide.DEBIT ? rawDelta : -rawDelta;
     }
 
     private long initialBalance(DirectBalanceKey key) {

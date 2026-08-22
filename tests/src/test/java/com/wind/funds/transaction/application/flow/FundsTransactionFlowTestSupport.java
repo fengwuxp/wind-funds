@@ -18,6 +18,7 @@ import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
@@ -42,7 +43,6 @@ import com.wind.funds.transaction.application.FundsAuthorizationTransactionServi
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.impl.FundsBenefitContributionTransactionServiceImpl;
-import com.wind.funds.transaction.application.impl.DefaultFundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsClearingTransactionServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsSettlementTransactionServiceImpl;
@@ -67,8 +67,11 @@ import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -93,6 +96,7 @@ import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
@@ -104,9 +108,7 @@ import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.FundsAccountQueryService;
-import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -147,7 +149,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -157,6 +158,7 @@ import tools.jackson.core.type.TypeReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 
 /**
@@ -206,6 +208,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected LedgerService ledgerService;
+
+    @Autowired
+    protected LedgerProfileCatalog ledgerProfileCatalog;
 
     @Autowired
     protected LedgerBalanceProjectionService ledgerBalanceProjectionService;
@@ -357,27 +362,47 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         if (existing.isPresent()) {
             return;
         }
-        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
-                .setTenantId(TENANT_ID)
-                .setSubjectId(accountId.id())
-                .setSubjectType(accountId.type())
-                .setLedgerProfileCode("TEST")
-                .setLedgerProfileVersion(1)
-                .setLedgerSubjectCode(ledgerSubjectCode)
-                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
-                .setNormalBalanceSide(EntrySide.CREDIT)
-                .setAllowNegative(Boolean.FALSE)
-                .setCurrency(CURRENCY)
-                .setSettlementPolicy("RT")
-                .setCutOffTime(LocalTime.MIDNIGHT)
-                .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+        CreateLedgerRequest createRequest = ledgerProfileCatalog.requiredLedgerRequests(
+                        controlledInitializationRequest(accountId))
+                .stream()
+                .filter(request -> request.getLedgerSubjectCode() == ledgerSubjectCode)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("账户 profile 不包含账本科目: " + ledgerSubjectCode));
+        Long ledgerId = ledgerService.createLedger(createRequest);
         if (initialBalance != 0L) {
+            LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
-                    ledgerService.getLedgerById(ledgerId),
-                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    ledger,
+                    initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
                     Math.abs(initialBalance))));
         }
+    }
+
+    private InitializeSubjectLedgerRequest controlledInitializationRequest(FundsAccountId accountId) {
+        if (FundsSubjectType.CREDIT_ACCOUNT.name().equals(accountId.type())) {
+            CreditAccountDTO account = creditAccountService.getCreditAccount(accountId);
+            return new InitializeSubjectLedgerRequest()
+                    .setTenantId(account.getTenantId())
+                    .setSubjectId(account.getSn())
+                    .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                    .setCurrency(account.getCurrency())
+                    .setLedgerProfileCode(account.getLedgerProfileCode())
+                    .setLedgerProfileVersion(account.getLedgerProfileVersion())
+                    .setPeriodType(account.getPeriodType())
+                    .setPeriodId(account.getPeriodId());
+        }
+        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
+        FundingAccount account = fundingAccountMapper.selectOneByQuery(QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.sn.eq(accountId.id())));
+        assertThat(account).as("funding account %s", accountId).isNotNull();
+        return new InitializeSubjectLedgerRequest()
+                .setTenantId(account.getTenantId())
+                .setSubjectId(account.getSn())
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setCurrency(account.getCurrency())
+                .setLedgerProfileCode(account.getLedgerProfileCode())
+                .setLedgerProfileVersion(account.getLedgerProfileVersion());
     }
 
     protected void ensureLedger(FundsAccountId accountId, LedgerSubjectCode ledgerSubjectCode) {
@@ -769,6 +794,69 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isOne();
     }
 
+    protected void updateFundsTransactionState(String transactionSn, FundsTransactionState state) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET status = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, state.name(), TENANT_ID, transactionSn)).isOne();
+    }
+
+    protected void updateFundsTransactionCompletedAmount(String transactionSn, long completedAmount) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET completed_amount = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, completedAmount, TENANT_ID, transactionSn)).isOne();
+    }
+
+    protected void updateFundsTransactionRouteSnapshot(String transactionSn, String routeSnapshot) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET route_snapshot = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, routeSnapshot, TENANT_ID, transactionSn)).isOne();
+    }
+
+    protected void updateFundsTransactionDetailState(String detailSn, FundsTransactionDetailState state) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET status = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, state.name(), TENANT_ID, detailSn)).isOne();
+    }
+
+    protected void updateFundsTransactionDetailLedgerRef(String detailSn, String ledgerTransactionSn) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET ledger_transaction_sn = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, ledgerTransactionSn, TENANT_ID, detailSn)).isOne();
+    }
+
+    protected void updateFundsTransactionDetailErrorCode(String detailSn, String errorCode) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET error_code = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, errorCode, TENANT_ID, detailSn)).isOne();
+    }
+
+    protected void updateFundsTransactionDetailRequestHash(String detailSn, String requestHash) {
+        assertThat(jdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET request_hash = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, requestHash, TENANT_ID, detailSn)).isOne();
+    }
+
+    protected void deleteFundsTransactionDetail(String detailSn) {
+        assertThat(jdbcTemplate.update("""
+                DELETE FROM t_funds_transaction_detail
+                WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID, detailSn)).isOne();
+    }
+
     protected void clearLedgerFactsForFundsTransaction(String transactionSn) {
         int deletedEntries = jdbcTemplate.update("""
                 DELETE FROM t_ledger_entry
@@ -1038,6 +1126,173 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected List<FundsTransactionDetailDTO> fundsTransactionDetails(String transactionSn) {
         return fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
+    }
+
+    protected void assertPrimaryActionFacts(String businessScene,
+                                            String businessSn,
+                                            String expectedOutcome,
+                                            String expectedEffectKind,
+                                            long... expectedAmounts) {
+        List<FundsActionFactDTO> actionFacts = actionFactsByBusiness(businessScene, businessSn);
+        assertThat(actionFacts).hasSize(expectedAmounts.length);
+        assertThat(actionFacts.stream()
+                .map(actionFact -> actionFact.getMoney().getAmount())
+                .sorted()
+                .toList())
+                .containsExactly(java.util.Arrays.stream(expectedAmounts).boxed().sorted().toArray(Long[]::new));
+        assertThat(actionFacts)
+                .allSatisfy(actionFact -> {
+                    assertThat(actionFact.getActionKind()).isEqualToIgnoringCase("primary");
+                    assertThat(actionFact.getOutcome().getOwner()).isEqualTo("funds-transaction");
+                    assertThat(actionFact.getOutcome().getCode()).isEqualToIgnoringCase(expectedOutcome);
+                    assertThat(actionFact.getFundsEffect().getEffectKind())
+                            .isEqualToIgnoringCase(expectedEffectKind);
+                    assertThat(actionFact.getSemanticDigest().getAlgorithm()).isEqualTo("SHA-256");
+                    assertThat(actionFact.getSemanticDigest().getValue()).matches("[0-9a-f]{64}");
+                    assertThat(actionFact.getSemanticDigest().getCoveredFieldsVersion())
+                            .isEqualTo("transaction.action.pay.projection.v1");
+                    Money provenMoney = actionFact.getFundsEffect().getProvenMoney();
+                    if ("proven-zero".equalsIgnoreCase(expectedEffectKind)) {
+                        assertThat(provenMoney).isNull();
+                    } else {
+                        assertThat(provenMoney).isEqualTo(actionFact.getMoney());
+                    }
+                    assertThat(actionFact.getRouteProvenance())
+                            .as("action route provenance for %s", businessSn).singleElement()
+                            .satisfies(provenance -> {
+                                assertThat(provenance.getAllocatedMoney()).isEqualTo(actionFact.getMoney());
+                                assertThat(provenance.getRouteSnapshotRef().getTenantId()).isEqualTo(TENANT_ID);
+                                assertThat(provenance.getRouteSnapshotRef().getIdentity().getOwnerNamespace())
+                                        .isEqualTo("funds-route-snapshot");
+                                assertThat(provenance.getRouteSnapshotRef().getIdentity().getValue()).isNotBlank();
+                            });
+                    assertActionFactReadableByIdentity(actionFact);
+                });
+        if (actionFacts.size() > 1) {
+            assertThat(actionFacts)
+                    .extracting(FundsActionFactDTO::getAttemptRef)
+                    .containsOnly(actionFacts.getFirst().getAttemptRef());
+            assertThat(actionFacts)
+                    .extracting(FundsActionFactDTO::getIdentity)
+                    .doesNotHaveDuplicates();
+        }
+    }
+
+    protected void assertNoActionFacts(String businessScene, String businessSn) {
+        assertThat(actionFactsByBusiness(businessScene, businessSn)).isEmpty();
+    }
+
+    protected FundsActionFactDTO assertRecoveryActionFact(String businessScene,
+                                                          String businessSn,
+                                                          FundsActionFactDTO originalActionFact,
+                                                          long amount) {
+        return assertRecoveryActionFact(businessScene, businessSn, originalActionFact, amount,
+                "succeeded", "proven-full");
+    }
+
+    protected FundsActionFactDTO assertRecoveryActionFact(String businessScene,
+                                                          String businessSn,
+                                                          FundsActionFactDTO originalActionFact,
+                                                          long amount,
+                                                          String expectedOutcome,
+                                                          String expectedEffectKind) {
+        List<FundsActionFactDTO> actionFacts = actionFactsByBusiness(businessScene, businessSn);
+        assertThat(actionFacts).singleElement();
+        FundsActionFactDTO actionFact = actionFacts.getFirst();
+        Money expectedMoney = Money.immutable(amount, CURRENCY);
+        assertThat(actionFact.getActionKind()).isEqualToIgnoringCase("recovery/adjustment");
+        assertThat(actionFact.getMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getOutcome().getOwner()).isEqualTo("funds-transaction");
+        assertThat(actionFact.getOutcome().getCode()).isEqualToIgnoringCase(expectedOutcome);
+        assertThat(actionFact.getFundsEffect().getEffectKind()).isEqualToIgnoringCase(expectedEffectKind);
+        if ("proven-zero".equalsIgnoreCase(expectedEffectKind)) {
+            assertThat(actionFact.getFundsEffect().getProvenMoney()).isNull();
+        } else {
+            assertThat(actionFact.getFundsEffect().getProvenMoney()).isEqualTo(expectedMoney);
+        }
+        assertThat(actionFact.getSemanticDigest().getAlgorithm()).isEqualTo("SHA-256");
+        assertThat(actionFact.getSemanticDigest().getValue()).matches("[0-9a-f]{64}");
+        assertThat(actionFact.getSemanticDigest().getCoveredFieldsVersion())
+                .isEqualTo("transaction.action.recovery.projection.v1");
+
+        Object originalFactRef = singleRef(actionFact, "getOriginalFundsFactRefs");
+        assertThat(read(originalFactRef, "getTenantId")).isEqualTo(TENANT_ID);
+        assertThat(read(originalFactRef, "getFactType")).isEqualTo("funds-action");
+        assertThat(read(originalFactRef, "getFactId"))
+                .isEqualTo(originalActionFact.getIdentity().getIdentity());
+        assertThat(read(originalFactRef, "getRelationRole")).isEqualTo("reverses-confirmed-effect");
+        assertThat(read(originalFactRef, "getAllocatedMoney")).isEqualTo(expectedMoney);
+
+        assertThat(actionFact.getRouteProvenance()).singleElement().satisfies(provenance -> {
+            assertThat(read(provenance, "getOriginalFundsFactRef"))
+                    .usingRecursiveComparison().isEqualTo(originalFactRef);
+            assertThat(provenance.getAllocatedMoney()).isEqualTo(expectedMoney);
+            assertThat(provenance.getRouteSnapshotRef())
+                    .isEqualTo(originalActionFact.getRouteProvenance().getFirst().getRouteSnapshotRef());
+            assertThat(provenance.getProvenanceRole()).isEqualTo("replayed-original-route");
+        });
+        assertActionFactReadableByIdentity(actionFact);
+        return actionFact;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object singleRef(Object target, String getter) {
+        Object value = read(target, getter);
+        assertThat(value).isInstanceOf(List.class);
+        List<Object> refs = (List<Object>) value;
+        assertThat(refs).singleElement();
+        return refs.getFirst();
+    }
+
+    private Object read(Object target, String getter) {
+        try {
+            return target.getClass().getMethod(getter).invoke(target);
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(target.getClass().getSimpleName() + " 缺少 " + getter, exception);
+        }
+    }
+
+    protected List<FundsActionFactDTO> actionFactsByBusiness(String businessScene, String businessSn) {
+        return fundsTransactionQueryService.queryFundsActionFacts(new FundsActionFactQuery()
+                .setTenantId(TENANT_ID)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn));
+    }
+
+    protected List<FundsActionFactRef> actionFactIdentities(String businessScene, String businessSn) {
+        return actionFactsByBusiness(businessScene, businessSn).stream()
+                .map(FundsActionFactDTO::getIdentity)
+                .toList();
+    }
+
+    protected List<FundsActionFactDTO.SemanticDigest> actionFactDigests(String businessScene, String businessSn) {
+        return actionFactsByBusiness(businessScene, businessSn).stream()
+                .map(FundsActionFactDTO::getSemanticDigest)
+                .toList();
+    }
+
+    protected void assertActionFactReferenceBoundary(FundsActionFactDTO actionFact,
+                                                      String businessScene,
+                                                      String businessSn) {
+        assertActionFactQueryBoundary(businessScene, businessSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(
+                new FundsActionFactRef(TENANT_ID + 1, actionFact.getIdentity().getIdentity()))).isEmpty();
+    }
+
+    protected void assertActionFactQueryBoundary(String businessScene, String businessSn) {
+        assertThat(fundsTransactionQueryService.queryFundsActionFacts(new FundsActionFactQuery()
+                .setTenantId(TENANT_ID + 1)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn))).isEmpty();
+        assertThat(fundsTransactionQueryService.findFundsActionFact(
+                new FundsActionFactRef(TENANT_ID, "malformed"))).isEmpty();
+        assertThatThrownBy(() -> fundsTransactionQueryService.findFundsActionFact(
+                new FundsActionFactRef(TENANT_ID, " ")))
+                .hasMessageContaining("稳定身份不能为空");
+    }
+
+    private void assertActionFactReadableByIdentity(FundsActionFactDTO actionFact) {
+        assertThat(fundsTransactionQueryService.findFundsActionFact(actionFact.getIdentity())).hasValue(actionFact);
     }
 
     protected List<FundsTransaction> fundsTransactionsByBusinessSn(String businessSn) {
@@ -1361,7 +1616,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
             FundsBenefitContributionTransactionServiceImpl.class,
-            DefaultFundsBalanceAdjustmentAuditApplicationService.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             FundsClearingTransactionServiceImpl.class,
@@ -1371,13 +1625,11 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             LedgerTransactionServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class,
             DefaultLedgerTransactionPostingServiceImpl.class,
-            DefaultLedgerQueryService.class,
             DefaultFundsInstructionLifecycleSaver.class,
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,

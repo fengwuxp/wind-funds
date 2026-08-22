@@ -8,9 +8,6 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -74,17 +71,17 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     @NotNull
     private String reconciliationMatchResultSn;
 
-    /**
-     * 对账来源质量。
-     */
     @NotNull
-    private ReconciliationSourceQuality sourceQuality;
+    private String scopeOwnerNamespace;
 
-    /**
-     * 对账匹配强度。
-     */
     @NotNull
-    private ReconciliationMatchStrength matchStrength;
+    private String scopeIdentityValue;
+
+    @NotNull
+    private String pairOwnerNamespace;
+
+    @NotNull
+    private String pairIdentityValue;
 
     /**
      * 对账差错类型。
@@ -125,23 +122,20 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     @NotNull
     private String responsiblePartyRef;
 
-    /**
-     * 阻断对象类型，例如清算候选、结算单或出款单。
-     */
     @NotNull
-    private ReconciliationGateObjectType blockingObjectType;
+    private String ruleNamespace;
 
-    /**
-     * 阻断对象流水号。
-     */
     @NotNull
-    private String blockingObjectSn;
+    private String ruleIdentity;
 
     /**
      * 匹配或对账规则版本。
      */
     @NotNull
     private String ruleVersion;
+
+    @NotNull
+    private String currentLineageRef;
 
     /**
      * 来源证据引用。

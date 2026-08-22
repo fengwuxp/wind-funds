@@ -5,6 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.experimental.FieldNameConstants;
@@ -41,10 +42,58 @@ public class ReconciliationSourceItem implements Serializable, TenantIsolationOb
     private String sourceSnapshotSn;
 
     @NotNull
-    private String sourceItemRef;
+    private String sourceFactOwnerNamespace;
 
     @NotNull
-    private String contentDigest;
+    private String sourceFactIdentityValue;
+
+    @NotNull
+    private String comparisonOwnerNamespace;
+
+    @NotNull
+    private String comparisonIdentityValue;
+
+    @NotNull
+    private Long amount;
+
+    @NotNull
+    private CurrencyIsoCode currency;
+
+    @NotNull
+    private String ruleNamespace;
+
+    @NotNull
+    private String ruleIdentity;
+
+    @NotNull
+    private String ruleVersion;
+
+    @NotNull
+    private String comparisonStatusCode;
+
+    @NotNull
+    private Boolean comparisonProven;
+
+    @NotNull
+    private String claimKind;
+
+    @NotNull
+    private String economicComponent;
+
+    @NotNull
+    private String direction;
+
+    @NotNull
+    private String normalizationVersion;
+
+    @NotNull
+    private String semanticDigest;
+
+    @NotNull
+    private String evidenceBundleDigest;
+
+    @NotNull
+    private String evidenceRefs;
 
     @NotNull
     private String createdBy;

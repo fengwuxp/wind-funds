@@ -54,9 +54,9 @@ public final class ExternalAccountSensitiveValueValidator {
             "routingno",
             "iban");
 
-    private static final Set<String> INTERNAL_REFERENCE_CONTEXT_FIELDS = Set.of(
-            "authorizationtransactionsn",
-            "referencefreezesn");
+    private static final Pattern INTERNAL_FUNDS_TRANSACTION_SN_PATTERN = Pattern.compile("FT[0-9]{16}");
+
+    private static final Pattern INTERNAL_FREEZE_ORDER_SN_PATTERN = Pattern.compile("FO[0-9]{16}");
 
     private ExternalAccountSensitiveValueValidator() {
         throw new AssertionError();
@@ -171,7 +171,8 @@ public final class ExternalAccountSensitiveValueValidator {
             }
         }
         if (value instanceof CharSequence text) {
-            return !isInternalReferenceContextField(ownerFieldName) && isRawIbanValue(text.toString());
+            String textValue = text.toString();
+            return !isInternalReferenceContextValue(ownerFieldName, textValue) && isRawIbanValue(textValue);
         }
         return false;
     }
@@ -184,12 +185,17 @@ public final class ExternalAccountSensitiveValueValidator {
         return SENSITIVE_CONTEXT_FIELDS.contains(normalized);
     }
 
-    private static boolean isInternalReferenceContextField(@Nullable String fieldName) {
+    private static boolean isInternalReferenceContextValue(@Nullable String fieldName, String value) {
         if (fieldName == null || fieldName.isBlank()) {
             return false;
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
-        return INTERNAL_REFERENCE_CONTEXT_FIELDS.contains(normalized);
+        return switch (normalized) {
+            case "authorizationtransactionsn", "sourcesn" ->
+                    INTERNAL_FUNDS_TRANSACTION_SN_PATTERN.matcher(value).matches();
+            case "referencefreezesn" -> INTERNAL_FREEZE_ORDER_SN_PATTERN.matcher(value).matches();
+            default -> false;
+        };
     }
 
     private static boolean containsSensitiveRawContextFragment(String contextVariables) {

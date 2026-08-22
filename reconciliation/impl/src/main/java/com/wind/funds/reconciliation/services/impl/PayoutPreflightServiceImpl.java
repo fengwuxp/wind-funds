@@ -9,15 +9,15 @@ import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDecisionResult;
 import com.wind.funds.reconciliation.enums.PayoutPreflightAction;
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
-import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.service.PayoutPreflightService;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.context.TenantContextHolder;
 import lombok.AllArgsConstructor;
@@ -87,8 +87,7 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                 .setDisplayStatus(resolveDisplayStatus(passed, blockingReasons))
                 .setAction(resolveAction(passed))
                 .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
-                .setReconciliationRunResultSn(reconciliationGateDecision.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(reconciliationGateDecision.getReconciliationResultDigest())
+                .setStageRef(reconciliationGateDecision.getStageRef())
                 .setCheckedAt(checkedAt)
                 .setCheckedBy(operator.getOperatorAsText())
                 .setExpiresAt(checkedAt.plusMinutes(PREFLIGHT_RESULT_EXPIRE_MINUTES))
@@ -101,7 +100,6 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
         AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "出款前准入检查 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getSettlementSn(), "出款前准入检查结算单号不能为空");
-        AssertUtils.hasText(request.getReconciliationRunResultSn(), "出款前对账运行结果流水号不能为空");
     }
 
     private void addBlockingReasonIfMissing(List<PayoutPreflightBlockingReasonDTO> blockingReasons,
@@ -149,22 +147,16 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                                                                  WindOperator operator) {
         return reconciliationGateApplicationService.inspectGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
-                .setGateObjectType(payoutGateObjectType(request))
-                .setGateObjectSn(payoutGateObjectSn(request))
-                .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
+                .setStageRef(payoutGateStageRef(request)), operator);
     }
 
-    private ReconciliationGateObjectType payoutGateObjectType(CheckPayoutPreflightRequest request) {
-        return StringUtils.hasText(request.getPayoutSn())
-                ? ReconciliationGateObjectType.PAYOUT
-                : ReconciliationGateObjectType.SETTLEMENT;
-    }
-
-    private String payoutGateObjectSn(CheckPayoutPreflightRequest request) {
-        if (StringUtils.hasText(request.getPayoutSn())) {
-            return request.getPayoutSn();
-        }
-        return request.getSettlementSn();
+    private GateStageRef payoutGateStageRef(CheckPayoutPreflightRequest request) {
+        boolean existingPayout = StringUtils.hasText(request.getPayoutSn());
+        return new GateStageRef()
+                .setStageKind(existingPayout ? "PAYOUT_SUBMIT" : "PAYOUT_CREATE_PREFLIGHT")
+                .setStageIdentity(new StableIdentity()
+                        .setOwnerNamespace(existingPayout ? "payout-order" : "settlement-order")
+                        .setValue(existingPayout ? request.getPayoutSn() : request.getSettlementSn()));
     }
 
     private void addReconciliationGateBlockingReasonIfBlocked(
@@ -173,16 +165,9 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
         if (reconciliationGateDecision.getDecisionResult() != ReconciliationGateDecisionResult.BLOCKED) {
             return;
         }
-        List<ReconciliationGateBlockingDifferenceDTO> differences = reconciliationGateDecision.getBlockingDifferences();
-        if (differences == null || differences.isEmpty()) {
-            blockingReasons.add(reconciliationBlockingReason(
-                    reconciliationGateDecision.getExplanation(), firstEvidenceRef(reconciliationGateDecision),
-                    null, null));
-            return;
-        }
-        differences.forEach(difference -> blockingReasons.add(reconciliationBlockingReason(
-                difference.getBlockingReason(), difference.getEvidenceRef(), difference.getDifferenceSn(),
-                difference.getResponsiblePartyRef())));
+        blockingReasons.add(reconciliationBlockingReason(
+                reconciliationGateDecision.getExplanation(), firstEvidenceRef(reconciliationGateDecision),
+                null, null));
     }
 
     private PayoutPreflightBlockingReasonDTO reconciliationBlockingReason(String message,

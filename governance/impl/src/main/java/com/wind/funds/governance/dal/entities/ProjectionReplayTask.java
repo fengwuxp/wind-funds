@@ -63,10 +63,6 @@ public class ProjectionReplayTask implements TenantIsolationObject<Long> {
 
     private ProjectionReplayTaskState state;
 
-    void setStatus(ProjectionReplayTaskState state) {
-        this.state = state;
-    }
-
     private Long successCount;
 
     private Long failedCount;

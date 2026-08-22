@@ -1,8 +1,11 @@
 package com.wind.funds.route;
 
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -779,6 +782,16 @@ class DefaultRouteReplayServiceTests {
     }
 
     private static class EmptyFundsTransactionQueryService implements FundsTransactionQueryService {
+
+        @Override
+        public List<FundsActionFactDTO> queryFundsActionFacts(FundsActionFactQuery query) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<FundsActionFactDTO> findFundsActionFact(FundsActionFactRef ref) {
+            return Optional.empty();
+        }
 
         @Override
         public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {

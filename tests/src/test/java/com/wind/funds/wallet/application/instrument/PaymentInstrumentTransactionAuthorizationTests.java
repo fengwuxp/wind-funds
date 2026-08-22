@@ -104,9 +104,7 @@ import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
@@ -1942,10 +1940,8 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
-            DefaultLedgerQueryService.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,

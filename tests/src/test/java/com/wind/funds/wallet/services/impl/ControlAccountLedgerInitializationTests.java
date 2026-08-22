@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.common.exception.BaseException;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -9,7 +10,10 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -25,25 +29,32 @@ import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import com.wind.integration.core.context.TenantContextHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.SoftAssertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,12 +69,15 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnap
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         ControlAccountLedgerInitializationTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String CREDIT_ACCOUNT_SN = "credit_control_basic";
 
     private static final String NON_LIFETIME_CREDIT_ACCOUNT_SN = "credit_control_monthly";
+
+    private static final String CONCURRENT_CREDIT_ACCOUNT_SN = "credit_control_concurrent";
 
     private static final String SPEND_CONTROL_SCOPE_SN = "budget_control_basic";
 
@@ -112,9 +126,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Autowired
     private LedgerService ledgerService;
-
-    @Autowired
-    private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -195,48 +206,190 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testSubjectLedgerInitializerShouldKeepOldPeriodLedgersWhenCreatingNextPeriod() {
-        creditAccountService.createCreditAccount(createCreditAccountRequest()
-                .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
-                .setPeriodType(AccountBalancePeriodType.MONTHLY)
-                .setPeriodId(MONTHLY_PERIOD_ID));
-        List<LedgerDTO> oldPeriodLedgers = loadLedgers(
-                FundsSubjectType.CREDIT_ACCOUNT,
-                NON_LIFETIME_CREDIT_ACCOUNT_SN,
-                AccountBalancePeriodType.MONTHLY,
-                MONTHLY_PERIOD_ID);
+    void testCreateCreditAccountShouldRollbackRequiredLedgerGroupAfterLaterDrift() {
+        createCreditLedger(LedgerSubjectCode.LIMIT, 1, false);
+        createCreditLedger(LedgerSubjectCode.AVAILABLE, 2, true);
+        List<LedgerDTO> beforeLedgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Map<LedgerSubjectCode, Long> nextPeriodLedgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
-                initializeCreditSubjectLedgerRequest(NEXT_MONTHLY_PERIOD_ID));
-        Map<LedgerSubjectCode, Long> reusedNextPeriodLedgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
-                initializeCreditSubjectLedgerRequest(NEXT_MONTHLY_PERIOD_ID));
+        assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()))
+                .isInstanceOf(BaseException.class);
 
-        List<LedgerDTO> nextPeriodLedgers = loadLedgers(
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(countRows("t_credit_account", "sn", CREDIT_ACCOUNT_SN)).isZero();
+        softly.assertThat(loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN))
+                .containsExactlyInAnyOrderElementsOf(beforeLedgers);
+        softly.assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(before);
+        softly.assertAll();
+    }
+
+    @Test
+    void testControlledInitializationShouldConcurrentlyReuseSamePeriodLedgers() throws Exception {
+        Class<?> requestType = loadControlledInitializationRequest();
+        Method command = controlledInitializationCommand(requestType);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Throwable>> outcomes = List.of(
+                    concurrentInitialization(executor, ready, start, command, requestType),
+                    concurrentInitialization(executor, ready, start, command, requestType));
+            ready.await();
+            start.countDown();
+            for (Future<Throwable> outcome : outcomes) {
+                assertThat(outcome.get()).isNull();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        List<LedgerDTO> winner = loadLedgers(
                 FundsSubjectType.CREDIT_ACCOUNT,
-                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
                 AccountBalancePeriodType.MONTHLY,
                 NEXT_MONTHLY_PERIOD_ID);
-        List<LedgerDTO> allLedgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, NON_LIFETIME_CREDIT_ACCOUNT_SN);
+        assertThat(winner).hasSize(4);
+        List<Long> winnerIds = winner.stream().map(LedgerDTO::getId).sorted().toList();
 
-        assertThat(nextPeriodLedgerIds).isEqualTo(reusedNextPeriodLedgerIds);
-        assertThat(nextPeriodLedgerIds).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
-        assertThat(oldPeriodLedgers).hasSize(4);
-        assertThat(nextPeriodLedgers).hasSize(4);
-        assertThat(allLedgers).hasSize(8);
-        assertThat(oldPeriodLedgers).allSatisfy(ledger -> assertControlLedger(
-                ledger,
+        invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, NEXT_MONTHLY_PERIOD_ID));
+        assertThat(loadLedgers(
                 FundsSubjectType.CREDIT_ACCOUNT,
-                NON_LIFETIME_CREDIT_ACCOUNT_SN,
-                LedgerProfileCode.CREDIT_BASIC,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
                 AccountBalancePeriodType.MONTHLY,
-                MONTHLY_PERIOD_ID));
-        assertThat(nextPeriodLedgers).allSatisfy(ledger -> assertControlLedger(
-                ledger,
+                NEXT_MONTHLY_PERIOD_ID).stream().map(LedgerDTO::getId).sorted().toList())
+                .isEqualTo(winnerIds);
+    }
+
+    @Test
+    void testControlledInitializationShouldReplaySameKeyAndRejectProfileConflict() throws Exception {
+        Class<?> requestType = loadControlledInitializationRequest();
+        Method command = controlledInitializationCommand(requestType);
+        invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, NEXT_MONTHLY_PERIOD_ID));
+        List<Long> winnerIds = loadLedgers(
                 FundsSubjectType.CREDIT_ACCOUNT,
-                NON_LIFETIME_CREDIT_ACCOUNT_SN,
-                LedgerProfileCode.CREDIT_BASIC,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
                 AccountBalancePeriodType.MONTHLY,
-                NEXT_MONTHLY_PERIOD_ID));
+                NEXT_MONTHLY_PERIOD_ID).stream().map(LedgerDTO::getId).sorted().toList();
+
+        invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, NEXT_MONTHLY_PERIOD_ID));
+        assertThat(loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                NEXT_MONTHLY_PERIOD_ID).stream().map(LedgerDTO::getId).sorted().toList())
+                .isEqualTo(winnerIds);
+        assertThatThrownBy(() -> invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 2, NEXT_MONTHLY_PERIOD_ID)))
+                .isInstanceOf(BaseException.class);
+        assertThat(loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                NEXT_MONTHLY_PERIOD_ID).stream().map(LedgerDTO::getId).sorted().toList())
+                .isEqualTo(winnerIds);
+    }
+
+    @Test
+    void testControlledInitializationShouldCreateDifferentPeriodsIndependently() throws Exception {
+        Class<?> requestType = loadControlledInitializationRequest();
+        Method command = controlledInitializationCommand(requestType);
+        invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, MONTHLY_PERIOD_ID));
+        assertThat(loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                MONTHLY_PERIOD_ID)).hasSize(4);
+        invokeControlledInitialization(command, controlledInitializationRequest(
+                requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, NEXT_MONTHLY_PERIOD_ID));
+        assertThat(loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                NEXT_MONTHLY_PERIOD_ID)).hasSize(4);
+        assertThat(loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CONCURRENT_CREDIT_ACCOUNT_SN)).hasSize(8);
+    }
+
+    private Future<Throwable> concurrentInitialization(ExecutorService executor,
+                                                       CountDownLatch ready,
+                                                       CountDownLatch start,
+                                                       Method command,
+                                                       Class<?> requestType) {
+        return executor.submit(() -> {
+            TenantContextHolder.setTenantId(TENANT_ID);
+            ready.countDown();
+            try {
+                start.await();
+                invokeControlledInitialization(command, controlledInitializationRequest(
+                        requestType, CONCURRENT_CREDIT_ACCOUNT_SN, 1, NEXT_MONTHLY_PERIOD_ID));
+                return null;
+            } catch (Throwable throwable) {
+                return throwable;
+            } finally {
+                TenantContextHolder.clear();
+            }
+        });
+    }
+
+    private Class<?> loadControlledInitializationRequest() {
+        Class<?> requestType;
+        try {
+            requestType = Class.forName("com.wind.funds.ledger.request.InitializeSubjectLedgerRequest");
+        } catch (ClassNotFoundException ignored) {
+            requestType = null;
+        }
+        assertThat(requestType)
+                .as("Ledger-owned controlled initialization request must exist")
+                .isNotNull();
+        return requestType;
+    }
+
+    private Method controlledInitializationCommand(Class<?> requestType) {
+        Method command;
+        try {
+            command = LedgerService.class.getMethod("initializeRequiredLedgers", requestType);
+        } catch (NoSuchMethodException ignored) {
+            command = null;
+        }
+        assertThat(command)
+                .as("LedgerService must own controlled required-ledger initialization")
+                .isNotNull();
+        return command;
+    }
+
+    private Object controlledInitializationRequest(Class<?> requestType,
+                                                   String subjectId,
+                                                   int profileVersion,
+                                                   String periodId) throws Exception {
+        Object request = requestType.getDeclaredConstructor().newInstance();
+        requestType.getMethod("setTenantId", Long.class).invoke(request, TENANT_ID);
+        requestType.getMethod("setSubjectId", String.class).invoke(request, subjectId);
+        requestType.getMethod("setSubjectType", FundsSubjectType.class)
+                .invoke(request, FundsSubjectType.CREDIT_ACCOUNT);
+        requestType.getMethod("setCurrency", CurrencyIsoCode.class).invoke(request, CurrencyIsoCode.USD);
+        requestType.getMethod("setLedgerProfileCode", LedgerProfileCode.class)
+                .invoke(request, LedgerProfileCode.CREDIT_BASIC);
+        requestType.getMethod("setLedgerProfileVersion", Integer.class).invoke(request, profileVersion);
+        requestType.getMethod("setPeriodType", AccountBalancePeriodType.class)
+                .invoke(request, AccountBalancePeriodType.MONTHLY);
+        requestType.getMethod("setPeriodId", String.class).invoke(request, periodId);
+        return request;
+    }
+
+    private void invokeControlledInitialization(Method command, Object request) {
+        try {
+            command.invoke(ledgerService, request);
+        } catch (IllegalAccessException exception) {
+            throw new IllegalStateException(exception);
+        } catch (InvocationTargetException exception) {
+            if (exception.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException(exception.getCause());
+        }
     }
 
     @Test
@@ -371,7 +524,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     void testBudgetBasicProfileShouldNotBeActiveLedgerInitializationProfile() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> defaultLedgerProfileService().getProfile(LedgerProfileCode.BUDGET_BASIC))
+        assertThatThrownBy(() -> ledgerService.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(SPEND_CONTROL_SCOPE_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
+                .setLedgerProfileVersion(1)))
                 .hasMessageContaining("LedgerProfile 不存在");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -388,9 +547,10 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupControlAccountLedgerTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?, ?)",
                 CREDIT_ACCOUNT_SN,
                 NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                CONCURRENT_CREDIT_ACCOUNT_SN,
                 SPEND_CONTROL_SCOPE_SN,
                 CUSTOM_SPEND_CONTROL_SCOPE_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn IN (?, ?)",
@@ -411,6 +571,24 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.USD);
     }
 
+    private Long createCreditLedger(LedgerSubjectCode subjectCode, int profileVersion, boolean allowNegative) {
+        return ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(CREDIT_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT.name())
+                .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC.name())
+                .setLedgerProfileVersion(profileVersion)
+                .setLedgerSubjectCode(subjectCode)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.CONTROL)
+                .setNormalBalanceSide(EXPECTED_NORMAL_SIDES.get(subjectCode))
+                .setAllowNegative(allowNegative)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+    }
+
     private CreateSpendControlScopeRequest createSpendControlScopeRequest() {
         return new CreateSpendControlScopeRequest()
                 .setSn(SPEND_CONTROL_SCOPE_SN)
@@ -427,10 +605,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE)
                 .setPeriodId(null)
                 .setPeriodPolicy(CUSTOM_PERIOD_POLICY);
-    }
-
-    private DefaultLedgerProfileServiceImpl defaultLedgerProfileService() {
-        return new DefaultLedgerProfileServiceImpl();
     }
 
     private List<LedgerDTO> loadLedgers(FundsSubjectType subjectType, String subjectId) {
@@ -466,17 +640,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         return result;
     }
 
-    private InitializeSubjectLedgerRequest initializeCreditSubjectLedgerRequest(String periodId) {
-        return new InitializeSubjectLedgerRequest()
-                .setTenantId(TENANT_ID)
-                .setSubjectId(NON_LIFETIME_CREDIT_ACCOUNT_SN)
-                .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
-                .setPeriodType(AccountBalancePeriodType.MONTHLY)
-                .setPeriodId(periodId);
-    }
-
     private void assertControlLedger(LedgerDTO ledger,
                                      FundsSubjectType subjectType,
                                      String subjectId,
@@ -506,8 +669,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendControlScopeServiceImpl.class,

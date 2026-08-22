@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.common.exception.BaseException;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
@@ -20,6 +21,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -194,7 +196,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
@@ -218,7 +220,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(1);
@@ -268,7 +270,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         fee(payer, 5L, "FEE_REFUND_SENSITIVE_CONTEXT_SOURCE");
@@ -307,7 +309,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -345,7 +347,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         fee(payer, 5L, "FEE_REFUND_MISSING_ACCOUNT_SOURCE");
@@ -381,7 +383,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(2);
@@ -415,7 +417,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         fee(payer, 5L, "FEE_REFUND_EXTERNAL_ACCOUNT_SOURCE");
@@ -453,7 +455,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(2);
@@ -484,7 +486,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         fee(payer, 5L, "FEE_REFUND_MISSING_SOURCE_CHARGE");
@@ -518,7 +520,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(2);
@@ -549,7 +551,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         fee(payer, 5L, "FEE_REFUND_MISSING_SOURCE_AND_ACCOUNT_CHARGE");
@@ -582,7 +584,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(2);
@@ -613,7 +615,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String firstFeeSn = directTransactionService.fee(new FundsTransactionFeeRequest()
@@ -677,7 +679,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_050L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(2);
@@ -704,6 +706,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     void testFeeRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fee_refund_idem_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
@@ -716,7 +719,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
@@ -783,7 +786,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -812,6 +815,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     void testPayWithFeeThenRefundPrincipalAndFeeShouldReplayDifferentRouteLegs() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fee_flow_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot before = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
@@ -825,7 +829,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L, "FEE_FLOW_PAY");
@@ -866,7 +870,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(4);
@@ -938,7 +942,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(payer, feeAccount(), LedgerSubjectCode.FEE, 70L, 5L,
@@ -983,6 +987,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     void testFeeRefundWithUnknownSourceTransactionShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fee_refund_no_src_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
@@ -995,7 +1000,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
@@ -1028,7 +1033,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 25L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertPostedTransactions(2);
         assertThat(ledgerTransactions().stream()
@@ -1056,6 +1061,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     void testFeeRefundWithSourceTransactionWithoutFeeLegShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("no_fee_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
@@ -1068,7 +1074,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "FEE_REFUND_NO_FEE_LEG_PAY");
@@ -1087,7 +1093,8 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> refundFee(payer, 5L, nonFeeSourceTransactionSn,
                 "FEE_REFUND_NO_FEE_LEG_RETURN"))
-                .hasMessageContaining("手续费退回原交易没有可回放费用路径");
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原资金交易账本引用无法唯一解析");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
@@ -1102,7 +1109,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertPostedTransactions(2);
         assertThat(ledgerTransactions().stream()
@@ -1131,6 +1138,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("fee_refund_exceed_payee");
         FundsAccountId reservePayer = fundingAccount("fee_refund_reserve_user");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
 
@@ -1145,7 +1153,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
@@ -1184,7 +1192,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(reservePayer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         payWithFixedFee(reservePayer, payee, LedgerSubjectCode.SETTLEMENT, 10L, 20L,
@@ -1220,7 +1228,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 80L, CURRENCY);
         assertBucket(balance(reservePayer), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 20L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(5);

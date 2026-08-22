@@ -37,8 +37,7 @@ import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -1183,8 +1182,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
             SpendControlScopeServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

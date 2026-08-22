@@ -4,15 +4,12 @@ import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
-import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
@@ -78,9 +75,7 @@ import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
-import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
@@ -105,7 +100,6 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalTime;
 import java.util.List;
 
 import tools.jackson.databind.JsonNode;
@@ -525,25 +519,22 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     private void createTestLedger(FundsAccountId accountId,
                                   LedgerSubjectCode subjectCode,
                                   long initialBalance) {
-        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+        ledgerService.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
                 .setTenantId(TENANT_ID)
                 .setSubjectId(accountId.id())
-                .setSubjectType(accountId.type())
-                .setLedgerProfileCode("TEST")
-                .setLedgerProfileVersion(1)
-                .setLedgerSubjectCode(subjectCode)
-                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
-                .setNormalBalanceSide(EntrySide.CREDIT)
-                .setAllowNegative(Boolean.FALSE)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setSettlementPolicy("RT")
-                .setCutOffTime(LocalTime.MIDNIGHT)
-                .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_PLATFORM)
+                .setLedgerProfileVersion(1));
+        Long ledgerId = jdbcTemplate.queryForObject("""
+                SELECT id FROM t_ledger
+                WHERE tenant_id = ? AND subject_id = ? AND ledger_subject_code = ?
+                """, Long.class, TENANT_ID, accountId.id(), subjectCode.name());
         if (initialBalance != 0L) {
+            var ledger = ledgerService.getLedgerById(ledgerId);
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
-                    ledgerService.getLedgerById(ledgerId),
-                    initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
+                    ledger,
+                    initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
                     Math.abs(initialBalance))));
         }
     }
@@ -850,9 +841,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
-            DefaultLedgerQueryService.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,

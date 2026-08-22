@@ -96,10 +96,7 @@ public class ClearingCandidate implements Serializable, TenantIsolationObject<Lo
     private String clearingRuleVersion;
 
     @NotNull
-    private String reconciliationRunResultSn;
-
-    @NotNull
-    private String reconciliationResultDigest;
+    private String gateEvidenceRef;
 
     @NotNull
     private String reconciliationEvidenceRefs;

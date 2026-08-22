@@ -7,6 +7,7 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.reconciliation.application.clearing.ClearingCandidateApplicationService;
+import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ClearingCandidate;
 import com.wind.funds.reconciliation.dal.entities.ClearingSplitResultSnapshot;
 import com.wind.funds.reconciliation.dal.mapper.ClearingCandidateMapper;
@@ -14,15 +15,16 @@ import com.wind.funds.reconciliation.dal.mapper.ClearingSplitResultSnapshotMappe
 import com.wind.funds.reconciliation.dal.entities.table.ClearingCandidateNameRefs;
 import com.wind.funds.reconciliation.enums.ClearingCandidateState;
 import com.wind.funds.reconciliation.model.dto.ClearingCandidateDTO;
-import com.wind.funds.reconciliation.model.dto.ClearingSettlementGateResultDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.query.ClearingCandidateQuery;
-import com.wind.funds.reconciliation.model.request.CheckClearingSettlementGateRequest;
+import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.CreateClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.ExcludeClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.LockClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.ReleaseClearingCandidateLockRequest;
 import com.wind.funds.reconciliation.model.request.RestoreClearingCandidateRequest;
-import com.wind.funds.reconciliation.service.ClearingSettlementGateConsumerService;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
@@ -38,7 +40,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -58,7 +59,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
 
     private final ClearingSplitResultSnapshotMapper clearingSplitResultSnapshotMapper;
 
-    private final ClearingSettlementGateConsumerService clearingSettlementGateConsumerService;
+    private final ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -228,15 +229,16 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         if (now.isBefore(candidate.getClearingAvailableTime())) {
             return new CandidateDecision(ClearingCandidateState.WAITING_PERIOD, null);
         }
-        ClearingSettlementGateResultDTO gate = clearingSettlementGateConsumerService.inspectGate(
-                new CheckClearingSettlementGateRequest()
+        ReconciliationGateDecisionDTO gate = reconciliationGateApplicationService.inspectGate(
+                new CheckReconciliationGateRequest()
                         .setTenantId(candidate.getTenantId())
-                        .setGateObjectType(com.wind.funds.reconciliation.enums.ReconciliationGateObjectType.CLEARING)
-                        .setGateObjectSn(candidate.getFundsTransactionDetailSn())
-                        .setReconciliationRunResultSn(candidate.getReconciliationRunResultSn()),
+                        .setStageRef(new GateStageRef()
+                                .setStageKind("CLEARING_CONFIRM_ITEM")
+                                .setStageIdentity(new StableIdentity()
+                                        .setOwnerNamespace("clearing-candidate")
+                                        .setValue(candidate.getSn()))),
                 operator);
-        if (gate.isPassed() && Objects.equals(gate.getReconciliationResultDigest(),
-                candidate.getReconciliationResultDigest())) {
+        if (gate.isPassed()) {
             return new CandidateDecision(ClearingCandidateState.READY, null);
         }
         return new CandidateDecision(ClearingCandidateState.BLOCKED, "RECONCILIATION_BLOCKED");
@@ -279,8 +281,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         result.setClearingAvailableTime(request.getClearingAvailableTime());
         result.setClearingRuleCode(request.getClearingRuleCode());
         result.setClearingRuleVersion(request.getClearingRuleVersion());
-        result.setReconciliationRunResultSn(snapshot.getReconciliationRunResultSn());
-        result.setReconciliationResultDigest(snapshot.getReconciliationResultDigest());
+        result.setGateEvidenceRef(snapshot.getGateEvidenceRef());
         result.setReconciliationEvidenceRefs(snapshot.getReconciliationEvidenceRefs());
         result.setSourceDigest(snapshot.getSourceDigest());
         result.setCandidateDigest(candidateDigest);
@@ -301,7 +302,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         facts.put("clearingAvailableTime", request.getClearingAvailableTime());
         facts.put("clearingRuleCode", request.getClearingRuleCode());
         facts.put("clearingRuleVersion", request.getClearingRuleVersion());
-        facts.put("reconciliationResultDigest", snapshot.getReconciliationResultDigest());
+        facts.put("gateEvidenceRef", snapshot.getGateEvidenceRef());
         return FundsStableHashSupport.sha256Json(facts);
     }
 
@@ -362,8 +363,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
                 .setRouteSnapshotDigest(source.getRouteSnapshotDigest())
                 .setClearingRuleCode(source.getClearingRuleCode())
                 .setClearingRuleVersion(source.getClearingRuleVersion())
-                .setReconciliationRunResultSn(source.getReconciliationRunResultSn())
-                .setReconciliationResultDigest(source.getReconciliationResultDigest())
+                .setGateEvidenceRef(source.getGateEvidenceRef())
                 .setReconciliationEvidenceRefs(parseEvidenceRefs(source.getReconciliationEvidenceRefs()))
                 .setSourceDigest(source.getSourceDigest())
                 .setCandidateDigest(source.getCandidateDigest())

@@ -6,6 +6,7 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -339,8 +340,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class

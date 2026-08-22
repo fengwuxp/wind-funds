@@ -18,6 +18,9 @@ import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.funds.transaction.model.request.MerchantInfoRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.support.FundsContextVariables;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -175,6 +178,51 @@ class FundsTransactionRequestContextVariablesContractTests {
                 .map(Method::getName)
                 .toList())
                 .doesNotContain("getRefundMode", "setRefundMode", "isRefundMode");
+    }
+
+    /**
+     * 场景：余额调账公共契约收缩未被真实 Consumer 证明的负余额输入。
+     * 预期：Request 属性、transaction-face keys 和 core raw flag 均不存在。
+     * 红线：不得保留 getter/setter、常量别名或 raw context 旁路。
+     */
+    @Test
+    void testBalanceAdjustShouldNotExposeNegativeBalanceSurface() {
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(Arrays.stream(FundsBalanceAdjustRequest.class.getDeclaredFields())
+                        .map(Field::getName)
+                        .toList())
+                .doesNotContain(
+                        "allowNegativeBalance",
+                        "negativeAvailablePolicyCode",
+                        "negativeAvailableRiskStatus",
+                        "negativeAvailableSingleLimit",
+                        "negativeAvailableCumulativeLimit",
+                        "negativeAvailableAgingStartedAt");
+        softly.assertThat(Arrays.stream(FundsBalanceAdjustRequest.class.getMethods())
+                        .map(Method::getName)
+                        .toList())
+                .doesNotContain(
+                        "getAllowNegativeBalance", "setAllowNegativeBalance",
+                        "getNegativeAvailablePolicyCode", "setNegativeAvailablePolicyCode",
+                        "getNegativeAvailableRiskStatus", "setNegativeAvailableRiskStatus",
+                        "getNegativeAvailableSingleLimit", "setNegativeAvailableSingleLimit",
+                        "getNegativeAvailableCumulativeLimit", "setNegativeAvailableCumulativeLimit",
+                        "getNegativeAvailableAgingStartedAt", "setNegativeAvailableAgingStartedAt");
+        softly.assertThat(Arrays.stream(FundsInstructionContextKeys.class.getDeclaredFields())
+                        .map(Field::getName)
+                        .toList())
+                .doesNotContain(
+                        "ALLOW_NEGATIVE_BALANCE",
+                        "NEGATIVE_AVAILABLE_POLICY_CODE",
+                        "NEGATIVE_AVAILABLE_RISK_STATUS",
+                        "NEGATIVE_AVAILABLE_SINGLE_LIMIT",
+                        "NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT",
+                        "NEGATIVE_AVAILABLE_AGING_STARTED_AT");
+        softly.assertThat(Arrays.stream(FundsContextVariables.class.getDeclaredFields())
+                        .map(Field::getName)
+                        .toList())
+                .doesNotContain("ALLOW_NEGATIVE_BALANCE");
+        softly.assertAll();
     }
 
     private static <T> void assertReadonlyContextStored(RequestContextCase<T> requestCase) {

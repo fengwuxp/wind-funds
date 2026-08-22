@@ -1,6 +1,7 @@
 package com.wind.funds.reconciliation.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -10,7 +11,11 @@ import lombok.Getter;
  * <p>职责：表达出款前准入对外部规则、通道规则、风控规则或合规规则的核验结论。</p>
  *
  * <p>边界：状态只表达本次准入检查看到的规则核验结果，不替代法务、合规、财务或通道最终确认。</p>
+ *
+ * @author wuxp
+ * @since 2026-05-23
  */
+@Schema(description = "外部规则核验状态")
 @AllArgsConstructor
 @Getter
 public enum ExternalRuleVerificationStatus implements DescriptiveEnum {

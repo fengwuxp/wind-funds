@@ -2,6 +2,7 @@ package com.wind.funds.wallet.services.impl;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
@@ -192,8 +193,7 @@ class PlatformFundingAccountServiceImplTests extends AbstractFundsServiceTest {
     @Configuration
     @Import({
             LedgerServiceImpl.class,
-            DefaultLedgerProfileServiceImpl.class,
-            DefaultSubjectLedgerInitializer.class,
+            LedgerProfileCatalog.class,
             FundingAccountServiceImpl.class,
             PlatformFundingAccountServiceImpl.class
     })

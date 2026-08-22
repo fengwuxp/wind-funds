@@ -10,9 +10,6 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.SettlementReleaseCoverageStatus;
 import com.wind.funds.reconciliation.enums.SettlementReleaseDisposition;
@@ -30,7 +27,6 @@ import com.wind.funds.reconciliation.model.request.ApproveSettlementOrderRequest
 import com.wind.funds.reconciliation.model.request.CancelSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.ReleaseSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ReturnSettlementOrderToDraftRequest;
@@ -123,8 +119,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         SettlementOrderDTO order = approve(createRequest("CLB_SETTLEMENT_RELEASE", "policy-v1"));
         GateFixture gate = prepareSettlementGateFixture(order.getSn(), "release");
         settlementOrderApplicationService.lockOrder(new LockSettlementOrderRequest()
-                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                .setReconciliationRunResultSn(gate.runResultSn()), WindOperatorFactory.system());
+                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn()), WindOperatorFactory.system());
         var before = snapshot(balance(accountId));
         ReleaseSettlementOrderRequest request = releaseRequest(order, gate, "release approved");
 
@@ -267,10 +262,27 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         ReleaseSettlementOrderRequest request = releaseRequest(order, gate, "rollback test");
         var before = snapshot(balance(accountId));
 
+        String requirementIdentity = jdbcTemplate.queryForObject("""
+                SELECT current_requirement_identity_value
+                FROM t_reconciliation_gate_requirement_head
+                WHERE tenant_id = ? AND stage_kind = ?
+                  AND stage_identity_owner_namespace = ? AND stage_identity_value = ?
+                """, String.class, TENANT_ID, "SETTLEMENT_RELEASE", "settlement-order", order.getSn());
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_gate_requirement_head
+                SET current_requirement_identity_value = 'missing-requirement'
+                WHERE tenant_id = ? AND stage_kind = ?
+                  AND stage_identity_owner_namespace = ? AND stage_identity_value = ?
+                """, TENANT_ID, "SETTLEMENT_RELEASE", "settlement-order", order.getSn());
         assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
-                releaseRequest(order, new GateFixture("missing-run", "b".repeat(64), "missing-batch"),
-                        "missing gate"), WindOperatorFactory.system()))
+                request, WindOperatorFactory.system()))
                 .hasMessageContaining("Gate 未通过");
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_gate_requirement_head
+                SET current_requirement_identity_value = ?
+                WHERE tenant_id = ? AND stage_kind = ?
+                  AND stage_identity_owner_namespace = ? AND stage_identity_value = ?
+                """, requirementIdentity, TENANT_ID, "SETTLEMENT_RELEASE", "settlement-order", order.getSn());
         settlementReleaseAuthority.reject();
         assertThatThrownBy(() -> settlementOrderApplicationService.releaseOrder(
                 request, WindOperatorFactory.system())).hasMessageContaining("释放授权未通过");
@@ -336,7 +348,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
 
     private void assertSuccessfulLifecycle() {
         FundsAccountId accountId = fundingAccount("stl_order_merchant");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 1_000L, "SETTLEMENT_ORDER_TOPUP_001");
@@ -378,23 +390,21 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         var before = snapshot(balance(accountId));
         SettlementOrderDTO locked = settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID)
-                        .setSettlementOrderSn(created.getSn()).setReconciliationRunResultSn(runResultSn),
+                        .setSettlementOrderSn(created.getSn()),
                 WindOperatorFactory.system());
         SettlementOrderDTO lockReplay = settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID)
-                        .setSettlementOrderSn(created.getSn()).setReconciliationRunResultSn(runResultSn),
+                        .setSettlementOrderSn(created.getSn()),
                 WindOperatorFactory.system());
 
         assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
         assertThat(lockReplay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
-        assertThat(locked.getReconciliationRunResultSn()).isEqualTo(runResultSn);
-        assertThat(locked.getReconciliationResultDigest()).hasSize(64);
-        assertThat(locked.getReconciliationEvidenceDigest()).hasSize(64);
-        assertThatThrownBy(() -> settlementOrderApplicationService.lockOrder(
+        assertThat(locked.getLockGateEvidenceRef()).isNotBlank();
+        SettlementOrderDTO secondReplay = settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID)
-                        .setSettlementOrderSn(created.getSn()).setReconciliationRunResultSn("different-run-result"),
-                WindOperatorFactory.system()))
-                .hasMessageContaining("不同对账运行结果");
+                        .setSettlementOrderSn(created.getSn()),
+                WindOperatorFactory.system());
+        assertThat(secondReplay.getLockGateEvidenceRef()).isEqualTo(locked.getLockGateEvidenceRef());
         assertOnlyBalanceDeltas(before, snapshot(balance(accountId)),
                 delta(accountId, LedgerSubjectCode.AVAILABLE, -600L, CURRENCY),
                 delta(accountId, LedgerSubjectCode.SETTLEMENT, 600L, CURRENCY));
@@ -447,7 +457,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
     @Test
     void testLockShouldFailOrderReleaseSourceAndAllowRebuildWhenBalanceIsInsufficient() {
         FundsAccountId accountId = fundingAccount("stl_insufficient");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 1L, "SETTLEMENT_INSUFFICIENT_TOPUP");
@@ -458,7 +468,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                        .setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system()))
+                        , WindOperatorFactory.system()))
                 .isInstanceOf(LedgerPostingRejectedException.class)
                 .hasMessageContaining("账本余额不足");
         SettlementOrderDTO failed = settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn());
@@ -491,7 +501,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
     @Test
     void testTechnicalFailureAfterFundsPostingShouldRollbackAndKeepApproved() {
         FundsAccountId accountId = fundingAccount("stl_unknown");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 100L, "SETTLEMENT_UNKNOWN_TOPUP");
@@ -503,7 +513,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                        .setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system()))
+                        , WindOperatorFactory.system()))
                 .hasMessageContaining("simulated settlement result unknown");
         assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getState())
                 .isEqualTo(SettlementOrderState.APPROVED);
@@ -521,7 +531,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                        .setReconciliationRunResultSn("missing-run-result"), WindOperatorFactory.system()))
+                        , WindOperatorFactory.system()))
                 .hasMessageContaining("对账 Gate 未通过");
         assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, order.getSn()).getState())
                 .isEqualTo(SettlementOrderState.APPROVED);
@@ -556,7 +566,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
     @Test
     void testLockShouldRejectChangedClearingSourceWithoutFundsFact() {
         FundsAccountId accountId = fundingAccount("stl_changed_merchant");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
         topup(accountId, 100L, "SETTLEMENT_CHANGED_TOPUP");
@@ -567,7 +577,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> settlementOrderApplicationService.lockOrder(
                 new LockSettlementOrderRequest().setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                        .setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system()))
+                        , WindOperatorFactory.system()))
                 .hasMessageContaining("来源金额已变化");
         assertNoFundsOrLedgerFactsForBusinessSn(order.getSn());
     }
@@ -620,17 +630,13 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         String referenceSourceRef = "internal:settlement:" + suffix;
         String comparisonSourceRef = "external:settlement:" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, batchSn,
-                ReconciliationGateObjectType.SETTLEMENT, settlementOrderSn, "recon-rule-1",
+                "SETTLEMENT_LOCK", settlementOrderSn, "recon-rule-1",
                 "report:settlement-" + suffix, referenceSourceRef, comparisonSourceRef);
-        String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationTestFixture.prepareGateRequirement(jdbcTemplate, TENANT_ID, batchSn,
+                "SETTLEMENT_RELEASE", settlementOrderSn, "report:settlement-" + suffix);
+        String runResultSn = reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest().setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef("report:settlement-" + suffix + "#line-1"))),
+                        .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
         String resultDigest = jdbcTemplate.queryForObject(
                 "SELECT result_digest FROM t_reconciliation_run_result WHERE sn = ?", String.class, runResultSn);
@@ -649,12 +655,11 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         SettlementOrderDTO order = approve(createRequest(clearingBatchSn, "policy-v1"));
         GateFixture gate = prepareSettlementGateFixture(order.getSn(), suffix);
         return settlementOrderApplicationService.lockOrder(new LockSettlementOrderRequest()
-                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn())
-                .setReconciliationRunResultSn(gate.runResultSn()), WindOperatorFactory.system());
+                .setTenantId(TENANT_ID).setSettlementOrderSn(order.getSn()), WindOperatorFactory.system());
     }
 
     private GateFixture currentGate(SettlementOrderDTO order, String suffix) {
-        return new GateFixture(order.getReconciliationRunResultSn(), order.getReconciliationResultDigest(),
+        return new GateFixture(order.getLockGateEvidenceRef(), order.getLockGateEvidenceRef(),
                 "settlement_recon_batch_" + suffix);
     }
 
@@ -665,8 +670,6 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         return new ReleaseSettlementOrderRequest()
                 .setTenantId(TENANT_ID)
                 .setSettlementOrderSn(order.getSn())
-                .setReconciliationRunResultSn(gate.runResultSn())
-                .setReconciliationResultDigest(gate.resultDigest())
                 .setCoverageStatus(SettlementReleaseCoverageStatus.COMPLETE)
                 .setCoverageDigest(FundsStableHashSupport.sha256("coverage:" + order.getSn()))
                 .setWatermark(cutoff)

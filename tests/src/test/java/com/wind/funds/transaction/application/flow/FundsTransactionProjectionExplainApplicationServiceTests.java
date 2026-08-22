@@ -3,6 +3,7 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -44,6 +45,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
     void testPostedFundsTransactionShouldExplainFromPersistedFactsWithoutSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_explain_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -53,7 +55,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String transactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
@@ -211,6 +213,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
     void testDirectRefundShouldExplainRefundedStatusFromPersistedFacts() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_refund_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "PROJECTION_EXPLAIN_REFUND_TOPUP");
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "PROJECTION_EXPLAIN_REFUND_PAY");
@@ -301,6 +304,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
     void testMissingRouteSnapshotShouldFailFastWithoutRebuildingProjection() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_missing_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         topup(payer, 100L, "PROJECTION_EXPLAIN_MISSING_TOPUP");
         String transactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,

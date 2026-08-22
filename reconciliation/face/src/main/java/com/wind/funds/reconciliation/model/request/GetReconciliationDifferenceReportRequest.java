@@ -37,12 +37,6 @@ public class GetReconciliationDifferenceReportRequest implements Serializable {
     @NotBlank
     private String differenceSn;
 
-    @Schema(description = "是否包含准入 gate 决策摘要，默认包含")
-    private Boolean includeGateDecision;
-
-    @Schema(description = "用于计算准入 gate 的对账运行结果流水号；包含 gate 决策时必填")
-    private String reconciliationRunResultSn;
-
     @Schema(description = "是否包含证据引用列表，默认包含")
     private Boolean includeEvidenceRefs;
 }

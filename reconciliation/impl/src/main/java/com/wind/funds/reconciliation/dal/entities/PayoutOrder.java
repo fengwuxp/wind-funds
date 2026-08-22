@@ -40,6 +40,7 @@ public class PayoutOrder implements TenantIsolationObject<Long> {
     private CurrencyIsoCode currency;
 
     @Column("status")
+
     private PayoutOrderState state;
 
     void setStatus(PayoutOrderState state) {
@@ -56,9 +57,7 @@ public class PayoutOrder implements TenantIsolationObject<Long> {
 
     private String externalRuleEvidenceDigest;
 
-    private String reconciliationRunResultSn;
-
-    private String reconciliationResultDigest;
+    private String payoutGateEvidenceRef;
 
     private String admissionDecisionDigest;
 

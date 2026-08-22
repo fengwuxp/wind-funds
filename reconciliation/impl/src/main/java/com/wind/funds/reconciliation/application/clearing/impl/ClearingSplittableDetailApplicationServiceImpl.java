@@ -16,12 +16,13 @@ import com.wind.funds.reconciliation.dal.entities.ClearingSplittableDetail;
 import com.wind.funds.reconciliation.dal.mapper.ClearingSplittableDetailMapper;
 import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.mapstruct.ClearingSplittableDetailConverter;
 import com.wind.funds.reconciliation.model.dto.ClearingSplittableDetailDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
+import com.wind.funds.reconciliation.model.value.GateStageRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -133,9 +134,11 @@ public class ClearingSplittableDetailApplicationServiceImpl
                                                                   WindOperator operator) {
         return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
-                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                .setGateObjectSn(request.getFundsTransactionDetailSn())
-                .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
+                .setStageRef(new GateStageRef()
+                        .setStageKind("CLEARING_SPLITTABLE_IDENTIFY")
+                        .setStageIdentity(new StableIdentity()
+                                .setOwnerNamespace("funds-transaction-detail")
+                                .setValue(request.getFundsTransactionDetailSn()))), operator);
     }
 
     private ClearingSplittableDetail toCandidate(IdentifyClearingSplittableDetailRequest request,
@@ -171,8 +174,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 : ClearingSplittableAdmissionResult.EXCLUDED);
         result.setExclusionReason(exclusionReason);
         result.setReconciliationDecisionResult(reconciliationDecision.getDecisionResult());
-        result.setReconciliationRunResultSn(reconciliationDecision.getReconciliationRunResultSn());
-        result.setReconciliationResultDigest(reconciliationDecision.getReconciliationResultDigest());
+        if (reconciliationDecision.isPassed()) {
+            AssertUtils.notEmpty(reconciliationDecision.getEvidenceRefs(), "Gate 通过时必须持有消费证据");
+            result.setGateEvidenceRef(reconciliationDecision.getEvidenceRefs().getFirst());
+        }
         result.setReconciliationEvidenceRefs(WindJson.toJsonString(reconciliationDecision.getEvidenceRefs()));
         if (StringUtils.hasText(transaction.getRouteSnapshot())) {
             result.setRouteSnapshotDigest(FundsStableHashSupport.sha256Json(
@@ -191,6 +196,9 @@ public class ClearingSplittableDetailApplicationServiceImpl
             LedgerEntryDTO entry,
             LedgerTransactionDTO ledgerTransaction,
             ReconciliationGateDecisionDTO reconciliationDecision) {
+        if (!reconciliationDecision.isPassed()) {
+            return ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED;
+        }
         long refundedAmount = defaultAmount(transaction.getRefundedAmount());
         boolean partiallyRefunded = refundedAmount > 0
                 && transaction.getState() == FundsTransactionState.OPEN;
@@ -217,9 +225,6 @@ public class ClearingSplittableDetailApplicationServiceImpl
         }
         if (refundedAmount > 0) {
             return ClearingSplittableExclusionReason.REFUND_EXISTS;
-        }
-        if (!reconciliationDecision.isPassed()) {
-            return ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED;
         }
         return null;
     }
@@ -262,10 +267,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 && Objects.equals(detail.getAmount(), entry.getAmount().getAmount())
                 && Objects.equals(transaction.getBusinessScene(), detail.getBusinessScene())
                 && Objects.equals(transaction.getBusinessSn(), detail.getBusinessSn())
-                && Objects.equals(detail.getBusinessScene(), ledgerTransaction.getBusinessScene())
-                && Objects.equals(detail.getBusinessSn(), ledgerTransaction.getBusinessSn())
-                && Objects.equals(detail.getBusinessScene(), entry.getBusinessScene())
-                && Objects.equals(detail.getBusinessSn(), entry.getBusinessSn());
+                && Objects.equals(ledgerTransaction.getBusinessScene(), entry.getBusinessScene())
+                && Objects.equals(ledgerTransaction.getBusinessSn(), entry.getBusinessSn());
     }
 
     private boolean isClearingInflowFact(FundsTransactionDTO transaction,
@@ -346,8 +349,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         facts.put("splitRuleCode", request.getSplitRuleCode());
         facts.put("splitRuleVersion", request.getSplitRuleVersion());
         facts.put("reconciliationDecisionResult", reconciliationDecision.getDecisionResult());
-        facts.put("reconciliationRunResultSn", reconciliationDecision.getReconciliationRunResultSn());
-        facts.put("reconciliationResultDigest", reconciliationDecision.getReconciliationResultDigest());
+        facts.put("gateStageRef", reconciliationDecision.getStageRef());
         facts.put("reconciliationEvidenceRefs", List.copyOf(reconciliationDecision.getEvidenceRefs()));
         return FundsStableHashSupport.sha256Json(facts);
     }
@@ -367,7 +369,6 @@ public class ClearingSplittableDetailApplicationServiceImpl
         AssertUtils.hasText(request.getFundsTransactionSn(), "来源资金交易流水号不能为空");
         AssertUtils.hasText(request.getFundsTransactionDetailSn(), "来源资金交易明细流水号不能为空");
         AssertUtils.hasText(request.getLedgerEntrySn(), "来源账本分录流水号不能为空");
-        AssertUtils.hasText(request.getReconciliationRunResultSn(), "清分前对账运行结果流水号不能为空");
         AssertUtils.hasText(request.getBusinessLine(), "业务线不能为空");
         AssertUtils.hasText(request.getSplitPeriod(), "清分周期不能为空");
         AssertUtils.hasText(request.getSplitRuleCode(), "清分规则编码不能为空");

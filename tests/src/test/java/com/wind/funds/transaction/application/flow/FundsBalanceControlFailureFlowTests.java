@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
@@ -12,9 +13,12 @@ import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.SoftAssertions;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -22,6 +26,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * 余额控制失败业务流测试。
@@ -46,7 +51,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertThatThrownBy(() -> freeze(user, 80L, "BALANCE_FREEZE_FAIL_FREEZE"))
@@ -85,7 +90,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertThatThrownBy(() -> balanceControlService.freeze(new FundsBalanceFreezeRequest()
@@ -129,7 +134,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertThatThrownBy(() -> balanceControlService.freeze(new FundsBalanceFreezeRequest()
@@ -172,7 +177,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 30L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE");
@@ -226,7 +231,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_CURRENCY_FREEZE");
@@ -283,7 +288,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(user, 30L, "BALANCE_UNFREEZE_MISSING_REF_FREEZE");
@@ -339,7 +344,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         freeze(user, 30L, "BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE");
@@ -401,7 +406,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ACCOUNT_FREEZE");
@@ -464,7 +469,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ZERO_FREEZE");
@@ -521,7 +526,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 70L, "BALANCE_UNFREEZE_IDEMPOTENT_FREEZE");
@@ -591,7 +596,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
@@ -638,7 +643,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
@@ -839,10 +844,10 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
     /**
      * 场景：用户充值后发起超过可用余额的减少调账请求。
-     * 输入：充值 50、减少调账 80，并给齐调账原因、凭证和审批引用。
+     * 输入：充值 50、减少调账 80，并通过通用 context 注入完整六项负余额 raw tuple。
      * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台调整挂账余额保持调账前状态。
-     * 预期：默认调账减少必须遵守 AVAILABLE 不可为负约束。
-     * 红线：余额调账不能借人工审批语义绕过余额约束、透支客户资金或留下半成功账务事实。
+     * 预期：已删除语义的 raw tuple 必须被忽略，调账减少仍遵守 AVAILABLE 不可为负约束。
+     * 红线：余额调账不能借人工审批或 raw context 绕过余额约束、透支客户资金或留下半成功账务事实。
      */
     @Test
     void testBalanceDecreaseAdjustWithInsufficientAvailableBalanceShouldLeaveNoSideEffects() {
@@ -857,11 +862,11 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 50L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
 
-        assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
+        Throwable rejection = catchThrowable(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
                 .setAccountId(user)
                 .setAmount(Money.immutable(80L, CURRENCY))
                 .setIncrease(Boolean.FALSE)
@@ -870,7 +875,17 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustReason("customer service balance decrease adjust")
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_DECREASE_FAIL")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_DECREASE_FAIL")
-                .setDescription("balance decrease adjust exceeds available"), WindOperatorFactory.system()))
+                .setContextVariables(WritableContextVariables.of(Map.of(
+                        "allowNegativeBalance", Boolean.TRUE,
+                        "negativeAvailablePolicyCode", "RAW_NEGATIVE_POLICY",
+                        "negativeAvailableRiskStatus", "APPROVED",
+                        "negativeAvailableSingleLimit", Money.immutable(100L, CURRENCY),
+                        "negativeAvailableCumulativeLimit", Money.immutable(100L, CURRENCY),
+                        "negativeAvailableAgingStartedAt", LocalDateTime.of(2026, 8, 22, 0, 0))))
+                .setDescription("balance decrease adjust exceeds available"), WindOperatorFactory.system()));
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(rejection)
+                .isInstanceOf(LedgerPostingRejectedException.class)
                 .hasMessageContaining("账本余额不足");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
@@ -887,6 +902,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertPostedTransactions(1);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_ADJUST_DECREASE_FAIL_TOPUP", 3, 4);
         assertFailedFundsTransactionWithoutLedgerFacts("BALANCE_ADJUST_DECREASE_FAIL_ADJUST");
+        softly.assertAll();
     }
 
     /**

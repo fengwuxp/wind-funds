@@ -1,6 +1,7 @@
 package com.wind.funds.reconciliation.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -8,7 +9,11 @@ import lombok.Getter;
  * 出款前准入展示状态。
  *
  * <p>职责：面向商户账单、出款处理台和审计导出表达准入结果的可读状态。</p>
+ *
+ * @author wuxp
+ * @since 2026-05-23
  */
+@Schema(description = "出款前准入展示状态")
 @AllArgsConstructor
 @Getter
 public enum PayoutPreflightDisplayStatus implements DescriptiveEnum {

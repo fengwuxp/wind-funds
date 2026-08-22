@@ -101,6 +101,7 @@ class FundsAccountCapabilityAdmissionFlowTests extends FundsTransactionFlowTestS
         FundsAccountId payer = fundingAccount("cap_pay_payer");
         FundsAccountId payee = fundingAccount("cap_pay_payee");
         ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.CLEARING);
         topup(payer, 100L, "CAPABILITY_PAY_TOPUP");
         setCapabilities(payee, "PAY", "WITHDRAW");

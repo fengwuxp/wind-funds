@@ -9,9 +9,12 @@ import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.common.exception.BaseException;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.Pagination;
@@ -22,11 +25,13 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
+import com.wind.funds.route.model.ImmutablePlatformAccountsSnapshotSpec;
 import com.wind.funds.route.model.ImmutableRouteLegSpec;
 import com.wind.funds.route.model.ImmutableRouteNodeSpec;
 import com.wind.funds.route.model.ImmutableSubjectRef;
@@ -54,6 +59,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.SoftAssertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -70,10 +76,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -146,19 +154,45 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testAssembleShouldUseLifetimePeriodIdByDefault() {
-        LedgerTransactionSpec transaction = assembler.assemble(
+    void testAssembleShouldRejectCatalogDriftUsingLifetimePeriodByDefault() {
+        ledgerService.catalogDrift = CatalogDrift.PROFILE_VERSION;
+
+        assertThatThrownBy(() -> assembler.assemble(
                 instruction(AccountBalancePeriodType.LIFETIME, null, LedgerSubjectCode.AVAILABLE),
                 "FUNDS_TX_PERIOD_003",
-                resolvedRoute(routeLeg()));
-
-        assertThat(transaction.getPostingPlans()).hasSize(1);
-        assertTransferPostingFacts(transaction, AccountBalancePeriodType.LIFETIME,
-                AccountBalancePeriodType.LIFETIME.name());
-        assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
+                resolvedRoute(routeLeg())))
+                .isInstanceOf(BaseException.class);
+        assertThat(ledgerService.queries).singleElement().satisfies(query -> {
             assertThat(query.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
             assertThat(query.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         });
+    }
+
+    @Test
+    void testSettlementReleaseShouldRejectEveryCatalogIntegrityDriftBeforePosting() {
+        PostingCase settlementRelease = postingCases().stream()
+                .filter(postingCase -> postingCase.eventType() == FundsTransactionEventType.SETTLEMENT_RELEASE)
+                .findFirst()
+                .orElseThrow();
+        SoftAssertions softly = new SoftAssertions();
+        for (CatalogDrift drift : CatalogDrift.values()) {
+            if (drift == CatalogDrift.NONE) {
+                continue;
+            }
+            ledgerService.catalogDrift = drift;
+            Throwable rejection = catchThrowable(() -> assembler.assemble(
+                    instruction(settlementRelease),
+                    "FUNDS_TX_CATALOG_DRIFT_" + drift.name(),
+                    resolvedRoute(settlementRelease, routeLeg())));
+            softly.assertThat(rejection)
+                    .as("catalog drift must fail closed: %s", drift)
+                    .isInstanceOf(BaseException.class);
+            softly.assertThat(ledgerService.queries)
+                    .as("catalog drift must be checked after the ledger lookup: %s", drift)
+                    .isNotEmpty();
+            ledgerService.clear();
+        }
+        softly.assertAll();
     }
 
     /**
@@ -211,6 +245,50 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                                 LedgerBalanceConstraintType.PROFILE_DEFAULT));
     }
 
+    @Test
+    void testExternalInShouldIncreaseCashAndPrepayment() {
+        PostingCase postingCase = postingCase(FundsTransactionEventType.TOPUP);
+        RouteLegSpec leg = externalLeg(postingCase);
+        AtomicReference<LedgerTransactionSpec> result = new AtomicReference<>();
+
+        Throwable failure = catchThrowable(() -> result.set(assembler.assemble(
+                instruction(postingCase),
+                "FUNDS_TX_EXTERNAL_IN",
+                externalRoute(postingCase, leg))));
+
+        assertThat(failure).as("EXTERNAL_IN must produce a balanced posting plan").isNull();
+        assertExternalPosting(result.get(),
+                LedgerSubjectCode.CASH, EntrySide.DEBIT,
+                LedgerSubjectCode.PREPAYMENT, EntrySide.CREDIT);
+    }
+
+    @Test
+    void testExternalOutShouldDecreasePrepaymentAndCash() {
+        PostingCase postingCase = postingCase(FundsTransactionEventType.WITHDRAW);
+        RouteLegSpec leg = externalLeg(postingCase);
+        AtomicReference<LedgerTransactionSpec> result = new AtomicReference<>();
+
+        Throwable failure = catchThrowable(() -> result.set(assembler.assemble(
+                instruction(postingCase),
+                "FUNDS_TX_EXTERNAL_OUT",
+                externalRoute(postingCase, leg))));
+
+        assertThat(failure).as("EXTERNAL_OUT must produce a balanced posting plan").isNull();
+        assertExternalPosting(result.get(),
+                LedgerSubjectCode.PREPAYMENT, EntrySide.DEBIT,
+                LedgerSubjectCode.CASH, EntrySide.CREDIT);
+    }
+
+    @Test
+    void testFundingBalanceAdjustIncreaseShouldApplySameExplicitEffectAndBalance() {
+        assertFundingBalanceAdjustPosting(true);
+    }
+
+    @Test
+    void testFundingBalanceAdjustDecreaseShouldApplySameExplicitEffectAndBalance() {
+        assertFundingBalanceAdjustPosting(false);
+    }
+
     /**
      * 场景：所有公开资金事件进入默认 route -> posting 翻译器。
      * 预期：每个事件都映射到当前明确的 posting intent/scope，并保留 route phase/effect。
@@ -220,11 +298,17 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     void testAssembleShouldPreserveEventToPostingMatrix() {
         List<PostingCase> cases = postingCases();
         cases.forEach(postingCase -> {
-            RouteLegSpec leg = postingCaseLeg(postingCase);
+            boolean external = postingCase.eventType() == FundsTransactionEventType.TOPUP
+                    || postingCase.eventType() == FundsTransactionEventType.WITHDRAW
+                    || postingCase.eventType() == FundsTransactionEventType.PAYOUT_SUCCEEDED;
+            RouteLegSpec leg = external ? externalLeg(postingCase) : postingCaseLeg(postingCase);
+            ResolvedRouteSpec route = external
+                    ? externalRoute(postingCase, leg)
+                    : resolvedRoute(postingCase, leg);
             LedgerTransactionSpec transaction = assembler.assemble(
                     instruction(postingCase),
                     "FUNDS_TX_MATRIX_" + postingCase.eventType().name(),
-                    resolvedRoute(postingCase, leg));
+                    route);
 
             LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
             assertThat(plan.isBalanced()).as("%s plan balance", postingCase.eventType()).isTrue();
@@ -473,6 +557,68 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         return instruction(null, null, LedgerSubjectCode.AVAILABLE);
     }
 
+    private PostingCase postingCase(FundsTransactionEventType eventType) {
+        return postingCases().stream()
+                .filter(candidate -> candidate.eventType() == eventType)
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private void assertExternalPosting(LedgerTransactionSpec transaction,
+                                       LedgerSubjectCode sourceSubjectCode,
+                                       EntrySide sourceEntrySide,
+                                       LedgerSubjectCode targetSubjectCode,
+                                       EntrySide targetEntrySide) {
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThat(transaction.getPostingPlans()).singleElement().satisfies(plan -> {
+            assertThat(plan.isBalanced()).isTrue();
+            assertThat(plan.getEntries())
+                    .extracting(LedgerEntrySpec::getLedgerSubjectCode, LedgerEntrySpec::getEntryType)
+                    .containsExactly(
+                            tuple(sourceSubjectCode, sourceEntrySide),
+                            tuple(targetSubjectCode, targetEntrySide));
+        });
+    }
+
+    private void assertFundingBalanceAdjustPosting(boolean increase) {
+        AtomicReference<LedgerTransactionSpec> result = new AtomicReference<>();
+        Throwable failure = catchThrowable(() -> result.set(assembler.assemble(
+                balanceAdjustInstruction(increase),
+                "FUNDS_TX_BALANCE_ADJUST_" + (increase ? "INCREASE" : "DECREASE"),
+                balanceAdjustRoute(increase))));
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(failure)
+                .as("FUNDING_BALANCE_ADJUST must produce a balanced posting plan")
+                .isNull();
+        if (failure == null) {
+            LedgerPostingPlanSpec plan = result.get().getPostingPlans().getFirst();
+            softly.assertThat(result.get().isBalanced()).isTrue();
+            softly.assertThat(plan.isBalanced()).isTrue();
+            softly.assertThat(plan.getBalanceEffectType()).isEqualTo(increase
+                    ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE);
+            softly.assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.ADJUSTMENT);
+            softly.assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.ADJUSTMENT);
+            softly.assertThat(plan.getEntries()).allSatisfy(entry -> {
+                assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.ADJUSTMENT);
+                assertThat(entry.getAmount()).isEqualTo(AMOUNT);
+                assertThat(entry.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+                assertThat(entry.getBalanceEffectType()).isEqualTo(increase
+                        ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE);
+                assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.ADJUSTMENT);
+                assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.ADJUSTMENT);
+            });
+            softly.assertThat(plan.getEntries())
+                    .extracting(LedgerEntrySpec::getLedgerSubjectCode, LedgerEntrySpec::getEntryType)
+                    .containsExactly(increase
+                                    ? tuple(LedgerSubjectCode.ADJUSTMENT, EntrySide.DEBIT)
+                                    : tuple(LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
+                            increase
+                                    ? tuple(LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
+                                    : tuple(LedgerSubjectCode.ADJUSTMENT, EntrySide.CREDIT));
+        }
+        softly.assertAll();
+    }
+
     private FundsInstructionSpec instruction(AccountBalancePeriodType periodType,
                                               String periodId,
                                               LedgerSubjectCode payeeLedgerSubjectCode) {
@@ -510,7 +656,6 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .operator(WindOperatorFactory.system())
                 .payeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .contextVariables(postingCase.eventType() == FundsTransactionEventType.LIMIT_ADJUST
-                        || postingCase.eventType() == FundsTransactionEventType.BALANCE_ADJUST
                         ? Map.of(FundsInstructionContextKeys.INCREASE, true) : Map.of())
                 .build();
     }
@@ -526,6 +671,23 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .exchangeRate(BigDecimal.ONE)
                 .businessScene("LIMIT_ADJUST")
                 .businessSn("BIZ-LIMIT-ADJUST-001")
+                .eventTime(EVENT_TIME)
+                .operator(WindOperatorFactory.system())
+                .contextVariables(Map.of(FundsInstructionContextKeys.INCREASE, increase))
+                .build();
+    }
+
+    private FundsInstructionSpec balanceAdjustInstruction(boolean increase) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(TENANT_ID)
+                .instructionType(FundsInstructionType.BALANCE_CONTROL)
+                .eventType(FundsTransactionEventType.BALANCE_ADJUST)
+                .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
+                .amount(AMOUNT)
+                .originalAmount(AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .businessScene("BALANCE_ADJUST")
+                .businessSn("BIZ-BALANCE-ADJUST-" + (increase ? "INCREASE" : "DECREASE"))
                 .eventTime(EVENT_TIME)
                 .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of(FundsInstructionContextKeys.INCREASE, increase))
@@ -587,6 +749,42 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .build();
     }
 
+    private ResolvedRouteSpec balanceAdjustRoute(boolean increase) {
+        SubjectRef adjustmentAccount = ImmutableSubjectRef.builder()
+                .tenantId(TENANT_ID)
+                .subjectId("platform_adjustment")
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
+                .build();
+        RouteNodeSpec platformNode = routeNode("platform_adjustment",
+                FundsSubjectType.FUNDING_ACCOUNT, increase ? RouteNodeRole.SOURCE : RouteNodeRole.TARGET);
+        RouteNodeSpec accountNode = routeNode("funding_account",
+                FundsSubjectType.FUNDING_ACCOUNT, increase ? RouteNodeRole.TARGET : RouteNodeRole.SOURCE);
+        RouteLegSpec leg = new TestRouteLegSpec(
+                "FUNDING_BALANCE_ADJUST",
+                RouteLegType.ADJUST,
+                increase ? platformNode : accountNode,
+                increase ? accountNode : platformNode,
+                Map.of());
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("FUNDING_BALANCE_ADJUST_STANDARD")
+                .routeVersion("v1")
+                .businessScene("BALANCE_ADJUST")
+                .businessSn("BIZ-BALANCE-ADJUST-" + (increase ? "INCREASE" : "DECREASE"))
+                .instructionType(FundsInstructionType.BALANCE_CONTROL)
+                .eventType(FundsTransactionEventType.BALANCE_ADJUST)
+                .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
+                .participants(List.of())
+                .legs(List.of(leg))
+                .platformAccounts(ImmutablePlatformAccountsSnapshotSpec.builder()
+                        .adjustmentFundingAccount(adjustmentAccount)
+                        .build())
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
     private RouteLegSpec routeLeg() {
         return routeLeg("LEG-POSTING-PERIOD-001");
     }
@@ -631,6 +829,51 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
                 Map.of()
         );
+    }
+
+    private RouteLegSpec externalLeg(PostingCase postingCase) {
+        boolean inbound = postingCase.eventType() == FundsTransactionEventType.TOPUP;
+        return new TestRouteLegSpec(
+                "LEG-POSTING-" + postingCase.eventType().name(),
+                inbound ? RouteLegType.EXTERNAL_IN : RouteLegType.EXTERNAL_OUT,
+                routeNode(inbound ? "cash_account" : "prepayment_account",
+                        FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
+                routeNode(inbound ? "prepayment_account" : "cash_account",
+                        FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
+                Map.of());
+    }
+
+    private ResolvedRouteSpec externalRoute(PostingCase postingCase, RouteLegSpec leg) {
+        SubjectRef cashAccount = ImmutableSubjectRef.builder()
+                .tenantId(TENANT_ID)
+                .subjectId("cash_account")
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
+                .build();
+        SubjectRef prepaymentAccount = ImmutableSubjectRef.builder()
+                .tenantId(TENANT_ID)
+                .subjectId("prepayment_account")
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
+                .build();
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("POSTING_EXTERNAL_ROUTE")
+                .routeVersion("v1")
+                .businessScene("POSTING_EXTERNAL")
+                .businessSn("BIZ-POSTING-" + postingCase.eventType().name())
+                .instructionType(postingCase.instructionType())
+                .eventType(postingCase.eventType())
+                .transactionType(postingCase.transactionType())
+                .participants(List.of())
+                .legs(List.of(leg))
+                .platformAccounts(ImmutablePlatformAccountsSnapshotSpec.builder()
+                        .cashFundingAccount(cashAccount)
+                        .prepaymentFundingAccount(prepaymentAccount)
+                        .build())
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
     }
 
     private List<PostingCase> postingCases() {
@@ -699,10 +942,6 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         DefaultFundsTransactionType.BALANCE_CONTROL, LedgerPhaseCode.UNFREEZE,
                         LedgerBalanceEffectType.RELEASE, LedgerPostingIntentType.RELEASE,
                         LedgerPostingScope.CONTROL_RELEASE),
-                new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.BALANCE_ADJUST,
-                        DefaultFundsTransactionType.ADJUSTMENT, LedgerPhaseCode.ADJUSTMENT,
-                        LedgerBalanceEffectType.INCREASE, LedgerPostingIntentType.ADJUSTMENT,
-                        LedgerPostingScope.ADJUSTMENT),
                 new PostingCase(FundsInstructionType.BALANCE_CONTROL, FundsTransactionEventType.LIMIT_ADJUST,
                         DefaultFundsTransactionType.ADJUSTMENT, LedgerPhaseCode.ADJUSTMENT,
                         LedgerBalanceEffectType.INCREASE, LedgerPostingIntentType.ADJUSTMENT,
@@ -772,15 +1011,43 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                                LedgerPostingScope expectedScope) {
     }
 
+    private enum CatalogDrift {
+        NONE,
+        MISSING_REQUIRED_LEDGER,
+        MULTI_MATCH_REQUIRED_LEDGER,
+        PROFILE_CODE,
+        PROFILE_VERSION,
+        CATEGORY,
+        NORMAL_SIDE,
+        ALLOW_NEGATIVE,
+        PERIOD,
+        SETTLEMENT_POLICY,
+        CUTOFF
+    }
+
     private static final class RecordingLedgerService implements LedgerService {
 
         private final List<LedgerQuery> queries = new ArrayList<>();
 
+        private final LedgerProfileCatalog ledgerProfileCatalog;
+
         private long ledgerId = 1L;
+
+        private CatalogDrift catalogDrift;
+
+        private RecordingLedgerService(LedgerProfileCatalog ledgerProfileCatalog) {
+            this.ledgerProfileCatalog = ledgerProfileCatalog;
+        }
 
         void clear() {
             queries.clear();
             ledgerId = 1L;
+            catalogDrift = CatalogDrift.NONE;
+        }
+
+        @Override
+        public void initializeRequiredLedgers(InitializeSubjectLedgerRequest request) {
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -810,10 +1077,17 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             List<LedgerDTO> records = ledgerSubjectCodes(query).stream()
                     .map(subjectCode -> ledger(query, subjectCode))
                     .toList();
+            if (catalogDrift == CatalogDrift.MULTI_MATCH_REQUIRED_LEDGER) {
+                records = new ArrayList<>(records);
+                records.add(ledger(query, LedgerSubjectCode.SETTLEMENT));
+            }
             return Pagination.of(records, 1, options.getQuerySize(), QueryType.QUERY_BOTH, records.size());
         }
 
         private List<LedgerSubjectCode> ledgerSubjectCodes(LedgerQuery query) {
+            if (catalogDrift == CatalogDrift.MISSING_REQUIRED_LEDGER) {
+                return List.of(LedgerSubjectCode.AVAILABLE);
+            }
             if (query.getLedgerSubjectCode() != null) {
                 return List.of(query.getLedgerSubjectCode());
             }
@@ -822,16 +1096,60 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCode.AUTHORIZATION);
             }
-            return List.of(LedgerSubjectCode.AVAILABLE,
+            return List.of(LedgerSubjectCode.CASH,
+                    LedgerSubjectCode.AVAILABLE,
                     LedgerSubjectCode.FROZEN,
                     LedgerSubjectCode.AUTHORIZATION,
                     LedgerSubjectCode.CLEARING,
                     LedgerSubjectCode.SETTLEMENT,
                     LedgerSubjectCode.FEE,
-                    LedgerSubjectCode.PREPAYMENT);
+                    LedgerSubjectCode.PREPAYMENT,
+                    LedgerSubjectCode.ADJUSTMENT);
         }
 
         private LedgerDTO ledger(LedgerQuery query, LedgerSubjectCode subjectCode) {
+            LedgerProfileCode profileCode = resolveProfileCode(query, subjectCode);
+            CreateLedgerRequest expected = ledgerProfileCatalog.requiredLedgerRequests(
+                            new InitializeSubjectLedgerRequest()
+                                    .setTenantId(query.getTenantId())
+                                    .setSubjectId(query.getSubjectId())
+                                    .setSubjectType(FundsSubjectType.valueOf(query.getSubjectType()))
+                                    .setCurrency(query.getCurrency())
+                                    .setLedgerProfileCode(profileCode)
+                                    .setLedgerProfileVersion(1)
+                                    .setPeriodType(query.getPeriodType())
+                                    .setPeriodId(query.getPeriodId()))
+                    .stream()
+                    .filter(request -> request.getLedgerSubjectCode() == subjectCode)
+                    .findFirst()
+                    .orElseThrow();
+            String actualProfileCode = expected.getLedgerProfileCode();
+            Integer profileVersion = expected.getLedgerProfileVersion();
+            LedgerSubjectCategory category = expected.getLedgerSubjectCategory();
+            EntrySide normalSide = expected.getNormalBalanceSide();
+            boolean allowNegative = expected.getAllowNegative();
+            AccountBalancePeriodType periodType = expected.getPeriodType();
+            String periodId = expected.getPeriodId();
+            String settlementPolicy = expected.getSettlementPolicy();
+            LocalTime cutOffTime = expected.getCutOffTime();
+            switch (catalogDrift) {
+                case PROFILE_CODE -> actualProfileCode = FundsSubjectType.CREDIT_ACCOUNT.name()
+                        .equals(query.getSubjectType())
+                        ? LedgerProfileCode.FUNDING_BASIC.name()
+                        : LedgerProfileCode.CREDIT_BASIC.name();
+                case PROFILE_VERSION -> profileVersion = 2;
+                case CATEGORY -> category = LedgerSubjectCategory.ASSET;
+                case NORMAL_SIDE -> normalSide = normalSide == EntrySide.CREDIT ? EntrySide.DEBIT : EntrySide.CREDIT;
+                case ALLOW_NEGATIVE -> allowNegative = !allowNegative;
+                case PERIOD -> {
+                    periodType = AccountBalancePeriodType.MONTHLY;
+                    periodId = "DRIFT-PERIOD";
+                }
+                case SETTLEMENT_POLICY -> settlementPolicy = "NEXT_DAY";
+                case CUTOFF -> cutOffTime = LocalTime.NOON;
+                default -> {
+                }
+            }
             return new LedgerDTO()
                     .setId(ledgerId++)
                     .setGmtCreate(EVENT_TIME)
@@ -839,42 +1157,41 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                     .setTenantId(query.getTenantId())
                     .setSubjectId(query.getSubjectId())
                     .setSubjectType(query.getSubjectType())
-                    .setLedgerProfileCode("POSTING_PERIOD")
-                    .setLedgerProfileVersion(1)
+                    .setLedgerProfileCode(actualProfileCode)
+                    .setLedgerProfileVersion(profileVersion)
                     .setLedgerSubjectCode(subjectCode)
-                    .setLedgerSubjectCategory(resolveSubjectCategory(subjectCode))
-                    .setNormalBalanceSide(resolveNormalSide(subjectCode))
-                    .setAllowNegative(Boolean.FALSE)
+                    .setLedgerSubjectCategory(category)
+                    .setNormalBalanceSide(normalSide)
+                    .setAllowNegative(allowNegative)
                     .setDebitAmount(0L)
                     .setCreditAmount(0L)
                     .setCurrency(query.getCurrency())
-                    .setSettlementPolicy("RT")
-                    .setCutOffTime(LocalTime.MIDNIGHT)
-                    .setPeriodType(query.getPeriodType())
-                    .setPeriodId(query.getPeriodId())
+                    .setSettlementPolicy(settlementPolicy)
+                    .setCutOffTime(cutOffTime)
+                    .setPeriodType(periodType)
+                    .setPeriodId(periodId)
                     .setVersion(0);
         }
 
-        private LedgerSubjectCategory resolveSubjectCategory(LedgerSubjectCode ledgerSubjectCode) {
-            return ledgerSubjectCode == LedgerSubjectCode.LIMIT
-                    ? LedgerSubjectCategory.CONTROL
-                    : LedgerSubjectCategory.LIABILITY;
-        }
-
-        private EntrySide resolveNormalSide(LedgerSubjectCode ledgerSubjectCode) {
-            return ledgerSubjectCode == LedgerSubjectCode.LIMIT
-                    ? EntrySide.DEBIT
-                    : EntrySide.CREDIT;
+        private LedgerProfileCode resolveProfileCode(LedgerQuery query, LedgerSubjectCode subjectCode) {
+            if (FundsSubjectType.CREDIT_ACCOUNT.name().equals(query.getSubjectType())) {
+                return LedgerProfileCode.CREDIT_BASIC;
+            }
+            return switch (subjectCode) {
+                case CASH, PREPAYMENT, FEE, ADJUSTMENT -> LedgerProfileCode.FUNDING_PLATFORM;
+                case AUTHORIZATION -> LedgerProfileCode.FUNDING_BASIC;
+                default -> LedgerProfileCode.FUNDING_MERCHANT;
+            };
         }
     }
 
     @Configuration
-    @Import(DefaultLedgerPostingAssembler.class)
+    @Import({DefaultLedgerPostingAssembler.class, LedgerProfileCatalog.class})
     static class Config {
 
         @Bean
-        RecordingLedgerService ledgerService() {
-            return new RecordingLedgerService();
+        RecordingLedgerService ledgerService(LedgerProfileCatalog ledgerProfileCatalog) {
+            return new RecordingLedgerService(ledgerProfileCatalog);
         }
 
         @Bean

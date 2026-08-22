@@ -24,13 +24,9 @@ import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ClearingSplittableDetailDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -155,9 +151,9 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
         assertThat(result.getAmount()).isEqualTo(AMOUNT);
         assertThat(result.getReconciliationDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.PASSED);
-        assertThat(result.getReconciliationRunResultSn()).isEqualTo(reconciliationRunResultSn);
-        assertThat(result.getReconciliationResultDigest()).hasSize(64);
-        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("report:merchant-clearing-recon-run-001");
+        assertThat(result.getGateEvidenceRef()).isNotBlank();
+        assertThat(result.getReconciliationEvidenceRefs())
+                .contains("report:merchant-clearing-recon-run-001", result.getGateEvidenceRef());
         assertThat(result.getSourceDigest()).hasSize(64);
         assertThat(detailCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -285,7 +281,6 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         reconciliationMatchResultSn = recordDifferenceMatchResultSn();
         reconciliationDifferenceApplicationService.createDifference(blockingDifferenceRequest(),
                 WindOperatorFactory.system());
-        reconciliationRunResultSn = recordBalancedRerunResult();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -294,8 +289,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getAdmissionResult()).isEqualTo(ClearingSplittableAdmissionResult.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
         assertThat(result.getReconciliationDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
-        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("report:merchant-clearing-recon-run-001",
-                "merchant-clearing-recon-evidence-001");
+        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("merchant-clearing-recon-evidence-001",
+                "run:" + reconciliationRunResultSn);
         assertThat(result.getSn()).isNull();
         assertThat(detailCount()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -306,6 +301,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                     last_rerun_batch_sn = 'clearing_recon_batch_balanced_001'
                 WHERE tenant_id = ?
                 """, TENANT_ID);
+        reconciliationRunResultSn = recordBalancedRerunResult();
         ClearingSplittableDetailDTO retry = clearingSplittableDetailApplicationService.identifySplittableDetail(
                 minimumRequest(), WindOperatorFactory.system());
 
@@ -549,7 +545,6 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 .setFundsTransactionSn(FUNDS_TRANSACTION_SN)
                 .setFundsTransactionDetailSn(FUNDS_TRANSACTION_DETAIL_SN)
                 .setLedgerEntrySn(LEDGER_ENTRY_SN)
-                .setReconciliationRunResultSn(reconciliationRunResultSn)
                 .setBusinessLine("ACQUIRING")
                 .setSplitPeriod("2026-07-21")
                 .setSplitRuleCode("MERCHANT_DAILY_SPLIT")
@@ -569,18 +564,12 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         String referenceSourceRef = "internal:" + FUNDS_TRANSACTION_DETAIL_SN;
         String comparisonSourceRef = "external:" + FUNDS_TRANSACTION_DETAIL_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
+                jdbcTemplate, TENANT_ID, batchSn, "CLEARING_SPLITTABLE_IDENTIFY",
                 FUNDS_TRANSACTION_DETAIL_SN, "recon-rule-1", "report:merchant-clearing-recon-run-001",
                 referenceSourceRef, comparisonSourceRef, previousBatchSn);
-        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+        return reconciliationRunResultApplicationService.executeStrictExact(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batchSn)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(referenceSourceRef)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef("report:merchant-clearing-recon-run-001#line-1"))),
+                .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
     }
 
@@ -596,25 +585,16 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         String referenceSourceRef = "internal-difference:" + FUNDS_TRANSACTION_DETAIL_SN;
         String comparisonSourceRef = "external-difference:" + FUNDS_TRANSACTION_DETAIL_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, DIFFERENCE_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                jdbcTemplate, TENANT_ID, DIFFERENCE_BATCH_SN, "CLEARING_SPLITTABLE_IDENTIFY",
                 FUNDS_TRANSACTION_DETAIL_SN, "recon-rule-1", "merchant-clearing-recon-evidence-001",
-                referenceSourceRef, comparisonSourceRef);
-        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                referenceSourceRef, comparisonSourceRef, null, 2L, "CONFIRMED");
+        reconciliationRunResultSn = reconciliationRunResultApplicationService.executeStrictExact(
+                new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(DIFFERENCE_BATCH_SN)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(referenceSourceRef)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
-                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setCurrency(CurrencyIsoCode.USD)
-                        .setDifferenceAmount(AMOUNT)
-                        .setEvidenceRef("merchant-clearing-recon-evidence-001"))), WindOperatorFactory.system());
+                .setReconciliationBatchSn(DIFFERENCE_BATCH_SN), WindOperatorFactory.system()).getSn();
         return jdbcTemplate.queryForObject("""
                 SELECT sn FROM t_reconciliation_match_result
-                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND difference_type IS NOT NULL
+                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND result_kind <> 'MATCHED'
                 """, String.class, TENANT_ID, DIFFERENCE_BATCH_SN);
     }
 

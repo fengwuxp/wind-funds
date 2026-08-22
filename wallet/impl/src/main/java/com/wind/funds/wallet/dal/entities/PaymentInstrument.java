@@ -115,10 +115,6 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
     @Column("status")
     private FundsAccountState state;
 
-    void setStatus(FundsAccountState state) {
-        this.state = state;
-    }
-
     /**
      * 工具生效时间。
      */

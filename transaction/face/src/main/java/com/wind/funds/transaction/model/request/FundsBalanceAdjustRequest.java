@@ -10,8 +10,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
-import java.time.LocalDateTime;
-
 /**
  * 资金余额调整请求
  *
@@ -83,24 +81,6 @@ public class FundsBalanceAdjustRequest {
 
     @Schema(description = "重新对账或复核批次引用，可空；外部余额异常纠偏场景建议填写")
     private String reconciliationRerunRef;
-
-    @Schema(description = "是否允许本次调账形成受控负可用余额")
-    private Boolean allowNegativeBalance;
-
-    @Schema(description = "受控负可用策略编码")
-    private String negativeAvailablePolicyCode;
-
-    @Schema(description = "受控负可用风险状态")
-    private String negativeAvailableRiskStatus;
-
-    @Schema(description = "受控负可用单笔上限")
-    private Money negativeAvailableSingleLimit;
-
-    @Schema(description = "受控负可用累计上限")
-    private Money negativeAvailableCumulativeLimit;
-
-    @Schema(description = "受控负可用账龄起点")
-    private LocalDateTime negativeAvailableAgingStartedAt;
 
     @Schema(description = "交易描述")
     private String description;

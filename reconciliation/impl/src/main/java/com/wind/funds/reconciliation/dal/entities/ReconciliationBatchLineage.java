@@ -4,7 +4,6 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -40,13 +39,16 @@ public class ReconciliationBatchLineage implements Serializable, TenantIsolation
     private Long tenantId;
 
     @NotNull
-    private String reconciliationScopeRef;
+    private String scopeOwnerNamespace;
 
     @NotNull
-    private ReconciliationGateObjectType gateObjectType;
+    private String scopeIdentityValue;
 
     @NotNull
-    private String gateObjectSn;
+    private String pairOwnerNamespace;
+
+    @NotNull
+    private String pairIdentityValue;
 
     @NotNull
     private String currentBatchSn;

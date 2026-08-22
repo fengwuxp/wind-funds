@@ -111,10 +111,6 @@ public class PaymentInstrumentBinding implements Serializable, TenantIsolationOb
     @Column("status")
     private PaymentInstrumentBindingState state;
 
-    void setStatus(PaymentInstrumentBindingState state) {
-        this.state = state;
-    }
-
     /**
      * 绑定版本号。
      */

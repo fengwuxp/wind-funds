@@ -83,10 +83,6 @@ public class SpendRuleDefinition implements Serializable, TenantIsolationObject<
     @Column("status")
     private SpendRuleDefinitionState state;
 
-    void setStatus(SpendRuleDefinitionState state) {
-        this.state = state;
-    }
-
     /**
      * 规则定义说明。
      */

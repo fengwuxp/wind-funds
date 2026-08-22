@@ -8,25 +8,17 @@ import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplic
 import com.wind.funds.reconciliation.application.batch.impl.ReconciliationBatchApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.funds.reconciliation.model.dto.ReconciliationBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationMatchResultDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
-import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
-import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,16 +34,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.stream.IntStream;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.reconciliation.ReconciliationTestFixture.identity;
+import static com.wind.funds.reconciliation.ReconciliationTestFixture.rule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -90,7 +83,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID + 1);
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
                 .hasMessageContaining("tenantId 与当前租户不一致");
         assertThat(runResultCount()).isZero();
@@ -104,17 +97,11 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     void testRecordShouldRejectOversizedMatchResultsBeforeBatchLookup() {
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn("missing-batch")
-                .setMatchResults(IntStream.rangeClosed(
-                                1, RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT + 1)
-                        .mapToObj(index -> exactMatchResult(String.valueOf(index), "report:run#line-" + index))
-                        .toList());
+                .setReconciliationBatchSn("missing-batch");
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("逐笔匹配结果数量不能超过")
-                .hasMessageContaining(String.valueOf(
-                        RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT));
+                .hasMessageContaining("对账批次不存在");
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
@@ -122,25 +109,18 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
     @Test
     void testRecordShouldRejectOversizedMatchReferencesBeforeBatchLookup() {
-        ReconciliationMatchResultItem oversizedSourceRef = exactMatchResult("001", "report:run#line-1")
-                .setReferenceSourceRef("x".repeat(ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH + 1));
-        ReconciliationMatchResultItem oversizedEvidence = exactMatchResult("002",
-                "x".repeat(ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH + 1));
-
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn("missing-batch")
-                        .setMatchResults(List.of(oversizedSourceRef)),
+                        .setReconciliationBatchSn("missing-batch"),
                 WindOperatorFactory.system()))
-                .hasMessageContaining("基准侧来源引用长度不能超过");
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+                .hasMessageContaining("对账批次不存在");
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn("missing-batch")
-                        .setMatchResults(List.of(oversizedEvidence)),
+                        .setReconciliationBatchSn("missing-batch"),
                 WindOperatorFactory.system()))
-                .hasMessageContaining("证据引用长度不能超过");
+                .hasMessageContaining("对账批次不存在");
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
@@ -156,9 +136,9 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         RecordReconciliationRunResultRequest request = readyRequest(List.of("001"));
 
-        ReconciliationRunResultDTO first = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO first = reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system());
-        ReconciliationRunResultDTO replay = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO replay = reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system());
 
         assertThat(first.getSn()).isNotBlank();
@@ -181,7 +161,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
     @Test
     void testQueryShouldReadRunResultAndPageMatchEvidence() {
-        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.executeStrictExact(
                 readyRequest(List.of("001", "002")), WindOperatorFactory.system());
 
         ReconciliationRunResultDTO queried = reconciliationRunResultApplicationService.getRunResult(
@@ -196,11 +176,11 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         assertThat(queried.getResultDigest()).isEqualTo(recorded.getResultDigest());
         assertThat(firstPage.getTotal()).isEqualTo(2);
         assertThat(firstPage.getRecords())
-                .extracting(ReconciliationMatchResultDTO::getEvidenceRef)
-                .containsExactly("report:run#line-001");
+                .extracting(ReconciliationMatchResultDTO::getEvidenceRefs)
+                .allMatch(evidenceRefs -> !evidenceRefs.isEmpty());
         assertThat(secondPage.getRecords())
-                .extracting(ReconciliationMatchResultDTO::getEvidenceRef)
-                .containsExactly("report:run#line-002");
+                .extracting(ReconciliationMatchResultDTO::getEvidenceRefs)
+                .allMatch(evidenceRefs -> !evidenceRefs.isEmpty());
     }
 
     @Test
@@ -215,7 +195,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
     @Test
     void testQueryShouldRejectCustomSorting() {
-        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO recorded = reconciliationRunResultApplicationService.executeStrictExact(
                 readyRequest(List.of("001")), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.queryMatchResults(
@@ -229,15 +209,21 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
      */
     @Test
     void testRecordShouldRejectIncompleteSourceCoverage() {
-        RecordReconciliationRunResultRequest request = readyRequest(List.of("001", "002"))
-                .setMatchResults(List.of(exactMatchResult("001", "report:run#line-1")));
+        ReconciliationBatchDTO batch = createBatch();
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
+                "transaction", List.of("reference:001"), "report:reference");
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON,
+                "settlement", List.of("comparison:001"), "report:comparison", 1L, false);
+        RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batch.getSn());
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperatorFactory.system()))
-                .hasMessageContaining("未覆盖全部基准侧来源事实");
+        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.executeStrictExact(
+                request, WindOperatorFactory.system());
 
-        assertThat(runResultCount()).isZero();
-        assertThat(matchResultCount()).isZero();
+        assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
+        assertThat(result.getMatchedCount()).isOne();
+        assertThat(result.getDifferenceCount()).isZero();
     }
 
     /**
@@ -258,34 +244,33 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                 FROM t_reconciliation_source_item
                 WHERE source_snapshot_sn = ?
                 """, String.class, snapshotSn);
-        String contentDigest = jdbcTemplate.queryForObject(
-                "SELECT content_digest FROM t_reconciliation_source_item WHERE sn = ?", String.class, itemSn);
+        String semanticDigest = jdbcTemplate.queryForObject(
+                "SELECT semantic_digest FROM t_reconciliation_source_item WHERE sn = ?", String.class, itemSn);
         String sourceDigest = jdbcTemplate.queryForObject(
                 "SELECT source_digest FROM t_reconciliation_source_snapshot WHERE sn = ?", String.class, snapshotSn);
 
-        jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET record_count = 2 WHERE sn = ?", snapshotSn);
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET coverage_member_count = 2 WHERE sn = ?", snapshotSn);
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("快照成员数不一致");
-        jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET record_count = 1 WHERE sn = ?", snapshotSn);
+                .hasMessageContaining("快照成员数冲突");
+        jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET coverage_member_count = 1 WHERE sn = ?", snapshotSn);
 
-        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET semantic_digest = ? WHERE sn = ?",
                 "x".repeat(64), itemSn);
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("来源成员内容摘要无效");
+                .hasMessageContaining("来源事实摘要不一致");
 
-        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
-                "0".repeat(64), itemSn);
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET semantic_digest = ?, amount = 2 WHERE sn = ?",
+                semanticDigest, itemSn);
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("来源快照摘要不一致");
-        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET content_digest = ? WHERE sn = ?",
-                contentDigest, itemSn);
+                .hasMessageContaining("来源事实冲突");
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET amount = 1 WHERE sn = ?", itemSn);
 
         jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET source_digest = ? WHERE sn = ?",
                 "0".repeat(64), snapshotSn);
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
                 .hasMessageContaining("来源快照摘要不一致");
 
@@ -304,10 +289,9 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     void testRecordShouldRejectUnknownBatch() {
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn("missing-batch")
-                .setMatchResults(List.of(exactMatchResult("001", "report:run#line-1")));
+                .setReconciliationBatchSn("missing-batch");
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
                 .hasMessageContaining("对账批次不存在");
     }
@@ -320,13 +304,12 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     void testRecordShouldRejectBatchWithOneSourceSnapshot() {
         ReconciliationBatchDTO batch = createBatch();
         recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
-                ReconciliationSourceType.TRANSACTION, List.of("reference:001"), "report:reference");
+                "transaction", List.of("reference:001"), "report:reference");
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batch.getSn())
-                .setMatchResults(List.of(exactMatchResult("001", "report:run#line-1")));
+                .setReconciliationBatchSn(batch.getSn());
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
                 .hasMessageContaining("来源尚未冻结完整");
     }
@@ -339,14 +322,13 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     void testRecordShouldRejectWhenBothSourceSnapshotsAreEmpty() {
         ReconciliationBatchDTO batch = createBatch();
         recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
-                ReconciliationSourceType.TRANSACTION, List.of(), "report:reference");
+                "transaction", List.of(), "report:reference");
         insertEmptyComparisonSnapshotBypassingBatchService(batch.getSn());
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batch.getSn())
-                .setMatchResults(List.of());
+                .setReconciliationBatchSn(batch.getSn());
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
                 .hasMessageContaining("两侧来源不能同时为空");
 
@@ -360,11 +342,11 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     @Test
     void testRecordShouldRejectSourceReferenceOutsideSnapshot() {
         RecordReconciliationRunResultRequest request = readyRequest(List.of("001"));
-        request.getMatchResults().getFirst().setComparisonSourceRef("comparison:outside");
+        jdbcTemplate.update("UPDATE t_reconciliation_source_item SET comparison_identity_value = 'outside'");
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
+        assertThatThrownBy(() -> reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system()))
-                .hasMessageContaining("未冻结的核对侧来源引用");
+                .hasMessageContaining("对账来源事实冲突");
     }
 
     /**
@@ -373,18 +355,16 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
      */
     @Test
     void testRecordShouldDeriveDifferenceResultFromMatchFacts() {
-        RecordReconciliationRunResultRequest request = readyRequest(List.of("001"))
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef("reference:001")
-                        .setComparisonSourceRef("comparison:001")
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
-                        .setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setDifferenceAmount(0L)
-                        .setEvidenceRef("report:run#line-1")));
+        ReconciliationBatchDTO batch = createBatch();
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
+                "transaction", List.of("reference:001"), "report:reference");
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON,
+                "settlement", List.of("comparison:001"), "report:comparison", 2L, true);
+        RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batch.getSn());
 
-        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system());
 
         assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
@@ -400,29 +380,22 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     void testRecordShouldPersistReferenceMissingResult() {
         ReconciliationBatchDTO batch = createBatch();
         recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
-                ReconciliationSourceType.TRANSACTION, List.of(), "report:reference");
+                "transaction", List.of(), "report:reference");
         recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON,
-                ReconciliationSourceType.SETTLEMENT_REPORT, List.of("comparison:orphan-001"), "report:comparison");
+                "settlement", List.of("comparison:orphan-001"), "report:comparison");
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batch.getSn())
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setComparisonSourceRef("comparison:orphan-001")
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
-                        .setDifferenceType(ReconciliationDifferenceType.REFERENCE_MISSING)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setEvidenceRef("report:run#line-orphan")));
+                .setReconciliationBatchSn(batch.getSn());
 
-        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
+        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.executeStrictExact(
                 request, WindOperatorFactory.system());
 
         assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM t_reconciliation_match_result
-                WHERE reference_source_ref IS NULL
-                  AND difference_type = 'REFERENCE_MISSING'
+                WHERE reference_fact_identity_value IS NULL
+                  AND result_kind = 'REFERENCE_MISSING'
                 """, Integer.class)).isOne();
     }
 
@@ -432,14 +405,13 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
      */
     @Test
     void testRecordShouldRejectDuplicateSourcePairWithDifferentEvidence() {
-        RecordReconciliationRunResultRequest request = readyRequest(List.of("001"))
-                .setMatchResults(List.of(
-                        exactMatchResult("001", "report:run#line-1"),
-                        exactMatchResult("001", "report:run#line-2")));
+        ReconciliationBatchDTO batch = createBatch();
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
+                "transaction", List.of("reference:001"), "report:reference");
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperatorFactory.system()))
-                .hasMessageContaining("不能重复使用同一基准侧和核对侧来源对");
+        assertThatThrownBy(() -> recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
+                "transaction", List.of("reference:001"), "report:changed"))
+                .hasMessageContaining("快照事实冲突");
     }
 
     /**
@@ -449,29 +421,22 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
     @Test
     void testRecordShouldRejectReusingOneSideAcrossMatchResults() {
         ReconciliationBatchDTO batch = createBatch();
-        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.TRANSACTION,
-                List.of("reference:001", "reference:002"), "report:reference");
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE, "transaction",
+                List.of("reference:first:001", "reference:second:001"), "report:reference");
         recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON,
-                ReconciliationSourceType.SETTLEMENT_REPORT,
+                "settlement",
                 List.of("comparison:001"), "report:comparison");
         RecordReconciliationRunResultRequest request = new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batch.getSn())
-                .setMatchResults(List.of(
-                        exactMatchResult("001", "report:run#line-1"),
-                        new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef("reference:002")
-                                .setComparisonSourceRef("comparison:001")
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef("report:run#line-2")));
+                .setReconciliationBatchSn(batch.getSn());
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperatorFactory.system()))
-                .hasMessageContaining("同一核对侧来源引用只能参与一个匹配结果");
+        ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.executeStrictExact(
+                request, WindOperatorFactory.system());
 
-        assertThat(runResultCount()).isZero();
-        assertThat(matchResultCount()).isZero();
+        assertThat(result.getOutcome()).isEqualTo(ReconciliationRunOutcome.DIFFERENCE_FOUND);
+        assertThat(result.getDifferenceCount()).isOne();
+        assertThat(jdbcTemplate.queryForObject("SELECT result_kind FROM t_reconciliation_match_result",
+                String.class)).isEqualTo("IDENTITY_CONFLICT");
     }
 
     /**
@@ -480,18 +445,15 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
      */
     @Test
     void testRecordShouldRejectOversizedEvidenceBeforePersistence() {
-        RecordReconciliationRunResultRequest request = readyRequest(List.of("001", "002"))
-                .setMatchResults(List.of(
-                        exactMatchResult("001", "report:run#line-1"),
-                        exactMatchResult("002", "x".repeat(300))));
+        ReconciliationBatchDTO batch = createBatch();
 
-        assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperatorFactory.system()))
-                .hasMessageContaining("证据引用长度不能超过");
+        assertThatThrownBy(() -> recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE,
+                "transaction", List.of("reference:001"), "x".repeat(257)))
+                .hasMessageContaining("来源证据引用长度不能超过");
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
-        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
+        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -520,67 +482,84 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
     private RecordReconciliationRunResultRequest readyRequest(List<String> suffixes) {
         ReconciliationBatchDTO batch = createBatch();
-        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE, ReconciliationSourceType.TRANSACTION,
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.REFERENCE, "transaction",
                 suffixes.stream().map(suffix -> "reference:" + suffix).toList(), "report:reference");
-        recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.SETTLEMENT_REPORT,
+        recordSnapshot(batch.getSn(), ReconciliationSourceRole.COMPARISON, "settlement",
                 suffixes.stream().map(suffix -> "comparison:" + suffix).toList(), "report:comparison");
         return new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batch.getSn())
-                .setMatchResults(suffixes.stream()
-                        .map(suffix -> exactMatchResult(suffix, "report:run#line-" + suffix))
-                        .toList());
+                .setReconciliationBatchSn(batch.getSn());
     }
 
     private ReconciliationBatchDTO createBatch() {
         return reconciliationBatchApplicationService.createBatch(new CreateReconciliationBatchRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationScopeRef("clearing:clearing-candidate-001")
-                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                .setGateObjectSn("clearing-candidate-001")
-                .setRuleVersion("recon-rule-v1")
+                .setScopeIdentity(identity("test.scope", "clearing:clearing-candidate-001"))
+                .setPairIdentity(identity("test.pair", "clearing-candidate-001"))
+                .setCurrency(CurrencyIsoCode.USD)
+                .setComparisonRuleRef(rule("recon-rule-v1"))
                 .setWindowStart(LocalDateTime.of(2026, 7, 21, 0, 0))
                 .setWindowEnd(LocalDateTime.of(2026, 7, 22, 0, 0))
+                .setTimeSemantics("occurredAt")
                 .setTimezoneId("Asia/Shanghai"), WindOperatorFactory.system());
     }
 
     private void recordSnapshot(String batchSn,
                                 ReconciliationSourceRole sourceRole,
-                                ReconciliationSourceType sourceType,
+                                String sourceNamespace,
                                 List<String> sourceItemRefs,
                                 String evidenceRef) {
-        reconciliationBatchApplicationService.recordSourceSnapshot(new RecordReconciliationSourceSnapshotRequest()
-                .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(batchSn)
-                .setSourceRole(sourceRole)
-                .setSourceType(sourceType)
-                .setSourceItems(sourceItemRefs.stream()
-                        .map(sourceItemRef -> new ReconciliationSourceItemInput()
-                                .setSourceItemRef(sourceItemRef)
-                                .setContentDigest(FundsStableHashSupport.sha256(sourceItemRef)))
-                        .toList())
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system());
+        recordSnapshot(batchSn, sourceRole, sourceNamespace, sourceItemRefs, evidenceRef, 1L, true);
+    }
+
+    private void recordSnapshot(String batchSn,
+                                ReconciliationSourceRole sourceRole,
+                                String sourceNamespace,
+                                List<String> sourceItemRefs,
+                                String evidenceRef,
+                                long amount,
+                                boolean coverageComplete) {
+        RecordReconciliationSourceSnapshotRequest request =
+                com.wind.funds.reconciliation.ReconciliationTestFixture.sourceSnapshotRequest(
+                        TENANT_ID, batchSn, sourceRole, sourceNamespace, sourceItemRefs, List.of(evidenceRef));
+        request.getCoverage().setComplete(coverageComplete);
+        request.getFacts().forEach(fact -> {
+            String sourceFactValue = fact.getSourceFactRef().getValue().trim();
+            int separator = sourceFactValue.lastIndexOf(':');
+            fact.setComparisonIdentity(identity("test.compare",
+                    separator < 0 ? sourceFactValue : sourceFactValue.substring(separator + 1)));
+            fact.setAmount(amount);
+        });
+        reconciliationBatchApplicationService.recordSourceSnapshot(
+                request, WindOperatorFactory.system());
     }
 
     private void insertEmptyComparisonSnapshotBypassingBatchService(String batchSn) {
-        String sourceDigest = ReconciliationDigestSupport.sourceDigest(
-                ReconciliationSourceRole.COMPARISON, ReconciliationSourceType.SETTLEMENT_REPORT, Map.of());
+        String semanticDigest = FundsStableHashSupport.sha256Json(List.of());
+        TreeMap<String, Object> snapshot = new TreeMap<>();
+        snapshot.put("tenantId", TENANT_ID);
+        snapshot.put("batchSn", batchSn);
+        snapshot.put("sourceRole", ReconciliationSourceRole.COMPARISON);
+        snapshot.put("sourceNamespace", "settlement");
+        snapshot.put("snapshotIdentity", "test.snapshot:" + batchSn + ":COMPARISON");
+        snapshot.put("snapshotVersion", "v1");
+        snapshot.put("coverageComplete", true);
+        snapshot.put("coverageWatermark", "test-watermark");
+        snapshot.put("coverageMemberCount", 0);
+        snapshot.put("semanticDigest", semanticDigest);
+        String sourceDigest = FundsStableHashSupport.sha256Json(snapshot);
+        String evidenceBundleDigest = FundsStableHashSupport.sha256Json(List.of("report:comparison"));
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_source_snapshot
-                    (sn, tenant_id, reconciliation_batch_sn, source_role, source_type,
-                     source_digest, record_count, evidence_refs, created_by)
-                VALUES (?, ?, ?, 'COMPARISON', 'SETTLEMENT_REPORT', ?, 0, '["report:comparison"]', 'SYSTEM')
-                """, batchSn + ":CORRUPT_COMPARISON", TENANT_ID, batchSn, sourceDigest);
+                    (sn, tenant_id, reconciliation_batch_sn, source_role, source_namespace,
+                     snapshot_owner_namespace, snapshot_identity_value, snapshot_version,
+                     coverage_complete, coverage_watermark, coverage_member_count,
+                     source_digest, semantic_digest, evidence_bundle_digest, evidence_refs, created_by)
+                VALUES (?, ?, ?, 'COMPARISON', 'settlement', 'test.snapshot', ?, 'v1',
+                        1, 'test-watermark', 0, ?, ?, ?, '["report:comparison"]', 'SYSTEM')
+                """, batchSn + ":CORRUPT_COMPARISON", TENANT_ID, batchSn,
+                batchSn + ":COMPARISON", sourceDigest, semanticDigest, evidenceBundleDigest);
         jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'DATA_READY' WHERE sn = ?", batchSn);
-    }
-
-    private ReconciliationMatchResultItem exactMatchResult(String suffix, String evidenceRef) {
-        return new ReconciliationMatchResultItem()
-                .setReferenceSourceRef("reference:" + suffix)
-                .setComparisonSourceRef("comparison:" + suffix)
-                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                .setEvidenceRef(evidenceRef);
     }
 
     private Callable<RunResultAttempt> concurrentRecordAttempt(CountDownLatch startGate,
@@ -589,7 +568,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
             TenantContextHolder.setTenantId(TENANT_ID);
             try {
                 startGate.await();
-                ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
+                ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.executeStrictExact(
                         request, WindOperatorFactory.system());
                 return new RunResultAttempt(true, result.getSn(), null);
             } catch (RuntimeException exception) {

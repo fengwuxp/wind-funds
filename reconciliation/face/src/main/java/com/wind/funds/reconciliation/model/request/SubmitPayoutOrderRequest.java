@@ -54,7 +54,4 @@ public class SubmitPayoutOrderRequest implements Serializable {
     @NotNull
     private ExternalRuleVerificationEvidenceDTO externalRuleVerificationEvidence;
 
-    @Schema(description = "提交准入消费的对账运行结果流水号")
-    @NotBlank
-    private String reconciliationRunResultSn;
 }

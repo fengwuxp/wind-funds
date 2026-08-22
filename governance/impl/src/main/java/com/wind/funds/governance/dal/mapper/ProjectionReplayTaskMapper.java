@@ -15,21 +15,21 @@ import java.util.List;
 public interface ProjectionReplayTaskMapper extends BaseMapper<ProjectionReplayTask> {
 
     @Select("""
-            SELECT * FROM t_projection_replay_task
+            SELECT *, status AS state FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND request_sn = #{requestSn}
             """)
     ProjectionReplayTask selectByRequest(@Param("tenantId") Long tenantId,
                                          @Param("requestSn") String requestSn);
 
     @Select("""
-            SELECT * FROM t_projection_replay_task
+            SELECT *, status AS state FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND sn = #{taskSn}
             """)
     ProjectionReplayTask selectBySn(@Param("tenantId") Long tenantId,
                                     @Param("taskSn") String taskSn);
 
     @Select("""
-            SELECT * FROM t_projection_replay_task
+            SELECT *, status AS state FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND sn = #{taskSn}
             FOR UPDATE
             """)
@@ -37,7 +37,7 @@ public interface ProjectionReplayTaskMapper extends BaseMapper<ProjectionReplayT
                                              @Param("taskSn") String taskSn);
 
     @Select("""
-            SELECT * FROM t_projection_replay_task
+            SELECT *, status AS state FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND status IN ('CREATED', 'RUNNING')
             ORDER BY id ASC
             LIMIT #{maxSize}

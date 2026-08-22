@@ -7,13 +7,30 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-import java.util.List;
 
 /**
  * 对账差错 Mapper。
  */
 @Mapper
 public interface ReconciliationDifferenceMapper extends BaseMapper<ReconciliationDifference> {
+
+    @Select("""
+            SELECT COUNT(*) FROM t_reconciliation_difference
+            WHERE tenant_id = #{tenantId}
+              AND scope_owner_namespace = #{scopeOwnerNamespace}
+              AND scope_identity_value = #{scopeIdentityValue}
+              AND pair_owner_namespace = #{pairOwnerNamespace}
+              AND pair_identity_value = #{pairIdentityValue}
+              AND current_lineage_ref = #{currentLineageRef}
+              AND status NOT IN ('RESOLVED', 'INVALIDATED')
+            """)
+    int countBlockingByRequiredPair(
+            @Param("tenantId") Long tenantId,
+            @Param("scopeOwnerNamespace") String scopeOwnerNamespace,
+            @Param("scopeIdentityValue") String scopeIdentityValue,
+            @Param("pairOwnerNamespace") String pairOwnerNamespace,
+            @Param("pairIdentityValue") String pairIdentityValue,
+            @Param("currentLineageRef") String currentLineageRef);
 
     /**
      * 按差错流水号只读查询。
@@ -74,10 +91,7 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             FROM t_reconciliation_difference
             WHERE tenant_id = #{tenantId}
               AND status NOT IN ('RESOLVED', 'INVALIDATED')
-              AND (
-                    last_rerun_batch_sn = #{reconciliationBatchSn}
-                 OR (last_rerun_batch_sn IS NULL AND reconciliation_batch_sn = #{reconciliationBatchSn})
-              )
+              AND current_lineage_ref = #{reconciliationBatchSn}
             """)
     int countByCurrentBatch(@Param("tenantId") Long tenantId,
                             @Param("reconciliationBatchSn") String reconciliationBatchSn);
@@ -92,11 +106,7 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             FROM t_reconciliation_difference d
             WHERE d.tenant_id = #{tenantId}
               AND d.status NOT IN ('RESOLVED', 'INVALIDATED')
-              AND (
-                    d.last_rerun_batch_sn = #{reconciliationBatchSn}
-                 OR (d.last_rerun_batch_sn IS NULL
-                     AND d.reconciliation_batch_sn = #{reconciliationBatchSn})
-              )
+              AND d.current_lineage_ref = #{reconciliationBatchSn}
               AND (
                     d.status != 'ADJUSTING'
                  OR d.adjustment_sn IS NULL
@@ -123,80 +133,9 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             SET status = 'INVALIDATED'
             WHERE tenant_id = #{tenantId}
               AND status != 'INVALIDATED'
-              AND (
-                    last_rerun_batch_sn = #{reconciliationBatchSn}
-                 OR (last_rerun_batch_sn IS NULL AND reconciliation_batch_sn = #{reconciliationBatchSn})
-              )
+              AND current_lineage_ref = #{reconciliationBatchSn}
             """)
     int invalidateByCurrentBatch(@Param("tenantId") Long tenantId,
                                  @Param("reconciliationBatchSn") String reconciliationBatchSn);
 
-    /**
-     * 查询命中准入对象且当前仍阻断的对账差错。
-     *
-     * <p>差错只按对象类型和对象流水号精确命中，不允许空对象或类型级通配阻断。</p>
-     *
-     * @param tenantId           租户 ID
-     * @param blockingObjectType 阻断对象类型，例如 CLEARING、SETTLEMENT、PAYOUT
-     * @param blockingObjectSn   阻断对象流水号
-     * @param limit              最大返回数
-     * @param lockRows           是否锁定命中的差错行；权威 Gate 必须传 true
-     * @return 对账差错列表
-     */
-    @Select("""
-            <script>
-            SELECT *
-            FROM t_reconciliation_difference
-            WHERE tenant_id = #{tenantId}
-              AND blocking_object_type = #{blockingObjectType}
-              AND blocking_object_sn = #{blockingObjectSn}
-              AND status != 'INVALIDATED'
-              AND (
-                    status != 'RESOLVED'
-                 OR last_rerun_balanced IS NULL
-                 OR last_rerun_balanced != TRUE
-                 OR last_rerun_batch_sn IS NULL
-                 OR last_rerun_batch_sn NOT IN
-                    <foreach collection="currentLineageBatchSns" item="batchSn" open="(" separator="," close=")">
-                        #{batchSn}
-                    </foreach>
-              )
-            ORDER BY id ASC
-            LIMIT #{limit}
-            <if test="lockRows">
-            FOR UPDATE
-            </if>
-            </script>
-            """)
-    List<ReconciliationDifference> selectBlockingByGateObject(
-            @Param("tenantId") Long tenantId,
-            @Param("blockingObjectType") String blockingObjectType,
-            @Param("blockingObjectSn") String blockingObjectSn,
-            @Param("currentLineageBatchSns") List<String> currentLineageBatchSns,
-            @Param("limit") int limit,
-            @Param("lockRows") boolean lockRows);
-
-    /**
-     * 统计已在当前血缘重新对平并关闭的历史差错。
-     */
-    @Select("""
-            <script>
-            SELECT COUNT(*)
-            FROM t_reconciliation_difference
-            WHERE tenant_id = #{tenantId}
-              AND blocking_object_type = #{blockingObjectType}
-              AND blocking_object_sn = #{blockingObjectSn}
-              AND status = 'RESOLVED'
-              AND last_rerun_balanced = TRUE
-              AND last_rerun_batch_sn IN
-                    <foreach collection="currentLineageBatchSns" item="batchSn" open="(" separator="," close=")">
-                        #{batchSn}
-                    </foreach>
-            </script>
-            """)
-    int countResolvedByGateObject(
-            @Param("tenantId") Long tenantId,
-            @Param("blockingObjectType") String blockingObjectType,
-            @Param("blockingObjectSn") String blockingObjectSn,
-            @Param("currentLineageBatchSns") List<String> currentLineageBatchSns);
 }

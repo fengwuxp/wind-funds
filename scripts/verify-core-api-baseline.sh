@@ -57,8 +57,8 @@ awk -F '\t' '
     END { exit invalid }
 ' "$policy_file" | sort > "$policy_types"
 
-if [[ $(wc -l < "$actual_types" | tr -d ' ') -ne 107 ]]; then
-    echo "Expected 107 public top-level core types; found $(wc -l < "$actual_types" | tr -d ' ')"
+if [[ $(wc -l < "$actual_types" | tr -d ' ') -ne 105 ]]; then
+    echo "Expected 105 public top-level core types; found $(wc -l < "$actual_types" | tr -d ' ')"
     exit 1
 fi
 if [[ $(awk -F '\t' '$1 == "EXPERIMENTAL" { count++ } END { print count + 0 }' "$policy_file") -ne 4 ]] \
@@ -76,8 +76,8 @@ if ! comm -23 "$policy_types" "$actual_types" | diff -u /dev/null -; then
 fi
 
 comm -23 "$actual_types" "$policy_types" > "$stable_types"
-if [[ $(wc -l < "$stable_types" | tr -d ' ') -ne 99 ]]; then
-    echo "Expected 99 stable core types; found $(wc -l < "$stable_types" | tr -d ' ')"
+if [[ $(wc -l < "$stable_types" | tr -d ' ') -ne 97 ]]; then
+    echo "Expected 97 stable core types; found $(wc -l < "$stable_types" | tr -d ' ')"
     exit 1
 fi
 
@@ -120,7 +120,7 @@ fi
 grep -Fvx -f "$member_exclusions" "$actual_api" > "$filtered_api"
 if $update_baseline; then
     cp "$filtered_api" "$baseline_file"
-    echo "Core API baseline updated: 99 stable, 4 experimental, 4 internal public top-level types; public nested signatures included"
+    echo "Core API baseline updated: 97 stable, 4 experimental, 4 internal public top-level types; public nested signatures included"
     exit 0
 fi
 if ! diff -u "$baseline_file" "$filtered_api"; then
@@ -128,4 +128,4 @@ if ! diff -u "$baseline_file" "$filtered_api"; then
     exit 1
 fi
 
-echo "Core API baseline verified: 99 stable, 4 experimental, 4 internal public top-level types; public nested signatures included"
+echo "Core API baseline verified: 97 stable, 4 experimental, 4 internal public top-level types; public nested signatures included"

@@ -1,7 +1,9 @@
 package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
+import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -33,22 +35,25 @@ public class ReconciliationBatchDTO implements Serializable {
     private Long tenantId;
 
     @Schema(description = "本次对账作业范围的稳定业务引用")
-    private String reconciliationScopeRef;
+    private StableIdentity scopeIdentity;
 
-    @Schema(description = "准入对象类型；纯对账时为空")
-    private ReconciliationGateObjectType gateObjectType;
+    @Schema(description = "本次对账双方关系的稳定身份")
+    private StableIdentity pairIdentity;
 
-    @Schema(description = "准入对象流水号；纯对账时为空")
-    private String gateObjectSn;
+    @Schema(description = "本次对账币种")
+    private CurrencyIsoCode currency;
 
-    @Schema(description = "匹配或对账规则版本")
-    private String ruleVersion;
+    @Schema(description = "结构化比较规则引用")
+    private ComparisonRuleRef comparisonRuleRef;
 
     @Schema(description = "对账窗口开始时间，含")
     private LocalDateTime windowStart;
 
     @Schema(description = "对账窗口结束时间，不含")
     private LocalDateTime windowEnd;
+
+    @Schema(description = "窗口时间语义")
+    private String timeSemantics;
 
     @Schema(description = "对账窗口时区 ID")
     private String timezoneId;

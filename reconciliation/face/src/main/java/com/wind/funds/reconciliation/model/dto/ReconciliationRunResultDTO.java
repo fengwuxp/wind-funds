@@ -1,7 +1,9 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
+import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -39,19 +41,25 @@ public class ReconciliationRunResultDTO implements Serializable {
     private String reconciliationBatchSn;
 
     @Schema(description = "本次对账作业范围的稳定业务引用")
-    private String reconciliationScopeRef;
+    private StableIdentity scopeIdentity;
 
-    @Schema(description = "准入对象类型；纯对账时为空")
-    private ReconciliationGateObjectType gateObjectType;
+    @Schema(description = "本次对账双方关系的稳定身份")
+    private StableIdentity pairIdentity;
 
-    @Schema(description = "准入对象流水号；纯对账时为空")
-    private String gateObjectSn;
+    @Schema(description = "本次对账币种")
+    private CurrencyIsoCode currency;
 
     @Schema(description = "对账运行结论")
     private ReconciliationRunOutcome outcome;
 
-    @Schema(description = "匹配或对账规则版本")
-    private String ruleVersion;
+    @Schema(description = "结构化比较规则引用")
+    private ComparisonRuleRef comparisonRuleRef;
+
+    @Schema(description = "基准侧快照流水号")
+    private String referenceSnapshotSn;
+
+    @Schema(description = "核对侧快照流水号")
+    private String comparisonSnapshotSn;
 
     @Schema(description = "基准侧来源成员集合 SHA-256")
     private String referenceSourceDigest;

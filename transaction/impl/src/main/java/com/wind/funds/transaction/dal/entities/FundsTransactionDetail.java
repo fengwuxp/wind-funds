@@ -155,10 +155,6 @@ public class FundsTransactionDetail implements Serializable, TenantIsolationObje
     @Column("status")
     private FundsTransactionDetailState state;
 
-    void setStatus(FundsTransactionDetailState state) {
-        this.state = state;
-    }
-
     /**
      * 失败错误码。
      */

@@ -1,6 +1,5 @@
 package com.wind.funds.reconciliation.application.run.impl;
 
-import com.wind.jackson.WindJson;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -19,21 +18,18 @@ import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceItemMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationSourceSnapshotMapper;
 import com.wind.funds.reconciliation.enums.ReconciliationBatchState;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
+import com.wind.funds.reconciliation.enums.ReconciliationMatchResultKind;
 import com.wind.funds.reconciliation.enums.ReconciliationRunOutcome;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
-import com.wind.funds.reconciliation.mapstruct.ReconciliationRunResultConverter;
 import com.wind.funds.reconciliation.mapstruct.ReconciliationMatchResultConverter;
+import com.wind.funds.reconciliation.mapstruct.ReconciliationRunResultConverter;
 import com.wind.funds.reconciliation.model.dto.ReconciliationMatchResultDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationRunResultDTO;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
-import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
+import com.wind.jackson.WindJson;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -43,24 +39,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * 对账运行结果应用服务实现。
+ * 严格精确对账运行服务。
  */
 @Slf4j
 @Service
 @AllArgsConstructor
 public class ReconciliationRunResultApplicationServiceImpl
         implements ReconciliationRunResultApplicationService {
-
-    private static final Pattern SHA_256_PATTERN = Pattern.compile("[0-9a-f]{64}");
 
     private static final WindSequenceType RUN_RESULT_SEQUENCE_TYPE =
             WindSequenceType.immutable("RECONCILIATION_RUN_RESULT", "RRR", 6);
@@ -80,48 +74,42 @@ public class ReconciliationRunResultApplicationServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public ReconciliationRunResultDTO recordRunResult(RecordReconciliationRunResultRequest request,
-                                                       WindOperator operator) {
+    public ReconciliationRunResultDTO executeStrictExact(RecordReconciliationRunResultRequest request,
+                                                          WindOperator operator) {
         validateRequest(request, operator);
         ReconciliationBatch batch = reconciliationBatchMapper.selectBySnForUpdate(
-                request.getTenantId(), request.getReconciliationBatchSn());
+                request.getTenantId(), request.getReconciliationBatchSn().trim());
         AssertUtils.notNull(batch, "对账批次不存在，reconciliationBatchSn = {}", request.getReconciliationBatchSn());
         AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.DATA_READY
                         || batch.getState() == ReconciliationBatchState.COMPLETED,
                 "对账批次来源尚未冻结完整，reconciliationBatchSn = {}, status = {}",
                 batch.getSn(), batch.getState());
-        SourceSet sourceSet = loadSourceSet(batch);
-        String runResultSn = TemporalSequenceFactory.hourNext(RUN_RESULT_SEQUENCE_TYPE);
-        List<ReconciliationMatchResult> matchResults = toMatchResults(request, operator, runResultSn);
-        assertNoDuplicateMatchResult(matchResults);
-        assertCompleteCoverage(sourceSet, matchResults);
-        List<String> evidenceRefs = sourceSet.evidenceRefs();
-        ReconciliationRunResult candidate = toEntity(
-                request, batch, operator, evidenceRefs, sourceSet, matchResults, runResultSn);
-        ReconciliationRunResult existing = reconciliationRunResultMapper.selectByBatch(
-                request.getTenantId(), request.getReconciliationBatchSn());
+
+        SourceSet sources = loadSources(batch);
+        List<ReconciliationMatchResult> matches = compare(batch, sources, operator);
+        ReconciliationRunResult candidate = toRunResult(batch, sources, matches, operator);
+        ReconciliationRunResult existing = reconciliationRunResultMapper.selectByBatch(batch.getTenantId(), batch.getSn());
         if (existing != null) {
             AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.COMPLETED
-                            && Objects.equals(batch.getRunResultSn(), existing.getSn()),
-                    "对账批次与运行结果绑定不一致，reconciliationBatchSn = {}", batch.getSn());
-            return reuseExisting(existing, candidate);
+                            && Objects.equals(batch.getRunResultSn(), existing.getSn())
+                            && Objects.equals(existing.getResultDigest(), candidate.getResultDigest()),
+                    "同一批次的对账运行结果事实冲突，reconciliationBatchSn = {}", batch.getSn());
+            return ReconciliationRunResultConverter.INSTANCE.toDTO(existing);
         }
-        AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.DATA_READY,
-                "已完成对账批次缺少运行结果，reconciliationBatchSn = {}", batch.getSn());
+
         reconciliationRunResultMapper.insertSelective(candidate);
         AssertUtils.notNull(candidate.getId(), "记录对账运行结果失败");
-        matchResults.forEach(this::persistMatchResult);
-        AssertUtils.isTrue(reconciliationBatchMapper.complete(
-                        batch.getTenantId(), batch.getSn(), candidate.getSn()) == 1,
+        matches.forEach(match -> {
+            match.setReconciliationRunResultSn(candidate.getSn());
+            reconciliationMatchResultMapper.insertSelective(match);
+            AssertUtils.notNull(match.getId(), "记录对账逐笔匹配结果失败");
+        });
+        AssertUtils.isTrue(reconciliationBatchMapper.complete(batch.getTenantId(), batch.getSn(), candidate.getSn()) == 1,
                 "完成对账批次失败，reconciliationBatchSn = {}", batch.getSn());
-        ReconciliationRunResult saved = reconciliationRunResultMapper.selectBySn(
-                request.getTenantId(), candidate.getSn());
-        AssertUtils.notNull(saved, "记录对账运行结果后未找到持久化事实");
-        log.info("对账运行结果记录完成，tenantId = {}, reconciliationBatchSn = {}, "
-                        + "reconciliationScopeRef = {}, gateObjectType = {}, gateObjectSn = {}, status = {}",
-                batch.getTenantId(), batch.getSn(), batch.getReconciliationScopeRef(),
-                batch.getGateObjectType(), batch.getGateObjectSn(), candidate.getOutcome());
-        return ReconciliationRunResultConverter.INSTANCE.toDTO(saved);
+        log.info("strict-exact 对账完成，tenantId = {}, batchSn = {}, outcome = {}, total = {}",
+                batch.getTenantId(), batch.getSn(), candidate.getOutcome(), candidate.getTotalCount());
+        return ReconciliationRunResultConverter.INSTANCE.toDTO(
+                reconciliationRunResultMapper.selectBySn(batch.getTenantId(), candidate.getSn()));
     }
 
     @Override
@@ -158,203 +146,294 @@ public class ReconciliationRunResultApplicationServiceImpl
                 .query(options);
     }
 
-    private void validateQueryIdentity(Long tenantId, String runResultSn) {
-        AssertUtils.notNull(tenantId, "对账运行结果查询租户 ID 不能为空");
-        AssertUtils.equals(TenantContextHolder.requireTenantId(), tenantId,
-                "对账运行结果查询 tenantId 与当前租户不一致");
-        AssertUtils.hasText(runResultSn, "对账运行结果流水号不能为空");
-    }
-
-    private SourceSet loadSourceSet(ReconciliationBatch batch) {
-        SourceSnapshotFacts reference = loadSourceSnapshot(batch, ReconciliationSourceRole.REFERENCE);
-        SourceSnapshotFacts comparison = loadSourceSnapshot(batch, ReconciliationSourceRole.COMPARISON);
+    private SourceSet loadSources(ReconciliationBatch batch) {
+        SourceFacts reference = loadSource(batch, ReconciliationSourceRole.REFERENCE);
+        SourceFacts comparison = loadSource(batch, ReconciliationSourceRole.COMPARISON);
         AssertUtils.isTrue(!reference.items().isEmpty() || !comparison.items().isEmpty(),
                 "对账批次两侧来源不能同时为空，reconciliationBatchSn = {}", batch.getSn());
-        LinkedHashSet<String> evidenceRefs = new LinkedHashSet<>();
-        evidenceRefs.addAll(parseEvidenceRefs(reference.snapshot().getEvidenceRefs()));
-        evidenceRefs.addAll(parseEvidenceRefs(comparison.snapshot().getEvidenceRefs()));
-        return new SourceSet(reference, comparison, evidenceRefs.stream().sorted().toList());
+        return new SourceSet(reference, comparison);
     }
 
-    private SourceSnapshotFacts loadSourceSnapshot(ReconciliationBatch batch, ReconciliationSourceRole sourceRole) {
+    private SourceFacts loadSource(ReconciliationBatch batch, ReconciliationSourceRole role) {
         ReconciliationSourceSnapshot snapshot = reconciliationSourceSnapshotMapper.selectByBatchAndRole(
-                batch.getTenantId(), batch.getSn(), sourceRole.name());
-        AssertUtils.notNull(snapshot, "对账批次缺少{}来源快照，reconciliationBatchSn = {}",
-                sourceRole.getDesc(), batch.getSn());
+                batch.getTenantId(), batch.getSn(), role.name());
+        AssertUtils.notNull(snapshot, "对账批次缺少{}来源快照，reconciliationBatchSn = {}", role.getDesc(), batch.getSn());
         List<ReconciliationSourceItem> items = reconciliationSourceItemMapper.selectBySnapshot(
                 batch.getTenantId(), snapshot.getSn());
-        AssertUtils.isTrue(items.size() == snapshot.getRecordCount(),
-                "对账来源快照成员数不一致，sourceSnapshotSn = {}", snapshot.getSn());
-        AssertUtils.isTrue(items.stream().allMatch(item -> isSha256(item.getContentDigest())),
-                "对账来源成员内容摘要无效，sourceSnapshotSn = {}", snapshot.getSn());
-        String sourceDigest = ReconciliationDigestSupport.sourceDigest(
-                snapshot.getSourceRole(), snapshot.getSourceType(),
-                sourceContentDigests(items));
-        AssertUtils.isTrue(Objects.equals(sourceDigest, snapshot.getSourceDigest()),
+        AssertUtils.isTrue(items.size() == snapshot.getCoverageMemberCount(),
+                "对账来源快照成员数冲突，sourceSnapshotSn = {}", snapshot.getSn());
+
+        List<Map<String, Object>> semanticFacts = items.stream()
+                .sorted(java.util.Comparator.comparing(this::sourceFactKey))
+                .<Map<String, Object>>map(this::semanticFact)
+                .toList();
+        String semanticDigest = FundsStableHashSupport.sha256Json(semanticFacts);
+        AssertUtils.isTrue(Objects.equals(semanticDigest, snapshot.getSemanticDigest()),
+                "对账来源事实冲突，sourceSnapshotSn = {}", snapshot.getSn());
+        for (ReconciliationSourceItem item : items) {
+            AssertUtils.isTrue(Objects.equals(FundsStableHashSupport.sha256Json(semanticFact(item)),
+                            item.getSemanticDigest()),
+                    "对账来源事实摘要不一致，sourceFact = {}", sourceFactKey(item));
+            AssertUtils.isTrue(Objects.equals(FundsStableHashSupport.sha256Json(parseRefs(item.getEvidenceRefs())),
+                            item.getEvidenceBundleDigest()),
+                    "对账来源事实证据摘要不一致，sourceFact = {}", sourceFactKey(item));
+        }
+        AssertUtils.isTrue(Objects.equals(snapshotDigest(snapshot, semanticDigest), snapshot.getSourceDigest()),
                 "对账来源快照摘要不一致，sourceSnapshotSn = {}", snapshot.getSn());
-        return new SourceSnapshotFacts(snapshot, items);
+        AssertUtils.isTrue(Objects.equals(FundsStableHashSupport.sha256Json(parseRefs(snapshot.getEvidenceRefs())),
+                        snapshot.getEvidenceBundleDigest()),
+                "对账来源快照证据摘要不一致，sourceSnapshotSn = {}", snapshot.getSn());
+        return new SourceFacts(snapshot, List.copyOf(items));
     }
 
-    private ReconciliationRunResult toEntity(RecordReconciliationRunResultRequest request,
-                                              ReconciliationBatch batch,
-                                              WindOperator operator,
-                                              List<String> evidenceRefs,
-                                              SourceSet sourceSet,
-                                              List<ReconciliationMatchResult> matchResults,
-                                              String runResultSn) {
-        int matchedCount = (int) matchResults.stream().filter(this::isMatched).count();
-        int differenceCount = matchResults.size() - matchedCount;
-        ReconciliationRunOutcome outcome = differenceCount == 0
-                ? ReconciliationRunOutcome.BALANCED
-                : ReconciliationRunOutcome.DIFFERENCE_FOUND;
-        String sourceDigest = sourceDigest(sourceSet);
-        List<String> matchDigests = matchResults.stream()
-                .map(ReconciliationMatchResult::getMatchDigest)
+    private List<ReconciliationMatchResult> compare(ReconciliationBatch batch,
+                                                     SourceSet sources,
+                                                     WindOperator operator) {
+        Map<String, List<ReconciliationSourceItem>> references = byComparisonIdentity(sources.reference().items());
+        Map<String, List<ReconciliationSourceItem>> comparisons = byComparisonIdentity(sources.comparison().items());
+        return java.util.stream.Stream.concat(references.keySet().stream(), comparisons.keySet().stream())
+                .distinct()
+                .sorted()
+                .map(key -> toMatchResult(batch, references.getOrDefault(key, List.of()),
+                        comparisons.getOrDefault(key, List.of()), operator))
+                .toList();
+    }
+
+    private Map<String, List<ReconciliationSourceItem>> byComparisonIdentity(List<ReconciliationSourceItem> items) {
+        return items.stream().collect(Collectors.groupingBy(this::comparisonIdentityKey));
+    }
+
+    private ReconciliationMatchResult toMatchResult(ReconciliationBatch batch,
+                                                     List<ReconciliationSourceItem> references,
+                                                     List<ReconciliationSourceItem> comparisons,
+                                                     WindOperator operator) {
+        ReconciliationSourceItem reference = references.isEmpty() ? null : references.getFirst();
+        ReconciliationSourceItem comparison = comparisons.isEmpty() ? null : comparisons.getFirst();
+        ReconciliationMatchResultKind kind = classify(references, comparisons);
+        List<String> evidenceRefs = java.util.stream.Stream.concat(references.stream(), comparisons.stream())
+                .flatMap(item -> parseRefs(item.getEvidenceRefs()).stream())
+                .distinct()
                 .sorted()
                 .toList();
-        ReconciliationRunResult result = new ReconciliationRunResult();
-        result.setSn(runResultSn);
-        result.setTenantId(request.getTenantId());
-        result.setReconciliationBatchSn(batch.getSn());
-        result.setReconciliationScopeRef(batch.getReconciliationScopeRef());
-        result.setGateObjectType(batch.getGateObjectType());
-        result.setGateObjectSn(batch.getGateObjectSn());
-        result.setOutcome(outcome);
-        result.setRuleVersion(batch.getRuleVersion());
-        result.setReferenceSourceDigest(sourceSet.reference().snapshot().getSourceDigest());
-        result.setComparisonSourceDigest(sourceSet.comparison().snapshot().getSourceDigest());
-        result.setSourceDigest(sourceDigest);
-        result.setTotalCount(matchResults.size());
-        result.setMatchedCount(matchedCount);
-        result.setDifferenceCount(differenceCount);
-        result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs));
-        result.setResultDigest(resultDigest(batch, evidenceRefs, sourceSet, sourceDigest, outcome,
-                matchedCount, differenceCount, matchDigests));
-        result.setCreatedBy(operator.getOperatorAsText());
-        return result;
-    }
-
-    private List<ReconciliationMatchResult> toMatchResults(RecordReconciliationRunResultRequest request,
-                                                           WindOperator operator,
-                                                           String runResultSn) {
-        return request.getMatchResults().stream()
-                .map(item -> toMatchResult(request, item, operator, runResultSn))
-                .sorted(Comparator.comparing(ReconciliationMatchResult::getMatchDigest))
-                .toList();
-    }
-
-    private ReconciliationMatchResult toMatchResult(RecordReconciliationRunResultRequest request,
-                                                     ReconciliationMatchResultItem item,
-                                                     WindOperator operator,
-                                                     String runResultSn) {
         ReconciliationMatchResult result = new ReconciliationMatchResult();
         result.setSn(TemporalSequenceFactory.hourNext(MATCH_RESULT_SEQUENCE_TYPE));
-        result.setTenantId(request.getTenantId());
-        result.setReconciliationRunResultSn(runResultSn);
-        result.setReconciliationBatchSn(request.getReconciliationBatchSn());
-        result.setReferenceSourceRef(normalizedOptionalText(item.getReferenceSourceRef()));
-        result.setComparisonSourceRef(normalizedOptionalText(item.getComparisonSourceRef()));
-        result.setSourceQuality(item.getSourceQuality());
-        result.setMatchStrength(item.getMatchStrength());
-        result.setDifferenceType(item.getDifferenceType());
-        result.setSeverity(item.getSeverity());
-        result.setCurrency(item.getCurrency());
-        result.setDifferenceAmount(item.getDifferenceAmount());
-        result.setEvidenceRef(item.getEvidenceRef().trim());
-        result.setCreatedBy(operator.getOperatorAsText());
+        result.setTenantId(batch.getTenantId());
+        result.setReconciliationBatchSn(batch.getSn());
+        setFactRef(result, reference, true);
+        setFactRef(result, comparison, false);
+        ReconciliationSourceItem identitySource = reference == null ? comparison : reference;
+        result.setComparisonOwnerNamespace(identitySource.getComparisonOwnerNamespace());
+        result.setComparisonIdentityValue(identitySource.getComparisonIdentityValue());
+        result.setResultKind(kind);
+        if (kind == ReconciliationMatchResultKind.MONEY_MISMATCH) {
+            result.setAbsoluteDifferenceCurrency(reference.getCurrency());
+            result.setAbsoluteDifferenceAmount(Math.absExact(Math.subtractExact(reference.getAmount(), comparison.getAmount())));
+            result.setLargerSide(reference.getAmount() > comparison.getAmount()
+                    ? ReconciliationSourceRole.REFERENCE : ReconciliationSourceRole.COMPARISON);
+        }
+        result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs));
         result.setMatchIdentityDigest(matchIdentityDigest(result));
-        result.setMatchDigest(matchDigest(result));
+        result.setResultDigest(matchResultDigest(result));
+        result.setCreatedBy(operator.getOperatorAsText());
         return result;
     }
 
-    private void persistMatchResult(ReconciliationMatchResult matchResult) {
-        reconciliationMatchResultMapper.insertSelective(matchResult);
-        AssertUtils.notNull(matchResult.getId(), "记录对账逐笔匹配结果失败");
+    private ReconciliationMatchResultKind classify(List<ReconciliationSourceItem> references,
+                                                    List<ReconciliationSourceItem> comparisons) {
+        if (references.size() > 1 || comparisons.size() > 1) {
+            return ReconciliationMatchResultKind.IDENTITY_CONFLICT;
+        }
+        if (references.isEmpty()) {
+            return ReconciliationMatchResultKind.REFERENCE_MISSING;
+        }
+        if (comparisons.isEmpty()) {
+            return ReconciliationMatchResultKind.COMPARISON_MISSING;
+        }
+        ReconciliationSourceItem reference = references.getFirst();
+        ReconciliationSourceItem comparison = comparisons.getFirst();
+        if (!Boolean.TRUE.equals(reference.getComparisonProven())
+                || !Boolean.TRUE.equals(comparison.getComparisonProven())) {
+            return ReconciliationMatchResultKind.NOT_COMPARABLE;
+        }
+        if (!same(reference, comparison, ReconciliationSourceItem::getRuleNamespace)
+                || !same(reference, comparison, ReconciliationSourceItem::getRuleIdentity)
+                || !same(reference, comparison, ReconciliationSourceItem::getRuleVersion)) {
+            return ReconciliationMatchResultKind.RULE_MISMATCH;
+        }
+        if (reference.getCurrency() != comparison.getCurrency()) {
+            return ReconciliationMatchResultKind.CURRENCY_MISMATCH;
+        }
+        if (!Objects.equals(reference.getAmount(), comparison.getAmount())) {
+            return ReconciliationMatchResultKind.MONEY_MISMATCH;
+        }
+        if (!same(reference, comparison, ReconciliationSourceItem::getComparisonStatusCode)) {
+            return ReconciliationMatchResultKind.STATUS_MISMATCH;
+        }
+        if (!same(reference, comparison, ReconciliationSourceItem::getClaimKind)
+                || !same(reference, comparison, ReconciliationSourceItem::getEconomicComponent)
+                || !same(reference, comparison, ReconciliationSourceItem::getDirection)
+                || !same(reference, comparison, ReconciliationSourceItem::getNormalizationVersion)) {
+            return ReconciliationMatchResultKind.SEMANTICS_MISMATCH;
+        }
+        return ReconciliationMatchResultKind.MATCHED;
     }
 
-    private void assertCompleteCoverage(SourceSet sourceSet, List<ReconciliationMatchResult> matchResults) {
-        Set<String> expectedReferenceRefs = sourceSet.reference().sourceItemRefs();
-        Set<String> expectedComparisonRefs = sourceSet.comparison().sourceItemRefs();
-        Set<String> actualReferenceRefs = matchResults.stream()
-                .map(ReconciliationMatchResult::getReferenceSourceRef)
-                .filter(StringUtils::hasText)
-                .collect(java.util.stream.Collectors.toSet());
-        Set<String> actualComparisonRefs = matchResults.stream()
-                .map(ReconciliationMatchResult::getComparisonSourceRef)
-                .filter(StringUtils::hasText)
-                .collect(java.util.stream.Collectors.toSet());
-        AssertUtils.isTrue(expectedReferenceRefs.containsAll(actualReferenceRefs),
-                "对账匹配结果包含未冻结的基准侧来源引用");
-        AssertUtils.isTrue(expectedComparisonRefs.containsAll(actualComparisonRefs),
-                "对账匹配结果包含未冻结的核对侧来源引用");
-        AssertUtils.isTrue(actualReferenceRefs.containsAll(expectedReferenceRefs),
-                "对账匹配结果未覆盖全部基准侧来源事实");
-        AssertUtils.isTrue(actualComparisonRefs.containsAll(expectedComparisonRefs),
-                "对账匹配结果未覆盖全部核对侧来源事实");
+    private boolean same(ReconciliationSourceItem left,
+                         ReconciliationSourceItem right,
+                         Function<ReconciliationSourceItem, Object> extractor) {
+        return Objects.equals(extractor.apply(left), extractor.apply(right));
+    }
+
+    private ReconciliationRunResult toRunResult(ReconciliationBatch batch,
+                                                SourceSet sources,
+                                                List<ReconciliationMatchResult> matches,
+                                                WindOperator operator) {
+        int matchedCount = (int) matches.stream()
+                .filter(match -> match.getResultKind() == ReconciliationMatchResultKind.MATCHED)
+                .count();
+        int differenceCount = matches.size() - matchedCount;
+        boolean coverageComplete = Boolean.TRUE.equals(sources.reference().snapshot().getCoverageComplete())
+                && Boolean.TRUE.equals(sources.comparison().snapshot().getCoverageComplete());
+        ReconciliationRunOutcome outcome = coverageComplete && differenceCount == 0
+                ? ReconciliationRunOutcome.BALANCED : ReconciliationRunOutcome.DIFFERENCE_FOUND;
+        LinkedHashSet<String> evidenceRefs = new LinkedHashSet<>();
+        evidenceRefs.addAll(parseRefs(sources.reference().snapshot().getEvidenceRefs()));
+        evidenceRefs.addAll(parseRefs(sources.comparison().snapshot().getEvidenceRefs()));
+        matches.forEach(match -> evidenceRefs.addAll(parseRefs(match.getEvidenceRefs())));
+
+        ReconciliationRunResult result = new ReconciliationRunResult();
+        result.setSn(TemporalSequenceFactory.hourNext(RUN_RESULT_SEQUENCE_TYPE));
+        result.setTenantId(batch.getTenantId());
+        result.setReconciliationBatchSn(batch.getSn());
+        result.setScopeOwnerNamespace(batch.getScopeOwnerNamespace());
+        result.setScopeIdentityValue(batch.getScopeIdentityValue());
+        result.setPairOwnerNamespace(batch.getPairOwnerNamespace());
+        result.setPairIdentityValue(batch.getPairIdentityValue());
+        result.setCurrency(batch.getCurrency());
+        result.setOutcome(outcome);
+        result.setRuleNamespace(batch.getRuleNamespace());
+        result.setRuleIdentity(batch.getRuleIdentity());
+        result.setRuleVersion(batch.getRuleVersion());
+        result.setReferenceSnapshotSn(sources.reference().snapshot().getSn());
+        result.setComparisonSnapshotSn(sources.comparison().snapshot().getSn());
+        result.setReferenceSourceDigest(sources.reference().snapshot().getSourceDigest());
+        result.setComparisonSourceDigest(sources.comparison().snapshot().getSourceDigest());
+        result.setSourceDigest(FundsStableHashSupport.sha256Json(Map.of(
+                "referenceSourceDigest", result.getReferenceSourceDigest(),
+                "comparisonSourceDigest", result.getComparisonSourceDigest())));
+        result.setTotalCount(matches.size());
+        result.setMatchedCount(matchedCount);
+        result.setDifferenceCount(differenceCount);
+        result.setEvidenceRefs(WindJson.toJsonString(evidenceRefs.stream().sorted().toList()));
+        result.setResultDigest(runResultDigest(batch, result, matches));
+        result.setCreatedBy(operator.getOperatorAsText());
+        return result;
+    }
+
+    private String runResultDigest(ReconciliationBatch batch,
+                                   ReconciliationRunResult result,
+                                   List<ReconciliationMatchResult> matches) {
+        TreeMap<String, Object> facts = new TreeMap<>();
+        facts.put("tenantId", batch.getTenantId());
+        facts.put("batchSn", batch.getSn());
+        facts.put("batchDigest", batch.getBatchDigest());
+        facts.put("scope", batch.getScopeOwnerNamespace() + ":" + batch.getScopeIdentityValue());
+        facts.put("pair", batch.getPairOwnerNamespace() + ":" + batch.getPairIdentityValue());
+        facts.put("currency", batch.getCurrency());
+        facts.put("rule", batch.getRuleNamespace() + ":" + batch.getRuleIdentity() + ":" + batch.getRuleVersion());
+        facts.put("outcome", result.getOutcome());
+        facts.put("referenceSourceDigest", result.getReferenceSourceDigest());
+        facts.put("comparisonSourceDigest", result.getComparisonSourceDigest());
+        facts.put("sourceDigest", result.getSourceDigest());
+        facts.put("totalCount", result.getTotalCount());
+        facts.put("matchedCount", result.getMatchedCount());
+        facts.put("differenceCount", result.getDifferenceCount());
+        facts.put("matchDigests", matches.stream().map(ReconciliationMatchResult::getResultDigest).sorted().toList());
+        facts.put("evidenceRefs", parseRefs(result.getEvidenceRefs()));
+        return FundsStableHashSupport.sha256Json(facts);
+    }
+
+    private TreeMap<String, Object> semanticFact(ReconciliationSourceItem item) {
+        TreeMap<String, Object> value = new TreeMap<>();
+        value.put("sourceFactRef", sourceFactKey(item));
+        value.put("comparisonIdentity", comparisonIdentityKey(item));
+        value.put("amount", item.getAmount());
+        value.put("currency", item.getCurrency());
+        value.put("rule", item.getRuleNamespace() + ":" + item.getRuleIdentity() + ":" + item.getRuleVersion());
+        value.put("comparisonStatusCode", item.getComparisonStatusCode());
+        value.put("comparisonProven", item.getComparisonProven());
+        value.put("claimKind", item.getClaimKind());
+        value.put("economicComponent", item.getEconomicComponent());
+        value.put("direction", item.getDirection());
+        value.put("normalizationVersion", item.getNormalizationVersion());
+        return value;
+    }
+
+    private String snapshotDigest(ReconciliationSourceSnapshot snapshot, String semanticDigest) {
+        TreeMap<String, Object> value = new TreeMap<>();
+        value.put("tenantId", snapshot.getTenantId());
+        value.put("batchSn", snapshot.getReconciliationBatchSn());
+        value.put("sourceRole", snapshot.getSourceRole());
+        value.put("sourceNamespace", snapshot.getSourceNamespace());
+        value.put("snapshotIdentity", snapshot.getSnapshotOwnerNamespace() + ":" + snapshot.getSnapshotIdentityValue());
+        value.put("snapshotVersion", snapshot.getSnapshotVersion());
+        value.put("coverageComplete", snapshot.getCoverageComplete());
+        value.put("coverageWatermark", snapshot.getCoverageWatermark());
+        value.put("coverageMemberCount", snapshot.getCoverageMemberCount());
+        value.put("semanticDigest", semanticDigest);
+        return FundsStableHashSupport.sha256Json(value);
     }
 
     private String matchIdentityDigest(ReconciliationMatchResult result) {
-        TreeMap<String, Object> identityFacts = new TreeMap<>();
-        identityFacts.put("referenceSourceRef", result.getReferenceSourceRef());
-        identityFacts.put("comparisonSourceRef", result.getComparisonSourceRef());
-        return FundsStableHashSupport.sha256Json(identityFacts);
+        return FundsStableHashSupport.sha256Json(Map.of(
+                "comparisonIdentity", result.getComparisonOwnerNamespace() + ":" + result.getComparisonIdentityValue()));
     }
 
-    private String matchDigest(ReconciliationMatchResult result) {
+    private String matchResultDigest(ReconciliationMatchResult result) {
         TreeMap<String, Object> facts = new TreeMap<>();
-        facts.put("referenceSourceRef", result.getReferenceSourceRef());
-        facts.put("comparisonSourceRef", result.getComparisonSourceRef());
-        facts.put("sourceQuality", result.getSourceQuality());
-        facts.put("matchStrength", result.getMatchStrength());
-        facts.put("differenceType", result.getDifferenceType());
-        facts.put("severity", result.getSeverity());
-        facts.put("currency", result.getCurrency());
-        facts.put("differenceAmount", result.getDifferenceAmount());
-        facts.put("evidenceRef", result.getEvidenceRef());
+        facts.put("referenceFact", nullableIdentity(result.getReferenceFactOwnerNamespace(),
+                result.getReferenceFactIdentityValue()));
+        facts.put("comparisonFact", nullableIdentity(result.getComparisonFactOwnerNamespace(),
+                result.getComparisonFactIdentityValue()));
+        facts.put("comparisonIdentity", result.getComparisonOwnerNamespace() + ":" + result.getComparisonIdentityValue());
+        facts.put("resultKind", result.getResultKind());
+        facts.put("absoluteDifferenceCurrency", result.getAbsoluteDifferenceCurrency());
+        facts.put("absoluteDifferenceAmount", result.getAbsoluteDifferenceAmount());
+        facts.put("largerSide", result.getLargerSide());
+        facts.put("evidenceRefs", parseRefs(result.getEvidenceRefs()));
         return FundsStableHashSupport.sha256Json(facts);
     }
 
-    private String sourceDigest(SourceSet sourceSet) {
-        TreeMap<String, Object> sourceFacts = new TreeMap<>();
-        sourceFacts.put("referenceSourceDigest", sourceSet.reference().snapshot().getSourceDigest());
-        sourceFacts.put("comparisonSourceDigest", sourceSet.comparison().snapshot().getSourceDigest());
-        return FundsStableHashSupport.sha256Json(sourceFacts);
+    private void setFactRef(ReconciliationMatchResult target,
+                            ReconciliationSourceItem source,
+                            boolean reference) {
+        if (source == null) {
+            return;
+        }
+        if (reference) {
+            target.setReferenceFactOwnerNamespace(source.getSourceFactOwnerNamespace());
+            target.setReferenceFactIdentityValue(source.getSourceFactIdentityValue());
+        } else {
+            target.setComparisonFactOwnerNamespace(source.getSourceFactOwnerNamespace());
+            target.setComparisonFactIdentityValue(source.getSourceFactIdentityValue());
+        }
     }
 
-    private String resultDigest(ReconciliationBatch batch,
-                                List<String> evidenceRefs,
-                                SourceSet sourceSet,
-                                String sourceDigest,
-                                ReconciliationRunOutcome outcome,
-                                int matchedCount,
-                                int differenceCount,
-                                List<String> matchDigests) {
-        TreeMap<String, Object> facts = new TreeMap<>();
-        facts.put("tenantId", batch.getTenantId());
-        facts.put("reconciliationBatchSn", batch.getSn());
-        facts.put("batchDigest", batch.getBatchDigest());
-        facts.put("reconciliationScopeRef", batch.getReconciliationScopeRef());
-        facts.put("gateObjectType", batch.getGateObjectType());
-        facts.put("gateObjectSn", batch.getGateObjectSn());
-        facts.put("status", outcome);
-        facts.put("ruleVersion", batch.getRuleVersion());
-        facts.put("referenceSourceDigest", sourceSet.reference().snapshot().getSourceDigest());
-        facts.put("comparisonSourceDigest", sourceSet.comparison().snapshot().getSourceDigest());
-        facts.put("sourceDigest", sourceDigest);
-        facts.put("totalCount", matchDigests.size());
-        facts.put("matchedCount", matchedCount);
-        facts.put("differenceCount", differenceCount);
-        facts.put("matchDigests", matchDigests);
-        facts.put("evidenceRefs", evidenceRefs);
-        return FundsStableHashSupport.sha256Json(facts);
+    private String sourceFactKey(ReconciliationSourceItem item) {
+        return item.getSourceFactOwnerNamespace() + ":" + item.getSourceFactIdentityValue();
     }
 
-    private ReconciliationRunResultDTO reuseExisting(ReconciliationRunResult existing,
-                                                      ReconciliationRunResult candidate) {
-        AssertUtils.isTrue(existing.getResultDigest().equals(candidate.getResultDigest()),
-                "同一批次的对账运行结果事实不一致，reconciliationBatchSn = {}",
-                existing.getReconciliationBatchSn());
-        return ReconciliationRunResultConverter.INSTANCE.toDTO(existing);
+    private String comparisonIdentityKey(ReconciliationSourceItem item) {
+        return item.getComparisonOwnerNamespace() + ":" + item.getComparisonIdentityValue();
+    }
+
+    private String nullableIdentity(String ownerNamespace, String value) {
+        return StringUtils.hasText(ownerNamespace) && StringUtils.hasText(value)
+                ? ownerNamespace + ":" + value : null;
+    }
+
+    private List<String> parseRefs(String value) {
+        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
     }
 
     private void validateRequest(RecordReconciliationRunResultRequest request, WindOperator operator) {
@@ -363,147 +442,19 @@ public class ReconciliationRunResultApplicationServiceImpl
         AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "对账运行结果 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getReconciliationBatchSn(), "对账运行结果批次流水号不能为空");
-        AssertUtils.notNull(request.getMatchResults(), "对账运行结果逐笔匹配结果列表不能为空");
-        AssertUtils.isTrue(request.getMatchResults().size()
-                        <= RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT,
-                "对账运行结果逐笔匹配结果数量不能超过 {}",
-                RecordReconciliationRunResultRequest.MAX_MATCH_RESULT_COUNT);
-        request.getMatchResults().forEach(this::validateMatchResult);
         AssertUtils.notNull(operator, "对账运行结果操作人不能为空");
     }
 
-    private void validateMatchResult(ReconciliationMatchResultItem item) {
-        AssertUtils.notNull(item, "对账运行结果逐笔匹配项不能为空");
-        AssertUtils.notNull(item.getSourceQuality(), "对账匹配结果来源质量不能为空");
-        AssertUtils.notNull(item.getMatchStrength(), "对账匹配结果匹配强度不能为空");
-        AssertUtils.hasText(item.getEvidenceRef(), "对账匹配结果证据引用不能为空");
-        AssertUtils.isTrue(item.getEvidenceRef().trim().length()
-                        <= ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH,
-                "对账匹配结果证据引用长度不能超过 {}",
-                ReconciliationMatchResultItem.MAX_EVIDENCE_REF_LENGTH);
-        assertOptionalSourceRefLength(item.getReferenceSourceRef(), "基准侧");
-        assertOptionalSourceRefLength(item.getComparisonSourceRef(), "核对侧");
-        boolean hasReferenceSource = StringUtils.hasText(item.getReferenceSourceRef());
-        boolean hasComparisonSource = StringUtils.hasText(item.getComparisonSourceRef());
-        AssertUtils.isTrue(hasReferenceSource || hasComparisonSource, "对账匹配结果至少需要一侧来源引用");
-        if (isAutomaticMatch(item.getMatchStrength())) {
-            AssertUtils.isTrue(item.getSourceQuality() == ReconciliationSourceQuality.VERIFIED,
-                    "自动对平的来源必须已验证");
-            AssertUtils.isTrue(hasReferenceSource && hasComparisonSource,
-                    "自动对平必须同时存在基准侧和核对侧来源引用");
-            AssertUtils.isTrue(item.getDifferenceType() == null && item.getSeverity() == null
-                            && item.getCurrency() == null && item.getDifferenceAmount() == null,
-                    "自动对平项不能包含差错字段");
-            return;
-        }
-        AssertUtils.notNull(item.getDifferenceType(), "未自动对平项必须填写差错类型");
-        AssertUtils.notNull(item.getSeverity(), "未自动对平项必须填写差错严重等级");
-        validateDifferenceSourceRefs(item.getDifferenceType(), hasReferenceSource, hasComparisonSource);
-        if (item.getDifferenceAmount() != null) {
-            AssertUtils.isTrue(item.getDifferenceAmount() >= 0, "对账匹配结果差异金额不能小于 0");
-            AssertUtils.isTrue(item.getDifferenceAmount() == 0 || item.getCurrency() != null,
-                    "存在差异金额时必须填写币种");
-        }
-        if (item.getDifferenceType() == ReconciliationDifferenceType.AMOUNT_MISMATCH) {
-            AssertUtils.isTrue(item.getCurrency() != null && item.getDifferenceAmount() != null
-                            && item.getDifferenceAmount() > 0,
-                    "金额差异必须填写币种和大于 0 的差异金额");
-        }
+    private void validateQueryIdentity(Long tenantId, String runResultSn) {
+        AssertUtils.notNull(tenantId, "对账运行结果查询租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), tenantId,
+                "对账运行结果查询 tenantId 与当前租户不一致");
+        AssertUtils.hasText(runResultSn, "对账运行结果流水号不能为空");
     }
 
-    private void assertOptionalSourceRefLength(String sourceRef, String sourceRole) {
-        if (!StringUtils.hasText(sourceRef)) {
-            return;
-        }
-        AssertUtils.isTrue(sourceRef.trim().length() <= ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH,
-                "对账匹配结果{}来源引用长度不能超过 {}",
-                sourceRole, ReconciliationMatchResultItem.MAX_SOURCE_REF_LENGTH);
+    private record SourceFacts(ReconciliationSourceSnapshot snapshot, List<ReconciliationSourceItem> items) {
     }
 
-    private void validateDifferenceSourceRefs(ReconciliationDifferenceType differenceType,
-                                              boolean hasReferenceSource,
-                                              boolean hasComparisonSource) {
-        if (differenceType == ReconciliationDifferenceType.REFERENCE_MISSING) {
-            AssertUtils.isTrue(!hasReferenceSource && hasComparisonSource,
-                    "REFERENCE_MISSING 只能缺少基准侧来源引用");
-            return;
-        }
-        if (differenceType == ReconciliationDifferenceType.COMPARISON_MISSING) {
-            AssertUtils.isTrue(hasReferenceSource && !hasComparisonSource,
-                    "COMPARISON_MISSING 只能缺少核对侧来源引用");
-            return;
-        }
-        AssertUtils.isTrue(hasReferenceSource && hasComparisonSource,
-                "非缺失类差错必须同时存在基准侧和核对侧来源引用");
-    }
-
-    private void assertNoDuplicateMatchResult(List<ReconciliationMatchResult> matchResults) {
-        long distinctIdentityCount = matchResults.stream()
-                .map(ReconciliationMatchResult::getMatchIdentityDigest)
-                .distinct()
-                .count();
-        AssertUtils.isTrue(distinctIdentityCount == matchResults.size(),
-                "对账运行结果不能重复使用同一基准侧和核对侧来源对");
-        assertOneToOneSourceUsage(matchResults, ReconciliationMatchResult::getReferenceSourceRef,
-                "同一基准侧来源引用只能参与一个匹配结果");
-        assertOneToOneSourceUsage(matchResults, ReconciliationMatchResult::getComparisonSourceRef,
-                "同一核对侧来源引用只能参与一个匹配结果");
-    }
-
-    private void assertOneToOneSourceUsage(List<ReconciliationMatchResult> matchResults,
-                                           java.util.function.Function<ReconciliationMatchResult, String> extractor,
-                                           String message) {
-        long sourceCount = matchResults.stream()
-                .map(extractor)
-                .filter(StringUtils::hasText)
-                .count();
-        long distinctSourceCount = matchResults.stream()
-                .map(extractor)
-                .filter(StringUtils::hasText)
-                .distinct()
-                .count();
-        AssertUtils.isTrue(sourceCount == distinctSourceCount, message);
-    }
-
-    private boolean isMatched(ReconciliationMatchResult result) {
-        return result.getSourceQuality() == ReconciliationSourceQuality.VERIFIED
-                && isAutomaticMatch(result.getMatchStrength());
-    }
-
-    private boolean isAutomaticMatch(ReconciliationMatchStrength matchStrength) {
-        return matchStrength == ReconciliationMatchStrength.EXACT_MATCH
-                || matchStrength == ReconciliationMatchStrength.RULE_MATCH;
-    }
-
-    private TreeMap<String, String> sourceContentDigests(List<ReconciliationSourceItem> items) {
-        TreeMap<String, String> result = new TreeMap<>();
-        items.forEach(item -> result.put(item.getSourceItemRef(), item.getContentDigest()));
-        return result;
-    }
-
-    private boolean isSha256(String digest) {
-        return digest != null && SHA_256_PATTERN.matcher(digest).matches();
-    }
-
-    private List<String> parseEvidenceRefs(String value) {
-        return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();
-    }
-
-    private String normalizedOptionalText(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
-    }
-
-    private record SourceSnapshotFacts(ReconciliationSourceSnapshot snapshot,
-                                       List<ReconciliationSourceItem> items) {
-
-        private Set<String> sourceItemRefs() {
-            return items.stream().map(ReconciliationSourceItem::getSourceItemRef)
-                    .collect(java.util.stream.Collectors.toSet());
-        }
-    }
-
-    private record SourceSet(SourceSnapshotFacts reference,
-                             SourceSnapshotFacts comparison,
-                             List<String> evidenceRefs) {
+    private record SourceSet(SourceFacts reference, SourceFacts comparison) {
     }
 }

@@ -3,6 +3,8 @@ package com.wind.funds.reconciliation.application.gate;
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationGateRequirementRequest;
+import com.wind.funds.reconciliation.model.value.GateRequirementRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -20,6 +22,16 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public interface ReconciliationGateApplicationService {
+
+    /**
+     * 发布一份不可变的必需对账对版本。
+     *
+     * @param request 要求事实和期望的当前版本
+     * @param operator 发布者
+     * @return 稳定的要求引用
+     */
+    GateRequirementRef recordGateRequirement(RecordReconciliationGateRequirementRequest request,
+                                             WindOperator operator);
 
     /**
      * 检查对账差错准入。

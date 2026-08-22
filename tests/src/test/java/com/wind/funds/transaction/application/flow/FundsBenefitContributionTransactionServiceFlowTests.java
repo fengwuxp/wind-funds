@@ -4,11 +4,13 @@ import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
 import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import com.wind.funds.wallet.FundsAccountId;
@@ -50,6 +52,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_cost");
         FundsAccountId receiver = fundingAccount("ben_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
 
         topup(costBearer, 100L, "BENEFIT_CHAIN_TOPUP");
@@ -68,6 +71,10 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerEventAndBuckets("BENEFIT_SETTLE_001", FundsTransactionEventType.PAY,
                 LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
         assertBenefitContributionDescription(settleTransactionSn, "benefit contribution settle");
+        assertPrimaryActionFacts("BENEFIT_SETTLE", "BENEFIT_SETTLE_001",
+                "succeeded", "proven-full", 30L);
+        FundsActionFactDTO originalSettleAction = actionFactsByBusiness(
+                "BENEFIT_SETTLE", "BENEFIT_SETTLE_001").getFirst();
 
         String refundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
@@ -89,6 +96,9 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerEventAndBuckets("BENEFIT_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
         assertBenefitContributionDescription(refundTransactionSn, "benefit contribution refund");
+        assertRecoveryActionFact("BENEFIT_REFUND", "BENEFIT_REFUND_001", originalSettleAction, 10L);
+        assertThat(actionFactsByBusiness("BENEFIT_SETTLE", "BENEFIT_SETTLE_001"))
+                .containsExactly(originalSettleAction);
 
         String cancelRefundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
@@ -109,6 +119,9 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerFactsFollowRouteSnapshot("BENEFIT_CANCEL_REFUND_001");
         assertLedgerEventAndBuckets("BENEFIT_CANCEL_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
+        assertRecoveryActionFact("BENEFIT_CANCEL", "BENEFIT_CANCEL_REFUND_001", originalSettleAction, 5L);
+        assertThat(actionFactsByBusiness("BENEFIT_SETTLE", "BENEFIT_SETTLE_001"))
+                .containsExactly(originalSettleAction);
 
         assertBucket(balance(costBearer), LedgerSubjectCode.AVAILABLE, 85L, CURRENCY);
         assertBucket(balance(receiver), LedgerSubjectCode.SETTLEMENT, 15L, CURRENCY);
@@ -144,6 +157,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_rebate_cost");
         FundsAccountId receiver = fundingAccount("ben_rebate_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
@@ -203,6 +217,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_invalid_type_cost");
         FundsAccountId receiver = fundingAccount("ben_invalid_type_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
@@ -238,6 +253,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId merchantCostBearer = fundingAccount("ben_merchant_cost");
         FundsAccountId userBenefit = fundingAccount("ben_user_benefit");
         ensureLedger(merchantCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(userBenefit, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(userBenefit, LedgerSubjectCode.SETTLEMENT);
 
         topup(merchantCostBearer, 100L, "BENEFIT_MERCHANT_TOPUP");
@@ -269,21 +285,23 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_idempotent_cost");
         FundsAccountId alternateCostBearer = fundingAccount("ben_idempotent_alt_cost");
         FundsAccountId receiver = fundingAccount("ben_idempotent_recv");
-        FundsAccountId receiverAsCreditAccount = creditAccount(receiver.id());
+        FundsAccountId alternateReceiver = fundingAccount("ben_idempotent_alt_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(alternateCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(receiver, LedgerSubjectCode.CLEARING);
-        ensureLedger(receiverAsCreditAccount, LedgerSubjectCode.SETTLEMENT);
+        ensureFundingAccount(alternateReceiver, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(alternateReceiver, LedgerSubjectCode.SETTLEMENT);
 
         topup(costBearer, 100L, "BENEFIT_IDEMPOTENT_TOPUP");
         topup(alternateCostBearer, 100L, "BENEFIT_IDEMPOTENT_ALT_TOPUP");
-        var afterTopup = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
+        var afterTopup = snapshot(balances(costBearer, alternateCostBearer, receiver, alternateReceiver));
 
         String businessSn = "BENEFIT_IDEMPOTENT_SETTLE_001";
         String transactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 30L,
                 businessSn), WindOperatorFactory.system());
-        var afterSettle = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
+        var afterSettle = snapshot(balances(costBearer, alternateCostBearer, receiver, alternateReceiver));
         assertOnlyBalanceDeltas(afterTopup, afterSettle,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
@@ -294,7 +312,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 businessSn), WindOperatorFactory.system());
 
         assertThat(retryTransactionSn).isEqualTo(transactionSn);
-        var afterRetry = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
+        var afterRetry = snapshot(balances(costBearer, alternateCostBearer, receiver, alternateReceiver));
         assertOnlyBalanceDeltas(afterSettle, afterRetry,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -304,7 +322,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 businessSn), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
-        var afterConflict = snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount));
+        var afterConflict = snapshot(balances(costBearer, alternateCostBearer, receiver, alternateReceiver));
         assertOnlyBalanceDeltas(afterRetry, afterConflict,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
@@ -322,7 +340,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(
-                settleRequest(costBearer, receiverAsCreditAccount, 30L, businessSn),
+                settleRequest(costBearer, alternateReceiver, 30L, businessSn),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
@@ -333,7 +351,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         assertOnlyBalanceDeltas(afterConflict,
-                snapshot(balances(costBearer, alternateCostBearer, receiver, receiverAsCreditAccount)),
+                snapshot(balances(costBearer, alternateCostBearer, receiver, alternateReceiver)),
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.CLEARING, 0L, CURRENCY));
@@ -358,6 +376,9 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId orderBenefitPool = fundingAccount("ben_matrix_order");
         ensureLedger(platformMarketing, LedgerSubjectCode.AVAILABLE);
         ensureLedger(partnerCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(merchantClearing, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureFundingAccount(userSubsidy, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureFundingAccount(orderBenefitPool, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(merchantClearing, LedgerSubjectCode.CLEARING);
         ensureLedger(userSubsidy, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(orderBenefitPool, LedgerSubjectCode.SETTLEMENT);
@@ -438,6 +459,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId receiver = fundingAccount("ben_multi_receiver");
         ensureLedger(platformCostBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(merchantCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
 
         topup(platformCostBearer, 100L, "BENEFIT_MULTI_PLATFORM_TOPUP");
@@ -500,6 +522,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_missing_cost");
         FundsAccountId receiver = fundingAccount("ben_missing_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
@@ -533,6 +556,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_no_transfer_cost");
         FundsAccountId receiver = fundingAccount("ben_no_transfer_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
@@ -559,6 +583,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_context_cost");
         FundsAccountId receiver = fundingAccount("ben_context_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
@@ -661,6 +686,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         FundsAccountId costBearer = fundingAccount("ben_refund_context_cost");
         FundsAccountId receiver = fundingAccount("ben_refund_context_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(receiver, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         topup(costBearer, 100L, "BENEFIT_REFUND_CONTEXT_TOPUP");
         String settleTransactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,

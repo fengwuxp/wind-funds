@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.wind.common.exception.BaseException;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
@@ -11,11 +12,15 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerState;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionDetailState;
@@ -23,6 +28,8 @@ import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
@@ -41,6 +48,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -52,8 +60,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -68,6 +81,64 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 授权交易业务流测试。
  */
 class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSupport {
+
+    @Autowired
+    private JdbcTemplate authorizationJdbcTemplate;
+
+    @Test
+    void testAuthorizationSuccessorShouldRejectLedgerReferenceFromSuccessorFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "MIG05_AUTH_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "MIG05_AUTH_AUTHORIZE");
+        completeAuthorization(user, 20L, authorizationSn, "MIG05_AUTH_FIRST_COMPLETE");
+        assertSingleFundsAndLedgerFactsForBusinessSn("MIG05_AUTH_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("MIG05_AUTH_FIRST_COMPLETE", 0, 2, 1, 2);
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+                .hasValueSatisfying(snapshot -> assertThat(snapshot.getLegs()).singleElement());
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
+
+        FundsTransactionDetail authorizationDetail = fundsTransactionDetailsByBusinessSn("MIG05_AUTH_AUTHORIZE")
+                .getFirst();
+        String successorLedgerTransactionSn = ledgerTransactionByBusinessSn("MIG05_AUTH_FIRST_COMPLETE").getSn();
+        updateFundsTransactionDetailLedgerRef(authorizationDetail.getSn(), successorLedgerTransactionSn);
+        BalanceSnapshot beforeRelease = snapshot(balances(user, settlementAccount()));
+        LedgerFactSnapshot beforeReleaseFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> reverseAuthorization(user, 10L, authorizationSn,
+                "MIG05_AUTH_INVALID_SUCCESSOR_REFERENCE"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("原记账计划不存在或不唯一");
+        assertOnlyBalanceDeltas(beforeRelease, snapshot(balances(user, settlementAccount())),
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeReleaseFacts);
+        assertThat(fundsTransactionsByBusinessSn("MIG05_AUTH_INVALID_SUCCESSOR_REFERENCE")).isEmpty();
+        assertThat(fundsTransactionDetailsByBusinessSn("MIG05_AUTH_INVALID_SUCCESSOR_REFERENCE"))
+                .isNotEmpty()
+                .allSatisfy(detail -> {
+                    assertThat(detail.getTransactionSn()).isEqualTo(authorizationSn);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.FAILED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                    assertThat(detail.getErrorCode()).isNotBlank();
+                    assertThat(detail.getErrorMessage()).contains("原记账计划不存在或不唯一");
+                });
+        assertThat(ledgerTransactionsForBusinessSn("MIG05_AUTH_INVALID_SUCCESSOR_REFERENCE")).isEmpty();
+        assertThat(entriesByBusinessSn("MIG05_AUTH_INVALID_SUCCESSOR_REFERENCE")).isEmpty();
+        assertThat(fundsTransactionsByBusinessSn("MIG05_AUTH_AUTHORIZE")).singleElement();
+        assertThat(fundsTransactionDetailsByBusinessSn("MIG05_AUTH_AUTHORIZE"))
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.SUCCEEDED);
+                    assertThat(detail.getLedgerTransactionSn()).isEqualTo(successorLedgerTransactionSn);
+                });
+        assertThat(ledgerTransactionsForBusinessSn("MIG05_AUTH_AUTHORIZE")).singleElement();
+        assertThat(entriesByBusinessSn("MIG05_AUTH_AUTHORIZE")).hasSize(2);
+        assertFundsAndLedgerFactsForBusinessSn("MIG05_AUTH_FIRST_COMPLETE", 0, 2, 1, 2);
+        assertThat(fundsTransaction(authorizationSn).getCompletedAmount()).isEqualTo(20L);
+        assertThat(fundsTransaction(authorizationSn).getReversedAmount()).isZero();
+    }
 
     /**
      * 场景：普通资金账户把可用资金转入授权占用，随后完成扣款。
@@ -189,7 +260,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, beforeDecline,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, false, "AUTH_DECLINE_AUTHORIZE");
@@ -252,6 +323,669 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 });
     }
 
+    @Test
+    void testSuccessfulAuthorizationActionFactShouldRemainStableAcrossReplayAndConflict() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_ACTION_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_ACTION_AUTHORIZE");
+
+        assertActionFactQueryBoundary("AUTHORIZATION", "AUTH_ACTION_AUTHORIZE");
+        FundsActionFactDTO firstFact = assertAuthorizationActionFact(
+                "AUTH_ACTION_AUTHORIZE", 60L, "succeeded", "proven-full");
+        assertActionFactReferenceBoundary(firstFact, "AUTHORIZATION", "AUTH_ACTION_AUTHORIZE");
+
+        assertThat(authorize(user, 60L, true, "AUTH_ACTION_AUTHORIZE")).isEqualTo(authorizationSn);
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_AUTHORIZE"))
+                .containsExactly(firstFact);
+        assertThatThrownBy(() -> authorize(user, 61L, true, "AUTH_ACTION_AUTHORIZE"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_AUTHORIZE"))
+                .containsExactly(firstFact);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_ACTION_AUTHORIZE", 1, 2);
+    }
+
+    @Test
+    void testRejectedAuthorizationShouldExposeProvenZeroActionFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_ACTION_REJECTED_TOPUP");
+        BalanceSnapshot beforeReject = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeRejectFacts = ledgerFactSnapshot();
+
+        String authorizationSn = authorize(user, 60L, false, "AUTH_ACTION_REJECTED");
+
+        assertOnlyBalanceDeltas(beforeReject,
+                snapshot(balances(user, cashMappingAccount(), settlementAccount())),
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRejectFacts);
+        assertNoLedgerFactsForFundsTransaction(authorizationSn);
+        FundsActionFactDTO rejectedFact = assertAuthorizationActionFact(
+                "AUTH_ACTION_REJECTED", 60L, "rejected", "proven-zero");
+        assertThat(rejectedFact.getFundsEffect().getProvenMoney()).isNull();
+        assertActionFactReferenceBoundary(rejectedFact, "AUTHORIZATION", "AUTH_ACTION_REJECTED");
+    }
+
+    @Test
+    void testSharedAuthorizationShouldExposeOneActionFactAndFailClosedForRouteDrift() {
+        FundsAccountId parentAccount = fundingAccount("auth_action_parent");
+        FundsAccountId cardAccount = creditAccount("auth_action_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount, parentAccount);
+        topup(parentAccount, 100L, "AUTH_ACTION_SHARED_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_ACTION_SHARED_LIMIT");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_ACTION_SHARED");
+
+        FundsActionFactDTO firstFact = assertAuthorizationActionFact(
+                "AUTH_ACTION_SHARED", 60L, "succeeded", "proven-full");
+        String routeSnapshot = fundsTransactionsByBusinessSn("AUTH_ACTION_SHARED")
+                .getFirst().getRouteSnapshot();
+
+        ObjectNode wrongHierarchy = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        for (JsonNode participant : (ArrayNode) wrongHierarchy.get("participants")) {
+            if (cardAccount.id().equals(participant.path("subjectRef").path("subjectId").asText())) {
+                ((ObjectNode) participant.path("accountHierarchySnapshot").path("parentAccountRef"))
+                        .put("subjectId", "wrong_parent");
+            }
+        }
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(wrongHierarchy));
+        assertNoActionFacts("AUTHORIZATION", "AUTH_ACTION_SHARED");
+        assertThat(fundsTransactionQueryService.findFundsActionFact(firstFact.getIdentity())).isEmpty();
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_SHARED")).containsExactly(firstFact);
+
+        ObjectNode missingParentCurrency = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        for (JsonNode participant : (ArrayNode) missingParentCurrency.get("participants")) {
+            if (cardAccount.id().equals(participant.path("subjectRef").path("subjectId").asText())) {
+                ((ObjectNode) participant.path("accountHierarchySnapshot").path("parentAccountRef"))
+                        .put("currency", "");
+            }
+        }
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingParentCurrency));
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_SHARED");
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+
+        ObjectNode missingFundingParticipantCurrency = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        for (JsonNode participant : (ArrayNode) missingFundingParticipantCurrency.get("participants")) {
+            if (parentAccount.id().equals(participant.path("subjectRef").path("subjectId").asText())) {
+                ((ObjectNode) participant).put("currency", "");
+            }
+        }
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingFundingParticipantCurrency));
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_SHARED");
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+
+        ObjectNode wrongLeg = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode firstLeg = (ObjectNode) ((ArrayNode) wrongLeg.get("legs")).get(0);
+        String sourceSubjectId = firstLeg.path("sourceNode").path("subjectRef").path("subjectId").asText();
+        String wrongTarget = sourceSubjectId.equals(cardAccount.id()) ? parentAccount.id() : cardAccount.id();
+        ((ObjectNode) firstLeg.path("targetNode").path("subjectRef")).put("subjectId", wrongTarget);
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(wrongLeg));
+        assertNoActionFacts("AUTHORIZATION", "AUTH_ACTION_SHARED");
+        assertThat(fundsTransactionQueryService.findFundsActionFact(firstFact.getIdentity())).isEmpty();
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+
+        FundsTransactionDetail parentDetail = fundsTransactionDetailsByBusinessSn("AUTH_ACTION_SHARED").stream()
+                .filter(detail -> parentAccount.id().equals(detail.getSubjectId()))
+                .findFirst()
+                .orElseThrow();
+        deleteFundsTransactionDetail(parentDetail.getSn());
+        assertNoActionFacts("AUTHORIZATION", "AUTH_ACTION_SHARED");
+        assertThat(fundsTransactionQueryService.findFundsActionFact(firstFact.getIdentity())).isEmpty();
+    }
+
+    @Test
+    void testAuthorizationActionFactShouldRemainStableAcrossLifecycleProgress() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_ACTION_LIFECYCLE_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_ACTION_LIFECYCLE_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_ACTION_LIFECYCLE_AUTHORIZE", 100L, "succeeded", "proven-full");
+
+        completeAuthorization(user, 40L, authorizationSn, "AUTH_ACTION_LIFECYCLE_COMPLETE_1");
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_LIFECYCLE_AUTHORIZE"))
+                .containsExactly(authorizationFact);
+        reverseAuthorization(user, 20L, authorizationSn, "AUTH_ACTION_LIFECYCLE_RELEASE");
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_LIFECYCLE_AUTHORIZE"))
+                .containsExactly(authorizationFact);
+        completeAuthorization(user, 40L, authorizationSn, "AUTH_ACTION_LIFECYCLE_COMPLETE_2");
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_LIFECYCLE_AUTHORIZE"))
+                .containsExactly(authorizationFact);
+        authorizationTransactionService.refund(new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(user)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(20L, CURRENCY)))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("AUTHORIZATION_REFUND")
+                .setBusinessSn("AUTH_ACTION_LIFECYCLE_REFUND"), WindOperatorFactory.system());
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_LIFECYCLE_AUTHORIZE"))
+                .containsExactly(authorizationFact);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
+
+        FundsTransaction lifecycle = fundsTransactionsByBusinessSn("AUTH_ACTION_LIFECYCLE_AUTHORIZE").getFirst();
+        updateFundsTransactionState(authorizationSn, FundsTransactionState.FAILED);
+        assertAuthorizationActionFactAvailable(authorizationFact, "AUTH_ACTION_LIFECYCLE_AUTHORIZE");
+        updateFundsTransactionState(authorizationSn, lifecycle.getState());
+
+        updateFundsTransactionCompletedAmount(authorizationSn, lifecycle.getAuthorizedAmount() + 1L);
+        assertAuthorizationActionFactAvailable(authorizationFact, "AUTH_ACTION_LIFECYCLE_AUTHORIZE");
+        updateFundsTransactionCompletedAmount(authorizationSn, lifecycle.getCompletedAmount());
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET reversed_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, lifecycle.getAuthorizedAmount() + 1L, TENANT_ID, authorizationSn)).isOne();
+        assertAuthorizationActionFactAvailable(authorizationFact, "AUTH_ACTION_LIFECYCLE_AUTHORIZE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET reversed_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, lifecycle.getReversedAmount(), TENANT_ID, authorizationSn)).isOne();
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET refunded_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, lifecycle.getAuthorizedAmount() + 1L, TENANT_ID, authorizationSn)).isOne();
+        assertAuthorizationActionFactAvailable(authorizationFact, "AUTH_ACTION_LIFECYCLE_AUTHORIZE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET refunded_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, lifecycle.getRefundedAmount(), TENANT_ID, authorizationSn)).isOne();
+    }
+
+    @Test
+    void testAuthorizationActionFactShouldFailClosedForDurableFactTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_ACTION_TAMPER_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_ACTION_TAMPER");
+        FundsActionFactDTO firstFact = assertAuthorizationActionFact(
+                "AUTH_ACTION_TAMPER", 60L, "succeeded", "proven-full");
+        FundsTransactionDetail detail = fundsTransactionDetailsByBusinessSn("AUTH_ACTION_TAMPER").getFirst();
+        String ledgerTransactionSn = detail.getLedgerTransactionSn();
+        String routeSnapshot = fundsTransactionsByBusinessSn("AUTH_ACTION_TAMPER").getFirst().getRouteSnapshot();
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET authorized_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, 61L, TENANT_ID, authorizationSn)).isOne();
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction SET authorized_amount = ? WHERE tenant_id = ? AND sn = ?
+                """, 60L, TENANT_ID, authorizationSn)).isOne();
+
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), null);
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), ledgerTransactionSn);
+
+        ObjectNode missingLegs = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        missingLegs.putArray("legs");
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingLegs));
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+
+        clearFundsTransactionRouteSnapshot(authorizationSn);
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+        assertThat(actionFactsByBusiness("AUTHORIZATION", "AUTH_ACTION_TAMPER")).containsExactly(firstFact);
+
+        ObjectNode missingParticipantSubject = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ((ObjectNode) ((ArrayNode) missingParticipantSubject.get("participants")).get(0)).remove("subjectRef");
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingParticipantSubject));
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+
+        ObjectNode wrongFundingResponsibility = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode participant = (ObjectNode) ((ArrayNode) wrongFundingResponsibility.get("participants")).get(0);
+        participant.put("participantRole", RouteParticipantRole.AUTH_HOLDER.name());
+        ((ObjectNode) participant.path("subjectRef")).put("subjectType", FundsSubjectType.CREDIT_ACCOUNT.name());
+        for (JsonNode leg : (ArrayNode) wrongFundingResponsibility.get("legs")) {
+            ((ObjectNode) leg.path("sourceNode").path("subjectRef"))
+                    .put("subjectType", FundsSubjectType.CREDIT_ACCOUNT.name());
+            ((ObjectNode) leg.path("targetNode").path("subjectRef"))
+                    .put("subjectType", FundsSubjectType.CREDIT_ACCOUNT.name());
+        }
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(wrongFundingResponsibility));
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET subject_type = ?, participant_role = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, FundsSubjectType.CREDIT_ACCOUNT.name(), RouteParticipantRole.AUTH_HOLDER.name(),
+                TENANT_ID, detail.getSn())).isOne();
+        assertAuthorizationActionFactUnavailable(firstFact, "AUTH_ACTION_TAMPER");
+    }
+
+    /**
+     * 场景：普通 Funding 授权完成后投影稳定 complete ActionFact。
+     * 输入：充值 100、授权 100、完成 30，并执行同摘要重放和异金额冲突。
+     * 输出：完成物理事实、原账本引用和余额先闭合，再查询唯一 complete ActionFact。
+     * 红线：ActionFact 缺失不得被不完整的 detail、route、ledger 或余额事实掩盖。
+     */
+    @Test
+    void testSuccessfulAuthorizationCompleteShouldExposeStableActionFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_ACTION_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_COMPLETE_ACTION_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_COMPLETE_ACTION_AUTHORIZE", 100L, "succeeded", "proven-full");
+
+        String completeSn = completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_ACTION_CAPTURE");
+        LedgerFactSnapshot completedFacts = ledgerFactSnapshot();
+        BalanceSnapshot completedBalances = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertThat(fundsTransaction(authorizationSn).getCompletedAmount()).isEqualTo(30L);
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_ACTION_AUTHORIZE",
+                "AUTH_COMPLETE_ACTION_CAPTURE", 2, 1, 2);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
+
+        assertThat(completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_ACTION_CAPTURE"))
+                .isEqualTo(completeSn);
+        assertLedgerTransactionFactsUnchanged(completedFacts);
+        assertOnlyBalanceDeltas(completedBalances,
+                snapshot(balances(user, cashMappingAccount(), settlementAccount())),
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertThatThrownBy(() -> completeAuthorization(user, 31L, authorizationSn,
+                "AUTH_COMPLETE_ACTION_CAPTURE"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+        assertThat(fundsTransaction(authorizationSn).getCompletedAmount()).isEqualTo(30L);
+
+        FundsActionFactDTO completeFact = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_ACTION_CAPTURE", 30L, 1);
+        assertActionFactReferenceBoundary(completeFact,
+                "AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_CAPTURE");
+    }
+
+    /**
+     * 场景：同一授权根经历两次部分完成、释放和退款后保留两条独立 complete ActionFact。
+     * 输入：授权 100，依次完成 30、完成 50、释放 20、退款 20。
+     * 输出：每个后继动作的 detail/posting/ledger 独立闭合，累计和最终余额可复算。
+     * 红线：release/refund 不得覆盖或合并两条 complete 动作事实。
+     */
+    @Test
+    void testPartialAuthorizationCompletesShouldRemainIndependentAcrossReleaseAndRefund() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_LIFECYCLE_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_COMPLETE_LIFECYCLE_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_COMPLETE_LIFECYCLE_AUTHORIZE", 100L, "succeeded", "proven-full");
+
+        completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_1");
+        completeAuthorization(user, 50L, authorizationSn, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_2");
+        FundsActionFactDTO firstCompleteBeforeReverse = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_1", 30L, 1);
+        FundsActionFactDTO secondCompleteBeforeReverse = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_2", 50L, 1);
+        reverseAuthorization(user, 20L, authorizationSn, "AUTH_COMPLETE_LIFECYCLE_RELEASE");
+        refundCompletedAuthorization(user, 20L, authorizationSn, "AUTH_COMPLETE_LIFECYCLE_REFUND");
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getCompletedAmount()).isEqualTo(80L);
+        assertThat(transaction.getReversedAmount()).isEqualTo(20L);
+        assertThat(transaction.getRefundedAmount()).isEqualTo(20L);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_LIFECYCLE_AUTHORIZE",
+                "AUTH_COMPLETE_LIFECYCLE_CAPTURE_1", 2, 1, 2);
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_LIFECYCLE_AUTHORIZE",
+                "AUTH_COMPLETE_LIFECYCLE_CAPTURE_2", 2, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_COMPLETE_LIFECYCLE_RELEASE", 0, 1, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_COMPLETE_LIFECYCLE_REFUND", 0, 2, 1, 2);
+
+        FundsActionFactDTO firstComplete = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_1", 30L, 1);
+        FundsActionFactDTO secondComplete = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_LIFECYCLE_CAPTURE_2", 50L, 1);
+        assertThat(firstComplete).isEqualTo(firstCompleteBeforeReverse);
+        assertThat(secondComplete).isEqualTo(secondCompleteBeforeReverse);
+        assertThat(firstComplete.getIdentity()).isNotEqualTo(secondComplete.getIdentity());
+    }
+
+    /**
+     * 场景：SHARED 授权完成同时消费 Credit 与父 Funding 责任。
+     * 输入：Credit 与父 Funding 各授权占用 60，随后完成 60。
+     * 输出：三条 detail、两组 posting 和四条 entry 闭合，但只形成一条金额 60 的 ActionFact。
+     * 红线：多责任 participant 不得把 complete Money 累加成 120。
+     */
+    @Test
+    void testSharedAuthorizationCompleteShouldExposeOneActionFactWithoutDoublingMoney() {
+        FundsAccountId parentAccount = fundingAccount("aca_parent");
+        FundsAccountId cardAccount = creditAccount("aca_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount, parentAccount);
+        topup(parentAccount, 100L, "AUTH_COMPLETE_ACTION_SHARED_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_COMPLETE_ACTION_SHARED_LIMIT");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_COMPLETE_ACTION_SHARED_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_COMPLETE_ACTION_SHARED_AUTHORIZE", 60L, "succeeded", "proven-full");
+
+        completeAuthorization(cardAccount, 60L, authorizationSn, "AUTH_COMPLETE_ACTION_SHARED_CAPTURE");
+
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_ACTION_SHARED_AUTHORIZE",
+                "AUTH_COMPLETE_ACTION_SHARED_CAPTURE", 3, 2, 4);
+        assertBucket(balance(cardAccount), LedgerSubjectCode.OUTSTANDING, 60L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
+        assertCompleteActionFact(authorizationSn, authorizationFact,
+                "AUTH_COMPLETE_ACTION_SHARED_CAPTURE", 60L, 2);
+    }
+
+    /**
+     * 场景：两个不同 complete identity 并发竞争同一授权剩余额度。
+     * 输入：授权 80，并发完成 60 与 60。
+     * 输出：仅一个 winner 形成完整资金/账务事实，loser 零新增，余额只反映 60。
+     * 红线：并发失败方不得生成 detail、ledger、余额或 ActionFact。
+     */
+    @Test
+    void testConcurrentAuthorizationCompletesShouldExposeOnlyWinnerActionFact() throws Exception {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_ACTION_RACE_TOPUP");
+        String authorizationSn = authorize(user, 80L, true, "AUTH_COMPLETE_ACTION_RACE_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_COMPLETE_ACTION_RACE_AUTHORIZE", 80L, "succeeded", "proven-full");
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<RaceOutcome> first = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_COMPLETE_ACTION_RACE_1", FundsTransactionEventType.COMPLETE,
+                    () -> completeAuthorization(user, 60L, authorizationSn, "AUTH_COMPLETE_ACTION_RACE_1")));
+            Future<RaceOutcome> second = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_COMPLETE_ACTION_RACE_2", FundsTransactionEventType.COMPLETE,
+                    () -> completeAuthorization(user, 60L, authorizationSn, "AUTH_COMPLETE_ACTION_RACE_2")));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            List<RaceOutcome> outcomes = List.of(awaitOutcome(first), awaitOutcome(second));
+            List<RaceOutcome> successes = outcomes.stream().filter(RaceOutcome::succeeded).toList();
+            List<RaceOutcome> failures = outcomes.stream().filter(outcome -> !outcome.succeeded()).toList();
+            assertThat(successes).hasSize(1);
+            assertThat(failures).hasSize(1);
+            RaceOutcome winner = successes.getFirst();
+            RaceOutcome loser = failures.getFirst();
+            assertThat(fundsTransaction(authorizationSn).getCompletedAmount()).isEqualTo(60L);
+            assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_ACTION_RACE_AUTHORIZE",
+                    winner.businessSn(), 2, 1, 2);
+            assertNoFundsOrLedgerFactsForBusinessSn(loser.businessSn());
+            assertNoActionFacts("AUTHORIZATION_COMPLETE", loser.businessSn());
+            assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+            assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 20L, CURRENCY);
+            assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
+            assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
+            assertCompleteActionFact(authorizationSn, authorizationFact, winner.businessSn(), 60L, 1);
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    /**
+     * 场景：完整 complete 物理事实存在时查询稳定 ActionFact，并为后续篡改用例冻结基线。
+     * 输入：充值 100、授权 100、完成 30。
+     * 输出：detail、route provenance、ledger 和余额闭合后，查询唯一 complete ActionFact。
+     * 红线：目标红灯只能来自 ActionFact 投影缺失，不能来自完成主链不完整。
+     */
+    @Test
+    void testAuthorizationCompleteActionFactShouldFailClosedForDurableFactTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_ACTION_TAMPER_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_COMPLETE_ACTION_TAMPER_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_COMPLETE_ACTION_TAMPER_AUTHORIZE", 100L, "succeeded", "proven-full");
+        completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_ACTION_TAMPER_AUTHORIZE",
+                "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE", 2, 1, 2);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
+        FundsActionFactDTO completeFact = assertCompleteActionFact(
+                authorizationSn, authorizationFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE", 30L, 1);
+        FundsTransactionDetail detail = fundsTransactionDetailsByBusinessSn(
+                "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE").getFirst();
+        String requestHash = detail.getRequestHash();
+        String ledgerRef = detail.getLedgerTransactionSn();
+        String contextVariables = detail.getContextVariables();
+        String routeSnapshot = fundsTransactionsByBusinessSn(
+                "AUTH_COMPLETE_ACTION_TAMPER_AUTHORIZE").getFirst().getRouteSnapshot();
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET request_hash = '' WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID, detail.getSn())).isOne();
+        assertThat(actionFactsByBusiness("AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE"))
+                .containsExactly(completeFact);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(completeFact.getIdentity()))
+                .hasValue(completeFact);
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET request_hash = ? WHERE tenant_id = ? AND sn = ?
+                """, "0".repeat(64), TENANT_ID, detail.getSn())).isOne();
+        assertThat(actionFactsByBusiness("AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE"))
+                .containsExactly(completeFact);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(completeFact.getIdentity()))
+                .hasValue(completeFact);
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET request_hash = ? WHERE tenant_id = ? AND sn = ?
+                """, requestHash, TENANT_ID, detail.getSn())).isOne();
+
+        ObjectNode forceContext = WindJson.parseObject(contextVariables, ObjectNode.class);
+        forceContext.put(FundsInstructionContextKeys.COMPLETION_MODE,
+                FundsAuthorizationTransactionCompleteRequest.COMPLETION_MODE_FORCE);
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, WindJson.toJsonString(forceContext), TENANT_ID, detail.getSn())).isOne();
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, contextVariables, TENANT_ID, detail.getSn())).isOne();
+
+        ObjectNode fractionalContext = WindJson.parseObject(contextVariables, ObjectNode.class);
+        ObjectNode replayAmounts = (ObjectNode) fractionalContext.get(
+                FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
+        replayAmounts.put(replayAmounts.propertyNames().iterator().next(), 30.5D);
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, WindJson.toJsonString(fractionalContext), TENANT_ID, detail.getSn())).isOne();
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, contextVariables, TENANT_ID, detail.getSn())).isOne();
+
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), null);
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), ledgerRef);
+
+        updateFundsTransactionCompletedAmount(authorizationSn, 31L);
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        updateFundsTransactionCompletedAmount(authorizationSn, 30L);
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, "{}", TENANT_ID, detail.getSn())).isOne();
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, contextVariables, TENANT_ID, detail.getSn())).isOne();
+
+        ObjectNode missingLegs = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        missingLegs.putArray("legs");
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingLegs));
+        assertCompleteActionFactUnavailable(completeFact, "AUTH_COMPLETE_ACTION_TAMPER_CAPTURE");
+    }
+
+    /**
+     * 场景：complete 的耐久 detail、引用、状态或授权累计被篡改。
+     * 输入：先形成完整完成事实，再依次篡改 sibling 状态、Ledger 引用、累计和 context。
+     * 输出：业务列表和 identity 查询均 fail-closed，恢复原值后继续测试下一种篡改。
+     * 红线：FAILED/PROCESSING 标签、缺引用或聚合不一致不得被投影为成功事实。
+     */
+    @Test
+    void testAuthorizationCompleteActionFactShouldRejectDetailAndAggregateTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_DETAIL_TAMPER_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_COMPLETE_DETAIL_TAMPER_AUTHORIZE");
+        completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_AUTHORIZE",
+                "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE", 2, 1, 2);
+
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(
+                "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        FundsTransactionDetail firstDetail = details.getFirst();
+        String ledgerRef = firstDetail.getLedgerTransactionSn();
+        String contextVariables = firstDetail.getContextVariables();
+
+        updateFundsTransactionDetailState(firstDetail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        updateFundsTransactionDetailState(firstDetail.getSn(), FundsTransactionDetailState.FAILED);
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        updateFundsTransactionDetailState(firstDetail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+
+        updateFundsTransactionDetailLedgerRef(firstDetail.getSn(), null);
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        updateFundsTransactionDetailLedgerRef(firstDetail.getSn(), ledgerRef);
+
+        updateFundsTransactionCompletedAmount(authorizationSn, 31L);
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        updateFundsTransactionCompletedAmount(authorizationSn, 30L);
+
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, "{}", TENANT_ID, firstDetail.getSn())).isOne();
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_DETAIL_TAMPER_CAPTURE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET context_variables = ? WHERE tenant_id = ? AND sn = ?
+                """, contextVariables, TENANT_ID, firstDetail.getSn())).isOne();
+    }
+
+    /**
+     * 场景：SHARED complete 的责任 sibling 缺失、重复或交换。
+     * 输入：Credit、父 Funding 和 settlement 三条 detail 已成功形成。
+     * 输出：任何责任 identity/role 映射不再无重无漏时，两种查询均返回空。
+     * 红线：不得用仍存在的 sibling 或聚合金额补推缺失责任事实。
+     */
+    @Test
+    void testSharedAuthorizationCompleteActionFactShouldRejectResponsibilitySiblingTamper() {
+        FundsAccountId parentAccount = fundingAccount("acs_parent");
+        FundsAccountId cardAccount = creditAccount("acs_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount, parentAccount);
+        topup(parentAccount, 100L, "AUTH_COMPLETE_SIBLING_TAMPER_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_COMPLETE_SIBLING_TAMPER_LIMIT");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_COMPLETE_SIBLING_TAMPER_AUTHORIZE");
+        completeAuthorization(cardAccount, 60L, authorizationSn, "AUTH_COMPLETE_SIBLING_TAMPER_CAPTURE");
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_SIBLING_TAMPER_AUTHORIZE",
+                "AUTH_COMPLETE_SIBLING_TAMPER_CAPTURE", 3, 2, 4);
+
+        FundsTransactionDetail cardDetail = fundsTransactionDetailsByBusinessSn(
+                "AUTH_COMPLETE_SIBLING_TAMPER_CAPTURE").stream()
+                .filter(detail -> cardAccount.id().equals(detail.getSubjectId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET subject_id = ? WHERE tenant_id = ? AND sn = ?
+                """, parentAccount.id(), TENANT_ID, cardDetail.getSn())).isOne();
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_SIBLING_TAMPER_CAPTURE");
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail SET subject_id = ? WHERE tenant_id = ? AND sn = ?
+                """, cardAccount.id(), TENANT_ID, cardDetail.getSn())).isOne();
+
+        deleteFundsTransactionDetail(cardDetail.getSn());
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_SIBLING_TAMPER_CAPTURE");
+    }
+
+    /**
+     * 场景：complete 的派生 settlement sibling 或原授权 replay leg 不完整。
+     * 输入：普通授权完成事实已闭合，随后删除 capture target 或篡改原 HOLD leg。
+     * 输出：缺失、重复、换向或改 identity/amount 时，两种 ActionFact 查询均返回空。
+     * 红线：不得按当前余额、剩余 detail 或聚合累计重建 provenance。
+     */
+    @Test
+    void testAuthorizationCompleteActionFactShouldRejectCaptureTargetAndReplayLegTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_COMPLETE_ROUTE_TAMPER_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_COMPLETE_ROUTE_TAMPER_AUTHORIZE");
+        completeAuthorization(user, 30L, authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+        assertAuthorizationCompletePhysicalFacts(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_AUTHORIZE",
+                "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE", 2, 1, 2);
+
+        String routeSnapshot = fundsTransactionsByBusinessSn(
+                "AUTH_COMPLETE_ROUTE_TAMPER_AUTHORIZE").getFirst().getRouteSnapshot();
+        ObjectNode duplicateLeg = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ArrayNode duplicateLegs = (ArrayNode) duplicateLeg.get("legs");
+        duplicateLegs.add(duplicateLegs.get(0).deepCopy());
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(duplicateLeg));
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+
+        ObjectNode exchangedLeg = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode leg = (ObjectNode) ((ArrayNode) exchangedLeg.get("legs")).get(0);
+        JsonNode sourceNode = leg.get("sourceNode").deepCopy();
+        leg.set("sourceNode", leg.get("targetNode").deepCopy());
+        leg.set("targetNode", sourceNode);
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(exchangedLeg));
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+
+        ObjectNode wrongLegIdentity = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ((ObjectNode) ((ArrayNode) wrongLegIdentity.get("legs")).get(0)).put("legId", "HOLD_TAMPERED");
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(wrongLegIdentity));
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+
+        ObjectNode wrongLegAmount = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        ObjectNode amount = (ObjectNode) ((ArrayNode) wrongLegAmount.get("legs")).get(0).get("amount");
+        ObjectNode originalAmount = (ObjectNode) ((ArrayNode) wrongLegAmount.get("legs")).get(0)
+                .get("originalAmount");
+        amount.put("amount", 31L);
+        originalAmount.put("amount", 31L);
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(wrongLegAmount));
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+        FundsTransactionDetail settlementDetail = fundsTransactionDetailsByBusinessSn(
+                "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE").stream()
+                .filter(detail -> settlementAccount().id().equals(detail.getSubjectId()))
+                .findFirst()
+                .orElseThrow();
+        deleteFundsTransactionDetail(settlementDetail.getSn());
+        assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+    }
+
+    /**
+     * 场景：force/standalone complete 或不存在的业务身份查询 ActionFact。
+     * 输入：force completion 60，以及不存在的 ordinary complete businessSn。
+     * 输出：两种查询均返回空，不生成公共 complete ActionFact。
+     * 红线：standalone/force、wrong tenant 或 malformed identity 不得混入普通授权完成投影。
+     */
+    @Test
+    void testUnsupportedAuthorizationCompleteInputsShouldNotExposeActionFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        assertActionFactQueryBoundary("AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_ABSENT");
+        topup(user, 100L, "AUTH_COMPLETE_ACTION_FORCE_TOPUP");
+
+        forceCompletionAuthorization(user, 60L, "AUTH_COMPLETE_ACTION_FORCE");
+
+        assertNoActionFacts("AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_FORCE");
+        assertNoActionFacts("AUTHORIZATION_COMPLETE", "AUTH_COMPLETE_ACTION_ABSENT");
+    }
+
     /**
      * 场景：授权拒绝使用相同业务流水重复提交，第二次请求摘要一致时复用原拒绝交易，拒绝原因变化时拒绝。
      * 输入：账户充值 100 后，授权拒绝 60，拒绝原因为 RISK_DECLINED；随后同流水同原因重试，再改为 LIMIT_DECLINED。
@@ -269,7 +1003,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -305,7 +1039,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(declinedSn);
@@ -367,7 +1101,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
@@ -415,7 +1149,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         assertPostedTransactions(1);
@@ -446,7 +1180,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_FULL_REVERSAL_AUTHORIZE");
@@ -467,7 +1201,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -631,7 +1365,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_PARTIAL_REVERSAL_COMPLETE_AUTHORIZE");
@@ -665,7 +1399,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -765,7 +1499,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 100L, true, "AUTH_AMOUNT_PROGRESS_AUTHORIZE");
@@ -818,7 +1552,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 80L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -882,7 +1616,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_REVERSAL_EXCEED_AUTHORIZE");
@@ -952,7 +1686,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_FULL_COMPLETE_AUTHORIZE");
@@ -973,7 +1707,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
 
         assertPostedTransactions(3);
@@ -1258,7 +1992,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_RACE_AUTHORIZE");
@@ -1365,7 +2099,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String forceCompletionSn = forceCompletionAuthorization(user, 60L, "AUTH_FORCE_COMPLETION_CAPTURE");
@@ -1379,7 +2113,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(forceCompletionSn);
@@ -1512,7 +2246,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_FULL_REFUND_AUTHORIZE");
@@ -1541,7 +2275,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -1613,7 +2347,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L, "AUTH_NO_AUTH_REFUND_EXTERNAL_CAPTURE");
@@ -1798,7 +2532,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_DISPUTE_REFUND_AUTHORIZE");
@@ -2104,7 +2838,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_DISPUTE_REFUND_EXCEED_AUTHORIZE");
@@ -2136,7 +2870,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String reserveAuthorizationSn = authorize(reserveUser, 100L, true,
@@ -2167,7 +2901,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
         assertBucket(balance(reserveUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(reserveUser), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 150L, CURRENCY);
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(
@@ -2235,7 +2969,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_REFUND_EXCEED_AUTHORIZE");
@@ -2266,7 +3000,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String reserveAuthorizationSn = authorize(reserveUser, 100L, true,
@@ -2296,7 +3030,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
         assertBucket(balance(reserveUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(reserveUser), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 150L, CURRENCY);
 
         assertThatThrownBy(() -> refundCompletedAuthorization(user, 60L, authorizationSn,
@@ -2358,7 +3092,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_AUTHORIZE");
@@ -2393,7 +3127,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -2478,7 +3212,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         topup(anotherUser, 100L, "AUTH_IDEMPOTENT_ACCOUNT_ANOTHER_TOPUP");
@@ -2489,7 +3223,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT");
@@ -2522,7 +3256,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_200L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -2563,7 +3297,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_REVERSAL_AUTHORIZE");
@@ -2609,7 +3343,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 50L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -2663,7 +3397,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_COMPLETE_AUTHORIZE");
@@ -2709,7 +3443,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 50L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -2763,7 +3497,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_REFUND_AUTHORIZE");
@@ -2817,7 +3551,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_100L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
@@ -2960,14 +3694,15 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setTenantId(TENANT_ID)
                 .setSubjectId(accountId.id())
                 .setSubjectType(accountId.type())
-                .setLedgerProfileCode("TEST")
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
                 .setLedgerProfileVersion(1)
                 .setLedgerSubjectCode(ledgerSubjectCode)
                 .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
                 .setNormalBalanceSide(EntrySide.CREDIT)
-                .setAllowNegative(Boolean.FALSE)
+                .setAllowNegative(ledgerSubjectCode == LedgerSubjectCode.AVAILABLE)
                 .setCurrency(CURRENCY)
                 .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
                 .setPeriodType(periodType)
                 .setPeriodId(periodId));
         if (initialBalance != 0L) {
@@ -3035,6 +3770,131 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(entry.getPeriodType()).isEqualTo(periodType);
                     assertThat(entry.getPeriodId()).isEqualTo(periodId);
                 });
+    }
+
+    private FundsActionFactDTO assertAuthorizationActionFact(String businessSn,
+                                                             long amount,
+                                                             String outcome,
+                                                             String effectKind) {
+        List<FundsActionFactDTO> actionFacts = actionFactsByBusiness("AUTHORIZATION", businessSn);
+        assertThat(actionFacts).singleElement();
+        FundsActionFactDTO actionFact = actionFacts.getFirst();
+        Money expectedMoney = Money.immutable(amount, CURRENCY);
+        assertThat(actionFact.getIdentity().getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(actionFact.getIdentity().getIdentity()).isNotBlank();
+        assertThat(actionFact.getIntentRef()).isNotBlank();
+        assertThat(actionFact.getAttemptRef()).isNotBlank();
+        assertThat(actionFact.getActionKind()).isEqualToIgnoringCase("authorize");
+        assertThat(actionFact.getMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getOutcome().getOwner()).isEqualTo("funds-transaction");
+        assertThat(actionFact.getOutcome().getCode()).isEqualToIgnoringCase(outcome);
+        assertThat(actionFact.getFundsEffect().getEffectKind()).isEqualToIgnoringCase(effectKind);
+        if ("proven-zero".equalsIgnoreCase(effectKind)) {
+            assertThat(actionFact.getFundsEffect().getProvenMoney()).isNull();
+        } else {
+            assertThat(actionFact.getFundsEffect().getProvenMoney()).isEqualTo(expectedMoney);
+        }
+        assertThat(actionFact.getSemanticDigest().getAlgorithm()).isEqualTo("SHA-256");
+        assertThat(actionFact.getSemanticDigest().getValue()).matches("[0-9a-f]{64}");
+        assertThat(actionFact.getSemanticDigest().getCoveredFieldsVersion())
+                .isEqualTo("transaction.action.authorization.projection.v1");
+        assertThat(actionFact.getOriginalFundsFactRefs()).isEmpty();
+        assertThat(actionFact.getRouteProvenance()).singleElement().satisfies(provenance -> {
+            assertThat(provenance.getOriginalFundsFactRef()).isNull();
+            assertThat(provenance.getAllocatedMoney()).isEqualTo(expectedMoney);
+            assertThat(provenance.getRouteSnapshotRef().getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(provenance.getRouteSnapshotRef().getIdentity().getOwnerNamespace())
+                    .isEqualTo("funds-route-snapshot");
+            assertThat(provenance.getRouteSnapshotRef().getIdentity().getValue()).isNotBlank();
+        });
+        assertThat(fundsTransactionQueryService.findFundsActionFact(actionFact.getIdentity())).hasValue(actionFact);
+        return actionFact;
+    }
+
+    private void assertAuthorizationCompletePhysicalFacts(String authorizationSn,
+                                                          String authorizationBusinessSn,
+                                                          String completeBusinessSn,
+                                                          int expectedDetails,
+                                                          int expectedPostingPlans,
+                                                          int expectedEntries) {
+        assertFundsAndLedgerFactsForBusinessSn(completeBusinessSn, 0, expectedDetails,
+                expectedPostingPlans, expectedEntries);
+        LedgerTransaction authorizationLedger = ledgerTransactionByBusinessSn(authorizationBusinessSn);
+        LedgerTransaction completeLedger = ledgerTransactionByBusinessSn(completeBusinessSn);
+        assertThat(completeLedger.getReferenceLedgerTransactionSn()).isEqualTo(authorizationLedger.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn(completeBusinessSn))
+                .allSatisfy(detail -> {
+                    assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
+                    assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationLedger.getSn());
+                });
+        assertThat(postingPlansOf(completeLedger))
+                .allSatisfy(plan -> assertThat(plan.getRouteLegId()).startsWith("CONSUME_"));
+    }
+
+    private FundsActionFactDTO assertCompleteActionFact(String authorizationSn,
+                                                        FundsActionFactDTO authorizationFact,
+                                                        String businessSn,
+                                                        long amount,
+                                                        int provenanceCount) {
+        List<FundsActionFactDTO> actionFacts = actionFactsByBusiness("AUTHORIZATION_COMPLETE", businessSn);
+        assertThat(actionFacts).singleElement();
+        FundsActionFactDTO actionFact = actionFacts.getFirst();
+        Money expectedMoney = Money.immutable(amount, CURRENCY);
+        String expectedIdentity = authorizationSn + ":complete:AUTHORIZATION_COMPLETE:" + businessSn;
+        assertThat(actionFact.getIdentity().getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(actionFact.getIdentity().getIdentity()).isEqualTo(expectedIdentity);
+        assertThat(actionFact.getIntentRef()).isEqualTo(authorizationSn);
+        assertThat(actionFact.getAttemptRef())
+                .isEqualTo(authorizationSn + ":AUTHORIZATION_COMPLETE:" + businessSn + ":COMPLETE");
+        assertThat(actionFact.getActionKind()).isEqualTo("complete");
+        assertThat(actionFact.getMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getOutcome().getOwner()).isEqualTo("funds-transaction");
+        assertThat(actionFact.getOutcome().getCode()).isEqualTo("succeeded");
+        assertThat(actionFact.getFundsEffect().getEffectKind()).isEqualTo("proven-full");
+        assertThat(actionFact.getFundsEffect().getProvenMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getSemanticDigest().getAlgorithm()).isEqualTo("SHA-256");
+        assertThat(actionFact.getSemanticDigest().getValue()).matches("[0-9a-f]{64}");
+        assertThat(actionFact.getSemanticDigest().getCoveredFieldsVersion())
+                .isEqualTo("transaction.action.complete.projection.v1");
+        assertThat(actionFact.getOriginalFundsFactRefs()).singleElement().satisfies(originalRef -> {
+            assertThat(originalRef.getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(originalRef.getFactType()).isEqualTo("funds-action");
+            assertThat(originalRef.getFactId()).isEqualTo(authorizationFact.getIdentity().getIdentity());
+            assertThat(originalRef.getRelationRole()).isEqualTo("consumes-authorized-effect");
+            assertThat(originalRef.getAllocatedMoney()).isEqualTo(expectedMoney);
+        });
+        assertThat(actionFact.getRouteProvenance()).hasSize(provenanceCount).allSatisfy(provenance -> {
+            assertThat(provenance.getOriginalFundsFactRef()).isEqualTo(actionFact.getOriginalFundsFactRefs().getFirst());
+            assertThat(provenance.getAllocatedMoney()).isEqualTo(expectedMoney);
+            assertThat(provenance.getRouteSnapshotRef())
+                    .isEqualTo(authorizationFact.getRouteProvenance().getFirst().getRouteSnapshotRef());
+            assertThat(provenance.getProvenanceRole()).isEqualTo("replayed-original-route");
+        });
+        assertThat(fundsTransactionQueryService.findFundsActionFact(actionFact.getIdentity())).hasValue(actionFact);
+        return actionFact;
+    }
+
+    private void assertCompleteActionFactUnavailable(FundsActionFactDTO originalFact, String businessSn) {
+        assertNoActionFacts("AUTHORIZATION_COMPLETE", businessSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFact.getIdentity())).isEmpty();
+    }
+
+    private void assertCompleteActionFactUnavailable(String authorizationSn, String businessSn) {
+        assertNoActionFacts("AUTHORIZATION_COMPLETE", businessSn);
+        String identity = authorizationSn + ":complete:AUTHORIZATION_COMPLETE:" + businessSn;
+        assertThat(fundsTransactionQueryService.findFundsActionFact(new FundsActionFactRef(TENANT_ID, identity)))
+                .isEmpty();
+    }
+
+    private void assertAuthorizationActionFactUnavailable(FundsActionFactDTO originalFact, String businessSn) {
+        assertNoActionFacts("AUTHORIZATION", businessSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFact.getIdentity())).isEmpty();
+    }
+
+    private void assertAuthorizationActionFactAvailable(FundsActionFactDTO originalFact, String businessSn) {
+        assertThat(actionFactsByBusiness("AUTHORIZATION", businessSn)).containsExactly(originalFact);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFact.getIdentity()))
+                .hasValue(originalFact);
     }
 
     private static Map<String, Object> contextVariablesOf(String contextVariables) {

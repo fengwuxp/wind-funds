@@ -31,7 +31,4 @@ public class LockSettlementOrderRequest implements Serializable {
     @NotBlank
     private String settlementOrderSn;
 
-    @Schema(description = "锁定准入消费的对账运行结果流水号")
-    @NotBlank
-    private String reconciliationRunResultSn;
 }

@@ -2,8 +2,6 @@ package com.wind.funds.transaction.application.impl;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
-import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -33,7 +31,6 @@ import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.funds.wallet.service.LedgerProfileService;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
@@ -67,8 +64,6 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
     private final FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
-
-    private final LedgerProfileService ledgerProfileService;
 
     private final FundsBalanceControlInstructionConverter balanceControlInstructionConverter;
 
@@ -241,10 +236,6 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
         AssertUtils.isTrue(account.isAvailable(), "结算释放资金账户不可用，accountId = {}", accountId);
         AssertUtils.equals(account.getCurrency(), amount.getCurrency(),
                 "结算释放金额币种必须与账户币种一致，accountId = {}", accountId);
-        LedgerProfileCode profileCode = fundsAccountQueryService.getLedgerProfileCode(accountId);
-        ledgerProfileService.getRequiredItem(profileCode, LedgerSubjectCode.SETTLEMENT);
-        ledgerProfileService.getRequiredItem(profileCode, LedgerSubjectCode.AVAILABLE);
-        ledgerProfileService.getRequiredItem(profileCode, LedgerSubjectCode.FROZEN);
     }
 
     private void validateRequest(FundsSettlementLockRequest request, WindOperator operator) {

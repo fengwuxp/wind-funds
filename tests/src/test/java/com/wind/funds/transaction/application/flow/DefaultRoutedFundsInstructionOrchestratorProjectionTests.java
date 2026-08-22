@@ -15,6 +15,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -63,6 +64,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     void testSuccessfulPostingShouldPublishProjectionAfterCommitWithCompletedLifecycle() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         var beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -72,7 +74,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
@@ -172,7 +174,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
@@ -232,7 +234,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         var beforeDeclineFacts = ledgerFactSnapshot();
         projectionPublisher.clear();
@@ -310,7 +312,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
@@ -364,6 +366,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     void testProjectionFailureShouldNotRollbackCommittedFacts() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_failure_payee");
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         var beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -373,7 +376,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
         projectionPublisher.failOnce();
@@ -453,7 +456,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String freezeSn = freeze(user, 40L, "PROJECTION_UNFREEZE_FREEZE");

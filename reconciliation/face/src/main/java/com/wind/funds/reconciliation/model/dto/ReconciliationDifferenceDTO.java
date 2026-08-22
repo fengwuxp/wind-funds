@@ -4,9 +4,8 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
+import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -49,11 +48,11 @@ public class ReconciliationDifferenceDTO implements Serializable {
     @Schema(description = "对账逐笔匹配结果流水号")
     private String reconciliationMatchResultSn;
 
-    @Schema(description = "对账来源质量")
-    private ReconciliationSourceQuality sourceQuality;
+    @Schema(description = "对账范围稳定身份")
+    private StableIdentity scopeIdentity;
 
-    @Schema(description = "对账匹配强度")
-    private ReconciliationMatchStrength matchStrength;
+    @Schema(description = "对账双方关系稳定身份")
+    private StableIdentity pairIdentity;
 
     @Schema(description = "对账差错类型")
     private ReconciliationDifferenceType differenceType;
@@ -73,14 +72,11 @@ public class ReconciliationDifferenceDTO implements Serializable {
     @Schema(description = "责任方引用")
     private String responsiblePartyRef;
 
-    @Schema(description = "阻断对象类型，例如 CLEARING、SETTLEMENT、PAYOUT")
-    private ReconciliationGateObjectType blockingObjectType;
+    @Schema(description = "结构化比较规则引用")
+    private ComparisonRuleRef comparisonRuleRef;
 
-    @Schema(description = "阻断对象流水号，例如清算候选、结算单或出款单号")
-    private String blockingObjectSn;
-
-    @Schema(description = "匹配或对账规则版本")
-    private String ruleVersion;
+    @Schema(description = "差错所属当前血缘")
+    private String currentLineageRef;
 
     @Schema(description = "来源证据引用")
     private String evidenceRef;

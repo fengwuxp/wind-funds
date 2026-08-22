@@ -26,9 +26,6 @@ import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
 import com.wind.funds.reconciliation.enums.SettlementOrderState;
@@ -42,6 +39,7 @@ import com.wind.funds.reconciliation.model.dto.PayoutOrderDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutSubmissionAdmissionDecisionDTO;
 import com.wind.funds.reconciliation.model.dto.SettlementOrderDTO;
 import com.wind.funds.reconciliation.model.request.ApproveSettlementOrderRequest;
+import com.wind.funds.reconciliation.model.request.CancelSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.ConfirmClearingBatchRequest;
 import com.wind.funds.reconciliation.model.request.ConfirmClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateClearingBatchRequest;
@@ -52,16 +50,18 @@ import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.HandlePayoutReceiptRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
+import com.wind.funds.reconciliation.model.request.RestoreClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
-import com.wind.funds.reconciliation.services.impl.ClearingSettlementGateConsumerServiceImpl;
 import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.transaction.enums.SourceObjectType;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
@@ -75,6 +75,7 @@ import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.assertj.core.api.SoftAssertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -95,6 +96,8 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * 两级代理分佣结算业务流程测试。
@@ -206,7 +209,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 snapshot(balances(userAgent, platformEmployee, cashMappingAccount())),
                 delta(userAgent, LedgerSubjectCode.SETTLEMENT, -70L, CURRENCY),
                 delta(platformEmployee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 70L, CURRENCY));
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -70L, CURRENCY));
         assertThat(employeeLocked.settlementOrder().getNetAmount()).isEqualTo(30L);
         assertBucket(balance(platformEmployee), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
     }
@@ -237,6 +240,167 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
         assertBucket(balance(userAgent), LedgerSubjectCode.CLEARING, 20L, CURRENCY);
         assertBucket(balance(userAgent), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+    }
+
+    /**
+     * 场景：佣金已经从 CLEARING 清算到 AVAILABLE 后，上游确认原分配需要全额扣回。
+     * 输入：携带原资金交易、审批、证据、责任和对账差错引用的独立余额调账请求。
+     * 输出：受益人 AVAILABLE 减少，平台 ADJUSTMENT 减少，重放不生成重复事实。
+     * 红线：不得覆盖原佣金交易、route、detail、posting、entry 或已确认清算批次。
+     */
+    @Test
+    void testCommissionAdjustmentAfterClearingShouldAppendAuditableFactsWithoutOverwritingAllocation() {
+        FundsAccountId platform = fundingAccount("cmp_adjust_platform");
+        FundsAccountId beneficiaryRef = payableAccount("cmp_adjust_agent");
+        FundsAccountId beneficiary = fundingAccount(beneficiaryRef.id());
+        FundsAccountId adjustmentAccount = fundingAccount("platform_adjustment");
+        prepareAccount(platform);
+        preparePayableAccount(beneficiaryRef);
+        ensureLedger(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT);
+        topup(platform, 100L, "COMMISSION_ADJUST_PLATFORM_TOPUP");
+        CommissionAllocation allocation = allocateCommission(
+                platform, beneficiaryRef, 20L, "AGENT_NET_COMMISSION", "adjust");
+        ClearingBatchDTO confirmedClearing = clearCommission(allocation);
+        var originalTransactions = jdbcTemplate.queryForList(
+                "SELECT * FROM t_funds_transaction WHERE tenant_id = ? AND sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn());
+        var originalDetails = jdbcTemplate.queryForList(
+                "SELECT * FROM t_funds_transaction_detail WHERE tenant_id = ? AND transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn());
+        var originalLedgerTransactions = jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_transaction WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn());
+        var originalPostingPlans = jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_posting_plan WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn());
+        var originalEntries = jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_entry WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn());
+        var beforeAdjust = snapshot(balances(beneficiary, adjustmentAccount));
+        var beforeAdjustLedgerFacts = ledgerFactSnapshot();
+        String adjustBusinessSn = "COMMISSION_AVAILABLE_ADJUST";
+        FundsBalanceAdjustRequest adjustRequest = new FundsBalanceAdjustRequest()
+                .setAccountId(beneficiary)
+                .setAmount(Money.immutable(allocation.amount(), CURRENCY))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("COMMISSION_SETTLEMENT_ADJUSTMENT")
+                .setBusinessSn(adjustBusinessSn)
+                .setAdjustReason("commission corrected after clearing")
+                .setAdjustEvidenceRef("commission-adjust-evidence:" + allocation.suffix())
+                .setSourceType(SourceObjectType.FUNDS_TRANSACTION)
+                .setSourceSn(allocation.transactionSn())
+                .setReasonCode("COMMISSION_CORRECTION_AFTER_CLEARING")
+                .setResponsibilityRef("commission-adjustment-case:" + allocation.suffix())
+                .setApprovalRef("commission-adjust-approval:" + allocation.suffix())
+                .setReconciliationExceptionRef("commission-reconciliation-difference:" + allocation.suffix())
+                .setReconciliationRerunRef("commission-reconciliation-rerun:" + allocation.suffix())
+                .setDescription("commission correction after clearing");
+
+        String[] adjustmentTransactionSn = new String[1];
+        Throwable failure = catchThrowable(() -> adjustmentTransactionSn[0] = balanceControlService.adjust(
+                adjustRequest, WindOperatorFactory.system()));
+        SoftAssertions softly = new SoftAssertions();
+        softly.assertThat(failure)
+                .as("commission adjustment must produce a balanced posting plan")
+                .isNull();
+        if (failure == null) {
+            String replay = balanceControlService.adjust(adjustRequest, WindOperatorFactory.system());
+            assertThat(replay).isEqualTo(adjustmentTransactionSn[0]);
+            assertOnlyBalanceDeltas(beforeAdjust, snapshot(balances(beneficiary, adjustmentAccount)),
+                    delta(beneficiary, LedgerSubjectCode.AVAILABLE, -allocation.amount(), CURRENCY),
+                    delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, -allocation.amount(), CURRENCY));
+            assertSingleFundsAndLedgerFactsForBusinessSn(adjustBusinessSn, 2, 1, 2);
+            assertLedgerFactsFollowRouteSnapshot(adjustBusinessSn);
+            fundsTransactionDetails(adjustmentTransactionSn[0]).forEach(detail -> assertThat(
+                    WindJson.parseObject(detail.getContextVariables(), new TypeReference<Map<String, Object>>() {
+                    }))
+                    .containsEntry(FundsInstructionContextKeys.SOURCE_TYPE, SourceObjectType.FUNDS_TRANSACTION.name())
+                    .containsEntry(FundsInstructionContextKeys.SOURCE_SN, allocation.transactionSn())
+                    .containsEntry(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF,
+                            adjustRequest.getAdjustEvidenceRef())
+                    .containsEntry(FundsInstructionContextKeys.APPROVAL_REF, adjustRequest.getApprovalRef())
+                    .containsEntry(FundsInstructionContextKeys.RESPONSIBILITY_REF,
+                            adjustRequest.getResponsibilityRef()));
+        } else {
+            assertOnlyBalanceDeltas(beforeAdjust, snapshot(balances(beneficiary, adjustmentAccount)),
+                    delta(beneficiary, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                    delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+            assertLedgerTransactionFactsUnchanged(beforeAdjustLedgerFacts);
+            assertNoFundsOrLedgerFactsForBusinessSn(adjustBusinessSn);
+        }
+        assertThat(clearingBatchApplicationService.getBatch(TENANT_ID, confirmedClearing.getSn()))
+                .satisfies(current -> {
+                    assertThat(current.getState()).isEqualTo(ClearingBatchState.CONFIRMED);
+                    assertThat(current.getFundsTransactionSn())
+                            .isEqualTo(confirmedClearing.getFundsTransactionSn());
+                    assertThat(current.getAmountDigest()).isEqualTo(confirmedClearing.getAmountDigest());
+                });
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT * FROM t_funds_transaction WHERE tenant_id = ? AND sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn())).isEqualTo(originalTransactions);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT * FROM t_funds_transaction_detail WHERE tenant_id = ? AND transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn())).isEqualTo(originalDetails);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_transaction WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn())).isEqualTo(originalLedgerTransactions);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_posting_plan WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn())).isEqualTo(originalPostingPlans);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT * FROM t_ledger_entry WHERE tenant_id = ? AND funds_transaction_sn = ? ORDER BY id",
+                TENANT_ID, allocation.transactionSn())).isEqualTo(originalEntries);
+        softly.assertAll();
+    }
+
+    /**
+     * 场景：佣金结算已经锁定 SETTLEMENT，但尚未创建或提交出款单。
+     * 输入：调用现有结算单取消入口尝试撤销 LOCKED 结算单。
+     * 输出：请求失败关闭，结算单继续 LOCKED，余额与资金、route、posting、entry 均不变化。
+     * 红线：当前公共入口不得把 LOCKED 误当可取消，也不得覆盖历史结算事实。
+     */
+    @Test
+    void testLockedCommissionSettlementCancellationShouldFailClosedWithoutSideEffects() {
+        FundsAccountId platform = fundingAccount("cmp_locked_platform");
+        FundsAccountId beneficiaryRef = payableAccount("cmp_locked_agent");
+        FundsAccountId beneficiary = fundingAccount(beneficiaryRef.id());
+        prepareAccount(platform);
+        preparePayableAccount(beneficiaryRef);
+        topup(platform, 100L, "COMMISSION_LOCKED_PLATFORM_TOPUP");
+        CommissionAllocation allocation = allocateCommission(
+                platform, beneficiaryRef, 20L, "AGENT_NET_COMMISSION", "locked");
+        LockedCommission locked = clearAndLock(allocation, SettlementDestination.EXTERNAL_ENDPOINT);
+        var beforeBalance = snapshot(balance(beneficiary));
+        var beforeLedgerFacts = ledgerFactSnapshot();
+        var beforeTransactions = jdbcTemplate.queryForList("SELECT * FROM t_funds_transaction ORDER BY id");
+        var beforeDetails = jdbcTemplate.queryForList("SELECT * FROM t_funds_transaction_detail ORDER BY id");
+
+        assertThatThrownBy(() -> settlementOrderApplicationService.cancelOrder(
+                new CancelSettlementOrderRequest()
+                        .setTenantId(TENANT_ID)
+                        .setSettlementOrderSn(locked.settlementOrder().getSn())
+                        .setReason("commission correction after settlement lock"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("只有 DRAFT 或 REVIEWING 结算单可以取消");
+
+        assertOnlyBalanceDeltas(beforeBalance, snapshot(balance(beneficiary)),
+                delta(beneficiary, LedgerSubjectCode.CLEARING, 0L, CURRENCY),
+                delta(beneficiary, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(beneficiary, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeLedgerFacts);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM t_funds_transaction ORDER BY id"))
+                .isEqualTo(beforeTransactions);
+        assertThat(jdbcTemplate.queryForList("SELECT * FROM t_funds_transaction_detail ORDER BY id"))
+                .isEqualTo(beforeDetails);
+        assertThat(settlementOrderApplicationService.getOrder(TENANT_ID, locked.settlementOrder().getSn()))
+                .satisfies(current -> {
+                    assertThat(current.getState()).isEqualTo(SettlementOrderState.LOCKED);
+                    assertThat(current.getLockFundsTransactionSn())
+                            .isEqualTo(locked.settlementOrder().getLockFundsTransactionSn());
+                });
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_payout_order WHERE settlement_order_sn = ?",
+                Integer.class, locked.settlementOrder().getSn())).isZero();
     }
 
     private CommissionAllocation allocateCommission(FundsAccountId platform,
@@ -285,8 +449,38 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
 
     private LockedCommission clearAndLock(CommissionAllocation allocation,
                                           SettlementDestination destination) {
+        ClearingBatchDTO confirmedClearing = clearCommission(allocation);
+        SettlementOrderDTO settlementOrder = settlementOrderApplicationService.createOrder(
+                settlementRequest(confirmedClearing, destination), WindOperatorFactory.system());
+        settlementOrderApplicationService.submitOrder(new SubmitSettlementOrderRequest()
+                .setTenantId(TENANT_ID).setSettlementOrderSn(settlementOrder.getSn()), WindOperatorFactory.system());
+        settlementOrderApplicationService.approveOrder(new ApproveSettlementOrderRequest()
+                .setTenantId(TENANT_ID)
+                .setSettlementOrderSn(settlementOrder.getSn())
+                .setSettlementApprovalRef("settlement-approval:" + allocation.suffix()),
+                WindOperatorFactory.system());
+        String settlementRunResultSn = prepareGate("SETTLEMENT_LOCK",
+                settlementOrder.getSn(), "settlement-" + allocation.suffix());
+        var beforeLock = snapshot(balance(allocation.beneficiary()));
+        SettlementOrderDTO locked = settlementOrderApplicationService.lockOrder(
+                new LockSettlementOrderRequest().setTenantId(TENANT_ID)
+                        .setSettlementOrderSn(settlementOrder.getSn()), WindOperatorFactory.system());
+        SettlementOrderDTO lockReplay = settlementOrderApplicationService.lockOrder(
+                new LockSettlementOrderRequest().setTenantId(TENANT_ID)
+                        .setSettlementOrderSn(settlementOrder.getSn()), WindOperatorFactory.system());
+
+        assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
+        assertThat(lockReplay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
+        assertOnlyBalanceDeltas(beforeLock, snapshot(balance(allocation.beneficiary())),
+                delta(allocation.beneficiary(), LedgerSubjectCode.AVAILABLE, -allocation.amount(), CURRENCY),
+                delta(allocation.beneficiary(), LedgerSubjectCode.SETTLEMENT, allocation.amount(), CURRENCY));
+        assertSingleFundsAndLedgerFactsForBusinessSn(settlementOrder.getSn(), 1, 1, 2);
+        return new LockedCommission(allocation, locked);
+    }
+
+    private ClearingBatchDTO clearCommission(CommissionAllocation allocation) {
         String commissionEvidenceRef = "commission-evidence-bundle:" + allocation.suffix();
-        String splitRunResultSn = prepareGate(ReconciliationGateObjectType.CLEARING,
+        String splitRunResultSn = prepareGate("CLEARING_SPLITTABLE_IDENTIFY",
                 allocation.detailSn(), "split-" + allocation.suffix(), commissionEvidenceRef);
         var beforeSplit = ledgerFactSnapshot();
         ClearingSplittableDetailDTO splittable = clearingSplittableDetailApplicationService
@@ -296,6 +490,8 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         ClearingSplitBatchDTO splitBatch = clearingSplitBatchApplicationService.createBatch(
                 new CreateClearingSplitBatchRequest().setTenantId(TENANT_ID)
                         .setSplittableDetailSns(List.of(splittable.getSn())), WindOperatorFactory.system());
+        prepareGate("CLEARING_SPLIT_CONFIRM_ITEM", splitBatch.getSn() + ":" + splittable.getSn(),
+                "split-confirm-" + allocation.suffix(), commissionEvidenceRef);
         clearingSplitBatchApplicationService.submitBatch(new SubmitClearingSplitBatchRequest()
                 .setTenantId(TENANT_ID).setSplitBatchSn(splitBatch.getSn()), WindOperatorFactory.system());
         ClearingSplitBatchDTO confirmedSplit = clearingSplitBatchApplicationService.confirmBatch(
@@ -306,7 +502,10 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         assertThat(splittable.getBusinessLine()).isEqualTo(BUSINESS_LINE);
         assertThat(splittable.getSplitRuleCode()).isEqualTo(RULE_CODE);
         assertThat(splittable.getSplitRuleVersion()).isEqualTo(RULE_VERSION);
-        assertThat(splittable.getReconciliationEvidenceRefs()).containsExactly(commissionEvidenceRef);
+        assertThat(splittable.getReconciliationEvidenceRefs())
+                .contains(commissionEvidenceRef)
+                .anyMatch(ref -> ref.startsWith("RGE"))
+                .anyMatch(ref -> ref.startsWith("run:"));
         assertThat(splittable.getSourceDigest()).isNotBlank();
         assertThat(confirmedSplit.getTotalAmount()).isEqualTo(allocation.amount());
         assertLedgerFactsUnchanged(jdbcTemplate, beforeSplit);
@@ -320,8 +519,13 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setClearingRuleCode(RULE_CODE)
                 .setClearingRuleVersion(RULE_VERSION)
                 .setClearingAvailableTime(LocalDateTime.now().minusMinutes(1));
-        ClearingCandidateDTO candidate = clearingCandidateApplicationService.createCandidate(
+        ClearingCandidateDTO blockedCandidate = clearingCandidateApplicationService.createCandidate(
                 candidateRequest, WindOperatorFactory.system());
+        prepareGate("CLEARING_CONFIRM_ITEM", blockedCandidate.getSn(),
+                "clearing-confirm-" + allocation.suffix(), commissionEvidenceRef);
+        ClearingCandidateDTO candidate = clearingCandidateApplicationService.restoreCandidate(
+                new RestoreClearingCandidateRequest().setTenantId(TENANT_ID)
+                        .setCandidateSn(blockedCandidate.getSn()), WindOperatorFactory.system());
         ClearingCandidateDTO candidateReplay = clearingCandidateApplicationService.createCandidate(
                 candidateRequest, WindOperatorFactory.system());
         ClearingBatchDTO clearingBatch = clearingBatchApplicationService.createBatch(
@@ -345,34 +549,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 delta(allocation.beneficiary(), LedgerSubjectCode.AVAILABLE, allocation.amount(), CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn(clearingBatch.getSn(), 1, 1, 2);
 
-        SettlementOrderDTO settlementOrder = settlementOrderApplicationService.createOrder(
-                settlementRequest(confirmedClearing, destination), WindOperatorFactory.system());
-        settlementOrderApplicationService.submitOrder(new SubmitSettlementOrderRequest()
-                .setTenantId(TENANT_ID).setSettlementOrderSn(settlementOrder.getSn()), WindOperatorFactory.system());
-        settlementOrderApplicationService.approveOrder(new ApproveSettlementOrderRequest()
-                .setTenantId(TENANT_ID)
-                .setSettlementOrderSn(settlementOrder.getSn())
-                .setSettlementApprovalRef("settlement-approval:" + allocation.suffix()),
-                WindOperatorFactory.system());
-        String settlementRunResultSn = prepareGate(ReconciliationGateObjectType.SETTLEMENT,
-                settlementOrder.getSn(), "settlement-" + allocation.suffix());
-        var beforeLock = snapshot(balance(allocation.beneficiary()));
-        SettlementOrderDTO locked = settlementOrderApplicationService.lockOrder(
-                new LockSettlementOrderRequest().setTenantId(TENANT_ID)
-                        .setSettlementOrderSn(settlementOrder.getSn())
-                        .setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
-        SettlementOrderDTO lockReplay = settlementOrderApplicationService.lockOrder(
-                new LockSettlementOrderRequest().setTenantId(TENANT_ID)
-                        .setSettlementOrderSn(settlementOrder.getSn())
-                        .setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
-
-        assertThat(locked.getState()).isEqualTo(SettlementOrderState.LOCKED);
-        assertThat(lockReplay.getLockFundsTransactionSn()).isEqualTo(locked.getLockFundsTransactionSn());
-        assertOnlyBalanceDeltas(beforeLock, snapshot(balance(allocation.beneficiary())),
-                delta(allocation.beneficiary(), LedgerSubjectCode.AVAILABLE, -allocation.amount(), CURRENCY),
-                delta(allocation.beneficiary(), LedgerSubjectCode.SETTLEMENT, allocation.amount(), CURRENCY));
-        assertSingleFundsAndLedgerFactsForBusinessSn(settlementOrder.getSn(), 1, 1, 2);
-        return new LockedCommission(allocation, locked);
+        return confirmedClearing;
     }
 
     private PayoutOrderDTO payout(LockedCommission commission, String suffix) {
@@ -383,7 +560,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 new CreatePayoutOrderRequest().setTenantId(TENANT_ID)
                         .setSettlementOrderSn(commission.settlementOrder().getSn()), WindOperatorFactory.system());
         String payoutRunResultSn = prepareGate(
-                ReconciliationGateObjectType.PAYOUT, created.getSn(), "payout-" + suffix);
+                "PAYOUT_SUBMIT", created.getSn(), "payout-" + suffix);
         payoutOrderApplicationService.submitOrder(new SubmitPayoutOrderRequest()
                 .setTenantId(TENANT_ID)
                 .setPayoutOrderSn(created.getSn())
@@ -391,8 +568,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setPayeeEndpointRef("payee-endpoint:" + suffix)
                 .setChannelRef("channel:" + suffix)
                 .setApprovalRef("payout-approval:" + suffix)
-                .setExternalRuleVerificationEvidence(verifiedPayoutRule(suffix))
-                .setReconciliationRunResultSn(payoutRunResultSn), WindOperatorFactory.system());
+                .setExternalRuleVerificationEvidence(verifiedPayoutRule(suffix)), WindOperatorFactory.system());
         HandlePayoutReceiptRequest receipt = new HandlePayoutReceiptRequest()
                 .setTenantId(TENANT_ID)
                 .setPayoutOrderSn(created.getSn())
@@ -423,7 +599,6 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setFundsTransactionSn(allocation.transactionSn())
                 .setFundsTransactionDetailSn(allocation.detailSn())
                 .setLedgerEntrySn(allocation.ledgerEntrySn())
-                .setReconciliationRunResultSn(reconciliationRunResultSn)
                 .setBusinessLine(BUSINESS_LINE)
                 .setSplitPeriod(SPLIT_PERIOD)
                 .setSplitRuleCode(RULE_CODE)
@@ -459,13 +634,13 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setStatus(ExternalRuleVerificationStatus.VERIFIED);
     }
 
-    private String prepareGate(ReconciliationGateObjectType objectType,
+    private String prepareGate(String stageKind,
                                String objectSn,
                                String suffix) {
-        return prepareGate(objectType, objectSn, suffix, "report:" + suffix);
+        return prepareGate(stageKind, objectSn, suffix, "report:" + suffix);
     }
 
-    private String prepareGate(ReconciliationGateObjectType objectType,
+    private String prepareGate(String stageKind,
                                String objectSn,
                                String suffix,
                                String evidenceRef) {
@@ -473,23 +648,17 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
         String referenceSourceRef = "internal:" + suffix;
         String comparisonSourceRef = "evidence:" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, batchSn,
-                objectType, objectSn, RULE_VERSION, evidenceRef,
+                stageKind, objectSn, RULE_VERSION, evidenceRef,
                 referenceSourceRef, comparisonSourceRef);
-        return reconciliationRunResultApplicationService.recordRunResult(
+        return reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef(evidenceRef + "#line-1"))),
+                        .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
     }
 
     private void prepareAccount(FundsAccountId accountId) {
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
@@ -515,7 +684,6 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
     @Import({
             ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class,
-            ClearingSettlementGateConsumerServiceImpl.class,
             ClearingSplittableDetailApplicationServiceImpl.class,
             ClearingSplitBatchApplicationServiceImpl.class,
             ClearingCandidateApplicationServiceImpl.class,

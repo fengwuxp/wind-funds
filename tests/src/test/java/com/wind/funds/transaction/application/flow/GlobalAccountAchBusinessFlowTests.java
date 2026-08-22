@@ -96,7 +96,7 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
         assertOnlyBalanceDeltas(before, afterCredit,
                 delta(globalAccount, LedgerSubjectCode.AVAILABLE, 90L, CURRENCY),
                 delta(globalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -90L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 90L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn(CREDIT_BUSINESS_SN, 3, 2, 4);
         assertLedgerFactsFollowRouteSnapshot(CREDIT_BUSINESS_SN);
@@ -141,7 +141,7 @@ class GlobalAccountAchBusinessFlowTests extends FundsTransactionFlowTestSupport 
         assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
                 delta(globalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(globalAccount, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -60L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn(WITHDRAW_BUSINESS_SN, 3, 2, 4);
         assertLedgerFactsFollowRouteSnapshot(WITHDRAW_BUSINESS_SN);

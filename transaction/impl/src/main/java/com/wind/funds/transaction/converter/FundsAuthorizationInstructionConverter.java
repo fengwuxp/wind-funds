@@ -21,8 +21,6 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
-import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
-import com.wind.funds.wallet.service.LedgerQueryService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +29,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -48,13 +45,9 @@ public class FundsAuthorizationInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
-    private final LedgerQueryService ledgerQueryService;
-
     @Autowired
-    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                  @NonNull LedgerQueryService ledgerQueryService) {
+    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService) {
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
-        this.ledgerQueryService = ledgerQueryService;
     }
 
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
@@ -98,7 +91,8 @@ public class FundsAuthorizationInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToReversalInstruction(
             @NonNull FundsAuthorizationTransactionReversalRequest request,
-            @NonNull WindOperator operator) {
+            @NonNull WindOperator operator,
+            @NonNull String referenceLedgerTransactionSn) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
@@ -109,7 +103,8 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
+                .reference(authorizationReference(request.getAuthorizationTransactionSn(),
+                        referenceLedgerTransactionSn))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getReversalTime()))
@@ -124,7 +119,8 @@ public class FundsAuthorizationInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToCompleteInstruction(
             @NonNull FundsAuthorizationTransactionCompleteRequest request,
-            @NonNull WindOperator operator) {
+            @NonNull WindOperator operator,
+            @Nullable String referenceLedgerTransactionSn) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
@@ -145,7 +141,9 @@ public class FundsAuthorizationInstructionConverter {
         } else {
             AssertUtils.hasText(request.getAuthorizationTransactionSn(),
                     "authorizationTransactionSn must not be blank");
-            reference = authorizationReference(request.getAuthorizationTransactionSn());
+            AssertUtils.hasText(referenceLedgerTransactionSn, "授权完成原账本交易流水不能为空");
+            reference = authorizationReference(request.getAuthorizationTransactionSn(),
+                    referenceLedgerTransactionSn);
             context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
                     request.getAuthorizationTransactionSn());
         }
@@ -170,7 +168,8 @@ public class FundsAuthorizationInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToRefundInstruction(
             @NonNull FundsAuthorizationTransactionRefundRequest request,
-            @NonNull WindOperator operator) {
+            @NonNull WindOperator operator,
+            @Nullable String referenceLedgerTransactionSn) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
@@ -186,7 +185,9 @@ public class FundsAuthorizationInstructionConverter {
         } else {
             AssertUtils.hasText(request.getAuthorizationTransactionSn(),
                     "authorizationTransactionSn must not be blank");
-            reference = authorizationReference(request.getAuthorizationTransactionSn());
+            AssertUtils.hasText(referenceLedgerTransactionSn, "授权退款原账本交易流水不能为空");
+            reference = authorizationReference(request.getAuthorizationTransactionSn(),
+                    referenceLedgerTransactionSn);
             context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
                     request.getAuthorizationTransactionSn());
             putDisputeRefundContext(request, context);
@@ -259,9 +260,11 @@ public class FundsAuthorizationInstructionConverter {
         context.put(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, request.getExternalDisputeRef());
     }
 
-    private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {
+    private @NonNull FundsInstructionReferenceSpec authorizationReference(
+            @NonNull String authorizationTransactionSn,
+            @NonNull String referenceLedgerTransactionSn) {
         return reference(FundsInstructionReferenceType.AUTHORIZATION, authorizationTransactionSn,
-                authorizationLedgerTransactionSn(authorizationTransactionSn));
+                referenceLedgerTransactionSn);
     }
 
     private @NonNull FundsInstructionReferenceSpec noAuthRefundReference(
@@ -271,17 +274,6 @@ public class FundsAuthorizationInstructionConverter {
                 .externalTransactionId(request.getExternalReferenceSn())
                 .contextVariables(Map.of())
                 .build();
-    }
-
-    private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {
-        List<LedgerTransactionFactDTO> records = ledgerQueryService.queryLedgerTransactions(
-                TenantContextHolder.requireTenantId(),
-                authorizationTransactionSn,
-                FundsTransactionEventType.AUTHORIZE.name(),
-                2);
-        AssertUtils.isTrue(records.size() == 1, "授权原账本交易不存在或不唯一，authorizationTransactionSn = {}",
-                authorizationTransactionSn);
-        return records.getFirst().getSn();
     }
 
     private @NonNull FundsInstructionReferenceSpec reference(@NonNull FundsInstructionReferenceType referenceType,

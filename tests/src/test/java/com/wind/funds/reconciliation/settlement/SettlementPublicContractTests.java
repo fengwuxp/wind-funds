@@ -41,8 +41,8 @@ class SettlementPublicContractTests {
         assertThat(Arrays.stream(ReleaseSettlementOrderRequest.class.getDeclaredFields())
                 .filter(field -> !Modifier.isStatic(field.getModifiers())))
                 .extracting(Field::getName)
-                .containsExactlyInAnyOrder("tenantId", "settlementOrderSn", "reconciliationRunResultSn",
-                        "reconciliationResultDigest", "coverageStatus", "coverageDigest", "watermark", "cutoff",
+                .containsExactlyInAnyOrder("tenantId", "settlementOrderSn",
+                        "coverageStatus", "coverageDigest", "watermark", "cutoff",
                         "ruleVersion", "ruleDecisionDigest", "currentLineageBatchSn", "lateDataStatus",
                         "resultReplacementStatus", "lineageSupersessionStatus", "approvalRef", "reason", "evidenceRefs");
         assertThat(SettlementReleaseAuthority.class.getDeclaredMethods())

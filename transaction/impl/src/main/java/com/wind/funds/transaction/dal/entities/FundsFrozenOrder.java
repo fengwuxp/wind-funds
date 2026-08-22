@@ -128,10 +128,6 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
     @Column("status")
     private FundsFrozenOrderState state;
 
-    void setStatus(FundsFrozenOrderState state) {
-        this.state = state;
-    }
-
     /**
      * 冻结过期时间。
      */

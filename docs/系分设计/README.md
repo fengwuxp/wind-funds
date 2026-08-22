@@ -2,7 +2,7 @@
 
 ## 目录定位
 
-本目录把已确认产品事实和 DSL 契约转成可编码、可测试的系统约束，重点说明模块职责、依赖方向、服务契约、数据模型、状态、不变量、事务、一致性、安全和观测。
+本目录把已确认产品事实和 DSL 契约转成可编码、可测试的系统约束，重点说明模块职责、依赖方向、服务契约、数据模型、状态、不变量、事务、一致性、安全和观测。[支付资金公共能力层系统分析设计](支付资金公共能力层-系分设计.md) 是本轮重设计的目标态权威入口；编号文档保留为当前实现和迁移证据，不能覆盖已通过 Checker 的目标章节。
 
 正式系分只保留当前有效设计、真实取舍、风险、待确认和验证方向。测试类、执行命令、任务状态和历史争论由 TDD、Goal 或 Git 历史承接。
 
@@ -10,7 +10,7 @@
 
 1. 产品目标、业务对象和验收边界以 [产品设计](../产品设计/README.md) 为准。
 2. 结构化资金事实和不变量以 [DSL 设计](../DSL设计/README.md) 为准。
-3. 当前可用接口、字段和状态以源码、公共 face 契约和枚举为准。
+3. 目标工程边界以 [支付资金公共能力层系统分析设计](支付资金公共能力层-系分设计.md) 已通过 Checker 的章节为准；当前接口、字段、状态与编号系分只用于现状取证和迁移清册。
 4. 表约束以实际迁移 DDL 为准；当前仓库只有 H2 测试 schema，不能据此声明生产 DDL 已交付。
 5. 测试覆盖和验证命令以 [TDD 设计](../TDD设计/README.md) 与实际测试为准。
 
@@ -24,7 +24,7 @@
 | `wallet-face/impl` | 资金账户、信用账户、支出控制、支付工具、关系管理和余额查询。 | 写资金交易、route、posting 或 LedgerEntry。 |
 | `transaction-face/impl` | 资金指令、交易生命周期、路由、回放和交易投影编排。 | 依赖 wallet/ledger 的实现层或 DAL。 |
 | `ledger-face/impl` | 账本、账本交易、分录、posting 和余额投影。 | 持有业务交易生命周期或反向决定业务状态。 |
-| `reconciliation-face/impl` | 对账批次、来源快照、运行结果、差异和准入门禁。 | 反写交易、钱包或账本历史事实。 |
+| `reconciliation-face/impl` | 对账范围/快照、strict-exact 运行结果、差异/current lineage/Gate，以及规范化清分、清算、结算阶段事实。 | 反写交易、钱包或账本历史事实；解释 raw rail、裁决责任、生成展示或把 Gate 当资金动作。 |
 | `governance-face/impl` | 归档、重放、差异报告和治理控制面。 | 把治理结果当资金事实或余额来源。 |
 | `fx-impl` | 来源汇率选择和金额换算。 | 创建报价、换汇执行或资金交易。 |
 
@@ -33,16 +33,17 @@
 ## 系统事实链
 
 ```text
-已确认业务事实
-  -> FundsInstruction
-  -> ResolvedRoute / RouteSnapshot
-  -> PostingPlan
+BusinessFactRef / NormalizedExternalFundsFact
+  -> FundsIntent / FundsAttempt / FundsActionInstruction
+  -> FundsActionFact
+  -> internal Route / Posting
   -> LedgerTransaction / LedgerEntry
-  -> BalanceProjection
-  -> TransactionProjection / Reconciliation / Replay
+  -> BalanceProjection / Reconciliation evidence
 ```
 
-主链写入必须保持原子性和可追溯性。投影、对账和治理只能消费或追加新事实，不能修改原交易、原分录或余额投影来“修正”历史。
+Ledger 本地写链必须在一个本地事务内原子写入 LedgerTransaction、LedgerEntry 与主余额投影；W3-03 进一步要求正资金效果的成功 FundsAction、生命周期累计/逐原事实上限、action-ledger 关联与这条写链共享本地事务。外部 authority/finality、Wallet 控制和 Reconciliation 仍通过稳定引用正交闭合；投影、对账和治理只能消费或追加新事实，不能修改原交易、原分录或余额投影来“修正”历史。
+
+W3-04 已准出：Reconciliation 只按冻结 source/current lineage 强制 normalized 1:1 strict exact，Difference 只追加 action evidence，Gate 只作 exact-object 事务时点准入；raw payout receipt、责任裁决、beneficiary arrival、rail finality 和 recovery case 归上游或 adapter。
 
 ## 当前关键设计
 
@@ -74,12 +75,13 @@
 
 | 文档 | 定位 |
 | --- | --- |
-| [01-系分设计总览.md](01-系分设计总览.md) | 系统边界、分层、模块、事实链和统一非功能约束。 |
-| [02-交易路由钱包账目与投影系分设计.md](02-交易路由钱包账目与投影系分设计.md) | 钱包、交易、路由、账本和投影主链详细设计。 |
-| [03-清结算与对账系分设计.md](03-清结算与对账系分设计.md) | 清分、清算、结算、出款、对账和差异闭环。 |
-| [04-归档重放与指标治理系分设计.md](04-归档重放与指标治理系分设计.md) | 归档、重放、检查点、水位和治理边界。 |
-| [05-测试观测安全与金融红线.md](05-测试观测安全与金融红线.md) | 跨模块测试、观测、安全和金融红线。 |
-| [06-SpendRule支出规则系分设计.md](06-SpendRule支出规则系分设计.md) | Spend Rule、决策记录、控制流水和预算投影。 |
+| [支付资金公共能力层-系分设计.md](支付资金公共能力层-系分设计.md) | 本轮目标态系统设计；按 W3 章节与 Checker 逐步准出。 |
+| [01-系分设计总览.md](01-系分设计总览.md) | 当前实现的系统边界与事实链迁移证据。 |
+| [02-交易路由钱包账目与投影系分设计.md](02-交易路由钱包账目与投影系分设计.md) | 当前钱包、交易、路由、账本和投影实现证据。 |
+| [03-清结算与对账系分设计.md](03-清结算与对账系分设计.md) | 当前清分、清算、结算、出款和对账实现证据。 |
+| [04-归档重放与指标治理系分设计.md](04-归档重放与指标治理系分设计.md) | 当前归档、重放和治理实现证据。 |
+| [05-测试观测安全与金融红线.md](05-测试观测安全与金融红线.md) | 当前跨模块验证与治理证据。 |
+| [06-SpendRule支出规则系分设计.md](06-SpendRule支出规则系分设计.md) | 当前 Spend Rule 与控制流水实现证据。 |
 
 ## 系分准出
 

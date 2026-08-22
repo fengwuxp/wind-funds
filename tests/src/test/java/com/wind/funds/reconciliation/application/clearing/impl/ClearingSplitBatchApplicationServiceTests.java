@@ -13,9 +13,6 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ClearingSplitBatchState;
 import com.wind.funds.reconciliation.enums.ClearingCandidateState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitBatchDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingSplitResultSnapshotDTO;
 import com.wind.funds.reconciliation.model.dto.ClearingCandidateDTO;
@@ -29,8 +26,6 @@ import com.wind.funds.reconciliation.model.request.ExcludeClearingCandidateReque
 import com.wind.funds.reconciliation.model.request.LockClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.ReleaseClearingCandidateLockRequest;
 import com.wind.funds.reconciliation.model.request.RestoreClearingCandidateRequest;
-import com.wind.funds.reconciliation.services.impl.ClearingSettlementGateConsumerServiceImpl;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -53,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.time.LocalDateTime;
 import java.util.stream.IntStream;
 
@@ -93,12 +89,14 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private final Map<String, String> reconciliationBatchByDetail = new HashMap<>();
+
     /**
      * 场景：清分批次公共状态契约只表达草稿、复核、确认和取消。
      * 结果：CONFIRMED 是不可变结果快照形成后的终态，不保留未落地的候选消费关闭状态。
      */
     @Test
-    void testStateContractShouldUseConfirmedAsTerminalState() {
+    void testStatusContractShouldUseConfirmedAsTerminalState() {
         assertThat(ClearingSplitBatchState.values()).containsExactly(
                 ClearingSplitBatchState.DRAFT,
                 ClearingSplitBatchState.REVIEWING,
@@ -108,6 +106,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
 
     @BeforeEach
     void prepareFacts() {
+        reconciliationBatchByDetail.clear();
         jdbcTemplate.update("DELETE FROM t_clearing_candidate");
         jdbcTemplate.update("DELETE FROM t_clearing_split_result_snapshot");
         jdbcTemplate.update("DELETE FROM t_clearing_split_batch_detail");
@@ -130,6 +129,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
 
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(first, second), WindOperatorFactory.system());
+        prepareConfirmGate(created.getSn(), first, second);
         ClearingSplitBatchDTO replay = clearingSplitBatchApplicationService.createBatch(
                 createRequest(second, first), WindOperatorFactory.system());
 
@@ -153,10 +153,11 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
      * 结果：只返回符合条件的当前租户批次。
      */
     @Test
-    void testQueryShouldDiscoverSplitBatchesByStateAndAge() {
+    void testQueryShouldDiscoverSplitBatchesByStatusAndAge() {
         String detail = prepareSplittableDetail("003", SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 1000L);
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(detail), WindOperatorFactory.system());
+        prepareConfirmGate(created.getSn(), detail);
         jdbcTemplate.update("""
                 INSERT INTO t_clearing_split_batch (
                     sn, tenant_id, subject_type, subject_id, currency, business_line, split_period,
@@ -277,6 +278,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String second = prepareSplittableDetail("042", SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 400L);
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(first, second), WindOperatorFactory.system());
+        prepareConfirmGate(created.getSn(), first, second);
         ClearingSplitBatchDTO reviewing = clearingSplitBatchApplicationService.submitBatch(
                 new SubmitClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system());
@@ -337,6 +339,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String detail = prepareSplittableDetail("051", SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 1000L);
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(detail), WindOperatorFactory.system());
+        prepareConfirmGate(created.getSn(), detail);
         clearingSplitBatchApplicationService.submitBatch(
                 new SubmitClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system());
@@ -364,6 +367,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String detail = prepareSplittableDetail("052", SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 1000L);
         ClearingSplitBatchDTO created = clearingSplitBatchApplicationService.createBatch(
                 createRequest(detail), WindOperatorFactory.system());
+        prepareConfirmGate(created.getSn(), detail);
         clearingSplitBatchApplicationService.submitBatch(
                 new SubmitClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(created.getSn()),
                 WindOperatorFactory.system());
@@ -414,14 +418,21 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
 
         ClearingCandidateDTO created = clearingCandidateApplicationService.createCandidate(
                 request, WindOperatorFactory.system());
+        prepareCandidateGate(created.getSn(), detail);
+        ClearingCandidateDTO restored = clearingCandidateApplicationService.restoreCandidate(
+                new RestoreClearingCandidateRequest()
+                        .setTenantId(TENANT_ID)
+                        .setCandidateSn(created.getSn()),
+                WindOperatorFactory.system());
         ClearingCandidateDTO replay = clearingCandidateApplicationService.createCandidate(
                 request, WindOperatorFactory.system());
 
-        assertThat(created.getState()).isEqualTo(ClearingCandidateState.READY);
-        assertThat(created.getAmount()).isEqualTo(1000L);
-        assertThat(created.getSplittableDetailSn()).isEqualTo(detail);
-        assertThat(created.getCandidateDigest()).hasSize(64);
-        assertThat(replay.getSn()).isEqualTo(created.getSn());
+        assertThat(created.getState()).isEqualTo(ClearingCandidateState.BLOCKED);
+        assertThat(restored.getState()).isEqualTo(ClearingCandidateState.READY);
+        assertThat(restored.getAmount()).isEqualTo(1000L);
+        assertThat(restored.getSplittableDetailSn()).isEqualTo(detail);
+        assertThat(restored.getCandidateDigest()).hasSize(64);
+        assertThat(replay.getSn()).isEqualTo(restored.getSn());
         assertThat(candidateCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -431,10 +442,16 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
      * 结果：只返回账期上界内的候选。
      */
     @Test
-    void testQueryShouldDiscoverCandidatesByStateAndAvailableTime() {
+    void testQueryShouldDiscoverCandidatesByStatusAndAvailableTime() {
         String detail = prepareConfirmedSnapshot("074");
         ClearingCandidateDTO created = clearingCandidateApplicationService.createCandidate(
                 createCandidateRequest(snapshotSn(detail), LocalDateTime.now().minusMinutes(1)),
+                WindOperatorFactory.system());
+        prepareCandidateGate(created.getSn(), detail);
+        ClearingCandidateDTO restored = clearingCandidateApplicationService.restoreCandidate(
+                new RestoreClearingCandidateRequest()
+                        .setTenantId(TENANT_ID)
+                        .setCandidateSn(created.getSn()),
                 WindOperatorFactory.system());
 
         WindPagination<ClearingCandidateDTO> result = clearingCandidateApplicationService.queryCandidates(
@@ -443,7 +460,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                         .setClearingAvailableTimeMax(LocalDateTime.now()),
                 DefaultPageQueryOptions.defaults(10));
 
-        assertThat(result.getRecords()).extracting(ClearingCandidateDTO::getSn).containsExactly(created.getSn());
+        assertThat(result.getRecords()).extracting(ClearingCandidateDTO::getSn).containsExactly(restored.getSn());
     }
 
     /**
@@ -490,6 +507,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                 SET clearing_available_time = ?
                 WHERE tenant_id = ? AND sn = ?
                 """, LocalDateTime.now().minusMinutes(1), TENANT_ID, waiting.getSn());
+        prepareCandidateGate(waiting.getSn(), detail);
         ClearingCandidateDTO restored = clearingCandidateApplicationService.restoreCandidate(
                 new RestoreClearingCandidateRequest()
                         .setTenantId(TENANT_ID)
@@ -544,6 +562,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String detail = prepareSplittableDetail(suffix, SUBJECT_ID, CurrencyIsoCode.USD, BUSINESS_LINE, 1000L);
         ClearingSplitBatchDTO batch = clearingSplitBatchApplicationService.createBatch(
                 createRequest(detail), WindOperatorFactory.system());
+        prepareConfirmGate(batch.getSn(), detail);
         clearingSplitBatchApplicationService.submitBatch(
                 new SubmitClearingSplitBatchRequest().setTenantId(TENANT_ID).setSplitBatchSn(batch.getSn()),
                 WindOperatorFactory.system());
@@ -606,18 +625,12 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String referenceSourceRef = "internal:" + transactionDetailSn;
         String comparisonSourceRef = "external:" + transactionDetailSn;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, reconciliationBatchSn,
-                ReconciliationGateObjectType.CLEARING, transactionDetailSn, "recon-rule-1",
+                "CLEARING_SPLITTABLE_IDENTIFY", transactionDetailSn, "recon-rule-1",
                 "report:split-" + suffix, referenceSourceRef, comparisonSourceRef);
-        String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
+        String runResultSn = reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(reconciliationBatchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef("report:split-" + suffix + "#line-1"))),
+                        .setReconciliationBatchSn(reconciliationBatchSn),
                 WindOperatorFactory.system()).getSn();
         String resultDigest = jdbcTemplate.queryForObject(
                 "SELECT result_digest FROM t_reconciliation_run_result WHERE sn = ?", String.class, runResultSn);
@@ -628,19 +641,34 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                             subject_type, subject_id, currency, amount, refund_amount, business_line,
                             split_period, split_rule_code, split_rule_version,
                             status, reconciliation_decision_status,
-                            reconciliation_run_result_sn, reconciliation_result_digest,
+                            gate_evidence_ref,
                             reconciliation_evidence_refs, route_snapshot_digest, source_digest, created_by
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'FUNDING_ACCOUNT', ?, ?, ?, 0, ?, ?, ?, ?,
-                                  'SPLIT_READY', 'PASSED', ?, ?, ?, ?, ?, 'system')
+                                  'SPLIT_READY', 'PASSED', ?, ?, ?, ?, 'system')
                         """,
                 splittableSn, TENANT_ID, transactionSn, transactionDetailSn,
                 "split_ledger_tx_" + suffix, "split_posting_plan_" + suffix,
                 "split_ledger_entry_" + suffix, subjectId, currency.name(), amount, businessLine,
-                SPLIT_PERIOD, SPLIT_RULE_CODE, SPLIT_RULE_VERSION, runResultSn, resultDigest,
+                SPLIT_PERIOD, SPLIT_RULE_CODE, SPLIT_RULE_VERSION, "gate-evidence:" + suffix,
                 "[\"report:split-" + suffix + "\"]",
                 FundsStableHashSupport.sha256Json(Map.of("routeSnapshot", routeSnapshot)),
                 ("b" + suffix).repeat(64).substring(0, 64));
+        reconciliationBatchByDetail.put(splittableSn, reconciliationBatchSn);
         return splittableSn;
+    }
+
+    private void prepareConfirmGate(String splitBatchSn, String... splittableDetailSns) {
+        for (String detailSn : splittableDetailSns) {
+            ReconciliationTestFixture.prepareGateRequirement(jdbcTemplate, TENANT_ID,
+                    reconciliationBatchByDetail.get(detailSn), "CLEARING_SPLIT_CONFIRM_ITEM",
+                    splitBatchSn + ":" + detailSn, "report:split-confirm:" + detailSn);
+        }
+    }
+
+    private void prepareCandidateGate(String candidateSn, String splittableDetailSn) {
+        ReconciliationTestFixture.prepareGateRequirement(jdbcTemplate, TENANT_ID,
+                reconciliationBatchByDetail.get(splittableDetailSn), "CLEARING_CONFIRM_ITEM",
+                candidateSn, "report:candidate:" + splittableDetailSn);
     }
 
     private String transactionSn(String suffix) {
@@ -668,7 +696,6 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
             DefaultFundsTransactionQueryService.class,
             ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class,
-            ClearingSettlementGateConsumerServiceImpl.class,
             ClearingSplitBatchApplicationServiceImpl.class,
             ClearingCandidateApplicationServiceImpl.class
     })

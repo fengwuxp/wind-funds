@@ -345,24 +345,6 @@ com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.lang.String
 com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.util.List<com.wind.funds.ledger.spec.LedgerEntrySpec> getEntries();
 com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();
 com.wind.funds.ledger.spec.LedgerPostingPlanSpec	public interface com.wind.funds.ledger.spec.LedgerPostingPlanSpec {
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.AccountBalancePeriodType getPeriodType();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.EntrySide getNormalBalanceSide();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCategory getLedgerSubjectCategory();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract com.wind.funds.ledger.enums.LedgerSubjectCode getLedgerSubjectCode();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.Boolean getAllowNegative();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.Boolean getRequired();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.String getDescription();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.lang.String getSettlementPolicy();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public abstract java.time.LocalTime getCutOffTime();
-com.wind.funds.ledger.spec.LedgerProfileItemSpec	public interface com.wind.funds.ledger.spec.LedgerProfileItemSpec {
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getProfileCode();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract com.wind.funds.route.enums.FundsSubjectType getSubjectType();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.Integer getProfileVersion();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getDescription();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getProfileName();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.lang.String getStatus();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public abstract java.util.List<? extends com.wind.funds.ledger.spec.LedgerProfileItemSpec> getItems();
-com.wind.funds.ledger.spec.LedgerProfileSpec	public interface com.wind.funds.ledger.spec.LedgerProfileSpec {
 com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract com.wind.funds.transaction.enums.FundsTransactionEventType getEventType();
 com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract com.wind.transaction.core.Money getAmount();
 com.wind.funds.ledger.spec.LedgerTransactionSpec	public abstract java.lang.Long getTenantId();
@@ -787,7 +769,6 @@ com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.St
 com.wind.funds.transaction.spec.FundsInstructionSpec	public default java.lang.String getLedgerPeriodId();
 com.wind.funds.transaction.spec.FundsInstructionSpec	public interface com.wind.funds.transaction.spec.FundsInstructionSpec {
 com.wind.funds.transaction.support.FundsContextVariables	public final class com.wind.funds.transaction.support.FundsContextVariables {
-com.wind.funds.transaction.support.FundsContextVariables	public static final java.lang.String ALLOW_NEGATIVE_BALANCE;
 com.wind.funds.transaction.support.FundsContextVariables	public static final java.lang.String INCREASE;
 com.wind.funds.transaction.support.FundsContextVariables	public static java.util.Map<java.lang.String, java.lang.Object> immutableCopy(java.util.Map<java.lang.String, java.lang.Object>);
 com.wind.funds.transaction.support.FundsInstructionContextValidator	public final class com.wind.funds.transaction.support.FundsInstructionContextValidator {

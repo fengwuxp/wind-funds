@@ -49,7 +49,7 @@ class ReconciliationMysqlMigrationIntegrationTests {
         List<String> tableNames = new ArrayList<>(coreTableNames);
         tableNames.addAll(extractTableNames(Files.readString(reconciliationDdl)));
         tableNames.addAll(governanceTableNames);
-        assertThat(tableNames).doesNotHaveDuplicates().hasSize(44);
+        assertThat(tableNames).doesNotHaveDuplicates().hasSize(48);
 
         Class.forName("com.mysql.cj.jdbc.Driver");
         try (Connection connection = openConnection()) {

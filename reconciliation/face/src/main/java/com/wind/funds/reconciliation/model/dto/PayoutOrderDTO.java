@@ -69,11 +69,8 @@ public class PayoutOrderDTO implements Serializable {
     @Schema(description = "外部通道业务引用")
     private String externalReference;
 
-    @Schema(description = "出款准入消费的对账运行结果流水号")
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "出款准入消费的对账结果摘要")
-    private String reconciliationResultDigest;
+    @Schema(description = "出款提交成功消费的阶段门禁证据引用")
+    private String payoutGateEvidenceRef;
 
     @Schema(description = "首次提交准入决定摘要")
     private String admissionDecisionDigest;

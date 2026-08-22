@@ -8,13 +8,20 @@ import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.spec.FeeSpec;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
+import com.wind.jackson.WindJson;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
@@ -65,6 +72,14 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
             assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
         });
         assertThat(entriesOf(ledgerTransaction)).hasSize(4);
+        assertPrimaryActionFacts("PAY", "PAY_WITH_RATE_FEE",
+                "succeeded", "proven-full", 5_000L, 50L);
+        List<FundsActionFactRef> firstActionIdentities = actionFactIdentities("PAY", "PAY_WITH_RATE_FEE");
+        List<FundsActionFactDTO.SemanticDigest> firstActionDigests = actionFactDigests("PAY", "PAY_WITH_RATE_FEE");
+        LedgerFactSnapshot afterFirstFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = fundsTransactionsByBusinessSn("PAY_WITH_RATE_FEE")
+                .getFirst()
+                .getRouteSnapshot();
 
         String retryTransactionSn = directTransactionService.pay(
                 payRequest(payer, payee, 5_000L, feeChargeSpec, "PAY_WITH_RATE_FEE"),
@@ -77,6 +92,49 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn("PAY_WITH_RATE_FEE", 3, 2, 4);
         assertLedgerFactsFollowRouteSnapshot("PAY_WITH_RATE_FEE");
+        assertThat(actionFactIdentities("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionIdentities);
+        assertThat(actionFactDigests("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionDigests);
+
+        FeeSpec conflictingFeeChargeSpec = FeeSpec.builder()
+                .feeType("RATE_FEE")
+                .feeRate(new BigDecimal("0.02"))
+                .build();
+        assertThatThrownBy(() -> directTransactionService.pay(
+                payRequest(payer, payee, 5_000L, conflictingFeeChargeSpec, "PAY_WITH_RATE_FEE"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(afterRetry, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFacts);
+        assertThat(fundsTransactionsByBusinessSn("PAY_WITH_RATE_FEE").getFirst().getRouteSnapshot())
+                .isEqualTo(firstRouteSnapshot);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PAY_WITH_RATE_FEE", 3, 2, 4);
+        assertThat(actionFactIdentities("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionIdentities);
+        assertThat(actionFactDigests("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionDigests);
+
+        ObjectNode wrongFeeRoute = WindJson.parseObject(firstRouteSnapshot, ObjectNode.class);
+        for (JsonNode node : (ArrayNode) wrongFeeRoute.get("legs")) {
+            ObjectNode leg = (ObjectNode) node;
+            if ("FEE".equals(leg.get("legId").asText())) {
+                ObjectNode targetSubject = (ObjectNode) ((ObjectNode) leg.get("targetNode")).get("subjectRef");
+                targetSubject.put("subjectId", payee.id());
+            }
+        }
+        updateFundsTransactionRouteSnapshot(transactionSn, WindJson.toJsonString(wrongFeeRoute));
+        assertNoActionFacts("PAY", "PAY_WITH_RATE_FEE");
+        updateFundsTransactionRouteSnapshot(transactionSn, firstRouteSnapshot);
+        assertThat(actionFactIdentities("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionIdentities);
+        assertThat(actionFactDigests("PAY", "PAY_WITH_RATE_FEE"))
+                .containsExactlyElementsOf(firstActionDigests);
     }
 
     /**
@@ -105,6 +163,50 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(beforeFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("PAY_WITH_EMPTY_FEE");
+        assertNoActionFacts("PAY", "PAY_WITH_EMPTY_FEE");
+    }
+
+    /**
+     * 场景：带费付款在资金准入后因余额不足被拒绝。
+     * 预期：本金与手续费两个 primary identity 共同终结为 proven-zero，重放不新增事实。
+     */
+    @Test
+    void testPayWithRateFeeFailureShouldCloseAllActionFactsAsProvenZero() {
+        FundsAccountId payer = fundingAccount("rate_fee_failure_payer");
+        FundsAccountId payee = fundingAccount("rate_fee_failure_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+        FeeSpec feeChargeSpec = FeeSpec.builder()
+                .feeType("RATE_FEE")
+                .feeRate(new BigDecimal("0.01"))
+                .build();
+        FundsTransactionPayRequest request = payRequest(payer, payee, 5_000L, feeChargeSpec,
+                "PAY_WITH_RATE_FEE_FAILURE");
+        BalanceSnapshot before = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.pay(request, WindOperatorFactory.system()))
+                .hasMessageContaining("账本余额不足");
+        List<FundsActionFactRef> firstActionIdentities = actionFactIdentities("PAY", "PAY_WITH_RATE_FEE_FAILURE");
+        List<FundsActionFactDTO.SemanticDigest> firstActionDigests = actionFactDigests(
+                "PAY", "PAY_WITH_RATE_FEE_FAILURE");
+
+        assertThatThrownBy(() -> directTransactionService.pay(request, WindOperatorFactory.system()))
+                .hasMessageContaining("资金交易已失败");
+
+        BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(before, after,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertFailedFundsTransactionWithoutLedgerFacts("PAY_WITH_RATE_FEE_FAILURE");
+        assertPrimaryActionFacts("PAY", "PAY_WITH_RATE_FEE_FAILURE",
+                "failed", "proven-zero", 5_000L, 50L);
+        assertThat(actionFactIdentities("PAY", "PAY_WITH_RATE_FEE_FAILURE"))
+                .containsExactlyElementsOf(firstActionIdentities);
+        assertThat(actionFactDigests("PAY", "PAY_WITH_RATE_FEE_FAILURE"))
+                .containsExactlyElementsOf(firstActionDigests);
     }
 
     /**
@@ -137,6 +239,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(beforeFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("PAY_WITH_ROUNDED_ZERO_FEE");
+        assertNoActionFacts("PAY", "PAY_WITH_ROUNDED_ZERO_FEE");
     }
 
     /**

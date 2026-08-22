@@ -43,14 +43,6 @@ public class ReleaseSettlementOrderRequest implements Serializable {
     @NotBlank
     private String settlementOrderSn;
 
-    @Schema(description = "当前对账运行结果流水号")
-    @NotBlank
-    private String reconciliationRunResultSn;
-
-    @Schema(description = "当前对账运行结果摘要")
-    @NotBlank
-    private String reconciliationResultDigest;
-
     @Schema(description = "必需来源收齐状态")
     @NotNull
     private SettlementReleaseCoverageStatus coverageStatus;

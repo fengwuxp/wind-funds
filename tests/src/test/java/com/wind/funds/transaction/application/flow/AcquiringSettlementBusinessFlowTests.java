@@ -27,9 +27,6 @@ import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
@@ -56,14 +53,13 @@ import com.wind.funds.reconciliation.model.request.CreateSettlementOrderRequest;
 import com.wind.funds.reconciliation.model.request.HandlePayoutReceiptRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
 import com.wind.funds.reconciliation.model.request.LockSettlementOrderRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
+import com.wind.funds.reconciliation.model.request.RestoreClearingCandidateRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchRequest;
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
-import com.wind.funds.reconciliation.services.impl.ClearingSettlementGateConsumerServiceImpl;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -202,7 +198,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         assertThat(payoutOrder.getCompletionFundsTransactionSn()).isNotBlank();
         assertOnlyBalanceDeltas(beforePayout, snapshot(balances(merchant, cashMappingAccount())),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, -CAPTURE_AMOUNT, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, CAPTURE_AMOUNT, CURRENCY));
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -CAPTURE_AMOUNT, CURRENCY));
     }
 
     /**
@@ -244,7 +240,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                     FundsTransactionEventType.REFUND, sourceLegId, CURRENCY).getAmount()).isEqualTo(100L);
         });
 
-        String runResultSn = prepareGate(ReconciliationGateObjectType.CLEARING, capture.detailSn(),
+        String runResultSn = prepareGate("CLEARING_SPLITTABLE_IDENTIFY", capture.detailSn(),
                 "refund-before-split", "acquiring-refund-before-split-evidence:001");
         var beforeIdentify = ledgerFactSnapshot();
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -253,7 +249,6 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                         .setFundsTransactionSn(capture.transactionSn())
                         .setFundsTransactionDetailSn(capture.detailSn())
                         .setLedgerEntrySn(capture.ledgerEntrySn())
-                        .setReconciliationRunResultSn(runResultSn)
                         .setBusinessLine(BUSINESS_LINE)
                         .setSplitPeriod(PERIOD)
                         .setSplitRuleCode(RULE_CODE)
@@ -390,14 +385,13 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
     private ClearingBatchDTO clear(CaptureFact capture) {
         String evidenceRef = "acquiring-capture-evidence:001";
         String runResultSn = prepareGate(
-                ReconciliationGateObjectType.CLEARING, capture.detailSn(), "split", evidenceRef);
+                "CLEARING_SPLITTABLE_IDENTIFY", capture.detailSn(), "split", evidenceRef);
         var beforeSplit = ledgerFactSnapshot();
         IdentifyClearingSplittableDetailRequest identifyRequest = new IdentifyClearingSplittableDetailRequest()
                 .setTenantId(TENANT_ID)
                 .setFundsTransactionSn(capture.transactionSn())
                 .setFundsTransactionDetailSn(capture.detailSn())
                 .setLedgerEntrySn(capture.ledgerEntrySn())
-                .setReconciliationRunResultSn(runResultSn)
                 .setBusinessLine(BUSINESS_LINE)
                 .setSplitPeriod(PERIOD)
                 .setSplitRuleCode(RULE_CODE)
@@ -409,6 +403,8 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         ClearingSplitBatchDTO splitBatch = clearingSplitBatchApplicationService.createBatch(
                 new CreateClearingSplitBatchRequest().setTenantId(TENANT_ID)
                         .setSplittableDetailSns(List.of(splittable.getSn())), WindOperatorFactory.system());
+        prepareGate("CLEARING_SPLIT_CONFIRM_ITEM", splitBatch.getSn() + ":" + splittable.getSn(),
+                "split-confirm", evidenceRef);
         clearingSplitBatchApplicationService.submitBatch(new SubmitClearingSplitBatchRequest()
                 .setTenantId(TENANT_ID).setSplitBatchSn(splitBatch.getSn()), WindOperatorFactory.system());
         ClearingSplitBatchDTO confirmedSplit = clearingSplitBatchApplicationService.confirmBatch(
@@ -417,7 +413,10 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
 
         assertThat(splittableReplay.getSn()).isEqualTo(splittable.getSn());
         assertThat(splittable.getBusinessLine()).isEqualTo(BUSINESS_LINE);
-        assertThat(splittable.getReconciliationEvidenceRefs()).containsExactly(evidenceRef);
+        assertThat(splittable.getReconciliationEvidenceRefs())
+                .contains(evidenceRef)
+                .anyMatch(ref -> ref.startsWith("RGE"))
+                .anyMatch(ref -> ref.startsWith("run:"));
         assertThat(confirmedSplit.getTotalAmount()).isEqualTo(CAPTURE_AMOUNT);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeSplit);
 
@@ -430,8 +429,12 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 .setClearingRuleCode(RULE_CODE)
                 .setClearingRuleVersion(RULE_VERSION)
                 .setClearingAvailableTime(LocalDateTime.now().minusMinutes(1));
-        ClearingCandidateDTO candidate = clearingCandidateApplicationService.createCandidate(
+        ClearingCandidateDTO blockedCandidate = clearingCandidateApplicationService.createCandidate(
                 candidateRequest, WindOperatorFactory.system());
+        prepareGate("CLEARING_CONFIRM_ITEM", blockedCandidate.getSn(), "clearing-confirm", evidenceRef);
+        ClearingCandidateDTO candidate = clearingCandidateApplicationService.restoreCandidate(
+                new RestoreClearingCandidateRequest().setTenantId(TENANT_ID)
+                        .setCandidateSn(blockedCandidate.getSn()), WindOperatorFactory.system());
         ClearingCandidateDTO candidateReplay = clearingCandidateApplicationService.createCandidate(
                 candidateRequest, WindOperatorFactory.system());
         ClearingBatchDTO clearingBatch = clearingBatchApplicationService.createBatch(
@@ -479,12 +482,11 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 .setSettlementOrderSn(created.getSn())
                 .setSettlementApprovalRef("acquiring-settlement-approval"), WindOperatorFactory.system());
         String runResultSn = prepareGate(
-                ReconciliationGateObjectType.SETTLEMENT, created.getSn(), "settlement", "settlement-evidence:001");
+                "SETTLEMENT_LOCK", created.getSn(), "settlement", "settlement-evidence:001");
         var beforeLock = snapshot(balance(merchant));
         LockSettlementOrderRequest request = new LockSettlementOrderRequest()
                 .setTenantId(TENANT_ID)
-                .setSettlementOrderSn(created.getSn())
-                .setReconciliationRunResultSn(runResultSn);
+                .setSettlementOrderSn(created.getSn());
         SettlementOrderDTO locked = settlementOrderApplicationService.lockOrder(
                 request, WindOperatorFactory.system());
         SettlementOrderDTO replay = settlementOrderApplicationService.lockOrder(
@@ -508,7 +510,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         PayoutOrderDTO createReplay = payoutOrderApplicationService.createOrder(
                 createRequest, WindOperatorFactory.system());
         String runResultSn = prepareGate(
-                ReconciliationGateObjectType.PAYOUT, created.getSn(), "payout", "payout-evidence:001");
+                "PAYOUT_SUBMIT", created.getSn(), "payout", "payout-evidence:001");
         payoutOrderApplicationService.submitOrder(new SubmitPayoutOrderRequest()
                 .setTenantId(TENANT_ID)
                 .setPayoutOrderSn(created.getSn())
@@ -516,8 +518,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 .setPayeeEndpointRef("merchant-bank-endpoint:001")
                 .setChannelRef("acquiring-payout-channel:001")
                 .setApprovalRef("acquiring-payout-approval:001")
-                .setExternalRuleVerificationEvidence(verifiedPayoutRule())
-                .setReconciliationRunResultSn(runResultSn), WindOperatorFactory.system());
+                .setExternalRuleVerificationEvidence(verifiedPayoutRule()), WindOperatorFactory.system());
         HandlePayoutReceiptRequest receipt = new HandlePayoutReceiptRequest()
                 .setTenantId(TENANT_ID)
                 .setPayoutOrderSn(created.getSn())
@@ -541,7 +542,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         return completed;
     }
 
-    private String prepareGate(ReconciliationGateObjectType objectType,
+    private String prepareGate(String stageKind,
                                String objectSn,
                                String suffix,
                                String evidenceRef) {
@@ -549,17 +550,11 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         String referenceSourceRef = "internal:" + suffix;
         String comparisonSourceRef = "evidence:" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, batchSn,
-                objectType, objectSn, RULE_VERSION, evidenceRef, referenceSourceRef, comparisonSourceRef);
-        return reconciliationRunResultApplicationService.recordRunResult(
+                stageKind, objectSn, RULE_VERSION, evidenceRef, referenceSourceRef, comparisonSourceRef);
+        return reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef(evidenceRef + "#line-1"))),
+                        .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
     }
 
@@ -577,7 +572,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
     }
 
     private void prepareAccount(FundsAccountId accountId) {
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT);
@@ -598,7 +593,6 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
     @Import({
             ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class,
-            ClearingSettlementGateConsumerServiceImpl.class,
             ClearingSplittableDetailApplicationServiceImpl.class,
             ClearingSplitBatchApplicationServiceImpl.class,
             ClearingCandidateApplicationServiceImpl.class,

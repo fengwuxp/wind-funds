@@ -1,7 +1,10 @@
 package com.wind.funds.reconciliation.model.request;
 
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
+import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -32,20 +35,24 @@ public class CreateReconciliationBatchRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "本次对账作业范围的稳定业务引用")
-    @NotBlank
-    @Size(max = 128)
-    private String reconciliationScopeRef;
+    @Schema(description = "本次对账作业范围的稳定身份")
+    @Valid
+    @NotNull
+    private StableIdentity scopeIdentity;
 
-    @Schema(description = "本批次运行结果适用的准入对象类型；纯对账时为空")
-    private ReconciliationGateObjectType gateObjectType;
+    @Schema(description = "本次对账双方关系的稳定身份")
+    @Valid
+    @NotNull
+    private StableIdentity pairIdentity;
 
-    @Schema(description = "本批次运行结果适用的准入对象流水号；纯对账时为空")
-    private String gateObjectSn;
+    @Schema(description = "本次对账币种")
+    @NotNull
+    private CurrencyIsoCode currency;
 
-    @Schema(description = "匹配或对账规则版本")
-    @NotBlank
-    private String ruleVersion;
+    @Schema(description = "结构化比较规则引用")
+    @Valid
+    @NotNull
+    private ComparisonRuleRef comparisonRuleRef;
 
     @Schema(description = "对账窗口开始时间，包含该时刻")
     @NotNull
@@ -54,6 +61,11 @@ public class CreateReconciliationBatchRequest implements Serializable {
     @Schema(description = "对账窗口结束时间，不包含该时刻")
     @NotNull
     private LocalDateTime windowEnd;
+
+    @Schema(description = "窗口时间语义")
+    @NotBlank
+    @Size(max = 64)
+    private String timeSemantics;
 
     @Schema(description = "对账窗口 IANA 时区 ID，例如 Asia/Shanghai")
     @NotBlank

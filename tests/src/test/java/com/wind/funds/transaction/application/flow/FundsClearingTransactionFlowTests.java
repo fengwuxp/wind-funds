@@ -4,6 +4,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.transaction.application.FundsClearingTransactionService;
@@ -45,7 +46,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
     @Test
     void testConfirmShouldMoveClearingToAvailableIdempotently() {
         FundsAccountId accountId = fundingAccount("clearing_merchant");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         FundsAccountId payerAccountId = fundingAccount("funding_user");
@@ -129,7 +130,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
     @Test
     void testConfirmWithInsufficientClearingBalanceShouldRejectWithoutLedgerSideEffects() {
         FundsAccountId accountId = fundingAccount("clearing_insufficient");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         FundsAccountId payerAccountId = fundingAccount("clr_ins_payer");
@@ -172,7 +173,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
     @Test
     void testConfirmShouldRejectRefundedSourceBeforeCreatingClearingFacts() {
         FundsAccountId accountId = fundingAccount("clr_refund_merchant");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         FundsAccountId payerAccountId = fundingAccount("clr_refund_payer");

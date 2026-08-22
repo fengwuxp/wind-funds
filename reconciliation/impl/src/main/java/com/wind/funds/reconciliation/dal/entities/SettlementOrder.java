@@ -107,13 +107,9 @@ public class SettlementOrder implements Serializable, TenantIsolationObject<Long
 
     private String releaseDigest;
 
-    private String releaseReconciliationRunResultSn;
-
-    private String releaseReconciliationResultDigest;
+    private String releaseGateEvidenceRef;
 
     private String releaseCurrentLineageBatchSn;
-
-    private String releaseGateEvidenceDigest;
 
     private String releaseSourceClosureDigest;
 
@@ -129,11 +125,7 @@ public class SettlementOrder implements Serializable, TenantIsolationObject<Long
 
     private LocalDateTime releasedTime;
 
-    private String reconciliationRunResultSn;
-
-    private String reconciliationResultDigest;
-
-    private String reconciliationEvidenceDigest;
+    private String lockGateEvidenceRef;
 
     @NotNull
     private String ruleCode;

@@ -5,7 +5,6 @@ import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.difference.report.ReconciliationDifferenceReportApplicationService;
-import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceReportCompleteness;
@@ -13,16 +12,11 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceState;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionResult;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceReportDTO;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.GetReconciliationDifferenceReportRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -118,12 +112,11 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         assertThat(result.getDifferenceType()).isEqualTo(ReconciliationDifferenceType.AMOUNT_MISMATCH);
         assertThat(result.getSeverity()).isEqualTo(ReconciliationDifferenceSeverity.S1_MAJOR);
         assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
-        assertThat(result.getDifferenceAmount()).isEqualTo(50L);
-        assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
-        assertThat(result.getBlockingObjectSn()).isEqualTo(CLEARING_OBJECT_SN);
-        assertThat(result.getGateDecisionResult()).isEqualTo(ReconciliationGateDecisionResult.BLOCKED);
+        assertThat(result.getDifferenceAmount()).isEqualTo(1L);
+        assertThat(result.getScopeIdentity().getValue()).contains(CLEARING_OBJECT_SN);
+        assertThat(result.getCurrentLineageRef()).isNotBlank();
         assertThat(result.getEvidenceRefs())
-                .containsExactly("processor-report-file-digest-001", RUN_RESULT_EVIDENCE_REF);
+                .containsExactly("processor-report-file-digest-001");
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
         assertThat(result.getExplanation()).contains("阻断");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -144,7 +137,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 """, TENANT_ID, requiredDifferenceSn());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest().setIncludeGateDecision(false), WindOperatorFactory.system());
+                reportRequest(), WindOperatorFactory.system());
 
         assertThat(result.getState()).isEqualTo(ReconciliationDifferenceState.INVALIDATED);
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
@@ -163,17 +156,11 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest()
-                        .setIncludeGateDecision(false)
-                        .setReconciliationRunResultSn(null)
-                        .setIncludeEvidenceRefs(false),
+                reportRequest().setIncludeEvidenceRefs(false),
                 WindOperatorFactory.system());
 
         assertThat(result.getDifferenceSn()).isEqualTo(requiredDifferenceSn());
-        assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
-        assertThat(result.getBlockingObjectSn()).isEqualTo(CLEARING_OBJECT_SN);
-        assertThat(result.getGateDecisionResult()).isNull();
-        assertThat(result.getGateExplanation()).isNull();
+        assertThat(result.getScopeIdentity().getValue()).contains(CLEARING_OBJECT_SN);
         assertThat(result.getEvidenceRefs()).isEmpty();
         assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -185,12 +172,13 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
      * 输出：快速失败，禁止报告服务隐式选择最新运行结果或仅凭差错缺失推断准入。
      */
     @Test
-    void testGetReportShouldRequireExplicitRunResultWhenIncludingObjectGateDecision() {
+    void testGetReportShouldNotRequireGateInput() {
         reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
-        assertThatThrownBy(() -> reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest().setReconciliationRunResultSn(null), WindOperatorFactory.system()))
-                .hasMessageContaining("对账运行结果流水号不能为空");
+        ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
+                reportRequest(), WindOperatorFactory.system());
+
+        assertThat(result.getDifferenceSn()).isEqualTo(requiredDifferenceSn());
     }
 
     /**
@@ -262,7 +250,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 adjustmentRequest("report-adjustment-001", "report-adjustment-idem-001",
                         ReconciliationDifferenceActionType.ADJUST),
                 WindOperatorFactory.system());
-        String firstRerunSn = recordRunResult(false, ACTION_RERUN_BATCH_SN,
+        String firstRerunSn = executeStrictExact(false, ACTION_RERUN_BATCH_SN,
                 RECONCILIATION_BATCH_SN, "report:action-rerun-001#line-1");
         reconciliationDifferenceApplicationService.recordRerunResult(
                 new RecordReconciliationDifferenceRerunRequest()
@@ -274,15 +262,13 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 adjustmentRequest("report-adjustment-002", "report-adjustment-idem-002",
                         ReconciliationDifferenceActionType.SUPPLEMENT_FACT),
                 WindOperatorFactory.system());
-        String currentRunSn = recordRunResult(true, ACTION_LATEST_BATCH_SN,
+        String currentRunSn = executeStrictExact(true, ACTION_LATEST_BATCH_SN,
                 ACTION_RERUN_BATCH_SN, "report:action-rerun-002#line-1");
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
                 new GetReconciliationDifferenceReportRequest()
                         .setTenantId(TENANT_ID)
                         .setDifferenceSn(requiredDifferenceSn())
-                        .setIncludeGateDecision(true)
-                        .setReconciliationRunResultSn(currentRunSn)
                         .setIncludeEvidenceRefs(true),
                 WindOperatorFactory.system());
 
@@ -297,60 +283,38 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     }
 
     private GetReconciliationDifferenceReportRequest reportRequest() {
-        String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
-                balancedRunResultRequest(), WindOperatorFactory.system()).getSn();
         return new GetReconciliationDifferenceReportRequest()
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(requiredDifferenceSn())
-                .setIncludeGateDecision(true)
-                .setReconciliationRunResultSn(runResultSn)
                 .setIncludeEvidenceRefs(true);
     }
 
     private RecordReconciliationRunResultRequest balancedRunResultRequest() {
-        String referenceSourceRef = "internal:" + CLEARING_OBJECT_SN;
-        String comparisonSourceRef = "external:" + CLEARING_OBJECT_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, RERUN_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                jdbcTemplate, TENANT_ID, RERUN_BATCH_SN, "CLEARING_CONFIRM_ITEM",
                 CLEARING_OBJECT_SN, "recon-rule-v1", RUN_RESULT_EVIDENCE_REF,
-                referenceSourceRef, comparisonSourceRef, RECONCILIATION_BATCH_SN);
+                "internal:" + CLEARING_OBJECT_SN, "external:" + CLEARING_OBJECT_SN,
+                RECONCILIATION_BATCH_SN);
         return new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(RERUN_BATCH_SN)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(referenceSourceRef)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef(RUN_RESULT_EVIDENCE_REF + "#line-1")));
+                .setReconciliationBatchSn(RERUN_BATCH_SN);
     }
 
-    private String recordRunResult(boolean balanced,
+    private String executeStrictExact(boolean balanced,
                                    String batchSn,
                                    String previousBatchSn,
                                    String evidenceRef) {
         String referenceSourceRef = SOURCE_RECORD_SN;
         String comparisonSourceRef = "external-difference:" + CLEARING_OBJECT_SN;
-        ReconciliationMatchResultItem matchResult = new ReconciliationMatchResultItem()
-                .setReferenceSourceRef(referenceSourceRef)
-                .setComparisonSourceRef(comparisonSourceRef)
-                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                .setMatchStrength(balanced ? ReconciliationMatchStrength.EXACT_MATCH
-                        : ReconciliationMatchStrength.UNMATCHED)
-                .setEvidenceRef(evidenceRef);
-        if (!balanced) {
-            matchResult.setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
-                    .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR);
-        }
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
+                jdbcTemplate, TENANT_ID, batchSn, "CLEARING_CONFIRM_ITEM",
                 CLEARING_OBJECT_SN, "recon-rule-v1", evidenceRef,
-                referenceSourceRef, comparisonSourceRef, previousBatchSn);
-        return reconciliationRunResultApplicationService.recordRunResult(
+                referenceSourceRef, comparisonSourceRef, previousBatchSn,
+                balanced ? 1L : 2L, "CONFIRMED");
+        return reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(batchSn)
-                        .setMatchResults(List.of(matchResult)),
+                        .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
     }
 
@@ -382,25 +346,15 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     private String recordInitialDifferenceRunResult() {
         String comparisonSourceRef = "external-difference:" + CLEARING_OBJECT_SN;
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
-                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, "CLEARING_CONFIRM_ITEM",
                 CLEARING_OBJECT_SN, "recon-rule-v1", "processor-report-file-digest-001",
-                SOURCE_RECORD_SN, comparisonSourceRef);
-        reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                SOURCE_RECORD_SN, comparisonSourceRef, null, 2L, "CONFIRMED");
+        reconciliationRunResultApplicationService.executeStrictExact(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
-                .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setReferenceSourceRef(SOURCE_RECORD_SN)
-                        .setComparisonSourceRef(comparisonSourceRef)
-                        .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
-                        .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
-                        .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
-                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
-                        .setCurrency(CurrencyIsoCode.USD)
-                        .setDifferenceAmount(50L)
-                        .setEvidenceRef("processor-report-file-digest-001"))), WindOperatorFactory.system());
+                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN), WindOperatorFactory.system());
         return jdbcTemplate.queryForObject("""
                 SELECT sn FROM t_reconciliation_match_result
-                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND difference_type IS NOT NULL
+                WHERE tenant_id = ? AND reconciliation_batch_sn = ? AND result_kind <> 'MATCHED'
                 """, String.class, TENANT_ID, RECONCILIATION_BATCH_SN);
     }
 
@@ -415,7 +369,6 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @Import({
             ReconciliationDifferenceApplicationServiceImpl.class,
             ReconciliationRunResultApplicationServiceImpl.class,
-            ReconciliationGateApplicationServiceImpl.class,
             ReconciliationDifferenceReportApplicationServiceImpl.class
     })
     static class Config {

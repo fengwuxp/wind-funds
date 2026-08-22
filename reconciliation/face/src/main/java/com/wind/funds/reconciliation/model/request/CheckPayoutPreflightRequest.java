@@ -51,10 +51,6 @@ public class CheckPayoutPreflightRequest implements Serializable {
     @Schema(description = "通道引用")
     private String channelRef;
 
-    @Schema(description = "出款前必须消费的对账运行结果流水号")
-    @NotBlank
-    private String reconciliationRunResultSn;
-
     @Schema(description = "外部规则核验证据引用，仅作审计引用；准入通过以结构化核验证据为准")
     private String ruleEvidenceRef;
 

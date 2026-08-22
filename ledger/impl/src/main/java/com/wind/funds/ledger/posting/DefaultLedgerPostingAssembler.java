@@ -11,7 +11,10 @@ import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.exception.AssertUtils;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -25,6 +28,7 @@ import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.support.FundsContextVariables;
@@ -60,8 +64,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * 默认 Route -> Posting 翻译器。
@@ -95,6 +97,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
     private static final int POSTING_PLAN_ID_DIGEST_LENGTH = 16;
 
     private final LedgerService ledgerService;
+
+    private final LedgerProfileCatalog ledgerProfileCatalog;
 
     private final LedgerPostingPlanMapper ledgerPostingPlanMapper;
 
@@ -190,10 +194,22 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 ? resolveInstructionPeriodType(instruction) : originalPosting.periodType();
         String periodId = originalPosting == null
                 ? resolveInstructionPeriodId(instruction, periodType) : originalPosting.periodId();
-        MovementDirection sourceDirection = route.getEventType() == FundsTransactionEventType.LIMIT_ADJUST
-                ? limitAdjustDirection(balanceEffectType) : MovementDirection.DECREASE;
-        MovementDirection targetDirection = route.getEventType() == FundsTransactionEventType.LIMIT_ADJUST
-                ? limitAdjustDirection(balanceEffectType) : MovementDirection.INCREASE;
+        MovementDirection sourceDirection;
+        MovementDirection targetDirection;
+        if (route.getEventType() == FundsTransactionEventType.BALANCE_ADJUST
+                || route.getEventType() == FundsTransactionEventType.LIMIT_ADJUST) {
+            sourceDirection = adjustmentDirection(balanceEffectType);
+            targetDirection = sourceDirection;
+        } else if (leg.getLegType() == RouteLegType.EXTERNAL_IN) {
+            sourceDirection = MovementDirection.INCREASE;
+            targetDirection = MovementDirection.INCREASE;
+        } else if (leg.getLegType() == RouteLegType.EXTERNAL_OUT) {
+            sourceDirection = MovementDirection.DECREASE;
+            targetDirection = MovementDirection.DECREASE;
+        } else {
+            sourceDirection = MovementDirection.DECREASE;
+            targetDirection = MovementDirection.INCREASE;
+        }
         return new PostingSemantics(
                 resolveSubjectCode(instruction, route, leg, leg.getSourceNode(), true, originalPosting),
                 resolveSubjectCode(instruction, route, leg, leg.getTargetNode(), false, originalPosting),
@@ -201,7 +217,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 periodId,
                 balanceEffectType,
                 resolvePhaseCode(route, leg),
-                resolveSourceConstraint(instruction, route, leg, balanceEffectType),
+                resolveSourceConstraint(route, leg, balanceEffectType),
                 sourceDirection,
                 targetDirection);
     }
@@ -269,6 +285,12 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         AssertUtils.equals(ledger.getCurrency(), leg.getAmount().getCurrency(),
                 "账本币种与路径金额币种不一致，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
                 subjectRef.getSubjectId(), subjectRef.getSubjectType(), subjectCode);
+        assertCatalogIntegrity(key, ledger);
+        if (route.getEventType() == FundsTransactionEventType.SETTLEMENT_RELEASE) {
+            LedgerProfileCode profileCode = requireProfileCode(ledger.getLedgerProfileCode());
+            ledgerProfileCatalog.requireItems(profileCode,
+                    LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN);
+        }
         return ledger;
     }
 
@@ -281,8 +303,45 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                         .setPeriodType(key.periodType())
                         .setPeriodId(key.periodId()),
                 DefaultPageQueryOptions.result(LedgerSubjectCode.values().length)).getRecords();
-        return records.stream()
-                .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, Function.identity()));
+        Map<LedgerSubjectCode, LedgerDTO> result = new LinkedHashMap<>();
+        for (LedgerDTO record : records) {
+            AssertUtils.isFalse(result.containsKey(record.getLedgerSubjectCode()),
+                    "账本不存在或不唯一，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, periodType = {}, periodId = {}",
+                    key.subjectId(), key.subjectType(), record.getLedgerSubjectCode(), key.periodType(), key.periodId());
+            result.put(record.getLedgerSubjectCode(), record);
+        }
+        return result;
+    }
+
+    private void assertCatalogIntegrity(LedgerBucketGroupKey key, LedgerDTO ledger) {
+        CreateLedgerRequest expected = ledgerProfileCatalog.requiredLedgerRequests(
+                        new InitializeSubjectLedgerRequest()
+                                .setTenantId(key.tenantId())
+                                .setSubjectId(key.subjectId())
+                                .setSubjectType(key.subjectType())
+                                .setCurrency(key.currency())
+                                .setLedgerProfileCode(requireProfileCode(ledger.getLedgerProfileCode()))
+                                .setLedgerProfileVersion(ledger.getLedgerProfileVersion())
+                                .setPeriodType(key.periodType())
+                                .setPeriodId(key.periodId()))
+                .stream()
+                .filter(candidate -> candidate.getLedgerSubjectCode() == ledger.getLedgerSubjectCode())
+                .findFirst()
+                .orElse(null);
+        AssertUtils.notNull(expected,
+                "LedgerProfileItem 不存在，profileCode = {}, subjectCode = {}",
+                ledger.getLedgerProfileCode(), ledger.getLedgerSubjectCode());
+        ledgerProfileCatalog.assertLedgerMatches(expected, ledger);
+    }
+
+    private LedgerProfileCode requireProfileCode(String rawProfileCode) {
+        for (LedgerProfileCode candidate : LedgerProfileCode.values()) {
+            if (candidate.name().equals(rawProfileCode)) {
+                return candidate;
+            }
+        }
+        AssertUtils.isTrue(false, "LedgerProfile 不存在，profileCode = {}", rawProfileCode);
+        throw new IllegalStateException("unreachable");
     }
 
     private AccountBalancePeriodType resolveInstructionPeriodType(FundsInstructionSpec instruction) {
@@ -536,8 +595,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         };
     }
 
-    private LedgerBalanceConstraintType resolveSourceConstraint(FundsInstructionSpec instruction,
-                                                                ResolvedRouteSpec route,
+    private LedgerBalanceConstraintType resolveSourceConstraint(ResolvedRouteSpec route,
                                                                 RouteLegSpec leg,
                                                                 LedgerBalanceEffectType balanceEffectType) {
         if (isFeeChargeLeg(route, leg)) {
@@ -549,22 +607,17 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                     ? LedgerBalanceConstraintType.PROFILE_DEFAULT
                     : LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
             case BALANCE_ADJUST, LIMIT_ADJUST -> balanceEffectType == LedgerBalanceEffectType.DECREASE
-                    ? adjustmentConstraint(instruction) : LedgerBalanceConstraintType.PROFILE_DEFAULT;
+                    ? LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE
+                    : LedgerBalanceConstraintType.PROFILE_DEFAULT;
             default -> LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
         };
     }
 
-    private LedgerBalanceConstraintType adjustmentConstraint(FundsInstructionSpec instruction) {
-        return Boolean.TRUE.equals(instruction.getContextVariables().get(FundsContextVariables.ALLOW_NEGATIVE_BALANCE))
-                ? LedgerBalanceConstraintType.ALLOW_NEGATIVE
-                : LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE;
-    }
-
-    private MovementDirection limitAdjustDirection(LedgerBalanceEffectType balanceEffectType) {
+    private MovementDirection adjustmentDirection(LedgerBalanceEffectType balanceEffectType) {
         return switch (balanceEffectType) {
             case INCREASE -> MovementDirection.INCREASE;
             case DECREASE -> MovementDirection.DECREASE;
-            default -> throw new IllegalArgumentException("LIMIT_ADJUST only supports INCREASE or DECREASE effect");
+            default -> throw new IllegalArgumentException("adjustment only supports INCREASE or DECREASE effect");
         };
     }
 

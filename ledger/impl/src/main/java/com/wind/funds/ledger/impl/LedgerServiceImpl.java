@@ -5,8 +5,10 @@ import com.wind.funds.ledger.dal.entities.table.LedgerNameRefs;
 import com.wind.funds.ledger.dal.mapper.LedgerMapper;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerStateRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -28,7 +30,9 @@ import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalTime;
@@ -49,6 +53,26 @@ import java.util.Objects;
 public class LedgerServiceImpl implements LedgerService {
 
     private final LedgerMapper ledgerMapper;
+
+    private final LedgerProfileCatalog ledgerProfileCatalog;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void initializeRequiredLedgers(@NonNull InitializeSubjectLedgerRequest request) {
+        List<CreateLedgerRequest> expectedLedgers = ledgerProfileCatalog.requiredLedgerRequests(request);
+        try {
+            for (CreateLedgerRequest expected : expectedLedgers) {
+                LedgerDTO existingLedger = findExistingLedger(expected);
+                if (existingLedger == null) {
+                    createLedger(expected);
+                } else {
+                    ledgerProfileCatalog.assertLedgerMatches(expected, existingLedger);
+                }
+            }
+        } catch (DuplicateKeyException exception) {
+            assertConcurrentWinnerMatches(expectedLedgers, exception);
+        }
+    }
 
     @Override
     public @NonNull Long createLedger(@NonNull CreateLedgerRequest request) {
@@ -135,6 +159,34 @@ public class LedgerServiceImpl implements LedgerService {
         Ledger result = ledgerMapper.selectOneById(id);
         AssertUtils.notNull(result, "账户账本不存在");
         return result;
+    }
+
+    private LedgerDTO findExistingLedger(CreateLedgerRequest expected) {
+        List<LedgerDTO> records = queryLedgers(new LedgerQuery()
+                        .setTenantId(expected.getTenantId())
+                        .setSubjectId(expected.getSubjectId())
+                        .setSubjectType(expected.getSubjectType())
+                        .setCurrency(expected.getCurrency())
+                        .setLedgerSubjectCode(expected.getLedgerSubjectCode())
+                        .setPeriodType(expected.getPeriodType())
+                        .setPeriodId(expected.getPeriodId()),
+                com.wind.common.query.supports.DefaultPageQueryOptions.defaults(2)).getRecords();
+        AssertUtils.isTrue(records.size() <= 1,
+                "账本唯一桶配置不唯一，subjectId = {}, ledgerSubjectCode = {}, currency = {}, periodType = {}, periodId = {}",
+                expected.getSubjectId(), expected.getLedgerSubjectCode(), expected.getCurrency(),
+                expected.getPeriodType(), expected.getPeriodId());
+        return records.isEmpty() ? null : records.getFirst();
+    }
+
+    private void assertConcurrentWinnerMatches(List<CreateLedgerRequest> expectedLedgers,
+                                               DuplicateKeyException exception) {
+        for (CreateLedgerRequest expected : expectedLedgers) {
+            LedgerDTO existingLedger = findExistingLedger(expected);
+            if (existingLedger == null) {
+                throw exception;
+            }
+            ledgerProfileCatalog.assertLedgerMatches(expected, existingLedger);
+        }
     }
 
     private void assertCloseableBalance(Ledger ledger, LedgerState targetState) {

@@ -5,6 +5,7 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
 import com.wind.funds.reconciliation.application.clearing.ClearingBatchApplicationService;
 import com.wind.funds.reconciliation.application.clearing.impl.ClearingBatchApplicationServiceImpl;
@@ -13,14 +14,10 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ClearingCandidateState;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ClearingBatchDTO;
 import com.wind.funds.reconciliation.model.query.ClearingBatchQuery;
 import com.wind.funds.reconciliation.model.request.ConfirmClearingBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateClearingBatchRequest;
-import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.model.request.ReplaceClearingBatchCandidatesRequest;
 import com.wind.funds.reconciliation.model.request.ReturnClearingBatchToDraftRequest;
@@ -153,7 +150,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
     @Test
     void testDeterministicFundsRejectionShouldFailBatchAndBlockCandidates() {
         FundsAccountId accountId = fundingAccount("cb_insufficient");
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         String candidateSn = prepareCandidate(accountId, 100L, "011");
@@ -238,7 +235,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
     }
 
     @Test
-    void testQueryShouldDiscoverClearingBatchesByStateAndAge() {
+    void testQueryShouldDiscoverClearingBatchesByStatusAndAge() {
         FundsAccountId accountId = fundingAccount("cb_query");
         String candidateSn = prepareCandidate(accountId, 100L, "041");
         ClearingBatchDTO created = clearingBatchApplicationService.createBatch(
@@ -264,7 +261,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
     }
 
     private void prepareClearingBalance(FundsAccountId accountId, long amount, String suffix) {
-        ensureFundingAccount(accountId);
+        ensureFundingAccount(accountId, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(accountId, LedgerSubjectCode.CLEARING);
         ensureLedger(accountId, LedgerSubjectCode.AVAILABLE);
         FundsAccountId payer = fundingAccount("cb_payer_" + suffix);
@@ -306,23 +303,17 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 CURRENCY.name(), amount, routeSnapshot);
         String referenceSourceRef = "internal:" + transactionDetailSn;
         String comparisonSourceRef = "external:" + transactionDetailSn;
+        String candidateSn = "CLC" + suffix;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, reconciliationBatchSn,
-                ReconciliationGateObjectType.CLEARING, transactionDetailSn, "recon-rule-1",
+                "CLEARING_CONFIRM_ITEM", candidateSn, "recon-rule-1",
                 "report:clearing-" + suffix, referenceSourceRef, comparisonSourceRef);
-        String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
+        String runResultSn = reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()
                         .setTenantId(TENANT_ID)
-                        .setReconciliationBatchSn(reconciliationBatchSn)
-                        .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                                .setReferenceSourceRef(referenceSourceRef)
-                                .setComparisonSourceRef(comparisonSourceRef)
-                                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
-                                .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                                .setEvidenceRef("report:clearing-" + suffix + "#line-1"))),
+                        .setReconciliationBatchSn(reconciliationBatchSn),
                 WindOperatorFactory.system()).getSn();
         String resultDigest = jdbcTemplate.queryForObject(
                 "SELECT result_digest FROM t_reconciliation_run_result WHERE sn = ?", String.class, runResultSn);
-        String candidateSn = "CLC" + suffix;
         String splittableDetailSn = "CSD" + suffix;
         String sourceDigest = FundsStableHashSupport.sha256Json(Map.of("source", suffix));
         String candidateDigest = FundsStableHashSupport.sha256Json(Map.of("candidate", suffix));
@@ -332,18 +323,18 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                             subject_type, subject_id, currency, business_line, clearing_period, amount,
                             funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn,
                             posting_plan_sn, ledger_entry_sn, route_snapshot_digest, clearing_available_time,
-                            clearing_rule_code, clearing_rule_version, reconciliation_run_result_sn,
-                            reconciliation_result_digest, reconciliation_evidence_refs, source_digest,
+                            clearing_rule_code, clearing_rule_version, gate_evidence_ref,
+                            reconciliation_evidence_refs, source_digest,
                             candidate_digest, active_splittable_detail_sn, status, created_by
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY', 'system')
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY', 'system')
                         """,
                 candidateSn, TENANT_ID, "split_result_" + suffix, "split_batch_" + suffix,
                 splittableDetailSn, accountId.type(), accountId.id(), CURRENCY.name(), BUSINESS_LINE,
                 CLEARING_PERIOD, amount, transactionSn, transactionDetailSn, "ledger_tx_" + suffix,
                 "posting_plan_" + suffix, "ledger_entry_" + suffix,
                 FundsStableHashSupport.sha256Json(Map.of("routeSnapshot", routeSnapshot)),
-                LocalDateTime.now().minusMinutes(1), "MERCHANT_DAILY_CLEARING", "1", runResultSn,
-                resultDigest, "[\"report:clearing-" + suffix + "\"]", sourceDigest, candidateDigest,
+                LocalDateTime.now().minusMinutes(1), "MERCHANT_DAILY_CLEARING", "1",
+                "gate-evidence:" + suffix, "[\"report:clearing-" + suffix + "\"]", sourceDigest, candidateDigest,
                 splittableDetailSn);
         return candidateSn;
     }

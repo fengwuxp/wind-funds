@@ -32,8 +32,6 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
-import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
-import com.wind.funds.wallet.service.LedgerQueryService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -43,7 +41,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -60,15 +57,11 @@ public class FundsDirectTransactionInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
-    private final LedgerQueryService ledgerQueryService;
-
     @Autowired
     public FundsDirectTransactionInstructionConverter(@NonNull PlatformFundingAccountService platformFundingAccountService,
-                                                     @NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                     @NonNull LedgerQueryService ledgerQueryService) {
+                                                     @NonNull FundsAccountQueryService fundsAccountQueryService) {
         this.platformFundingAccountService = platformFundingAccountService;
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
-        this.ledgerQueryService = ledgerQueryService;
     }
 
     public @NonNull FundsInstructionSpec convertToTopupInstruction(@NonNull FundsTransactionTopupRequest request,
@@ -192,7 +185,8 @@ public class FundsDirectTransactionInstructionConverter {
     }
 
     public @NonNull FundsInstructionSpec convertToRefundInstruction(@NonNull FundsTransactionRefundRequest request,
-                                                                    @NonNull WindOperator operator) {
+                                                                    @NonNull WindOperator operator,
+                                                                    @Nullable String referenceLedgerTransactionSn) {
         boolean referencedRefund = StringUtils.hasText(request.getReferenceTransactionSn());
         ConvertedAmount amount = referencedRefund
                 ? referencedRefundAmount(request)
@@ -216,7 +210,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .accountId(request.getAccountId())
                 .payerId(request.getPayerId())
                 .payerLedgerSubjectCode(request.getPayerLedgerSubjectCode())
-                .reference(refundReference(request))
+                .reference(refundReference(request, referenceLedgerTransactionSn))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -246,10 +240,13 @@ public class FundsDirectTransactionInstructionConverter {
         return amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
     }
 
-    private @Nullable FundsInstructionReferenceSpec refundReference(@NonNull FundsTransactionRefundRequest request) {
+    private @Nullable FundsInstructionReferenceSpec refundReference(
+            @NonNull FundsTransactionRefundRequest request,
+            @Nullable String referenceLedgerTransactionSn) {
         if (StringUtils.hasText(request.getReferenceTransactionSn())) {
+            AssertUtils.hasText(referenceLedgerTransactionSn, "关联退款原账本交易流水不能为空");
             return reference(FundsInstructionReferenceType.ORIGINAL_TRANSACTION, request.getReferenceTransactionSn(),
-                    referenceLedgerTransactionSn(request.getReferenceTransactionSn()), null);
+                    referenceLedgerTransactionSn, null);
         }
         if (request.getChannelTransactionSn() == null) {
             return null;
@@ -322,7 +319,8 @@ public class FundsDirectTransactionInstructionConverter {
     }
 
     public @NonNull FundsInstructionSpec convertToFeeRefundInstruction(@NonNull FundsTransactionFeeRefundRequest request,
-                                                                       @NonNull WindOperator operator) {
+                                                                       @NonNull WindOperator operator,
+                                                                       @NonNull String referenceLedgerTransactionSn) {
         AssertUtils.notNull(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
         AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
@@ -340,7 +338,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
                 .reference(reference(FundsInstructionReferenceType.FEE, request.getFeeSourceTransactionSn(),
-                        referenceLedgerTransactionSn(request.getFeeSourceTransactionSn()), null))
+                        referenceLedgerTransactionSn, null))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -385,14 +383,6 @@ public class FundsDirectTransactionInstructionConverter {
                 .externalTransactionId(externalTransactionId)
                 .contextVariables(Map.of())
                 .build();
-    }
-
-    private @NonNull String referenceLedgerTransactionSn(@NonNull String referenceTransactionSn) {
-        List<LedgerTransactionFactDTO> records = ledgerQueryService.queryLedgerTransactions(
-                TenantContextHolder.requireTenantId(), referenceTransactionSn, null, 2);
-        AssertUtils.isTrue(records.size() == 1,
-                "原资金交易账本流水不存在或不唯一，referenceTransactionSn = {}", referenceTransactionSn);
-        return records.getFirst().getSn();
     }
 
     private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,

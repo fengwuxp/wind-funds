@@ -4,10 +4,8 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
-import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
-import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
-import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
+import com.wind.funds.reconciliation.enums.ReconciliationMatchResultKind;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -48,32 +46,37 @@ public class ReconciliationMatchResult implements Serializable, TenantIsolationO
     @NotNull
     private String reconciliationBatchSn;
 
-    private String referenceSourceRef;
+    private String referenceFactOwnerNamespace;
 
-    private String comparisonSourceRef;
+    private String referenceFactIdentityValue;
 
-    @NotNull
-    private ReconciliationSourceQuality sourceQuality;
+    private String comparisonFactOwnerNamespace;
 
-    @NotNull
-    private ReconciliationMatchStrength matchStrength;
-
-    private ReconciliationDifferenceType differenceType;
-
-    private ReconciliationDifferenceSeverity severity;
-
-    private CurrencyIsoCode currency;
-
-    private Long differenceAmount;
+    private String comparisonFactIdentityValue;
 
     @NotNull
-    private String evidenceRef;
+    private String comparisonOwnerNamespace;
+
+    @NotNull
+    private String comparisonIdentityValue;
+
+    @NotNull
+    private ReconciliationMatchResultKind resultKind;
+
+    private CurrencyIsoCode absoluteDifferenceCurrency;
+
+    private Long absoluteDifferenceAmount;
+
+    private ReconciliationSourceRole largerSide;
+
+    @NotNull
+    private String evidenceRefs;
 
     @NotNull
     private String matchIdentityDigest;
 
     @NotNull
-    private String matchDigest;
+    private String resultDigest;
 
     @NotNull
     private String createdBy;

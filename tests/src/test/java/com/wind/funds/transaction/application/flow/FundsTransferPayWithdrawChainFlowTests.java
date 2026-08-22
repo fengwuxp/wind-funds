@@ -8,6 +8,7 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsFrozenOrderState;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
         FundsAccountId merchant = fundingAccount("merchant_payee");
         ensureLedger(accountB, LedgerSubjectCode.AVAILABLE);
         ensureLedger(accountB, LedgerSubjectCode.FROZEN);
+        ensureFundingAccount(merchant, LedgerProfileCode.FUNDING_MERCHANT);
         ensureLedger(merchant, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot before = snapshot(balances(accountA, accountB, merchant, cashMappingAccount(),
@@ -51,7 +53,7 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
                 delta(accountB, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(accountB, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -200L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 200L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         transfer(accountA, accountB, 120L, "CHAIN_TRANSFER_PAY_WITHDRAW_TRANSFER");
@@ -99,7 +101,7 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
                 delta(accountB, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(accountB, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         assertBucket(balance(accountA), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
@@ -107,7 +109,7 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(accountB), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(accountB), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(merchant), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY);
-        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_840L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_160L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(5);

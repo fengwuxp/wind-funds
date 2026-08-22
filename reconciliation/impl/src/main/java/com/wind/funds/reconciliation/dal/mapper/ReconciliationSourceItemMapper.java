@@ -19,7 +19,7 @@ public interface ReconciliationSourceItemMapper extends BaseMapper<Reconciliatio
             FROM t_reconciliation_source_item
             WHERE tenant_id = #{tenantId}
               AND source_snapshot_sn = #{sourceSnapshotSn}
-            ORDER BY source_item_ref
+            ORDER BY source_fact_owner_namespace, source_fact_identity_value
             """)
     List<ReconciliationSourceItem> selectBySnapshot(@Param("tenantId") Long tenantId,
                                                     @Param("sourceSnapshotSn") String sourceSnapshotSn);
