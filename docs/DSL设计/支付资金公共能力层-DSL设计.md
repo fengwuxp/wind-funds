@@ -4,9 +4,8 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| DSL 基线阶段 | `W2-02 / INSTRUCTION_FACT_ROUTE_LEDGER_REVERSAL_BOUNDARY` |
-| DSL 基线状态 | `BOUNDARY_CANDIDATE / INDEPENDENT_CHECKER_PASS / 0 P0-P2` |
-| 当前执行入口 | `plan-r2.260 / W5-MIG08-CAPTE-BENEFIT-ACTIONFACT-CONSUMER-E4-ASSESSMENT-ENTRY-CARD-001 / E4_BLOCKED_LINEAGE / E4_ASSESSMENT_ENTRY_CARD_INDEPENDENT_CHECKER_PENDING / E4_EXECUTION_GRANT_NO / DOCUMENTATION_ONLY / CODE_FREEZE`；E4 缺口只在制品谱系，不新增或改写 DSL |
+| DSL 基线 | 跨场景稳定词汇、资金指令、动作事实、路径、账务、逆向与证据边界 |
+| 执行记录 | 当前任务、验证状态、授权和恢复入口统一见 [重设计执行规格](../../openspec/changes/funds-public-capability-redesign/spec.md)；本文不承载运行态 |
 | 产品输入 | [支付资金公共能力层产品设计](../产品设计/支付资金公共能力层-产品设计.md) 的 `G1 PASS` 与 Product Context Card |
 | DSL Owner | Funds DSL Owner；Funds Product、架构、Consumer 与测试角色共同挑战 |
 | 权威范围 | 跨场景稳定词汇、事实层级、引用语义、序列化候选和负例 |
@@ -1158,10 +1157,4 @@ Consumer RED 未引入新 DSL，只以十个精准失败验证 10.33 已有词�
 
 Green 没有新增或改写 DSL：`businessScene + businessSn` 仍只是关联键，`benefitTransactionSn` 仍是执行引用，唯一 `succeeded + proven-full` ActionFact 仍只证明本层 Funds 动作结果。Capte 已用这一既有词义关闭 settle、已有 reference、原 primary、existing recovery、root-only 和 refund returned intentRef 场景，目标源码中的旧主交易完成判定为零。
 
-因此该轮只形成“真实 Consumer 可以使用现有 DSL”的 E3/集成候选证据，不把 ActionFact 升级成 Coupon、Ledger、Balance、finality、Reconciliation 或全局 completion DSL。独立 Green 与 closeout Checker 均=`PASS / 0 P0 / 0 P1 / 0 P2`；该 closeout 当时进入 E4 assessment Entry Card，现由 10.36 的 `plan-r2.260` 承接。
-
-### 10.36 `MIG-08` ActionFact Consumer E4 谱系评估
-
-本轮没有 DSL 变更。`businessScene + businessSn`、`intentRef`、ActionFact identity、`succeeded` 与 `proven-full` 的词义已被 Consumer Green 验证；E4 只回答承载这些词义的 Provider source、binary、Consumer resolved/loaded artifact 是否是同一份内容。
-
-评估时 face 的四个 ActionFact 源文件和对应 class 与已安装制品一致，但 impl 源码/class 不一致，且该本地 Snapshot 无 source revision；随后并发 clean 清除了 workspace target JAR，因此 target 哈希只保留为评估时观察，不作为最终 live 证据。`E4_BLOCKED_LINEAGE` 不代表 DSL 需要扩展；后续只允许以唯一版本离线重建和对账关闭谱系，任何需要新增 DSL/API/兼容读法的情况立即停止交还 Owner。
+因此该结论只说明真实 Consumer 可以使用现有 DSL，不把 ActionFact 升级成 Coupon、Ledger、Balance、finality、Reconciliation 或全局 completion DSL，也不构成 E4 制品谱系证明；后续执行状态和验证明细统一见 [重设计执行规格](../../openspec/changes/funds-public-capability-redesign/spec.md)。
