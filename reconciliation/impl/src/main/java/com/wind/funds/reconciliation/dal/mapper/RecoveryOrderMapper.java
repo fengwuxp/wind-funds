@@ -2,6 +2,7 @@ package com.wind.funds.reconciliation.dal.mapper;
 
 import com.mybatisflex.core.BaseMapper;
 import com.wind.funds.reconciliation.dal.entities.RecoveryOrder;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -36,7 +37,7 @@ public interface RecoveryOrderMapper extends BaseMapper<RecoveryOrder> {
                                  @Param("sourceSn") String sourceSn,
                                  @Param("responsibleSubjectType") String responsibleSubjectType,
                                  @Param("responsibleSubjectId") String responsibleSubjectId,
-                                 @Param("currency") String currency);
+                                 @Param("currency") CurrencyIsoCode currency);
 
     @Select("""
             SELECT * FROM t_recovery_order
@@ -53,5 +54,5 @@ public interface RecoveryOrderMapper extends BaseMapper<RecoveryOrder> {
                                           @Param("sourceSn") String sourceSn,
                                           @Param("responsibleSubjectType") String responsibleSubjectType,
                                           @Param("responsibleSubjectId") String responsibleSubjectId,
-                                          @Param("currency") String currency);
+                                          @Param("currency") CurrencyIsoCode currency);
 }

@@ -242,13 +242,13 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
 
     private RecoveryOrder selectBySource(CreateRecoveryOrderRequest request) {
         return recoveryOrderMapper.selectBySource(request.getTenantId(), request.getSourceType(), request.getSourceSn(),
-                request.getResponsibleSubjectType(), request.getResponsibleSubjectId(), request.getCurrency().name());
+                request.getResponsibleSubjectType(), request.getResponsibleSubjectId(), request.getCurrency());
     }
 
     private RecoveryOrder selectBySourceForUpdate(CreateRecoveryOrderRequest request) {
         return recoveryOrderMapper.selectBySourceForUpdate(request.getTenantId(), request.getSourceType(),
                 request.getSourceSn(), request.getResponsibleSubjectType(), request.getResponsibleSubjectId(),
-                request.getCurrency().name());
+                request.getCurrency());
     }
 
     private RecoveryOrder requiredOrder(Long tenantId, String recoveryOrderSn) {

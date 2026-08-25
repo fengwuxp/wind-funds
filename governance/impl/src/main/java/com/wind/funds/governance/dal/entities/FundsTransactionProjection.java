@@ -5,6 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -48,7 +49,7 @@ public class FundsTransactionProjection implements TenantIsolationObject<Long> {
 
     private Long amount;
 
-    private String currency;
+    private CurrencyIsoCode currency;
 
     private LocalDateTime occurredTime;
 
