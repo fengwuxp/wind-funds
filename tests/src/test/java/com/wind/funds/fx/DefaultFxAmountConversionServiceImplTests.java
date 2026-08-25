@@ -31,7 +31,7 @@ class DefaultFxAmountConversionServiceImplTests {
     private final FxAmountConversionService service = new DefaultFxAmountConversionServiceImpl(rateProvider);
 
     @Test
-    void shouldCalculateWithExplicitAppliedRate() {
+    void testShouldCalculateWithExplicitAppliedRate() {
         FxAppliedRate appliedRate = appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "7.12");
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate);
@@ -51,7 +51,7 @@ class DefaultFxAmountConversionServiceImplTests {
             "BID, 7.08, 70800",
             "ASK, 7.12, 71200"
     })
-    void shouldFetchSnapshotAndUseExplicitPriceType(FxPriceType priceType,
+    void testShouldFetchSnapshotAndUseExplicitPriceType(FxPriceType priceType,
                                                      String expectedRate,
                                                      long expectedAmount) {
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.CNY)
@@ -70,7 +70,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldUseHalfUpRoundingByDefault() {
+    void testShouldUseHalfUpRoundingByDefault() {
         FxAmountConversionRequest request = request(100L, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "1.005"));
 
@@ -80,7 +80,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldUseRequestedRoundingMode() {
+    void testShouldUseRequestedRoundingMode() {
         FxAmountConversionRequest request = request(100L, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "1.005"))
                 .setRoundingMode(RoundingMode.DOWN);
@@ -91,7 +91,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectTargetAmountOverflow() {
+    void testShouldRejectTargetAmountOverflow() {
         FxAmountConversionRequest request = request(Long.MAX_VALUE, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "2"));
 
@@ -100,7 +100,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectTargetAmountRoundedToZero() {
+    void testShouldRejectTargetAmountRoundedToZero() {
         FxAmountConversionRequest request = request(1L, CurrencyIsoCode.JPY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.JPY, "0.4"));
 
@@ -109,7 +109,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldConvertFromThreeDecimalCurrency() {
+    void testShouldConvertFromThreeDecimalCurrency() {
         FxAmountConversionRequest request = request(1_000L, CurrencyIsoCode.KWD, CurrencyIsoCode.USD)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.KWD, CurrencyIsoCode.USD, "3.25"));
 
@@ -119,7 +119,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRoundTargetThreeDecimalCurrency() {
+    void testShouldRoundTargetThreeDecimalCurrency() {
         FxAmountConversionRequest request = request(100L, CurrencyIsoCode.KWD)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.KWD, "0.3075"));
 
@@ -129,7 +129,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRoundTargetZeroDecimalCurrencyToWholeMinorUnit() {
+    void testShouldRoundTargetZeroDecimalCurrencyToWholeMinorUnit() {
         FxAmountConversionRequest request = request(100L, CurrencyIsoCode.JPY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.JPY, "150.5"));
 
@@ -139,7 +139,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectUnknownSourceCurrency() {
+    void testShouldRejectUnknownSourceCurrency() {
         FxAmountConversionRequest request = request(100L, CurrencyIsoCode.UNKNOWN, CurrencyIsoCode.USD);
 
         assertThatThrownBy(() -> service.calculate(request))
@@ -147,13 +147,13 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectUnknownTargetCurrency() {
+    void testShouldRejectUnknownTargetCurrency() {
         assertThatThrownBy(() -> service.calculate(request(100L, CurrencyIsoCode.UNKNOWN)))
                 .hasMessageContaining("外汇金额换算目标币种不能为 UNKNOWN");
     }
 
     @Test
-    void shouldRejectMismatchedAppliedRateCurrencyPair() {
+    void testShouldRejectMismatchedAppliedRateCurrencyPair() {
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.EUR, "0.92"));
 
@@ -162,14 +162,14 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRequireAppliedRateOrPriceTypeForCrossCurrency() {
+    void testShouldRequireAppliedRateOrPriceTypeForCrossCurrency() {
         assertThatThrownBy(() -> service.calculate(request(10_000L, CurrencyIsoCode.CNY)))
                 .hasMessageContaining("跨币种换算必须提供应用汇率或来源价格类型");
         assertThat(rateProviderCalls).hasValue(0);
     }
 
     @Test
-    void shouldRejectAppliedRateAndPriceTypeTogether() {
+    void testShouldRejectAppliedRateAndPriceTypeTogether() {
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.CNY)
                 .setAppliedRate(appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "7.12"))
                 .setPriceType(FxPriceType.ASK);
@@ -180,7 +180,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectPriceTypeForSameCurrency() {
+    void testShouldRejectPriceTypeForSameCurrency() {
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.USD)
                 .setPriceType(FxPriceType.MID);
 
@@ -190,7 +190,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectMismatchedProviderSnapshotCurrencyPair() {
+    void testShouldRejectMismatchedProviderSnapshotCurrencyPair() {
         FxRateProvider mismatchedProvider = (sourceCurrency, targetCurrency) ->
                 snapshot(CurrencyIsoCode.USD, CurrencyIsoCode.EUR, "0.90", "0.89", "0.91");
         FxAmountConversionService mismatchedProviderService =
@@ -203,7 +203,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldPropagateRateProviderFailureWithoutFallback() {
+    void testShouldPropagateRateProviderFailureWithoutFallback() {
         IllegalStateException providerFailure = new IllegalStateException("FX provider unavailable");
         FxRateProvider unavailableProvider = (sourceCurrency, targetCurrency) -> {
             throw providerFailure;
@@ -218,7 +218,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldUseIdentityRateForSameCurrency() {
+    void testShouldUseIdentityRateForSameCurrency() {
         FxAmountConversionRequest request = request(10_000L, CurrencyIsoCode.USD);
 
         FxAmountConversionResult result = service.calculate(request);
@@ -231,7 +231,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldAllowExplicitIdentityRateForSameCurrency() {
+    void testShouldAllowExplicitIdentityRateForSameCurrency() {
         FxAppliedRate appliedRate = FxAppliedRate.builder()
                 .rateId("QUOTE-001")
                 .sourceCurrency(CurrencyIsoCode.USD)
@@ -248,14 +248,14 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectNonPositiveAppliedRateAtConstruction() {
+    void testShouldRejectNonPositiveAppliedRateAtConstruction() {
         assertThatThrownBy(() -> appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "0"))
                 .hasMessageContaining("应用汇率必须大于 0");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"0.123456789", "10000000000"})
-    void shouldRejectRateOutsideLedgerPrecision(String rate) {
+    void testShouldRejectRateOutsideLedgerPrecision(String rate) {
         assertThatThrownBy(() -> appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, rate))
                 .hasMessageContaining("应用汇率最多支持 10 位整数和 8 位小数");
         assertThatThrownBy(() -> TransactionAmount.converted(
@@ -266,19 +266,19 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectUnknownAppliedRateCurrencyAtConstruction() {
+    void testShouldRejectUnknownAppliedRateCurrencyAtConstruction() {
         assertThatThrownBy(() -> appliedRate(CurrencyIsoCode.UNKNOWN, CurrencyIsoCode.CNY, "1"))
                 .hasMessageContaining("应用汇率源币种不能为 UNKNOWN");
     }
 
     @Test
-    void shouldRejectNonIdentityRateForSameCurrencyAtConstruction() {
+    void testShouldRejectNonIdentityRateForSameCurrencyAtConstruction() {
         assertThatThrownBy(() -> appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.USD, "1.01"))
                 .hasMessageContaining("同币种应用汇率必须等于 1");
     }
 
     @Test
-    void shouldRejectNonPositiveRateSnapshotAtConstruction() {
+    void testShouldRejectNonPositiveRateSnapshotAtConstruction() {
         assertThatThrownBy(() -> snapshot(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, "7.10", "0", "7.12"))
                 .hasMessageContaining("汇率快照价格必须大于 0");
     }
@@ -288,13 +288,13 @@ class DefaultFxAmountConversionServiceImplTests {
             "7.10, 7.11, 7.12",
             "7.10, 7.08, 7.09"
     })
-    void shouldRejectCrossedRateSnapshotAtConstruction(String mid, String bid, String ask) {
+    void testShouldRejectCrossedRateSnapshotAtConstruction(String mid, String bid, String ask) {
         assertThatThrownBy(() -> snapshot(CurrencyIsoCode.USD, CurrencyIsoCode.CNY, mid, bid, ask))
                 .hasMessageContaining("汇率快照价格必须满足 bid <= mid <= ask");
     }
 
     @Test
-    void shouldRejectMismatchedAppliedRateAtConversionResultConstruction() {
+    void testShouldRejectMismatchedAppliedRateAtConversionResultConstruction() {
         Money sourceAmount = Money.immutable(10_000L, CurrencyIsoCode.USD);
         Money targetAmount = Money.immutable(9_200L, CurrencyIsoCode.EUR);
         FxAppliedRate mismatchedRate = appliedRate(CurrencyIsoCode.GBP, CurrencyIsoCode.CNY, "9.20");
@@ -304,7 +304,7 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectNonPositiveConversionResultAmounts() {
+    void testShouldRejectNonPositiveConversionResultAmounts() {
         FxAppliedRate rate = appliedRate(CurrencyIsoCode.USD, CurrencyIsoCode.EUR, "0.92");
 
         assertThatThrownBy(() -> new FxAmountConversionResult(
@@ -320,19 +320,19 @@ class DefaultFxAmountConversionServiceImplTests {
     }
 
     @Test
-    void shouldRejectSameCurrencyRateSnapshotAtConstruction() {
+    void testShouldRejectSameCurrencyRateSnapshotAtConstruction() {
         assertThatThrownBy(() -> snapshot(CurrencyIsoCode.USD, CurrencyIsoCode.USD, "1", "1", "1"))
                 .hasMessageContaining("汇率快照源币种与目标币种不能相同");
     }
 
     @Test
-    void shouldRejectUnknownRateSnapshotCurrencyAtConstruction() {
+    void testShouldRejectUnknownRateSnapshotCurrencyAtConstruction() {
         assertThatThrownBy(() -> snapshot(CurrencyIsoCode.USD, CurrencyIsoCode.UNKNOWN, "1", "1", "1"))
                 .hasMessageContaining("汇率快照目标币种不能为 UNKNOWN");
     }
 
     @Test
-    void shouldRequireRateSnapshotObservationTime() {
+    void testShouldRequireRateSnapshotObservationTime() {
         assertThatThrownBy(() -> FxRateSnapshot.builder()
                 .snapshotId("SNAPSHOT-001")
                 .sourceCurrency(CurrencyIsoCode.USD)

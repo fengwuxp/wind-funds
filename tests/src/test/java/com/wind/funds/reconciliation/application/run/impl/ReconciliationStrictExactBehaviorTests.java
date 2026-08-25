@@ -70,7 +70,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB01ShouldComputeMatchedBalancedAndReuseExactReplay() {
+    void testSrB01ShouldComputeMatchedBalancedAndReuseExactReplay() {
         assertBehavior("MIG07-SR-001", () -> {
             RecordReconciliationRunResultRequest request = readyRequest("sr-b01",
                     List.of(fact("reference-1", "payment-1", 60, CurrencyIsoCode.CNY,
@@ -96,7 +96,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB02ShouldClassifyEveryStrictMismatchWithoutCallerOverride() {
+    void testSrB02ShouldClassifyEveryStrictMismatchWithoutCallerOverride() {
         assertBehavior("MIG07-SR-002", () -> {
             assertMismatch("money", 60, CurrencyIsoCode.CNY, "CONFIRMED", "FUNDS", "PRINCIPAL",
                     "CREDIT", RULE_VERSION, 80, CurrencyIsoCode.CNY, "CONFIRMED", "FUNDS",
@@ -123,7 +123,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB03ShouldNeverBalanceMissingIncompleteOrBothEmptySources() {
+    void testSrB03ShouldNeverBalanceMissingIncompleteOrBothEmptySources() {
         assertBehavior("MIG07-SR-003", () -> {
             RecordReconciliationRunResultRequest missingComparison = readyRequest("sr-b03-missing",
                     List.of(standardFact("reference-1", "payment-1")), List.of(), true, true);
@@ -145,7 +145,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB04ShouldFailClosedOnComparisonOrSourceIdentityConflict() {
+    void testSrB04ShouldFailClosedOnComparisonOrSourceIdentityConflict() {
         assertBehavior("MIG07-SR-004", () -> {
             RecordReconciliationRunResultRequest request = readyRequest("sr-b04",
                     List.of(
@@ -168,7 +168,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB05ShouldReturnNotComparableWhenRuleEvidenceIsUnknown() {
+    void testSrB05ShouldReturnNotComparableWhenRuleEvidenceIsUnknown() {
         assertBehavior("MIG07-SR-005", () -> {
             RecordReconciliationRunResultRequest request = readyRequest("sr-b05",
                     List.of(standardFact("reference-1", "payment-1").setComparisonProven(false)),
@@ -185,7 +185,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB06ShouldTreatCarrierFormsAsEvidenceForOneSemanticFact() {
+    void testSrB06ShouldTreatCarrierFormsAsEvidenceForOneSemanticFact() {
         assertBehavior("MIG07-SR-006", () -> {
             List<String> evidence = List.of("file:statement.csv#line-1", "api:query-1", "event:event-1",
                     "report:daily-1");
@@ -203,7 +203,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB07ShouldRecoverOriginalIdentityAndFailClosedOnDurableTamper() {
+    void testSrB07ShouldRecoverOriginalIdentityAndFailClosedOnDurableTamper() {
         assertBehavior("MIG07-SR-007", () -> {
             RecordReconciliationRunResultRequest request = readyRequest("sr-b07",
                     List.of(standardFact("reference-1", "payment-1")),
@@ -224,7 +224,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB08ShouldExposeNoOperationalOverrideWriteBypass() {
+    void testSrB08ShouldExposeNoOperationalOverrideWriteBypass() {
         assertBehavior("MIG07-SR-008", () -> {
             Set<String> requestFields = Arrays.stream(RecordReconciliationRunResultRequest.class.getDeclaredFields())
                     .filter(field -> !field.isSynthetic())
@@ -241,7 +241,7 @@ class ReconciliationStrictExactBehaviorTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void srB09ShouldUseTheSharedSourceRunModelWithoutLegacyProductionSurface() {
+    void testSrB09ShouldUseTheSharedSourceRunModelWithoutLegacyProductionSurface() {
         assertBehavior("MIG07-SR-009", () -> {
             assertClassMissing("com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem");
             assertThat(Arrays.stream(ReconciliationRunResultApplicationService.class.getMethods())

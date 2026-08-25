@@ -188,7 +188,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB01ShouldRequireAndConsumeAllThreeMandatoryPairs() {
+    void testGtB01ShouldRequireAndConsumeAllThreeMandatoryPairs() {
         assertBehavior("MIG07-GATE-001", () -> {
             GateSetup setup = prepareGate("gt-b01", 3, 3);
             GateRequirementRef requirement = record(setup.request());
@@ -206,7 +206,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB02ShouldReplayDualDigestsAndAdvanceHeadWithCas() {
+    void testGtB02ShouldReplayDualDigestsAndAdvanceHeadWithCas() {
         assertBehavior("MIG07-GATE-002", () -> {
             GateSetup setup = prepareGate("gt-b02", 1, 1);
             GateRequirementRef first = record(setup.request());
@@ -229,7 +229,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB03ShouldBlockWholeStageWhenAnyMandatoryPairIsInvalid() {
+    void testGtB03ShouldBlockWholeStageWhenAnyMandatoryPairIsInvalid() {
         assertBehavior("MIG07-GATE-003", () -> {
             GateSetup missingSetup = prepareGate("gt-b03-missing", 3, 2);
             record(missingSetup.request());
@@ -279,7 +279,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB04ShouldHaveNoOptionalThresholdOrConditionalPassSurface() {
+    void testGtB04ShouldHaveNoOptionalThresholdOrConditionalPassSurface() {
         assertBehavior("MIG07-GATE-004", () -> {
             Set<String> fields = Arrays.stream(RecordReconciliationGateRequirementRequest.class.getDeclaredFields())
                     .filter(field -> !field.isSynthetic())
@@ -298,7 +298,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB05ShouldTreatInspectAsExplanationAndRecheckCurrentHead() {
+    void testGtB05ShouldTreatInspectAsExplanationAndRecheckCurrentHead() {
         assertBehavior("MIG07-GATE-005", () -> {
             GateSetup setup = prepareGate("gt-b05", 1, 1);
             record(setup.request());
@@ -317,7 +317,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB06ShouldCommitStageConsumptionEvidenceInTheCallerTransaction() {
+    void testGtB06ShouldCommitStageConsumptionEvidenceInTheCallerTransaction() {
         assertBehavior("MIG07-GATE-006", () -> {
             prepareStageSourceFacts();
             GateSetup setup = prepareGate("gt-b06", 1, 1, stageSourceRef());
@@ -344,7 +344,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB07ShouldSeparateRollbackProvenZeroAndUnknownFailureEvidence() {
+    void testGtB07ShouldSeparateRollbackProvenZeroAndUnknownFailureEvidence() {
         assertBehavior("MIG07-GATE-007A/B/C", () -> {
             prepareStageSourceFacts();
             GateSetup blockedSetup = prepareGate("gt-b07-blocked", 2, 1, stageSourceRef());
@@ -376,7 +376,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB08ShouldRecoverSameStageIdentityWithoutSecondAction() {
+    void testGtB08ShouldRecoverSameStageIdentityWithoutSecondAction() {
         assertBehavior("MIG07-GATE-008", () -> {
             GateSetup setup = prepareGate("gt-b08", 1, 1);
             GateRequirementRef requirement = record(setup.request());
@@ -398,7 +398,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB09ShouldResolveBlockersOnlyThroughCurrentPairLineage() {
+    void testGtB09ShouldResolveBlockersOnlyThroughCurrentPairLineage() {
         assertBehavior("MIG07-GATE-009", () -> {
             GateSetup setup = prepareGate("gt-b09", 1, 1);
             record(setup.request());
@@ -424,7 +424,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     @Test
-    void gtB10ShouldUseOnlyTheRequirementBasedGateSurface() {
+    void testGtB10ShouldUseOnlyTheRequirementBasedGateSurface() {
         assertBehavior("MIG07-GATE-010", () -> {
             assertClassMissing("com.wind.funds.reconciliation.model.request.CheckClearingSettlementGateRequest");
             assertClassMissing("com.wind.funds.reconciliation.model.dto.ClearingSettlementGateResultDTO");
