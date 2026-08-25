@@ -21,6 +21,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
@@ -33,7 +34,7 @@ import java.util.Map;
  * @author wuxp
  * @since 2026-04-14
  */
-@Mapper(imports = {
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR, imports = {
         WindJson.class,
         Money.class
 })
@@ -47,6 +48,13 @@ public interface LedgerConverter {
      * @param request 创建请求
      * @return Ledger 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "debitAmount", ignore = true)
+    @Mapping(target = "creditAmount", ignore = true)
+    @Mapping(target = "state", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Ledger convertToLedger(CreateLedgerRequest request);
 
     /**
@@ -79,6 +87,12 @@ public interface LedgerConverter {
     @Mapping(target = "balanceEffectType", expression = "java(enumName(data.getBalanceEffectType()))")
     @Mapping(target = "phaseCode", expression = "java(enumName(data.getPhaseCode()))")
     @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(data.getContextVariables()))")
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "sn", ignore = true)
+    @Mapping(target = "tenantId", ignore = true)
+    @Mapping(target = "fundsTransactionSn", ignore = true)
     LedgerEntry convertToLedgerEntry(LedgerEntrySpec data);
 
     /**
@@ -128,6 +142,12 @@ public interface LedgerConverter {
             expression = "java(data.getTransactionType() == null ? null : data.getTransactionType().name())"
     )
     @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(data.getContextVariables()))")
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "debitAmount", ignore = true)
+    @Mapping(target = "creditAmount", ignore = true)
+    @Mapping(target = "sha256", ignore = true)
     LedgerTransaction convertToLedgerTransaction(LedgerTransactionSpec data);
 
     /**
@@ -150,6 +170,7 @@ public interface LedgerConverter {
     @Mapping(target = "debitAmount", expression = "java(new Money(data.getDebitAmount(), data.getCurrency()))")
     @Mapping(target = "creditAmount", expression = "java(new Money(data.getCreditAmount(), data.getCurrency()))")
     @Mapping(target = "contextVariables", expression = "java(parseContextVariables(data.getContextVariables()))")
+    @Mapping(target = "entries", ignore = true)
     LedgerTransactionDTO convertToAccountLedgerTransactionDTO(LedgerTransaction data);
 
     default Map<String, Object> parseContextVariables(String value) {
