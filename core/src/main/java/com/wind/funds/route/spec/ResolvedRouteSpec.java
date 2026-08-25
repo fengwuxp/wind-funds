@@ -19,7 +19,7 @@ import java.util.Map;
  * <ul>
  *   <li>表达一次资金指令经过规则解析后的资金流路径</li>
  *   <li>保留参与主体、路径步骤、外部账户、支付工具和平台账户选择结果</li>
- *   <li>作为 LedgerPostingAssembler 的输入，翻译为可执行账本交易</li>
+ *   <li>作为 Ledger 高阶入账命令的路径输入，由 Ledger 内部翻译为账本交易</li>
  * </ul>
  *
  * <p>边界：

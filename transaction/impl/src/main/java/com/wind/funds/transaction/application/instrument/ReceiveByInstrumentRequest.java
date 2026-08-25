@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.instrument;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -13,13 +13,13 @@ import lombok.ToString;
 import lombok.experimental.Accessors;
 
 /**
- * 支付工具收款请求。
+ * Transaction Provider 内部支付工具收款命令。
  *
- * <p>该请求是 wallet application 层的外部业务入口模型，用于把支付工具收款语义解析为账户主体型充值交易；
- * 不替代 transaction 层账户主体型充值请求。</p>
+ * <p>仅供 transaction-impl 把已归一支付工具收款事实解析为账户主体型充值交易，
+ * 不属于 Wallet 或 Public API。</p>
  *
  * @author Codex
- * @date 2026-06-21
+ * @since 2026-06-21
  */
 @Schema(description = "支付工具收款请求")
 @Data

@@ -19,7 +19,6 @@ import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.exception.AssertUtils;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.funds.ledger.LedgerPostingAssembler;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -53,7 +52,6 @@ import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -84,7 +82,7 @@ import java.util.Map;
  */
 @Component
 @AllArgsConstructor
-public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<ResolvedRouteSpec>, Ordered {
+public class DefaultLedgerPostingAssembler {
 
     private static final String KEY_SEPARATOR = ":";
 
@@ -117,25 +115,11 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
      * @param resolvedRoute 已解析资金路径
      * @return 账本交易定义
      */
-    @Override
     public @NonNull LedgerTransactionSpec assemble(@NonNull FundsInstructionSpec instruction,
                                                    @NonNull String fundsTransactionSn,
                                                    @NonNull ResolvedRouteSpec resolvedRoute) {
         return LedgerTransactionSpecFactory.createLedgerTransaction(instruction, fundsTransactionSn,
                 ledgerTransactionSn -> assemblePlans(instruction, ledgerTransactionSn, resolvedRoute));
-    }
-
-    /**
-     * 判断是否支持该路径。
-     *
-     * <p>能力范围：默认实现支持所有存在 RouteLeg 的路径；空路径代表无账务影响，由编排器短路处理。</p>
-     *
-     * @param resolvedRoute 已解析资金路径
-     * @return true 表示该路径存在可翻译的账务步骤
-     */
-    @Override
-    public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
-        return !resolvedRoute.getLegs().isEmpty();
     }
 
     private List<LedgerPostingPlanSpec> assemblePlans(FundsInstructionSpec instruction,
@@ -884,8 +868,4 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         }
     }
 
-    @Override
-    public int getOrder() {
-        return HIGHEST_PRECEDENCE;
-    }
 }

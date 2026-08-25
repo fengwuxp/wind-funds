@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.spend;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -15,13 +15,13 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 交易结果消费控制额度变动流水请求。
+ * Transaction Provider 内部交易结果消费控制额度变动命令。
  *
  * <p>本请求用于已存在原控制额度变动流水的交易消费、可信授权撤销释放和退款补偿链路。业务确认型退款找不到原控制事实时，
  * 不应通过资金退款入口自动回补周期额度；应由业务侧确认支付工具存在且状态有效，并显式给出周期和金额等控制补偿依据。</p>
  *
  * @author Codex
- * @date 2026-06-20
+ * @since 2026-06-20
  */
 @Data
 @NoArgsConstructor

@@ -35,7 +35,7 @@
 | 账户和余额查询 | `FundsAccountCapabilityApplicationService`、`FundsSubjectBalanceQueryService` | 账户能力解析、canonical 交易动作准入、余额查询、账本 profile 初始化。 | `FundsAccountCapabilityApplicationServiceTests`、`FundsAccountCapabilityAdmissionFlowTests`、`FundsSubjectBalanceQueryServiceImplTests`、`LedgerProfileContractTests`、`ControlAccountLedgerInitializationTests` |
 | 支付工具 | `PaymentInstrumentCapabilityApplicationService`、`PaymentInstrumentPreTransactionSnapshotApplicationService` | 支付工具能力、绑定快照、交易前快照。 | `PaymentInstrumentCapabilityApplicationServiceTests`、`PaymentInstrumentPreTransactionSnapshotApplicationServiceTests`、`PaymentInstrumentServiceImplTests` |
 | 资金责任 | `FundingResponsibilityResolutionApplicationService` | 按关系解析当前资金责任主体。 | `FundingResponsibilityResolutionApplicationServiceTests`、`SpendSubjectFundingRelationServiceImplTests` |
-| 支出控制 | `SpendControlAdmissionApplicationService`、`BudgetControlLimitAdjustmentApplicationService`、`SpendControlTransactionConsumptionApplicationService` | Spend Rule 准入、预算控制调整、交易消费记录。 | `SpendControlAdmissionApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendRuleDefinitionServiceFlowTests` |
+| 支出控制 | `SpendControlAdmissionApplicationService`、`BudgetControlLimitAdjustmentApplicationService`、`SpendControlMovementService` | Spend Rule 准入、预算控制调整和控制事实查询；交易结果到控制事实的转换由 Provider 内部编排。 | `SpendControlAdmissionApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendRuleDefinitionServiceFlowTests` |
 | 直接交易 | `FundsDirectTransactionService` | 充值、转账、付款、退款、提现、手续费、退费。 | `FundsDirectTransactionFlowTests`、`FundsTransactionFeeFlowTests`、`FundsTransferPayWithdrawChainFlowTests` |
 | 授权交易 | `FundsAuthorizationTransactionService` | 授权、撤销、完成、完成后退款。 | `FundsAuthorizationTransactionFlowTests` |
 | 余额控制 | `FundsBalanceControlService` | 冻结、解冻、受控调整；冻结不表达扣款。 | `FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests` |
@@ -249,7 +249,7 @@ SC-LOOP-06 准出交接卡：
 3. 普通交易调用方只把 `decisionSn` 作为决策引用交给 `SpendControlAdmissionApplicationService.resolveSpendControlAdmission`；rule、binding、结果和摘要字段即使提供也只用于一致性诊断
 4. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
 5. 交易层入口
-6. 支付工具可信完成或撤销调用 `PaymentInstrumentTransactionApplicationService` 的统一 facade；`SpendControlTransactionConsumptionApplicationService` 承接已成立交易事实对应的控制消费、可信释放或策略授权退款补偿
+6. 宿主先归一为账户主体型资金动作并调用 `FundsAuthorizationTransactionService` 或 `FundsDirectTransactionService`；支付工具快照恢复及交易结果到控制消费、可信释放或退款补偿的转换只由 Provider 内部编排，不提供独立 Public facade
 
 SpendControlScope 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
 
@@ -296,7 +296,7 @@ flowchart LR
 
 | 外部事实或状态 | 能否进入资金底座 | 推荐入口 | 必须带上的证据 | 不能做 |
 | --- | --- | --- | --- | --- |
-| 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume` 或 `PaymentInstrumentTransactionApplicationService.receiveByInstrument`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
+| 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume`，或上游归一目标账户后调用 `FundsDirectTransactionService.topup`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
 | 外部入金只是 accepted、submitted、processing、message sent 或待匹配。 | 不可以。 | 停在上游入金单、在途、挂账、对账或人工复核。 | 外部引用、状态、文件摘要、匹配原因、待处理 owner。 | 不增加 `AVAILABLE`，不生成 `topup`。 |
 | 外部出款已终态成功，且可以关闭内部冻结资金。 | 可以。 | 上层出款业务确认后调用 `FundsDirectTransactionService.withdraw`。 | 原冻结流水、经业务确认的外部出款事实、外部收款账户、金额、币种和业务流水。 | 不把 provider 状态解释下沉到资金底座；不按当前支付工具绑定重新选资金主体。 |
 | `LOCKED + EXTERNAL_ENDPOINT` 结算单进入通用出款。 | 可以进入出款事实。 | 通过 `PayoutOrderApplicationService#createOrder/submitOrder/handleReceipt`；宿主实现唯一 `PayoutSubmissionAuthority` 并负责外部投递和状态归一。 | 锁定结算单、PAYOUT Gate 结果、宿主准入决策摘要与证据引用、回单唯一引用、外部 reference、金额币种、来源摘要。 | 不直接调用 `FundsPayoutTransactionService`，不把 submit 当外部受理，不在失败后覆盖原单重试。 |

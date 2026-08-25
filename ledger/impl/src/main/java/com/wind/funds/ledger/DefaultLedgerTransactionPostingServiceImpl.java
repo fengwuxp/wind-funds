@@ -8,6 +8,10 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerState;
+import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
@@ -24,7 +28,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,15 +47,46 @@ import java.util.stream.Collectors;
 @Component
 public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransactionPostingService {
 
+    private final DefaultLedgerPostingAssembler postingAssembler;
+
     private final LedgerTransactionCommandService ledgerTransactionCommandService;
 
     private final LedgerService ledgerService;
 
-    private final List<LedgerBalanceProjectionService> ledgerBalanceProjectionServices;
+    private final LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
     @Override
     @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
-    public void post(@NonNull LedgerTransactionSpec transaction) {
+    public @NonNull String post(@NonNull FundsInstructionSpec instruction,
+                                @NonNull String fundsTransactionSn,
+                                @NonNull ResolvedRouteSpec resolvedRoute) {
+        assertCommandIdentity(instruction, fundsTransactionSn, resolvedRoute);
+        LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, fundsTransactionSn, resolvedRoute);
+        postAssembled(transaction);
+        return transaction.getSn();
+    }
+
+    private void assertCommandIdentity(FundsInstructionSpec instruction,
+                                       String fundsTransactionSn,
+                                       ResolvedRouteSpec resolvedRoute) {
+        AssertUtils.notNull(instruction.getTenantId(), "账本入账命令 tenantId 不能为空");
+        AssertUtils.hasText(fundsTransactionSn, "账本入账命令 fundsTransactionSn 不能为空");
+        AssertUtils.equals(resolvedRoute.getTenantId(), instruction.getTenantId(),
+                "ResolvedRoute tenantId 与资金指令不一致");
+        AssertUtils.equals(resolvedRoute.getBusinessScene(), instruction.getBusinessScene(),
+                "ResolvedRoute businessScene 与资金指令不一致");
+        AssertUtils.equals(resolvedRoute.getBusinessSn(), instruction.getBusinessSn(),
+                "ResolvedRoute businessSn 与资金指令不一致");
+        AssertUtils.equals(resolvedRoute.getInstructionType(), instruction.getInstructionType(),
+                "ResolvedRoute instructionType 与资金指令不一致");
+        AssertUtils.equals(resolvedRoute.getEventType(), instruction.getEventType(),
+                "ResolvedRoute eventType 与资金指令不一致");
+        AssertUtils.equals(resolvedRoute.getTransactionType(), instruction.getTransactionType(),
+                "ResolvedRoute transactionType 与资金指令不一致");
+    }
+
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
+    void postAssembled(@NonNull LedgerTransactionSpec transaction) {
         assertTransactionPostable(transaction);
         assertAllPostingPlansHaveEntries(transaction);
         assertAllEntriesUsePositiveAmounts(transaction);
@@ -67,10 +101,14 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
 
         // 按照账务主体分组更新余额
         Map<ProjectionGroupKey, List<LedgerEntrySpec>> groups = groupProjectionEntries(transaction);
-        Map<FundsAccountId, LedgerBalanceProjectionService> projectionServices = resolveProjectionServices(groups.keySet()
+        Set<FundsAccountId> accountIds = groups.keySet()
                 .stream()
                 .map(ProjectionGroupKey::accountId)
-                .collect(Collectors.toCollection(LinkedHashSet::new)));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        accountIds.forEach(accountId -> AssertUtils.isTrue(
+                ledgerBalanceProjectionService.supports(accountId),
+                "未找到支持的账本余额投影服务，accountId = {}",
+                accountId));
         LedgerTransactionPostResult postResult = ledgerTransactionCommandService.postLedgerTransaction(transaction);
         if (!postResult.isNewlyPosted()) {
             log.info("账本交易已存在，跳过重复入账和余额投影，ledgerTransactionSn={}, fundsTransactionSn={}, "
@@ -80,15 +118,14 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             return;
         }
         for (Map.Entry<ProjectionGroupKey, List<LedgerEntrySpec>> entry : groups.entrySet()) {
-            FundsAccountId accountId = entry.getKey().accountId();
             List<LedgerEntrySpec> entries = entry.getValue();
-            projectionServices.get(accountId).project(entries, entry.getKey().postingAccessType());
+            ledgerBalanceProjectionService.project(entries, entry.getKey().postingAccessType());
         }
         logAfterCommit(() -> log.info("账本交易入账完成，ledgerTransactionSn={}, fundsTransactionSn={}, eventType={}, "
                         + "businessScene={}, businessSn={}, amount={}, currency={}, postingPlanCount={}, subjectCount={}",
                 transaction.getSn(), transaction.getFundsTransactionSn(), transaction.getEventType(),
                 transaction.getBusinessScene(), transaction.getBusinessSn(), transaction.getAmount().getAmount(),
-                transaction.getCurrency(), transaction.getPostingPlans().size(), projectionServices.size()));
+                transaction.getCurrency(), transaction.getPostingPlans().size(), accountIds.size()));
     }
 
     private void logAfterCommit(Runnable action) {
@@ -380,20 +417,6 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 ProjectionGroupKey key = new ProjectionGroupKey(accountId, postingAccessType);
                 result.computeIfAbsent(key, ignored -> new ArrayList<>()).add(entry);
             }
-        }
-        return result;
-    }
-
-    private Map<FundsAccountId, LedgerBalanceProjectionService> resolveProjectionServices(
-            Collection<FundsAccountId> accountIds) {
-        Map<FundsAccountId, LedgerBalanceProjectionService> result = new LinkedHashMap<>();
-        for (FundsAccountId accountId : accountIds) {
-            List<LedgerBalanceProjectionService> supported = ledgerBalanceProjectionServices.stream()
-                    .filter(delegate -> delegate.supports(accountId))
-                    .toList();
-            AssertUtils.notEmpty(supported, "未找到支持的账本余额投影服务，accountId = {}", accountId);
-            AssertUtils.isTrue(supported.size() == 1, "账本余额投影服务不唯一，accountId = {}", accountId);
-            result.put(accountId, supported.getFirst());
         }
         return result;
     }

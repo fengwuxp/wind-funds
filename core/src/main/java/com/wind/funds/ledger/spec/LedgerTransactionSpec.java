@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * <p>职责：
  * <ul>
- *   <li>作为账本写入口的唯一交易输入对象</li>
+ *   <li>作为 ledger-impl 内部组装和校验账本交易的稳定会计 DSL</li>
  *   <li>聚合本次交易的 PostingPlan、业务标识、金额和交易上下文</li>
  *   <li>提供交易级借贷平衡校验能力</li>
  * </ul>
@@ -27,7 +27,7 @@ import java.util.Map;
  * <p>边界：
  * <ul>
  *   <li>不负责资金路径选择，路径选择由 RouteResolver 完成</li>
- *   <li>不负责持久化执行，持久化由 LedgerTransactionPostingService 完成</li>
+ *   <li>不作为 Consumer 可提交的公共写入参数</li>
  *   <li>不表达业务订单生命周期，业务生命周期由资金交易层维护</li>
  * </ul>
  */

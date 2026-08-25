@@ -6,7 +6,7 @@
 | --- | --- |
 | DSL 基线阶段 | `W2-02 / INSTRUCTION_FACT_ROUTE_LEDGER_REVERSAL_BOUNDARY` |
 | DSL 基线状态 | `BOUNDARY_CANDIDATE / INDEPENDENT_CHECKER_PASS / 0 P0-P2` |
-| 当前执行入口 | `plan-r2.206 / CI-MIG03-ACTION-LEDGER-BALANCE-CLOSURE-001 / MIG03_DOC_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_PENDING / EXECUTION_GRANT_NO / DOCUMENTATION_ONLY / CODE_FREEZE`；下一步只允许 Human Owner 裁决 A/B/C，源码、测试、脚本与 API baseline 全部 immutable |
+| 当前执行入口 | `plan-r2.260 / W5-MIG08-CAPTE-BENEFIT-ACTIONFACT-CONSUMER-E4-ASSESSMENT-ENTRY-CARD-001 / E4_BLOCKED_LINEAGE / E4_ASSESSMENT_ENTRY_CARD_INDEPENDENT_CHECKER_PENDING / E4_EXECUTION_GRANT_NO / DOCUMENTATION_ONLY / CODE_FREEZE`；E4 缺口只在制品谱系，不新增或改写 DSL |
 | 产品输入 | [支付资金公共能力层产品设计](../产品设计/支付资金公共能力层-产品设计.md) 的 `G1 PASS` 与 Product Context Card |
 | DSL Owner | Funds DSL Owner；Funds Product、架构、Consumer 与测试角色共同挑战 |
 | 权威范围 | 跨场景稳定词汇、事实层级、引用语义、序列化候选和负例 |
@@ -615,6 +615,26 @@ W2-02 通过条件：
 
 负例：release 只引用 authorization root String、调用方自报 route、用当前 binding 重算责任、释放已完成金额、expired/timeout 自动释放、把 unfreeze/settlement release/payout failure 因名称相近纳入本 Profile，均不构成合法公共 DSL。
 
+#### 10.8.1 Release ActionFact 物理命名 Contract
+
+当前 durable group 没有独立 release root，但在 authorization root 下持久化了唯一 `businessScene + businessSn + REVERSAL` action group。`businessScene/businessSn` 允许冒号，不能用原文分隔拼接。定义 `b64(x)=Base64URL(UTF-8(x), without padding)`，目标只从耐久字段机械派生三个版本化、无歧义身份，不把 authorization root 自身冒充 reverse Intent：
+
+- `identity=release:v1:<b64(authorizationSn)>:<b64(businessScene)>:<b64(businessSn)>`；
+- `intentRef=release-intent:v1:<b64(authorizationSn)>:<b64(businessScene)>:<b64(businessSn)>`；
+- `attemptRef=release-attempt:v1:<b64(authorizationSn)>:<b64(businessScene)>:<b64(businessSn)>:REVERSAL`。
+
+成功事实固定 `actionKind=release`、`DomainOutcome=funds-transaction/succeeded`、`FundsEffect=proven-full`。唯一 `OriginalFundsFactRef` 使用 `factType=funds-action`、原 authorization ActionFact identity、`relationRole=releases-authorized-effect` 与本次 Money；每条原 HOLD 责任使用 `provenanceRole=replayed-original-route`。ActionFact Money 只计一次，SHARED 多 sibling/provenance 不得相加。
+
+SemanticDigest 继续使用 `SHA-256`，domain/version 固定为 `transaction.action.release.projection` / `transaction.action.release.projection.v1`。摘要覆盖 identity、intentRef、attemptRef、action kind、Money、outcome/effect、原 authorization identity 与 semantic digest、关系与 allocated Money、排序后的 release siblings、原/本次 Ledger refs、原 route 摘要和逐 HOLD/RELEASE provenance；不得吸收会随后续 complete/release/refund 改变的 root 当前累计或余额。累计只作查询时完整性合取，不改写历史 release DTO/digest。
+
+列表查询必须同时检查主交易和全部 authorization successor detail 候选：同一业务键命中主交易与 release detail、命中多个 action family 或多个 authorization root 时属于歧义，列表与对应 identity 查询共同返回空/UNKNOWN，不按查询顺序遮蔽或合并。delimiter collision 种子 `(scene=A,sn=B:C)` 与 `(scene=A:B,sn=C)` 必须生成不同三层身份并可分别查询。
+
+release 完整性合取同时验证全部 successful COMPLETE groups 与全部 successful REVERSAL groups：前者合计精确等于 `completedAmount`，后者合计精确等于 `reversedAmount`，再验证二者相加不超过 authorized。任一 complete/release sibling、route、reference 或 root 累计不一致时双查询 fail-closed；这些可变累计只作当前完整性判断，不进入单个历史 release digest。
+
+RED rework 已把该 DSL 约束落成可达行为：每个 release 先精确核验 Funding/SHARED Balance delta、原 HOLD leg、replay consumed ID/amount 与 `RELEASE_<originalLegId>` posting；首笔 release DTO 形成后分别以后继 complete 和第二笔 release 改变 root 当前累计，再双查询原 DTO。fresh focused=`60/7F/0E`、transaction=`185/7F/0E`，7F 仍只指向缺失 release projector；最终独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。
+
+Green 已在既有查询实现中机械实现本节 Contract：三层 Base64URL v1 身份使用 UTF-8/no-padding 并做 canonical 重编码校验；同业务键多义候选双查询 fail-closed；release group 只接受完整 successful PAY/REVERSAL/RELEASE 责任组，逐原 HOLD replay 与原/本次 Ledger 引用一致；verified COMPLETE/REVERSAL 分别闭合 root 累计。release digest 纳入原 fact digest algorithm/value/version、allocated Money、排序 siblings、Ledger、route 与 replay，不纳入 root mutable cumulative、余额、描述或时间。fresh focused=`60/0F/0E`、transaction=`185/0F/0E`，最终 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。本轮未新增稳定 DSL 词汇、Java 类型、兼容形式或第二事实源；MIG-02B 当前范围关闭，下一切片必须重新成卡。
+
 ### 10.9 `MIG-02C` authorization refund 语义 Profile
 
 本 Profile 不新增稳定词汇，只把既有 reverse Intent、`refund`、`OriginalFundsFactRef`、`FundsRouteProvenance`、`FundsEffect` 和 `SemanticDigest` 约束到普通 authorization refund：
@@ -836,7 +856,7 @@ Requirement semantic digest 覆盖 stageRef、requirement version，以及按稳
 
 `inspectGate(stageRef)` 可以在无锁只读快照下解释当前结果；`checkGate(stageRef)` 必须加入 Stage 写事务并重新解析/锁定唯一 requirement head 和全部 current scope+pair heads。任何 scope+pair 缺失、非 current、非 Completed/Balanced、coverage 不完整、rule 不符或仍有 blocker，整体 BLOCKED。Gate、Ledger、Balance、Stage 和外部 finality 继续正交；任何一层都不能反证另一层。
 
-MIG-07 在 `plan-r2.150` 已完成 surface、behavioral RED 与 behavioral Green 并通过独立 Checker；该授权已经耗尽。本节稳定语义不变，`FUNDING_BALANCE_ADJUST`、外部资金腿与非负 Public surface 最终门禁也已关闭；当前活动状态只见本文顶部的 `plan-r2.206 / CI-MIG03-ACTION-LEDGER-BALANCE-CLOSURE-001 / MIG03_DOC_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_PENDING / EXECUTION_GRANT_NO / DOCUMENTATION_ONLY / CODE_FREEZE`，不得继承任何历史 Green 的生产授权。
+MIG-07 在 `plan-r2.150` 已完成 surface、behavioral RED 与 behavioral Green 并通过独立 Checker；该授权已经耗尽。本节稳定语义不变；MIG-04 已在 `plan-r2.232` 完成无兼容内部化并通过独立 Checker，当前活动状态只见本文顶部。
 
 ### 10.18 breaking Green 的物理映射约束
 
@@ -857,7 +877,7 @@ MIG-07 在 `plan-r2.150` 已完成 surface、behavioral RED 与 behavioral Green
 
 ### 10.20 `MIG-03` 首个 closure 切片的稳定 DSL 候选
 
-候选 A 不新增全局“闭合事实”，只约束三段引用关系：
+Human Owner 已接受候选 A。A 不新增全局“闭合事实”，只约束三段引用关系：
 
 ```text
 owner-qualified source action identity
@@ -872,3 +892,276 @@ owner-qualified source action identity
 - Balance closure 在首切只表达“同一 Ledger 本地事务已提交 entries 与投影”。它不是余额数值、余额快照、授权 token或 reconciliation outcome；后续资金动作改变当前余额时，历史 action closure 不被覆盖。
 
 `proven-zero` 对 Ledger/Balance 是明确不适用，不是 closure failure；但当前 clearing source admission 只接受 `primary + proven-full`，其他 effect/action kind 均 fail-closed。任何需要解析 `attemptRef` 字符串、读取 Entity/Mapper、把 `FundsActionFactDTO` 扩成 Ledger/Balance DTO、增加 balance evidence 表或引入兼容双入口的实现，都说明候选 A 尚不可执行，必须停止并返回合同裁决。
+
+### 10.21 `MIG-03` Contract RED 的最小物理 shape
+
+下列 shape 只是已接受 A 的 RED 目标，不是当前 Java 授权：
+
+```text
+FundsActionRecordedEvidenceQueryService
+  findRecordedEvidence(FundsActionFactRef) -> Optional<FundsActionRecordedEvidenceDTO>
+
+FundsActionRecordedEvidenceDTO
+  actionFact: FundsActionFactDTO
+  matchedSiblings: List<RecordedSiblingRef>
+  recordedLedgerTransactionSn: String
+  recordedReferenceDigest: FundsActionFactDTO.SemanticDigest
+
+RecordedSiblingRef
+  detailSn: String
+  participantRole: RouteParticipantRole
+  subjectId: String
+  subjectType: String
+  money: Money
+  recordedLedgerTransactionSn: String
+
+IdentifyClearingSplittableDetailRequest
+  tenantId + sourceActionFactRef: StableIdentity
+  + businessLine + splitPeriod + splitRuleCode + splitRuleVersion
+```
+
+`recordedReferenceDigest` 必须覆盖 action identity/action semantic digest，以及按稳定 role + detailSn 排序的完整 sibling 字段；所有 sibling 的 `recordedLedgerTransactionSn` 必须相同并等于 DTO 顶层值。DTO 不包含 LedgerTransactionDTO、LedgerEntryDTO、LedgerDTO、current balance、Entity、Mapper 或修复命令。
+
+Clearing request 删除 `fundsTransactionSn`、`fundsTransactionDetailSn`、`ledgerEntrySn`，不保留 deprecated/V2/alias/context fallback。`sourceActionFactRef.ownerNamespace` 必须精确指向 Funds ActionFact；tenant 继续独立传递，不编码进 identity 字符串。
+
+Contract RED 已按该 shape 执行：唯一反射测试类 fresh=`2/2F/0E/0S`，两项 assertion failure 分别证明 recorded-evidence service/DTO 尚不存在，以及 clearing request 仍保留旧 tuple。独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；这只证明 DSL shape 当前缺失，不授权 Green 或扩展本节语义。
+
+### 10.22 `MIG-03` Green 的精确语义
+
+- `sourceActionFactRef.ownerNamespace` 固定为 `funds`，`value` 原样承载 `FundsActionFactRef.identity`；Reconciliation 只做显式类型转换，不解析 `attemptRef`、不从 root/detail/entry 猜 identity。
+- `findRecordedEvidence` 首切只支持 exact direct PAY principal `primary / proven-full`。Provider 用自身投影确认请求 identity 等于 principal ActionFact；fee ActionFact、proven-zero、UNKNOWN、authorization、recovery 和 unsupported kind 返回 empty。
+- `matchedSiblings` 按 `participantRole + detailSn` 稳定排序，完整包含 principal、唯一 PAYEE、可选唯一 FEE_RECEIVER；每项都携带角色、Money、subject 和同一非空 recorded LedgerTransaction ref。DTO 顶层 ref 必须等于所有 sibling ref。
+- `recordedReferenceDigest` 使用 `SHA-256 / transaction.action.recorded-reference.v1`，覆盖 ActionFact identity/semantic digest、顶层 Ledger ref及排序后的全部 sibling 字段；Transaction 不读取 Ledger，也不把 Ledger/Balance DTO 放入该摘要模型。
+- Reconciliation 通过现有 ledger-face 精确读取 LedgerTransaction 和全量 entries；若分页 count 与读取数量不一致、任一 sibling 无唯一对应 entry、posting plan 不存在、Money/subject/digest 不一致或 PAYEE/CLEARING credit 非唯一，则 fail-closed 且不持久化候选。Gate stage identity 直接复用 `sourceActionFactRef`。
+
+上述语义不保留旧字段、alias、V2、bridge 或 context fallback。独立 Entry Card Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；当时只进入 Human Owner Green Grant 决策。后续 Green Execution 未通过 Checker，当前由 10.23 接替。
+
+### 10.23 `MIG-03` Ledger Persisted Digest 稳定 DSL
+
+本节只定义 Ledger 内部可重建事实摘要的稳定语言，不新增 Public DTO、service 或调用参数。摘要值不是独立资金事实、授权 token 或外部 finality；它只证明一组持久化 Ledger facts 与 Ledger Owner 的当前唯一 canonical contract 一致。
+
+```text
+PersistedLedgerFactDigest :=
+  SHA-256(
+    domain,
+    contractVersion,
+    canonicalPersistedFields
+  )
+
+CanonicalLedgerTime :=
+  transactionTime truncated to SECONDS
+
+CanonicalDecimal :=
+  BigDecimal.stripTrailingZeros().toPlainString()
+
+VerifiedLedgerAggregate :=
+  LedgerTransaction
+  + ordered PostingPlans
+  + ordered LedgerEntries
+  + every persisted digest recomputed successfully
+```
+
+稳定不变量：
+
+1. `CanonicalLedgerTime` 在进入摘要和持久化前只归一一次；writer、同 key replay 和 reader 使用同一值。它不从数据库回读结果猜测原 nanos，也不因数据库类型改变语义。
+2. LedgerTransaction、PostingPlan 和 LedgerEntry 使用显式 domain/version；Map key 与成员排序固定，Money 固定为 amount/currency，时间使用归一后的 ISO 文本，`exchangeRate` 等 BigDecimal 使用 `CanonicalDecimal`。`1`、`1.0` 与 `1.00000000` 必须生成相同数值 token；不得使用数据库 scale 或 `BigDecimal.toString()` 直接承重。
+3. transaction digest 覆盖 transaction header 与有序 posting/entry 语义；plan/entry digest 各自覆盖稳定身份和父引用。child 缺失、重复、父引用漂移或 digest 不一致均使 aggregate invalid。
+4. `VerifiedLedgerAggregate` 是 Ledger read boundary 的前置条件。调用方仍收到既有 Ledger DTO；DTO 中的 `sha256` 不是让调用方自行选择算法或声明验证通过的输入。
+5. `FundsActionRecordedEvidenceDTO.recordedReferenceDigest` 与 Ledger persisted digest 正交：前者证明 Transaction recorded sibling refs 未漂移，后者证明这些 refs 指向的持久化 Ledger facts 可重建。两个摘要都通过，仍不证明当前余额数值、外部到账或对账完成。
+
+目标 canonical field set 至少包含：
+
+- Transaction：ledger/funds transaction identity、tenant、instruction/event/type、business identity、Money/original Money、exchange rate、debit/credit totals、归一 transaction time、reference ledger transaction。
+- PostingPlan：plan identity、父 transaction refs、route leg、intent/scope/effect/phase、Money、debit/credit totals。
+- LedgerEntry：entry identity、transaction/plan/funds refs、ledger/period/subject、ledger subject/category、entry side/posting role/constraint、intent/scope/effect/phase、business identity、Money/original Money、exchange rate、归一 transaction time。
+
+描述文案、日志字段、`contextVariables`、当前余额和展示状态不进入 persisted digest。若未来证明某个 context 字段是承重账务事实，应先提升为显式字段并重开 DSL 决策，不能把整个 Map 纳入摘要。
+
+本卡选择 `ledger.persisted-transaction.v1 / ledger.persisted-plan.v1 / ledger.persisted-entry.v1` 作为唯一目标 domain/version，不兼容旧 `ledger.transaction.request` 或 `WindObjectDigestUtils` 结果。旧摘要不匹配即 fail-closed，不双验、不回填、不降级为 hasText 校验。首轮 Checker 指出的 exchange-rate scale drift 已由 `CanonicalDecimal` 关闭；最终 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。本节仍是文档合同，后续必须先取得 RED Entry Card 文档授权。
+
+### 10.24 `MIG-03` Ledger Persisted Digest RED Shape
+
+RED 不新增 DSL 类型，只用现有 test API/JDBC 对目标稳定语义施压：
+
+```text
+legacy stored digest
+  -> same-key replay MUST reject
+
+request canonical facts
+  -> persist
+  -> rebuild from stored transaction + plans + entries
+  -> expected digest MUST equal stored digest
+
+tamper(transaction | plan | entry)
+  -> stable-SN Ledger read MUST reject
+  -> clearing admission MUST reject before effects
+```
+
+失败分层固定为：
+
+- `LD-RED-01`：legacy fallback 当前被接受。
+- `LD-RED-02`：CanonicalLedgerTime + CanonicalDecimal round-trip 当前不成立。
+- `LD-RED-03~05`：stable-SN read 对 transaction/plan/entry tamper 当前不拒绝。
+- `LD-RED-06~08`：clearing 对 transaction/plan/entry tamper 当前不拒绝。
+
+测试中的 expected canonical builder 只能机械实现 10.23 已冻结的字段、排序、time/decimal 规则，用于生成 expected/golden 或 fixture；不得成为第二生产算法、宽 Map 扩展点或兼容 fallback。Gate fixture 可以使用同一目标 canonical values，但 Gate tests 自身保持 Green。
+
+RED 观察后，四个测试文件全部 immutable；Green 只能修改 `LedgerTransactionServiceImpl` 让上述失败自然转绿。若任何 failure 需要新 API、DTO、schema、helper production file 或修改 Reconciliation 生产代码，说明 10.23 合同不可由当前文件卡承载，必须停止重冻。
+
+八个 RED 已按本节语义实际观察为 `56/8F/0E/0S`；transaction/plan/entry 参数、stable labels 和 Gate fixture 均未漂移。扩大门禁返工不新增 DSL 类型，也不改变 `CanonicalLedgerTime`、`CanonicalDecimal` 或 `VerifiedLedgerAggregate`：它只区分 `owned behavior proof` 与 `test-infrastructure observation`。non-assembler Ledger 的 `50/5F/0E/0S` 可证明当前公共 Ledger 缺口；assembler 的 Mockito/ByteBuddy `15E` 只证明当前环境未执行其行为，不能支持或否定 persisted digest 合同。
+
+门禁分层经独立 Checker 判定 `PASS / 0 P0 / 0 P1 / 0 P2`，并以 `plan-r2.220` 收口；当前由 10.25 Green shape 接替。
+
+### 10.25 `MIG-03` Ledger Persisted Digest Green Shape
+
+Green 不新增 DSL 类型，只把 10.23 的三个 persisted v1 domain 落到同一个 Ledger internal builder family：
+
+```text
+NormalizedRequest
+  -> materialize transaction + ordered plans + generated-SN entries
+  -> digest(entry.v1)
+  -> digest(plan.v1)
+  -> digest(transaction aggregate.v1)
+  -> persist atomically
+  -> reload same facts
+  -> verify same builders
+
+ExistingSameKey
+  -> reload + verify persisted aggregate
+  -> bind request plans by plan SN
+  -> bind request entries to existing generated identities by stable order
+  -> compare with the same persisted v1 builders
+```
+
+transaction aggregate 的形状固定为 `{transaction, postingPlans:[{plan, entries}]}`；plan 按 `sn` 排序，entry 在各 plan 内按 `sn` 排序。transaction/plan/entry 字段集合与 10.23 及四个 immutable RED 的 expected builder 完全一致；`description`、`contextVariables`、日志、余额和展示状态仍不进入摘要。
+
+禁止继续使用 `ledger.transaction.request`、`WindObjectDigestUtils` 或 `matchesCanonicalOrLegacyJson` 作为 persisted contract；不存在 dual digest、legacy fallback、自动回填或调用方选版本。现有 3 个 layer RED 已聚合覆盖全部 exact read surface，并经独立 Checker 判定 `PASS / 0 P0 / 0 P1 / 0 P2`；该补强不改变 DSL，原 Green Entry Card 已重新 PASS。该阶段以 `LEDGER_DIGEST_EXACT_READ_RED_COVERAGE_REWORK_INDEPENDENT_CHECKER_PASS / LEDGER_DIGEST_GREEN_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.223` 收口，当前由 10.26 接替。
+
+### 10.26 `MIG-03` Ledger 完整性与 Clearing 语义分层
+
+Green 已证明 `VerifiedLedgerAggregate` 的 DSL 含义必须先于任何下游业务分类：持久化 transaction/plan/entry 的摘要、父引用、数量或唯一性不成立时，不存在可供 Clearing 继续解释的合法 Ledger fact。该顺序不增加新 DSL 类型，也不允许 `legacy digest`、fallback 或调用方声明“可信”。
+
+4 个旧 Clearing 用例混合了两种不同输入：删除 plan 属于无效 aggregate，必须由 Ledger fail-closed；修改 business identity、subject/direction/role 后仍要测试 Clearing 分类，则测试数据必须使用同一 persisted v1 重新形成有效 aggregate。重新计算测试 fixture 摘要不是兼容路径，而是明确区分“事实完整性”和“业务适用性”。当前只进入该单测试文件 Entry Card 的文档授权门，Green 保持暂停。
+
+### 10.27 `MIG-03` Legacy Clearing 测试迁移 DSL 约束
+
+测试输入只允许落入两个互斥集合：`InvalidLedgerAggregate` 代表摘要、父引用、数量或唯一性不成立，必须在 Ledger exact read fail-closed；`VerifiedLedgerAggregate` 代表同一 persisted v1 可重建，才允许进入 Clearing 的 source identity、subject、ledger subject、entry side、balance effect 与 phase 适用性判断。该分层是测试语言，不新增 Public DSL 类型。
+
+四个既有场景的归位固定为：missing plan 属于 `InvalidLedgerAggregate`；business identity mismatch、AVAILABLE/non-CLEARING、debit/decrease 属于 `VerifiedLedgerAggregate + ClearingIneligible`。后三者必须使用既有 `ledger.persisted-transaction.v1 / plan.v1 / entry.v1` builder 重算，不得添加第二摘要、legacy fallback、空摘要、调用方选版本或生产侧兼容分支。
+
+独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；该分层不新增 DSL 或兼容语义。该阶段以 `TEST_REWORK_EXECUTION_GRANT_NO / plan-r2.226` 收口，当前由 10.28 接替。
+
+### 10.28 `MIG-03` Ledger/Clearing 两层语义实证
+
+Test Rework 后，`InvalidLedgerAggregate -> Ledger fail-closed` 与 `VerifiedLedgerAggregate + ClearingIneligible -> Clearing exclusion` 两条路径均有 fresh 行为证据。该结果不新增 Public DSL 类型；`Verified` 只表示 persisted v1 可重建，不代替 business identity、ledger subject 或正逆方向适用性。MIG-03 Ledger Digest Green 已通过独立 Checker，当前只等待下一 W5 Entry Card。
+
+### 10.29 `MIG-04` Transaction orchestration 不新增 DSL
+
+本卡只收回错误 Public surface，不新增 action kind、PaymentInstrument DSL、Spend Rule DSL、route、LedgerFact 或完成状态。六个 command 的字段和行为保持不变，只从 wallet-face Public model 迁为 transaction-impl 内部 application command；Wallet 的 instrument/binding/capability/snapshot 与 SpendControlMovement 仍是稳定事实。不得建立 transaction-face V2、alias、bridge、双 Bean、双 command 或兼容反序列化入口。
+
+独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；该阶段当时只进入 Human Owner RED Execution Grant 决策，当前入口见本文顶部。
+
+### 10.30 `MIG-05C` Ledger extension surface collapse 不新增 DSL
+
+本卡不新增或删除 Money、Funds action、route、posting plan、LedgerTransaction、LedgerEntry、BalanceTarget、normal side、period、balance constraint 或 completion evidence 语义。`LedgerBalanceProjectionService` 是当前实现层扩展接口，不是稳定资金 DSL；删除它只把 `LedgerEntry -> balance projection` 的唯一解释责任收回 Ledger Owner。`CompositeLedgerPostingAssembler` 也是实现选择器，不是 posting grammar 或资金事实。
+
+稳定 DSL 继续要求：每个 posting plan 独立平衡；entry 金额为正且币种明确；余额由同一 Ledger 写链按 entry side、normal side、period 与 constraint 派生；同 action identity 同摘要重放零新增，异摘要冲突；逆向使用原 route/provenance；投影失败整组回滚。删除扩展 router 不允许调用方提交 projector、选择账目、提供 posting entries 或用当前余额反推动作事实。
+
+仍在 core 的 `LedgerPostingAssembler`、`LedgerTransactionPostingService` 和 posting specs 当前属于跨模块物理承接，不因本卡自动获得长期稳定 DSL 身份，也不在本卡删除。其高阶 command 替代方案必须另经 Contract Inquiry。返工只把 face-only Public Contract 目标校正为 `307/181/42`，并把 `LedgerPostingAssembler` 的 `supports` Javadoc comment-only 校正纳入第 19 个 MODIFY；不改变 DSL、签名、行为或增加兼容入口。执行与独立 Checker 均已通过，MIG-05C 当前范围关闭；下一 W5 切片必须重新形成 Entry Card，`EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+### 10.31 `CI-W5-MIG05D-LEDGER-POSTING-COMMAND-001` DSL 边界
+
+本决策不改变 `FundsInstructionSpec`、`ResolvedRouteSpec`、`LedgerTransactionSpec`、`LedgerPostingPlanSpec`、`LedgerPostingPhaseSpec` 或 `LedgerEntrySpec` 的资金/账务语义。Posting specs 继续位于 core，负责表达单币种 Money、plan 独立平衡、phase、entry side、posting role、normal-side 约束和 route provenance；“类型可表达”不等于“任意 Consumer 可提交写入”。
+
+候选 A 把写能力收口为一个高阶命令，候选签名仅用于 Owner 决策，不是已接受 Java 合同：
+
+```text
+LedgerTransactionPostingService.post(
+  FundsInstructionSpec instruction,
+  String fundsTransactionSn,
+  ResolvedRouteSpec resolvedRoute
+) -> String ledgerTransactionSn
+```
+
+该命令语义固定为：调用方提供已经归一的资金指令、由 Transaction 建立的非空 `fundsTransactionSn` 和已解析 route；Ledger 边界必须独立复验 instruction 与 route 的 `tenantId/businessScene/businessSn/instructionType/eventType/transactionType` 完全一致，不能只信任 `CompositeRouteResolver` 的上游调用顺序。Ledger Owner 在内部生成唯一 `LedgerTransactionSpec`、逐 leg PostingPlan/Phase/Entry，执行平衡、账目、period、原 route replay、幂等和余额约束，并在同一本地事务返回唯一 LedgerTransaction SN。调用方不能提交 ledgerId、entry side、normal side、allowNegative、posting plan、entry、digest 或任意上下文扩展来选择账务结果。
+
+候选阶段曾把 `tenantId + fundsTransactionSn` 当作稳定账本命令身份；后续源码闭包证明 authorization COMPLETE/REVERSAL 会复用同一 root，因此该 root-only 候选已被 10.32 的动作级 identity 取代。canonical aggregate digest 仍只覆盖可重建的归一资金语义与冻结 route 稳定字段，不吸收 operator 对象、描述、解析时间或任意可变 Map。
+
+候选 B 继续允许 `assemble(...) -> LedgerTransactionSpec -> post(spec)` 两阶段公共调用；候选 C 只把同一低阶 DSL 写入口移到 ledger-face。B 没有第二 production grammar/Consumer 证据，C 同时保留低阶写面并违反 Transaction 依赖方向，因此 A 为推荐，C 不是 fallback。
+
+候选阶段原拟让 `FundsTransactionProjectionPublishContext` 只保留 Ledger SN；源码闭包进一步确认既有 `FundsInstructionLifecycleResult` 已持有该引用，因此 10.32 的已接受 A 直接删除 raw spec component，不新增重复字段。完整 posting/entry 事实由 Ledger read contract 查询，不随 Transaction projection event 复制。该变化不新增完成状态，不让 Ledger 判断业务成功，不把 ActionFact、LedgerFact 与 Balance 合并，也不改变失败时 Funds 生命周期归纳。候选阶段的 `accepted_answer=none` 已由 10.32 取代。
+
+### 10.32 `CI-W5-MIG05D-LEDGER-POSTING-COMMAND-001-A` 已接受 DSL 合同
+
+Human Owner 已接受 A，替代 10.31 的 `accepted_answer=none`。目标高阶命令的精确 core 合同冻结为：
+
+```text
+LedgerTransactionPostingService.post(
+  FundsInstructionSpec instruction,
+  String fundsTransactionSn,
+  ResolvedRouteSpec resolvedRoute
+) -> String ledgerTransactionSn
+```
+
+该命令是 Funds 内部跨模块写端口，不是宿主订单、rail 或人工补账 API。调用前提与结果如下：
+
+1. `instruction` 与 `resolvedRoute` 非空；`instruction.tenantId` 非空；`fundsTransactionSn` 非空白。
+2. Ledger 独立要求两侧 `tenantId/businessScene/businessSn/instructionType/eventType/transactionType` 六字段完全相等，不能依赖 RouteResolver 已检查或当前 caller 顺序。
+3. 命令 identity=`tenantId + fundsTransactionSn + eventType + businessScene + businessSn`；其中 fundsTransactionSn 是 lifecycle root，后三项标识 root 下的 posting action。`ledgerTransactionSn` 使用 domain=`ledger.posting.command.identity` 的 canonical v1 SHA-256，格式固定为 `LE + first 48 hex`。
+4. `LedgerTransactionSpec`、`LedgerPostingPlanSpec`、`LedgerPostingPhaseSpec`、`LedgerEntrySpec` 继续留在 core 表达稳定会计 DSL，但只由 ledger-impl 组装并作为 Ledger 内部写入模型；Consumer 不再提交这些 spec。
+5. 同一 root 下不同 action identity 生成不同 Ledger SN；同 action identity 生成同一 SN。persisted aggregate digest 相同则返回该 SN 且零重复投影，digest 不同则冲突且 LedgerTransaction/plan/entry/Balance 零新增。唯一键竞争后必须回读同一 persisted aggregate，不能换 SN 重试。
+6. 无 route legs 的零账务动作继续由 Transaction 在调用高阶命令前短路；Ledger 高阶命令不把零账务动作伪造成 LedgerTransaction。
+
+Ledger identity digest 只决定持久化身份，不替代完整 aggregate digest。前者只吸收 tenant、funds transaction root、event 与 action business identity；instructionType/transactionType、Money、route/plan/entry 等语义由 aggregate digest 继续校验，用于区分同义重放和异义冲突。`WindOperator`、description、任意 context Map、resolvedAt 和投影结果不进入 identity digest；不得新增调用方自报 digest 参数。
+
+`FundsTransactionProjectionPublishContext` 不再保存 `LedgerTransactionSpec`，也不新增重复 `ledgerTransactionSn` 组件；投影解释直接读取既有 `FundsInstructionLifecycleResult.ledgerTransactionSn`。ActionFact、Funds lifecycle、Ledger facts 与 Balance 仍是正交证据，Ledger SN 不代表订单成功、外部到账、清算完成或对账通过。
+
+旧 `LedgerPostingAssembler` core type 与 `post(LedgerTransactionSpec)` 直接删除，不保留 alias、deprecated、overload、V2、bridge、双端口或 fallback。Contract Surface RED/Green 已按该无兼容合同执行并通过独立 Checker；当时只等待 `BEHAVIORAL_RED_EXECUTION_GRANT / CODE_FREEZE`，当前入口见本文顶部。
+
+Surface Green 的 DSL 准出当时只证明写入能力已收口为高阶命令：focused=`61/0F/0E/0S`、Core API=`103/95/4/4 / 1036 lines`、Public Contract=`307/181/42`，投影不再承载 raw `LedgerTransactionSpec`。`LedgerTransactionSpec` 及 posting plan/phase/entry 仍是 Ledger 内部会计 DSL，没有被删除或迁出 core；当时动作级 identity 与确定性 SN 尚未实现，不能把 Surface PASS 当成重放/并发合同已兑现。
+
+Behavioral RED 已把动作级 DSL 不变量落为 12 个真实调用：instruction/route 六字段必须相等，tenant 与 root identity 必须存在，同 action identity 必须稳定定位同一 Ledger SN，完整 aggregate digest 继续区分同义与异义，同 root 下不同 action 必须分离。fresh class=`30/12F/0E/0S`、focused=`73/12F/0E/0S`，每个失败都回链到已接受合同，没有新增 DSL 类型、调用方 digest、兼容形式或第二写链。
+
+首轮 Checker 的技术裁决为 PASS，但普通 `just compile` 触发 Maven Snapshot 私有仓库访问，形成未单独授权联网的流程 P1。Human Owner 已接受并授权在权威链记录；后续未单独获联网授权时只允许 Maven `-o`。独立 recheck 最终=`PASS / 0 P0 / 0 P1 / 0 P2`；当时只进入 `BEHAVIORAL_GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，随后已由本文顶部 `plan-r2.254` 接替。
+
+Behavioral Green 已兑现动作级 Ledger DSL：Ledger 在组装前复验 instruction/route 六字段并要求 tenant/root，`ledger.posting.command.identity` 只吸收 `tenantId + fundsTransactionSn + eventType + businessScene + businessSn`，输出 `LE + first48(sha256CanonicalJson(...))`。identity 只定位动作，既有 persisted aggregate digest 继续判定同义/异义；同一 root 的不同 action 由 event/business action 分离。factory 的无 root 重载与时序 SN 已直接删除，不保留 alias/V2/bridge；fresh focused=`73/0`、扩大去重=`638/0`，独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。该 DSL 能力只证明 Provider E2，不把 Ledger SN 外推为订单成功、外部到账、清算完成、对账通过或生产 finality。
+
+### 10.20 重构进度重基线的 DSL 结论（历史）
+
+当前稳定公共资金语言已经覆盖五类 canonical ActionFact：`primary`、`recovery/adjustment`、`authorize`、ordinary `complete` 与 authorization `release`；authorization `refund` 在缺少权威逐 complete allocation 时继续只保留 root-level 执行，canonical query 必须空/UNKNOWN。Ledger 高阶写命令、Action/Ledger/Balance 正交闭合与 Reconciliation strict-exact/Gate Provider 合同均已完成当前范围。
+
+剩余变化不产生新 DSL：`MIG-06/08` 等真实 Adapter/Consumer 把外部证据归一为既有 `NormalizedExternalFundsFact` 并提供 E4，`MIG-09` 等 Consumer cutover 后删除旧入口。未出现新 authority、allocation、Consumer 或 zero-call 证据前，不新增 raw rail matrix、refund 推断规则、`MIG-05E`、兼容类型或第二事实源。
+
+本轮独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；该阶段只保留 `NEXT_SLICE_EVIDENCE_REQUIRED / EXECUTION_GRANT_NO / CODE_FREEZE`，不从已完成 DSL 推导新实现。该门现已由 10.33 承接，不再构成第二当前入口。
+
+### 10.33 `MIG-08` Capte Benefit ActionFact Consumer 读法（历史 Entry Card）
+
+本卡不新增 DSL。它只把已经存在的三个稳定概念在真实 Consumer 中归位：
+
+- `businessScene + businessSn` 是 Consumer 与 Provider 共同持有的业务关联查询键，不是完成证据。
+- `FundsActionFact` 是 Funds Owner 对单次资金动作结果与已证明资金效果的规范化只读事实；空集合表示未知，不能解释为零效果或成功。
+- `benefitTransactionSn` 是 Coupon 保存的 Funds intent/执行引用；它与 `FundsActionFact.intentRef` 对齐，供后继动作引用，但自身不证明动作完成。
+
+Benefit 首次出资和已有 reference 复用都只接受唯一 `primary / funds-transaction:succeeded / proven-full`，并要求 ActionFact `money == provenMoney == expected contribution Money`、`intentRef == benefitTransactionSn`。Benefit 退款只接受唯一 `recovery/adjustment / funds-transaction:succeeded / proven-full`，并要求其 `intentRef == refund returned transactionSn`、`OriginalFundsFactRef` 指向原 settlement ActionFact、allocated Money 与本次退款 Money 一致。
+
+不存在、歧义、Money/币种不一致、`intentRef` 不一致、原事实引用不一致、`proven-zero`、failed 或 unsupported 都不能变成 Coupon 完成事实。空结果只表示 UNKNOWN，不授权重试、逆向或补单；只有 Coupon Owner 已成立且仍有效的核销/退款意图、冻结请求与原业务 identity 才能独立授权同 identity Provider 恢复。语义冲突必须停止并进入人工调查，不能建立主交易 + ActionFact 双判定、fallback 或兼容 facade。
+
+ActionFact 仍不证明 Ledger、Balance、外部 finality、Reconciliation 或 Coupon 生命周期。Consumer 角色、Coupon 对象和 `COUPON_BENEFIT_*` 常量不进入 core DSL；独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`，本卡当时状态为 `ENTRY_CARD_INDEPENDENT_CHECKER_PASS / DOCUMENTATION_ONLY / CAPTE_CONSUMER_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.257`。
+
+### 10.34 `MIG-08` Capte Benefit ActionFact Consumer RED 收口（历史）
+
+Consumer RED 未引入新 DSL，只以十个精准失败验证 10.33 已有词义：`benefitTransactionSn` 或主交易存在不能替代 ActionFact，ActionFact 缺失、歧义、`proven-zero`、Money/币种、`intentRef` 或原事实引用冲突都不能形成完成事实；refund root 存在也不能替代 recovery ActionFact。application=`57/8F/0E/0S`、boundary=`31/2F/0E/0S`，独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。
+
+未来 Green 仍只复用既有 `FundsActionFactQuery/FundsActionFactDTO`，不增加 Coupon DSL、完成状态、Provider surface、identity 解析、双判定或兼容语义。独立重冻 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`；该卡当时进入 Green Gate，现由 10.35 承接。
+
+### 10.35 `MIG-08` Capte Benefit ActionFact Consumer Green 收口
+
+Green 没有新增或改写 DSL：`businessScene + businessSn` 仍只是关联键，`benefitTransactionSn` 仍是执行引用，唯一 `succeeded + proven-full` ActionFact 仍只证明本层 Funds 动作结果。Capte 已用这一既有词义关闭 settle、已有 reference、原 primary、existing recovery、root-only 和 refund returned intentRef 场景，目标源码中的旧主交易完成判定为零。
+
+因此该轮只形成“真实 Consumer 可以使用现有 DSL”的 E3/集成候选证据，不把 ActionFact 升级成 Coupon、Ledger、Balance、finality、Reconciliation 或全局 completion DSL。独立 Green 与 closeout Checker 均=`PASS / 0 P0 / 0 P1 / 0 P2`；该 closeout 当时进入 E4 assessment Entry Card，现由 10.36 的 `plan-r2.260` 承接。
+
+### 10.36 `MIG-08` ActionFact Consumer E4 谱系评估
+
+本轮没有 DSL 变更。`businessScene + businessSn`、`intentRef`、ActionFact identity、`succeeded` 与 `proven-full` 的词义已被 Consumer Green 验证；E4 只回答承载这些词义的 Provider source、binary、Consumer resolved/loaded artifact 是否是同一份内容。
+
+评估时 face 的四个 ActionFact 源文件和对应 class 与已安装制品一致，但 impl 源码/class 不一致，且该本地 Snapshot 无 source revision；随后并发 clean 清除了 workspace target JAR，因此 target 哈希只保留为评估时观察，不作为最终 live 证据。`E4_BLOCKED_LINEAGE` 不代表 DSL 需要扩展；后续只允许以唯一版本离线重建和对账关闭谱系，任何需要新增 DSL/API/兼容读法的情况立即停止交还 Owner。

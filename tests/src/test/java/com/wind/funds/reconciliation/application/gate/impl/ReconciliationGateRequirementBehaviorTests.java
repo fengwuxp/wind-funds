@@ -62,6 +62,7 @@ import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
+import com.wind.jackson.WindJson;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,11 +79,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -116,6 +120,8 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
 
     private static final String STAGE_FUNDS_TRANSACTION_DETAIL_SN = "gate-stage-funds-detail";
 
+    private static final String STAGE_PAYER_DETAIL_SN = "gate-stage-payer-detail";
+
     private static final String STAGE_LEDGER_TRANSACTION_SN = "gate-stage-ledger-tx";
 
     private static final String STAGE_POSTING_PLAN_SN = "gate-stage-posting-plan";
@@ -124,12 +130,19 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
 
     private static final String STAGE_ACCOUNT_SN = "gate-stage-subject";
 
-    private static final String STAGE_ROUTE_SNAPSHOT = "{\"routeCode\":\"DIRECT_PAY_STANDARD\","
-            + "\"routeVersion\":\"v1\",\"legs\":[{\"legId\":\"gate-stage-leg\"}]}";
+    private static final String STAGE_ROUTE_SNAPSHOT = stageRouteSnapshot();
 
     private static final long STAGE_AMOUNT = 9800L;
 
     private static final long STAGE_CLEARING_AMOUNT = 100L;
+
+    private static final LocalDateTime STAGE_LEDGER_TRANSACTION_TIME = LocalDateTime.of(2026, 8, 19, 10, 0);
+
+    private static final String LEDGER_TRANSACTION_DIGEST_DOMAIN = "ledger.persisted-transaction.v1";
+
+    private static final String LEDGER_POSTING_PLAN_DIGEST_DOMAIN = "ledger.persisted-plan.v1";
+
+    private static final String LEDGER_ENTRY_DIGEST_DOMAIN = "ledger.persisted-entry.v1";
 
     @Autowired
     private ReconciliationGateApplicationService reconciliationGateApplicationService;
@@ -514,7 +527,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     private GateStageRef stageSourceRef() {
         return new GateStageRef()
                 .setStageKind("CLEARING_SPLITTABLE_IDENTIFY")
-                .setStageIdentity(identity("funds-transaction-detail", STAGE_FUNDS_TRANSACTION_DETAIL_SN));
+                .setStageIdentity(identity("funds", STAGE_FUNDS_TRANSACTION_SN + ":primary:0"));
     }
 
     private GateStageRef clearingConfirmStageRef(String suffix) {
@@ -526,9 +539,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     private IdentifyClearingSplittableDetailRequest stageRequest() {
         return new IdentifyClearingSplittableDetailRequest()
                 .setTenantId(TENANT_ID)
-                .setFundsTransactionSn(STAGE_FUNDS_TRANSACTION_SN)
-                .setFundsTransactionDetailSn(STAGE_FUNDS_TRANSACTION_DETAIL_SN)
-                .setLedgerEntrySn(STAGE_LEDGER_ENTRY_SN)
+                .setSourceActionFactRef(identity("funds", STAGE_FUNDS_TRANSACTION_SN + ":primary:0"))
                 .setBusinessLine("ACQUIRING")
                 .setSplitPeriod("2026-08-19")
                 .setSplitRuleCode("GATE_BEHAVIOR")
@@ -554,6 +565,16 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                     'gate-stage-subject', 'FUNDING_ACCOUNT', 'PAYEE', 'gate-stage-request',
                     'DIRECT', ?, ?, 'USD', 'SUCCEEDED')
                 """, STAGE_FUNDS_TRANSACTION_DETAIL_SN, TENANT_ID, STAGE_FUNDS_TRANSACTION_SN,
+                STAGE_LEDGER_TRANSACTION_SN, STAGE_AMOUNT);
+        jdbcTemplate.update("""
+                INSERT INTO t_funds_transaction_detail (
+                    sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
+                    event_type, subject_id, subject_type, participant_role, request_hash,
+                    funds_effect_type, ledger_transaction_sn, amount, currency, status
+                ) VALUES (?, ?, ?, 'GATE_BEHAVIOR', 'gate-stage-source', 'PAY', 'PAY',
+                    'gate-stage-payer', 'FUNDING_ACCOUNT', 'PAYER', 'gate-stage-payer-request',
+                    'DIRECT', ?, ?, 'USD', 'SUCCEEDED')
+                """, STAGE_PAYER_DETAIL_SN, TENANT_ID, STAGE_FUNDS_TRANSACTION_SN,
                 STAGE_LEDGER_TRANSACTION_SN, STAGE_AMOUNT);
         insertLedgerFacts(STAGE_FUNDS_TRANSACTION_SN, STAGE_LEDGER_TRANSACTION_SN,
                 STAGE_POSTING_PLAN_SN, STAGE_LEDGER_ENTRY_SN, STAGE_AMOUNT);
@@ -728,15 +749,28 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                                    String postingPlanSn,
                                    String ledgerEntrySn,
                                    long amount) {
+        Map<String, Object> payeeEntryFacts = stageLedgerEntryDigestFacts(
+                fundsTransactionSn, ledgerTransactionSn, postingPlanSn, ledgerEntrySn, 1L,
+                "gate-stage-subject", "CLEARING", "CLEARING", "CREDIT", "INCREASE", amount);
+        Map<String, Object> payerEntryFacts = stageLedgerEntryDigestFacts(
+                fundsTransactionSn, ledgerTransactionSn, postingPlanSn, ledgerEntrySn + "-payer", 2L,
+                "gate-stage-payer", "AVAILABLE", "ASSET", "DEBIT", "DECREASE", amount);
+        Map<String, Object> postingPlanFacts = stagePostingPlanDigestFacts(
+                fundsTransactionSn, ledgerTransactionSn, postingPlanSn, amount);
+        Map<String, Object> planAggregate = new TreeMap<>();
+        planAggregate.put("plan", postingPlanFacts);
+        planAggregate.put("entries", List.of(payeeEntryFacts, payerEntryFacts));
+        String transactionDigest = stageLedgerTransactionDigest(
+                fundsTransactionSn, ledgerTransactionSn, amount, List.of(planAggregate));
         jdbcTemplate.update("""
                 INSERT INTO t_ledger_transaction (
                     sn, tenant_id, funds_transaction_sn, instruction_type, event_type, transaction_type,
                     business_scene, business_sn, amount, currency, original_amount, original_currency,
-                    exchange_rate, debit_amount, credit_amount, sha256
+                    exchange_rate, debit_amount, credit_amount, transaction_time, sha256
                 ) VALUES (?, ?, ?, 'DIRECT_TRANSACTION', 'PAY', 'PAY', 'GATE_BEHAVIOR', ?,
-                    ?, 'USD', ?, 'USD', 1, ?, ?, ?)
+                    ?, 'USD', ?, 'USD', 1, ?, ?, ?, ?)
                 """, ledgerTransactionSn, TENANT_ID, fundsTransactionSn, fundsTransactionSn,
-                amount, amount, amount, amount, FundsStableHashSupport.sha256(ledgerTransactionSn));
+                amount, amount, amount, amount, STAGE_LEDGER_TRANSACTION_TIME, transactionDigest);
         jdbcTemplate.update("""
                 INSERT INTO t_ledger_posting_plan (
                     sn, tenant_id, ledger_transaction_sn, funds_transaction_sn, route_leg_id, intent,
@@ -745,19 +779,181 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 ) VALUES (?, ?, ?, ?, 'gate-stage-leg', 'TRANSFER', 'BETWEEN_SUBJECTS', 'INCREASE',
                     'TRANSFER', ?, 'USD', ?, ?, ?)
                 """, postingPlanSn, TENANT_ID, ledgerTransactionSn, fundsTransactionSn,
-                amount, amount, amount, FundsStableHashSupport.sha256(postingPlanSn));
+                amount, amount, amount,
+                FundsStableHashSupport.sha256CanonicalJson(LEDGER_POSTING_PLAN_DIGEST_DOMAIN, postingPlanFacts));
         jdbcTemplate.update("""
                 INSERT INTO t_ledger_entry (
                     sn, tenant_id, ledger_transaction_sn, posting_plan_sn, funds_transaction_sn, ledger_id,
                     subject_id, subject_type, ledger_subject_code, ledger_subject_category, entry_side,
                     posting_role, balance_constraint_type, intent, posting_scope, balance_effect_type,
                     phase_code, business_scene, business_sn, amount, currency, original_amount,
-                    original_currency, exchange_rate, sha256
+                    original_currency, exchange_rate, transaction_time, sha256
                 ) VALUES (?, ?, ?, ?, ?, 1, 'gate-stage-subject', 'FUNDING_ACCOUNT', 'CLEARING',
                     'CLEARING', 'CREDIT', 'DETAIL', 'MUST_NOT_BE_NEGATIVE', 'TRANSFER',
-                    'BETWEEN_SUBJECTS', 'INCREASE', 'TRANSFER', 'GATE_BEHAVIOR', ?, ?, 'USD', ?, 'USD', 1, ?)
+                    'BETWEEN_SUBJECTS', 'INCREASE', 'TRANSFER', 'GATE_BEHAVIOR', ?, ?, 'USD', ?, 'USD', 1, ?, ?)
                 """, ledgerEntrySn, TENANT_ID, ledgerTransactionSn, postingPlanSn, fundsTransactionSn,
-                fundsTransactionSn, amount, amount, FundsStableHashSupport.sha256(ledgerEntrySn));
+                fundsTransactionSn, amount, amount, STAGE_LEDGER_TRANSACTION_TIME,
+                FundsStableHashSupport.sha256CanonicalJson(LEDGER_ENTRY_DIGEST_DOMAIN, payeeEntryFacts));
+        jdbcTemplate.update("""
+                INSERT INTO t_ledger_entry (
+                    sn, tenant_id, ledger_transaction_sn, posting_plan_sn, funds_transaction_sn, ledger_id,
+                    subject_id, subject_type, ledger_subject_code, ledger_subject_category, entry_side,
+                    posting_role, balance_constraint_type, intent, posting_scope, balance_effect_type,
+                    phase_code, business_scene, business_sn, amount, currency, original_amount,
+                    original_currency, exchange_rate, transaction_time, sha256
+                ) VALUES (?, ?, ?, ?, ?, 2, 'gate-stage-payer', 'FUNDING_ACCOUNT', 'AVAILABLE',
+                    'ASSET', 'DEBIT', 'DETAIL', 'MUST_NOT_BE_NEGATIVE', 'TRANSFER',
+                    'BETWEEN_SUBJECTS', 'DECREASE', 'TRANSFER', 'GATE_BEHAVIOR', ?, ?, 'USD', ?, 'USD', 1, ?, ?)
+                """, ledgerEntrySn + "-payer", TENANT_ID, ledgerTransactionSn, postingPlanSn,
+                fundsTransactionSn, fundsTransactionSn, amount, amount,
+                STAGE_LEDGER_TRANSACTION_TIME,
+                FundsStableHashSupport.sha256CanonicalJson(LEDGER_ENTRY_DIGEST_DOMAIN, payerEntryFacts));
+    }
+
+    private String stageLedgerTransactionDigest(String fundsTransactionSn,
+                                                String ledgerTransactionSn,
+                                                long amount,
+                                                List<Map<String, Object>> postingPlans) {
+        Map<String, Object> transaction = new TreeMap<>();
+        transaction.put("sn", ledgerTransactionSn);
+        transaction.put("tenantId", TENANT_ID);
+        transaction.put("instructionType", "DIRECT_TRANSACTION");
+        transaction.put("eventType", "PAY");
+        transaction.put("fundsTransactionSn", fundsTransactionSn);
+        transaction.put("transactionType", "PAY");
+        transaction.put("businessScene", "GATE_BEHAVIOR");
+        transaction.put("businessSn", fundsTransactionSn);
+        transaction.put("amount", amount);
+        transaction.put("currency", "USD");
+        transaction.put("originalAmount", amount);
+        transaction.put("originalCurrency", "USD");
+        transaction.put("exchangeRate", BigDecimal.ONE);
+        transaction.put("debitAmount", amount);
+        transaction.put("creditAmount", amount);
+        transaction.put("transactionTime", STAGE_LEDGER_TRANSACTION_TIME);
+        transaction.put("referenceLedgerTransactionSn", null);
+        Map<String, Object> aggregate = new TreeMap<>();
+        aggregate.put("transaction", transaction);
+        aggregate.put("postingPlans", postingPlans);
+        return FundsStableHashSupport.sha256CanonicalJson(LEDGER_TRANSACTION_DIGEST_DOMAIN, aggregate);
+    }
+
+    private Map<String, Object> stagePostingPlanDigestFacts(String fundsTransactionSn,
+                                                            String ledgerTransactionSn,
+                                                            String postingPlanSn,
+                                                            long amount) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("sn", postingPlanSn);
+        facts.put("tenantId", TENANT_ID);
+        facts.put("ledgerTransactionSn", ledgerTransactionSn);
+        facts.put("fundsTransactionSn", fundsTransactionSn);
+        facts.put("routeLegId", "gate-stage-leg");
+        facts.put("intent", "TRANSFER");
+        facts.put("postingScope", "BETWEEN_SUBJECTS");
+        facts.put("balanceEffectType", "INCREASE");
+        facts.put("phaseCode", "TRANSFER");
+        facts.put("amount", amount);
+        facts.put("currency", "USD");
+        facts.put("debitAmount", amount);
+        facts.put("creditAmount", amount);
+        return facts;
+    }
+
+    private Map<String, Object> stageLedgerEntryDigestFacts(String fundsTransactionSn,
+                                                            String ledgerTransactionSn,
+                                                            String postingPlanSn,
+                                                            String ledgerEntrySn,
+                                                            long ledgerId,
+                                                            String subjectId,
+                                                            String subjectCode,
+                                                            String subjectCategory,
+                                                            String entrySide,
+                                                            String balanceEffectType,
+                                                            long amount) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("sn", ledgerEntrySn);
+        facts.put("tenantId", TENANT_ID);
+        facts.put("ledgerTransactionSn", ledgerTransactionSn);
+        facts.put("postingPlanSn", postingPlanSn);
+        facts.put("fundsTransactionSn", fundsTransactionSn);
+        facts.put("ledgerId", ledgerId);
+        facts.put("periodType", "LIFETIME");
+        facts.put("periodId", "LIFETIME");
+        facts.put("subjectId", subjectId);
+        facts.put("subjectType", "FUNDING_ACCOUNT");
+        facts.put("ledgerSubjectCode", subjectCode);
+        facts.put("ledgerSubjectCategory", subjectCategory);
+        facts.put("entrySide", entrySide);
+        facts.put("postingRole", "DETAIL");
+        facts.put("balanceConstraintType", "MUST_NOT_BE_NEGATIVE");
+        facts.put("intent", "TRANSFER");
+        facts.put("postingScope", "BETWEEN_SUBJECTS");
+        facts.put("balanceEffectType", balanceEffectType);
+        facts.put("phaseCode", "TRANSFER");
+        facts.put("businessScene", "GATE_BEHAVIOR");
+        facts.put("businessSn", fundsTransactionSn);
+        facts.put("amount", amount);
+        facts.put("currency", "USD");
+        facts.put("originalAmount", amount);
+        facts.put("originalCurrency", "USD");
+        facts.put("exchangeRate", BigDecimal.ONE);
+        facts.put("transactionTime", STAGE_LEDGER_TRANSACTION_TIME);
+        return facts;
+    }
+
+    private static String stageRouteSnapshot() {
+        Map<String, Object> payer = subject("gate-stage-payer");
+        Map<String, Object> payee = subject(STAGE_ACCOUNT_SN);
+        Map<String, Object> values = new java.util.TreeMap<>();
+        values.put("tenantId", TENANT_ID);
+        values.put("snapshotId", "gate-stage-route");
+        values.put("snapshotSchemaVersion", "1.0");
+        values.put("routeCode", "DIRECT_PAY_STANDARD");
+        values.put("routeVersion", "1.0");
+        values.put("businessScene", "GATE_BEHAVIOR");
+        values.put("businessSn", "gate-stage-source");
+        values.put("instructionType", "DIRECT_TRANSACTION");
+        values.put("eventType", "PAY");
+        values.put("transactionType", "PAY");
+        values.put("participants", List.of(
+                participant("PAYER", payer), participant("PAYEE", payee)));
+        values.put("legs", List.of(Map.ofEntries(
+                Map.entry("legId", "PAY"),
+                Map.entry("sequence", 0),
+                Map.entry("legType", "INTERNAL_TRANSFER"),
+                Map.entry("sourceNode", node("SOURCE", payer)),
+                Map.entry("targetNode", node("TARGET", payee)),
+                Map.entry("amount", money(STAGE_AMOUNT)),
+                Map.entry("originalAmount", money(STAGE_AMOUNT)),
+                Map.entry("exchangeRate", 1),
+                Map.entry("replayPolicy", "FULL_ONLY"),
+                Map.entry("contextVariables", Map.of()))));
+        return WindJson.toJsonString(values);
+    }
+
+    private static Map<String, Object> participant(String role, Map<String, Object> subject) {
+        return Map.of(
+                "participantRole", role,
+                "subjectRef", subject,
+                "currency", "USD",
+                "amount", money(STAGE_AMOUNT),
+                "contextVariables", Map.of());
+    }
+
+    private static Map<String, Object> node(String role, Map<String, Object> subject) {
+        return Map.of("nodeType", "SUBJECT", "subjectRef", subject, "nodeRole", role);
+    }
+
+    private static Map<String, Object> subject(String subjectId) {
+        return Map.of(
+                "tenantId", TENANT_ID,
+                "subjectId", subjectId,
+                "subjectType", "FUNDING_ACCOUNT",
+                "currency", "USD");
+    }
+
+    private static Map<String, Object> money(long amount) {
+        return Map.of("amount", amount, "currency", "USD");
     }
 
     private void seedDifference(String suffix,

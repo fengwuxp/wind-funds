@@ -1,6 +1,5 @@
 package com.wind.funds.route;
 
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
@@ -56,7 +55,6 @@ class RouteResolverFactBoundaryTests {
 
     private static final List<Class<?>> FACT_WRITE_TYPES = List.of(
             LedgerTransactionPostingService.class,
-            LedgerBalanceProjectionService.class,
             LedgerService.class,
             LedgerTransactionService.class,
             LedgerServiceImpl.class,

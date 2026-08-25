@@ -88,7 +88,7 @@ public class FundsTransactionDTO implements Serializable {
     @Schema(description = "累计手续费金额")
     private Long feeAmount;
 
-    @Schema(description = "RouteSnapshot JSON")
+    @Schema(description = "路由快照（RouteSnapshot）JSON")
     private String routeSnapshot;
 
     @Schema(description = "描述")

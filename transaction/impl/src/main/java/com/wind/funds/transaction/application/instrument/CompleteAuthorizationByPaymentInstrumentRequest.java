@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.instrument;
 
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,7 +13,8 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 支付工具授权完成请求，只携带可信完成事实并沿原授权快照回放账务与控制关系。
+ * Transaction Provider 内部支付工具授权完成命令，
+ * 只携带可信完成事实并沿原授权快照回放账务与控制关系。
  *
  * @author wuxp
  * @since 2026-07-29

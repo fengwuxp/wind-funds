@@ -22,64 +22,64 @@ import org.jspecify.annotations.NonNull;
 @Getter
 public enum DefaultFundsTransactionType implements DescriptiveEnum {
 
-    @Schema(description = "Top-up")
+    @Schema(description = "充值")
     TOPUP("充值"),
 
-    @Schema(description = "Transfer")
+    @Schema(description = "内部转账")
     TRANSFER("转账（内部）"),
 
     /**
      * 支付/消费
      */
-    @Schema(description = "Pay")
+    @Schema(description = "支付")
     PAY("支付"),
 
     /**
      * 手续费
      */
-    @Schema(description = "Fee")
+    @Schema(description = "手续费")
     FEE("手续费"),
 
     /**
      * 退款
      */
-    @Schema(description = "Refund")
+    @Schema(description = "退款")
     REFUND("退款"),
 
     /**
      * 提现
      */
-    @Schema(description = "Withdraw")
+    @Schema(description = "提现")
     WITHDRAW("提现"),
 
     /**
      * 已确认清算批次对应的账户内待清算资金转可用。
      */
-    @Schema(description = "Clearing")
+    @Schema(description = "清算确认")
     CLEARING("清算确认"),
 
     /**
      * 已审批结算单对应的账户内可用资金转结算锁定。
      */
-    @Schema(description = "Settlement")
+    @Schema(description = "结算锁定")
     SETTLEMENT("结算锁定"),
 
     /**
      * 已锁定结算资金的外部出款结果。
      */
-    @Schema(description = "Payout")
+    @Schema(description = "结算出款")
     PAYOUT("结算出款"),
 
     /**
      * 同一资金主体内的冻结与解冻控制。
      */
-    @Schema(description = "Balance control")
+    @Schema(description = "余额控制")
     BALANCE_CONTROL("余额控制"),
 
     /**
      * 受控余额或额度调整。
      */
-    @Schema(description = "Adjustment")
+    @Schema(description = "调账")
     ADJUSTMENT("调账"),
 
     ;

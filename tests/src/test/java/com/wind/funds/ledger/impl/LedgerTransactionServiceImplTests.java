@@ -16,6 +16,7 @@ import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
 import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -30,15 +31,21 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * 账本交易服务流程测试。
@@ -52,8 +59,14 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
 
     private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 5, 27, 10, 0);
 
-    private static final String CORE1B_LEDGER_CANONICAL_DIGEST =
-            "f27b0b1798d3c1b06576b4c87301bb037bd87dc30f5cdb69ac827990004c80a6";
+    private static final LocalDateTime NANOS_TRANSACTION_TIME =
+            LocalDateTime.of(2026, 5, 27, 10, 0, 0, 987_654_321);
+
+    private static final String LEDGER_TRANSACTION_DIGEST_DOMAIN = "ledger.persisted-transaction.v1";
+
+    private static final String LEDGER_POSTING_PLAN_DIGEST_DOMAIN = "ledger.persisted-plan.v1";
+
+    private static final String LEDGER_ENTRY_DIGEST_DOMAIN = "ledger.persisted-entry.v1";
 
     private static final String CORE1B_LEDGER_LEGACY_DIGEST =
             "50c63ea9e47976aae601f54b38e0ca92128ed454411ee270621ddf880068a71c";
@@ -86,21 +99,18 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：历史 ledger transaction 已保存 legacy 摘要，当前版本收到相同请求和冲突请求。
+     * 场景：历史 ledger transaction 已保存 legacy 摘要，当前版本收到相同请求。
      * 输入：先由当前 writer 写入 canonical v1，再把持久化摘要替换为基线旧 writer 的固定 golden。
-     * 输出：同请求复用原交易，冲突 intent 被拒绝，legacy 摘要和全部账务事实均保持不变。
-     * 红线：兼容读取不得重写历史摘要、重复入账或绕过摘要冲突检查。
+     * 输出：同请求因 legacy 摘要被拒绝，legacy 摘要和全部账务事实均保持不变。
+     * 红线：目标 persisted contract 不得兼容、回填或重写历史摘要。
      */
     @Test
-    void testPersistedLegacyLedgerDigestShouldReplayAndRejectConflictWithoutChangingFacts() {
+    void testPersistedLegacyLedgerDigestShouldFailClosedWithoutChangingFacts() {
         LedgerTransactionSpec transaction = ledgerTransaction(Map.of(), Map.of(), Map.of());
 
-        LedgerTransactionPostResult first = ledgerTransactionService.postLedgerTransaction(transaction);
+        ledgerTransactionService.postLedgerTransaction(transaction);
 
-        assertThat(first.isNewlyPosted()).isTrue();
-        assertThat(first.getLedgerTransactionId()).isNotNull();
-        assertThat(persistedLedgerDigest()).isEqualTo(CORE1B_LEDGER_CANONICAL_DIGEST)
-                .isNotEqualTo(CORE1B_LEDGER_LEGACY_DIGEST);
+        assertThat(persistedLedgerDigest()).isNotBlank().isNotEqualTo(CORE1B_LEDGER_LEGACY_DIGEST);
         assertThat(countFacts("t_ledger_transaction", "sn")).isEqualTo(1L);
         assertThat(countFacts("t_ledger_posting_plan", "ledger_transaction_sn")).isEqualTo(1L);
         assertThat(countFacts("t_ledger_entry", "ledger_transaction_sn")).isEqualTo(2L);
@@ -108,20 +118,54 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                 CORE1B_LEDGER_LEGACY_DIGEST, "LE_LEDGER_CONTEXT_001")).isEqualTo(1);
         LedgerFactSnapshot persistedLegacyFacts = ledgerFactSnapshot(jdbcTemplate);
 
-        LedgerTransactionPostResult replay = ledgerTransactionService.postLedgerTransaction(transaction);
+        Throwable failure = catchThrowable(() -> ledgerTransactionService.postLedgerTransaction(transaction));
+        assertThat(failure).as("ledger legacy digest must be rejected").isNotNull();
+        assertThat(failure).hasMessageContaining("摘要不一致");
+        assertThat(persistedLedgerDigest()).isEqualTo(CORE1B_LEDGER_LEGACY_DIGEST);
+        assertLedgerFactsUnchanged(jdbcTemplate, persistedLegacyFacts);
+    }
+
+    /**
+     * 场景：请求时间含 nanos，汇率以不同 decimal scale 重放。
+     * 输入：真实 writer 写入后，从 transaction/plan/entry 持久化列重建唯一 v1 摘要。
+     * 输出：时间统一截断到秒，1 与 1.00000000 同义重放，非等值汇率冲突。
+     * 红线：摘要不得依赖写前 nanos、数据库 decimal scale 或 legacy fallback。
+     */
+    @Test
+    void testPersistedDigestShouldRoundTripCanonicalTimeAndDecimalScale() {
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                Map.of(), Map.of(), Map.of(), LedgerPostingIntentType.TRANSFER,
+                NANOS_TRANSACTION_TIME, BigDecimal.ONE);
+
+        LedgerTransactionPostResult first = ledgerTransactionService.postLedgerTransaction(transaction);
+        LedgerFactSnapshot persistedFacts = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionPostResult replay = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
+                Map.of(), Map.of(), Map.of(), LedgerPostingIntentType.TRANSFER,
+                NANOS_TRANSACTION_TIME, new BigDecimal("1.00000000")));
 
         assertThat(replay.getLedgerTransactionId()).isEqualTo(first.getLedgerTransactionId());
         assertThat(replay.isNewlyPosted()).isFalse();
-        assertThat(persistedLedgerDigest()).isEqualTo(CORE1B_LEDGER_LEGACY_DIGEST);
-        assertLedgerFactsUnchanged(jdbcTemplate, persistedLegacyFacts);
-
-        LedgerTransactionSpec conflicting = ledgerTransaction(
-                Map.of(), Map.of(), Map.of(), LedgerPostingIntentType.REFUND);
-        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(conflicting))
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
+                Map.of(), Map.of(), Map.of(), LedgerPostingIntentType.TRANSFER,
+                NANOS_TRANSACTION_TIME, new BigDecimal("1.01"))))
                 .hasMessageContaining("账本交易已存在但摘要不一致");
+        assertLedgerFactsUnchanged(jdbcTemplate, persistedFacts);
 
-        assertThat(persistedLedgerDigest()).isEqualTo(CORE1B_LEDGER_LEGACY_DIGEST);
-        assertLedgerFactsUnchanged(jdbcTemplate, persistedLegacyFacts);
+        Map<String, Object> actual = new TreeMap<>();
+        actual.put("transactionTime", persistedTransactionDigestFacts().get("transactionTime"));
+        actual.put("entryTimes", persistedLedgerEntryDigestFacts().stream()
+                .map(facts -> facts.get("transactionTime"))
+                .toList());
+        actual.put("digests", persistedDigests());
+        LocalDateTime expectedTime = NANOS_TRANSACTION_TIME.truncatedTo(ChronoUnit.SECONDS);
+        Map<String, Object> expected = new TreeMap<>();
+        expected.put("transactionTime", expectedTime);
+        expected.put("entryTimes", List.of(expectedTime, expectedTime));
+        expected.put("digests", expectedPersistedDigests());
+
+        assertThat(actual)
+                .as("persisted ledger digest must round-trip canonical time and decimal")
+                .isEqualTo(expected);
     }
 
     /**
@@ -298,14 +342,24 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                                                     Map<String, Object> planContext,
                                                     Map<String, Object> entryContext,
                                                     LedgerPostingIntentType intent) {
+        return ledgerTransaction(transactionContext, planContext, entryContext, intent,
+                TRANSACTION_TIME, BigDecimal.ONE);
+    }
+
+    private LedgerTransactionSpec ledgerTransaction(Map<String, Object> transactionContext,
+                                                    Map<String, Object> planContext,
+                                                    Map<String, Object> entryContext,
+                                                    LedgerPostingIntentType intent,
+                                                    LocalDateTime transactionTime,
+                                                    BigDecimal exchangeRate) {
         return new TestLedgerTransactionSpec(List.of(new TestLedgerPostingPlanSpec(
                 "PLAN_LEDGER_CONTEXT_001",
                 "LE_LEDGER_CONTEXT_001",
                 intent,
                 List.of(new TestLedgerPostingPhaseSpec(LedgerPhaseCode.TRANSFER, List.of(
-                        entry("source_account", EntrySide.DEBIT, entryContext),
-                        entry("target_account", EntrySide.CREDIT, Map.of())))),
-                planContext)), transactionContext);
+                        entry("source_account", EntrySide.DEBIT, entryContext, transactionTime, exchangeRate),
+                        entry("target_account", EntrySide.CREDIT, Map.of(), transactionTime, exchangeRate)))),
+                planContext)), transactionTime, transactionContext);
     }
 
     private String persistedLedgerDigest() {
@@ -322,7 +376,11 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                 "LE_LEDGER_CONTEXT_001");
     }
 
-    private LedgerEntrySpec entry(String subjectId, EntrySide side, Map<String, Object> contextVariables) {
+    private LedgerEntrySpec entry(String subjectId,
+                                  EntrySide side,
+                                  Map<String, Object> contextVariables,
+                                  LocalDateTime transactionTime,
+                                  BigDecimal exchangeRate) {
         return new TestLedgerEntrySpec(subjectId,
                 FundsSubjectType.FUNDING_ACCOUNT.name(),
                 LedgerSubjectCode.AVAILABLE,
@@ -330,7 +388,114 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                 "LE_LEDGER_CONTEXT_001",
                 side,
                 Money.immutable(100L, CurrencyIsoCode.USD),
+                transactionTime,
+                exchangeRate,
                 contextVariables);
+    }
+
+    private Map<String, String> persistedDigests() {
+        Map<String, String> result = new TreeMap<>();
+        result.put("transaction:LE_LEDGER_CONTEXT_001", persistedLedgerDigest());
+        persistedPostingPlanDigestFacts().forEach(plan -> {
+            String planSn = (String) plan.get("sn");
+            result.put("plan:" + planSn, jdbcTemplate.queryForObject(
+                    "SELECT sha256 FROM t_ledger_posting_plan WHERE sn = ?", String.class, planSn));
+        });
+        persistedLedgerEntryDigestFacts().forEach(entry -> {
+            String entrySn = (String) entry.get("sn");
+            result.put("entry:" + entrySn, jdbcTemplate.queryForObject(
+                    "SELECT sha256 FROM t_ledger_entry WHERE sn = ?", String.class, entrySn));
+        });
+        return result;
+    }
+
+    private Map<String, String> expectedPersistedDigests() {
+        Map<String, String> result = new TreeMap<>();
+        result.put("transaction:LE_LEDGER_CONTEXT_001", FundsStableHashSupport.sha256CanonicalJson(
+                LEDGER_TRANSACTION_DIGEST_DOMAIN, persistedLedgerAggregateDigestFacts()));
+        persistedPostingPlanDigestFacts().forEach(plan -> result.put("plan:" + plan.get("sn"),
+                FundsStableHashSupport.sha256CanonicalJson(LEDGER_POSTING_PLAN_DIGEST_DOMAIN, plan)));
+        persistedLedgerEntryDigestFacts().forEach(entry -> result.put("entry:" + entry.get("sn"),
+                FundsStableHashSupport.sha256CanonicalJson(LEDGER_ENTRY_DIGEST_DOMAIN, entry)));
+        return result;
+    }
+
+    private Map<String, Object> persistedLedgerAggregateDigestFacts() {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("transaction", persistedTransactionDigestFacts());
+        facts.put("postingPlans", persistedPostingPlanDigestFacts().stream().map(plan -> {
+            Map<String, Object> aggregate = new TreeMap<>();
+            aggregate.put("plan", plan);
+            aggregate.put("entries", persistedLedgerEntryDigestFacts((String) plan.get("sn")));
+            return aggregate;
+        }).toList());
+        return facts;
+    }
+
+    private Map<String, Object> persistedTransactionDigestFacts() {
+        return jdbcTemplate.queryForObject("""
+                        SELECT sn AS "sn", tenant_id AS "tenantId", instruction_type AS "instructionType",
+                               event_type AS "eventType", funds_transaction_sn AS "fundsTransactionSn",
+                               transaction_type AS "transactionType", business_scene AS "businessScene",
+                               business_sn AS "businessSn", amount AS "amount", currency AS "currency",
+                               original_amount AS "originalAmount", original_currency AS "originalCurrency",
+                               exchange_rate AS "exchangeRate", debit_amount AS "debitAmount",
+                               credit_amount AS "creditAmount", transaction_time AS "transactionTime",
+                               reference_ledger_transaction_sn AS "referenceLedgerTransactionSn"
+                        FROM t_ledger_transaction WHERE sn = ?
+                        """, (resultSet, rowNum) -> digestFacts(resultSet), "LE_LEDGER_CONTEXT_001");
+    }
+
+    private List<Map<String, Object>> persistedPostingPlanDigestFacts() {
+        return jdbcTemplate.query("""
+                        SELECT sn AS "sn", tenant_id AS "tenantId",
+                               ledger_transaction_sn AS "ledgerTransactionSn",
+                               funds_transaction_sn AS "fundsTransactionSn", route_leg_id AS "routeLegId",
+                               intent AS "intent", posting_scope AS "postingScope",
+                               balance_effect_type AS "balanceEffectType", phase_code AS "phaseCode",
+                               amount AS "amount", currency AS "currency", debit_amount AS "debitAmount",
+                               credit_amount AS "creditAmount"
+                        FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ? ORDER BY sn
+                        """, (resultSet, rowNum) -> digestFacts(resultSet), "LE_LEDGER_CONTEXT_001");
+    }
+
+    private List<Map<String, Object>> persistedLedgerEntryDigestFacts() {
+        return jdbcTemplate.query("""
+                        SELECT sn AS "sn", tenant_id AS "tenantId",
+                               ledger_transaction_sn AS "ledgerTransactionSn", posting_plan_sn AS "postingPlanSn",
+                               funds_transaction_sn AS "fundsTransactionSn", ledger_id AS "ledgerId",
+                               period_type AS "periodType", period_id AS "periodId", subject_id AS "subjectId",
+                               subject_type AS "subjectType", ledger_subject_code AS "ledgerSubjectCode",
+                               ledger_subject_category AS "ledgerSubjectCategory", entry_side AS "entrySide",
+                               posting_role AS "postingRole", balance_constraint_type AS "balanceConstraintType",
+                               intent AS "intent", posting_scope AS "postingScope",
+                               balance_effect_type AS "balanceEffectType", phase_code AS "phaseCode",
+                               business_scene AS "businessScene", business_sn AS "businessSn",
+                               amount AS "amount", currency AS "currency", original_amount AS "originalAmount",
+                               original_currency AS "originalCurrency", exchange_rate AS "exchangeRate",
+                               transaction_time AS "transactionTime"
+                        FROM t_ledger_entry WHERE ledger_transaction_sn = ? ORDER BY sn
+                        """, (resultSet, rowNum) -> digestFacts(resultSet), "LE_LEDGER_CONTEXT_001");
+    }
+
+    private List<Map<String, Object>> persistedLedgerEntryDigestFacts(String postingPlanSn) {
+        return persistedLedgerEntryDigestFacts().stream()
+                .filter(entry -> postingPlanSn.equals(entry.get("postingPlanSn")))
+                .toList();
+    }
+
+    private Map<String, Object> digestFacts(ResultSet resultSet) throws SQLException {
+        Map<String, Object> facts = new TreeMap<>();
+        for (int column = 1; column <= resultSet.getMetaData().getColumnCount(); column++) {
+            Object value = resultSet.getObject(column);
+            if (value instanceof Timestamp timestamp) {
+                value = timestamp.toLocalDateTime().truncatedTo(ChronoUnit.SECONDS);
+            } else if (value instanceof LocalDateTime time) {
+                value = time.truncatedTo(ChronoUnit.SECONDS);
+            }
+            facts.put(resultSet.getMetaData().getColumnLabel(column), value);
+        }
+        return facts;
     }
 
     private void cleanupLedgerContextFacts() {
@@ -403,6 +568,8 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                                        String ledgerTransactionSn,
                                        EntrySide entryType,
                                        Money amount,
+                                       LocalDateTime transactionTime,
+                                       BigDecimal exchangeRate,
                                        Map<String, Object> contextVariables) implements LedgerEntrySpec {
 
         private TestLedgerEntrySpec {
@@ -466,12 +633,12 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
 
         @Override
         public BigDecimal getExchangeRate() {
-            return BigDecimal.ONE;
+            return exchangeRate;
         }
 
         @Override
         public LocalDateTime getTransactionTime() {
-            return TRANSACTION_TIME;
+            return transactionTime;
         }
 
         @Override
@@ -486,6 +653,7 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private record TestLedgerTransactionSpec(List<LedgerPostingPlanSpec> postingPlans,
+                                             LocalDateTime transactionTime,
                                              Map<String, Object> contextVariables)
             implements LedgerTransactionSpec {
 
@@ -536,7 +704,7 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
 
         @Override
         public LocalDateTime getTransactionTime() {
-            return TRANSACTION_TIME;
+            return transactionTime;
         }
 
         @Override

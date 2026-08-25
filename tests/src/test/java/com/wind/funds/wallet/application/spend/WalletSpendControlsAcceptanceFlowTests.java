@@ -7,6 +7,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.application.spend.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
@@ -51,7 +52,6 @@ import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
-import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendControlMovementService;
@@ -169,7 +169,8 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
     private SpendControlMovementService spendControlMovementService;
 
     @Autowired
-    private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
+    private SpendControlTransactionConsumptionApplicationServiceImpl
+            spendControlTransactionConsumptionApplicationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

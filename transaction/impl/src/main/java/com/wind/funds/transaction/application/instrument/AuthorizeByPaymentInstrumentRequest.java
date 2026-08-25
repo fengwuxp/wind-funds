@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.instrument;
 
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -16,12 +16,13 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 支付工具授权请求。
+ * Transaction Provider 内部支付工具授权命令。
  *
- * <p>该请求是 wallet application 层的外部业务入口模型，不替代 transaction 层账户主体型授权请求。</p>
+ * <p>仅供 transaction-impl 组合 Wallet 准入事实并委派账户主体型授权内核，
+ * 不属于 Wallet 或 Public API。</p>
  *
  * @author Codex
- * @date 2026-06-18
+ * @since 2026-06-18
  */
 @Schema(description = "支付工具授权请求")
 @Data

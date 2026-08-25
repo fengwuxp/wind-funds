@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
 import com.wind.integration.operator.WindOperatorFactory;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -121,6 +120,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -213,7 +213,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected LedgerProfileCatalog ledgerProfileCatalog;
 
     @Autowired
-    protected LedgerBalanceProjectionService ledgerBalanceProjectionService;
+    protected LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
     @Autowired
     protected CreditAccountService creditAccountService;
@@ -374,7 +374,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledger,
                     initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
-                    Math.abs(initialBalance))));
+                    Math.abs(initialBalance))), LedgerPostingAccessType.NORMAL);
         }
     }
 

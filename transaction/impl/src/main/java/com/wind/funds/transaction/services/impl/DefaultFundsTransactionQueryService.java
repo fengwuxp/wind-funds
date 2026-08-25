@@ -20,10 +20,12 @@ import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
 import com.wind.funds.transaction.model.dto.FundsActionFactRef;
+import com.wind.funds.transaction.model.dto.FundsActionRecordedEvidenceDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.model.query.FundsActionFactQuery;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
+import com.wind.funds.transaction.services.FundsActionRecordedEvidenceQueryService;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.transaction.support.FundsRouteLegIds;
@@ -52,7 +54,9 @@ import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +72,8 @@ import java.util.TreeMap;
  */
 @Service
 @AllArgsConstructor
-public class DefaultFundsTransactionQueryService implements FundsTransactionQueryService {
+public class DefaultFundsTransactionQueryService
+        implements FundsTransactionQueryService, FundsActionRecordedEvidenceQueryService {
 
     private static final String ACTION_IDENTITY_MARKER = ":primary:";
 
@@ -78,6 +83,12 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
 
     private static final String COMPLETE_ACTION_IDENTITY_MARKER = ":complete:";
 
+    private static final String RELEASE_ACTION_IDENTITY_PREFIX = "release:v1:";
+
+    private static final String RELEASE_INTENT_REF_PREFIX = "release-intent:v1:";
+
+    private static final String RELEASE_ATTEMPT_REF_PREFIX = "release-attempt:v1:";
+
     private static final String ACTION_KIND_PRIMARY = "primary";
 
     private static final String ACTION_KIND_RECOVERY = "recovery/adjustment";
@@ -85,6 +96,8 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     private static final String ACTION_KIND_AUTHORIZE = "authorize";
 
     private static final String ACTION_KIND_COMPLETE = "complete";
+
+    private static final String ACTION_KIND_RELEASE = "release";
 
     private static final String DOMAIN_OUTCOME_OWNER = "funds-transaction";
 
@@ -107,6 +120,8 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     private static final String ORIGINAL_FACT_RELATION = "reverses-confirmed-effect";
 
     private static final String AUTHORIZATION_COMPLETE_ORIGINAL_FACT_RELATION = "consumes-authorized-effect";
+
+    private static final String AUTHORIZATION_RELEASE_ORIGINAL_FACT_RELATION = "releases-authorized-effect";
 
     private static final String LEDGER_POSTING_REJECTED_ERROR_CODE = "LEDGER_POSTING_REJECTED";
 
@@ -133,7 +148,18 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     private static final String COMPLETE_SEMANTIC_DIGEST_FIELDS_VERSION =
             "transaction.action.complete.projection.v1";
 
+    private static final String RELEASE_SEMANTIC_DIGEST_DOMAIN =
+            "transaction.action.release.projection";
+
+    private static final String RELEASE_SEMANTIC_DIGEST_FIELDS_VERSION =
+            "transaction.action.release.projection.v1";
+
     private static final String ROUTE_SNAPSHOT_OWNER_NAMESPACE = "funds-route-snapshot";
+
+    private static final String RECORDED_REFERENCE_DIGEST_DOMAIN = "transaction.action.recorded-reference";
+
+    private static final String RECORDED_REFERENCE_DIGEST_FIELDS_VERSION =
+            "transaction.action.recorded-reference.v1";
 
     private final FundsTransactionMapper fundsTransactionMapper;
 
@@ -146,20 +172,31 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         AssertUtils.notNull(query.getTenantId(), "资金动作事实租户 ID 不能为空");
         AssertUtils.hasText(query.getBusinessScene(), "资金动作事实业务场景不能为空");
         AssertUtils.hasText(query.getBusinessSn(), "资金动作事实业务流水不能为空");
-        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(query.getTenantId()))
-                .and(ref.businessScene.eq(query.getBusinessScene()))
-                .and(ref.businessSn.eq(query.getBusinessSn()));
-        FundsTransaction transaction = fundsTransactionMapper.selectOneByQuery(wrapper);
-        return transaction == null ? queryAuthorizationCompleteActionFacts(query) : toActionFacts(transaction);
+        List<FundsTransaction> transactions = queryTransactionsByBusiness(
+                query.getTenantId(), query.getBusinessScene(), query.getBusinessSn());
+        if (transactions.size() > 1) {
+            return List.of();
+        }
+        if (transactions.isEmpty()) {
+            return queryAuthorizationSuccessorActionFacts(query);
+        }
+        FundsTransaction transaction = transactions.getFirst();
+        List<FundsTransactionDetail> details = queryTransactionDetailsByBusiness(
+                query.getTenantId(), query.getBusinessScene(), query.getBusinessSn());
+        return containsOnlyMainActionDetails(transaction, details) ? toActionFacts(transaction) : List.of();
     }
 
     @Override
     public @NonNull Optional<FundsActionFactDTO> findFundsActionFact(@NonNull FundsActionFactRef ref) {
         AssertUtils.notNull(ref.getTenantId(), "资金动作事实引用租户 ID 不能为空");
         AssertUtils.hasText(ref.getIdentity(), "资金动作事实稳定身份不能为空");
+        ReleaseActionIdentity releaseIdentity = parseReleaseActionIdentity(ref.getIdentity());
+        if (releaseIdentity != null) {
+            FundsTransaction transaction = findTransactionBySnNullable(
+                    ref.getTenantId(), releaseIdentity.authorizationSn());
+            return transaction == null ? Optional.empty()
+                    : findAuthorizationReleaseActionFact(transaction, ref, releaseIdentity);
+        }
         int markerIndex = actionIdentityMarkerIndex(ref.getIdentity());
         if (markerIndex <= 0) {
             return Optional.empty();
@@ -172,9 +209,80 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (ref.getIdentity().startsWith(transactionSn + COMPLETE_ACTION_IDENTITY_MARKER)) {
             return findAuthorizationCompleteActionFact(transaction, ref);
         }
+        if (!hasUnambiguousMainActionBusinessKey(transaction)) {
+            return Optional.empty();
+        }
         return toActionFacts(transaction).stream()
                 .filter(actionFact -> actionFact.getIdentity().equals(ref))
                 .findFirst();
+    }
+
+    @Override
+    public @NonNull Optional<FundsActionRecordedEvidenceDTO> findRecordedEvidence(
+            @NonNull FundsActionFactRef actionFactRef) {
+        AssertUtils.notNull(actionFactRef.getTenantId(), "资金动作事实引用租户 ID 不能为空");
+        AssertUtils.hasText(actionFactRef.getIdentity(), "资金动作事实稳定身份不能为空");
+        int markerIndex = actionFactRef.getIdentity().lastIndexOf(ACTION_IDENTITY_MARKER);
+        if (markerIndex <= 0) {
+            return Optional.empty();
+        }
+        String transactionSn = actionFactRef.getIdentity().substring(0, markerIndex);
+        if (!actionFactRef.getIdentity().equals(actionIdentity(transactionSn, 0))) {
+            return Optional.empty();
+        }
+        FundsTransaction transaction = findTransactionBySnNullable(actionFactRef.getTenantId(), transactionSn);
+        PayActionProjection projection = transaction == null ? null : verifiedPayActionProjection(transaction);
+        if (projection == null || !projection.succeeded()) {
+            return Optional.empty();
+        }
+        FundsActionFactDTO actionFact = toActionFact(
+                transaction, projection.routeSnapshot(), projection.principal(), 0, true);
+        if (!actionFactRef.equals(actionFact.getIdentity())) {
+            return Optional.empty();
+        }
+        List<FundsActionRecordedEvidenceDTO.RecordedSiblingRef> siblings = projection.matchedDetails().stream()
+                .sorted(java.util.Comparator.comparing((FundsTransactionDetail detail) ->
+                                detail.getParticipantRole().name())
+                        .thenComparing(FundsTransactionDetail::getSn))
+                .map(this::toRecordedSiblingRef)
+                .toList();
+        String ledgerTransactionSn = projection.principal().getLedgerTransactionSn();
+        FundsActionFactDTO.SemanticDigest digest = recordedReferenceDigest(
+                actionFact, siblings, ledgerTransactionSn);
+        return Optional.of(new FundsActionRecordedEvidenceDTO(
+                actionFact, siblings, ledgerTransactionSn, digest));
+    }
+
+    private FundsActionRecordedEvidenceDTO.RecordedSiblingRef toRecordedSiblingRef(
+            FundsTransactionDetail detail) {
+        return new FundsActionRecordedEvidenceDTO.RecordedSiblingRef(
+                detail.getSn(),
+                detail.getParticipantRole(),
+                detail.getSubjectId(),
+                detail.getSubjectType(),
+                Money.immutable(detail.getAmount(), detail.getCurrency()),
+                detail.getLedgerTransactionSn());
+    }
+
+    private FundsActionFactDTO.SemanticDigest recordedReferenceDigest(
+            FundsActionFactDTO actionFact,
+            List<FundsActionRecordedEvidenceDTO.RecordedSiblingRef> siblings,
+            String ledgerTransactionSn) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("actionSemanticDigest", actionFact.getSemanticDigest().getValue());
+        values.put("recordedLedgerTransactionSn", ledgerTransactionSn);
+        values.put("matchedSiblings", siblings.stream().map(sibling -> Map.of(
+                "detailSn", sibling.getDetailSn(),
+                "participantRole", sibling.getParticipantRole().name(),
+                "subjectId", sibling.getSubjectId(),
+                "subjectType", sibling.getSubjectType(),
+                "amount", sibling.getMoney().getAmount(),
+                "currency", sibling.getMoney().getCurrency().name(),
+                "recordedLedgerTransactionSn", sibling.getRecordedLedgerTransactionSn())).toList());
+        return new FundsActionFactDTO.SemanticDigest(
+                SEMANTIC_DIGEST_ALGORITHM,
+                FundsStableHashSupport.sha256CanonicalJson(RECORDED_REFERENCE_DIGEST_DOMAIN, values),
+                RECORDED_REFERENCE_DIGEST_FIELDS_VERSION);
     }
 
     @Override
@@ -340,20 +448,60 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         return fundsTransactionMapper.selectOneByQuery(wrapper);
     }
 
-    private List<FundsActionFactDTO> queryAuthorizationCompleteActionFacts(FundsActionFactQuery query) {
-        List<FundsTransactionDetail> details = queryTransactionDetailsByBusiness(
-                query.getTenantId(), query.getBusinessScene(), query.getBusinessSn());
-        if (details.isEmpty()) {
+    private List<FundsTransaction> queryTransactionsByBusiness(Long tenantId,
+                                                               String businessScene,
+                                                               String businessSn) {
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.businessScene.eq(businessScene))
+                .and(ref.businessSn.eq(businessSn))
+                .orderBy(ref.id.asc());
+        return fundsTransactionMapper.selectListByQuery(wrapper);
+    }
+
+    private boolean containsOnlyMainActionDetails(FundsTransaction transaction,
+                                                  List<FundsTransactionDetail> details) {
+        FundsTransactionEventType expectedEventType = mainActionEventType(transaction);
+        return expectedEventType != null && details.stream().allMatch(detail ->
+                Objects.equals(transaction.getSn(), detail.getTransactionSn())
+                        && detail.getEventType() == expectedEventType);
+    }
+
+    private boolean hasUnambiguousMainActionBusinessKey(FundsTransaction transaction) {
+        List<FundsTransaction> transactions = queryTransactionsByBusiness(
+                transaction.getTenantId(), transaction.getBusinessScene(), transaction.getBusinessSn());
+        if (transactions.size() != 1 || !Objects.equals(transactions.getFirst().getSn(), transaction.getSn())) {
+            return false;
+        }
+        return containsOnlyMainActionDetails(transaction, queryTransactionDetailsByBusiness(
+                transaction.getTenantId(), transaction.getBusinessScene(), transaction.getBusinessSn()));
+    }
+
+    private @Nullable FundsTransactionEventType mainActionEventType(FundsTransaction transaction) {
+        if (transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
+                && transaction.getTransactionType() == DefaultFundsTransactionType.PAY) {
+            return FundsTransactionEventType.AUTHORIZE;
+        }
+        if (transaction.getTransactionType() == DefaultFundsTransactionType.PAY) {
+            return FundsTransactionEventType.PAY;
+        }
+        return transaction.getTransactionType() == DefaultFundsTransactionType.REFUND
+                ? FundsTransactionEventType.REFUND : null;
+    }
+
+    private List<FundsActionFactDTO> queryAuthorizationSuccessorActionFacts(FundsActionFactQuery query) {
+        AuthorizationSuccessorActionGroup group = resolveAuthorizationSuccessorActionGroup(
+                query.getTenantId(), query.getBusinessScene(), query.getBusinessSn(), null);
+        if (group == null) {
             return List.of();
         }
-        String transactionSn = details.getFirst().getTransactionSn();
-        if (!StringUtils.hasText(transactionSn)
-                || details.stream().anyMatch(detail -> !Objects.equals(transactionSn, detail.getTransactionSn()))) {
-            return List.of();
-        }
-        FundsTransaction transaction = findTransactionBySnNullable(query.getTenantId(), transactionSn);
-        return transaction == null ? List.of()
-                : toAuthorizationCompleteActionFacts(transaction, query.getBusinessScene(), query.getBusinessSn());
+        return group.eventType() == FundsTransactionEventType.COMPLETE
+                ? toAuthorizationCompleteActionFacts(
+                group.transaction(), query.getBusinessScene(), query.getBusinessSn())
+                : toAuthorizationReleaseActionFacts(
+                group.transaction(), query.getBusinessScene(), query.getBusinessSn());
     }
 
     private Optional<FundsActionFactDTO> findAuthorizationCompleteActionFact(FundsTransaction transaction,
@@ -366,9 +514,57 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         }
         String businessScene = actionKey.substring(0, separator);
         String businessSn = actionKey.substring(separator + 1);
+        AuthorizationSuccessorActionGroup group = resolveAuthorizationSuccessorActionGroup(
+                transaction.getTenantId(), businessScene, businessSn, transaction.getSn());
+        if (group == null || group.eventType() != FundsTransactionEventType.COMPLETE) {
+            return Optional.empty();
+        }
         return toAuthorizationCompleteActionFacts(transaction, businessScene, businessSn).stream()
                 .filter(actionFact -> actionFact.getIdentity().equals(ref))
                 .findFirst();
+    }
+
+    private Optional<FundsActionFactDTO> findAuthorizationReleaseActionFact(
+            FundsTransaction transaction,
+            FundsActionFactRef ref,
+            ReleaseActionIdentity identity) {
+        AuthorizationSuccessorActionGroup group = resolveAuthorizationSuccessorActionGroup(
+                transaction.getTenantId(), identity.businessScene(), identity.businessSn(), transaction.getSn());
+        if (group == null || group.eventType() != FundsTransactionEventType.REVERSAL) {
+            return Optional.empty();
+        }
+        return toAuthorizationReleaseActionFacts(
+                transaction, identity.businessScene(), identity.businessSn()).stream()
+                .filter(actionFact -> actionFact.getIdentity().equals(ref))
+                .findFirst();
+    }
+
+    private @Nullable AuthorizationSuccessorActionGroup resolveAuthorizationSuccessorActionGroup(
+            Long tenantId,
+            String businessScene,
+            String businessSn,
+            @Nullable String expectedTransactionSn) {
+        if (!queryTransactionsByBusiness(tenantId, businessScene, businessSn).isEmpty()) {
+            return null;
+        }
+        List<FundsTransactionDetail> details = queryTransactionDetailsByBusiness(
+                tenantId, businessScene, businessSn);
+        if (details.isEmpty()) {
+            return null;
+        }
+        FundsTransactionDetail first = details.getFirst();
+        String transactionSn = first.getTransactionSn();
+        FundsTransactionEventType eventType = first.getEventType();
+        if (!StringUtils.hasText(transactionSn)
+                || (expectedTransactionSn != null && !expectedTransactionSn.equals(transactionSn))
+                || (eventType != FundsTransactionEventType.COMPLETE
+                && eventType != FundsTransactionEventType.REVERSAL)
+                || details.stream().anyMatch(detail -> !Objects.equals(transactionSn, detail.getTransactionSn())
+                        || detail.getEventType() != eventType)) {
+            return null;
+        }
+        FundsTransaction transaction = findTransactionBySnNullable(tenantId, transactionSn);
+        return transaction == null ? null : new AuthorizationSuccessorActionGroup(transaction, eventType);
     }
 
     private List<FundsTransactionDetail> queryTransactionDetailsByBusiness(Long tenantId,
@@ -416,6 +612,21 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         }
         try {
             return List.of(toAuthorizationCompleteActionFact(transaction, projection));
+        } catch (RuntimeException exception) {
+            return List.of();
+        }
+    }
+
+    private List<FundsActionFactDTO> toAuthorizationReleaseActionFacts(FundsTransaction transaction,
+                                                                        String businessScene,
+                                                                        String businessSn) {
+        AuthorizationReleaseActionProjection projection = verifiedAuthorizationReleaseActionProjection(
+                transaction, businessScene, businessSn);
+        if (projection == null) {
+            return List.of();
+        }
+        try {
+            return List.of(toAuthorizationReleaseActionFact(transaction, projection));
         } catch (RuntimeException exception) {
             return List.of();
         }
@@ -555,7 +766,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         boolean succeeded = isProvenFull(transaction, matchedDetails, principal, fee);
         boolean provenZero = isProvenZero(transaction, matchedDetails);
         return succeeded == provenZero ? null
-                : new PayActionProjection(routeSnapshot, principal, fee, succeeded);
+                : new PayActionProjection(routeSnapshot, matchedDetails, principal, fee, succeeded);
     }
 
     private @Nullable AuthorizationActionProjection verifiedAuthorizationActionProjection(
@@ -637,7 +848,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
             return null;
         }
         List<FundsTransactionDetail> settlementDetails = details.stream()
-                .filter(detail -> matchesAuthorizationCompleteSubject(
+                .filter(detail -> matchesAuthorizationSuccessorSubject(
                         transaction, detail, settlementSubject,
                         RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, money))
                 .toList();
@@ -688,7 +899,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 return List.of();
             }
             List<FundsTransactionDetail> candidates = details.stream()
-                    .filter(detail -> matchesAuthorizationCompleteSubject(
+                    .filter(detail -> matchesAuthorizationSuccessorSubject(
                             transaction, detail, subjectRef, participant.getParticipantRole(), money))
                     .toList();
             if (candidates.size() != 1
@@ -700,11 +911,11 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 ? new ArrayList<>(matches.values()) : List.of();
     }
 
-    private boolean matchesAuthorizationCompleteSubject(FundsTransaction transaction,
-                                                        FundsTransactionDetail detail,
-                                                        SubjectRef subjectRef,
-                                                        RouteParticipantRole role,
-                                                        Money money) {
+    private boolean matchesAuthorizationSuccessorSubject(FundsTransaction transaction,
+                                                         FundsTransactionDetail detail,
+                                                         SubjectRef subjectRef,
+                                                         RouteParticipantRole role,
+                                                         Money money) {
         return Objects.equals(subjectRef.getTenantId(), transaction.getTenantId())
                 && Objects.equals(subjectRef.getSubjectId(), detail.getSubjectId())
                 && subjectRef.getSubjectType() != null
@@ -728,7 +939,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
             List<FundsTransactionDetail> sourceDetails = responsibilityDetails.stream()
                     .filter(detail -> matchesNode(leg.getTargetNode(), detail))
                     .toList();
-            if (sourceDetails.size() != 1 || !validAuthorizationCompleteMoney(money, leg.getAmount())) {
+            if (sourceDetails.size() != 1 || !validAuthorizationSuccessorMoney(money, leg.getAmount())) {
                 return false;
             }
             FundsTransactionDetail sourceDetail = sourceDetails.getFirst();
@@ -760,11 +971,11 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 .orElse(null);
     }
 
-    private boolean validAuthorizationCompleteMoney(Money completeMoney, Money authorizationMoney) {
+    private boolean validAuthorizationSuccessorMoney(Money successorMoney, Money authorizationMoney) {
         return authorizationMoney != null
-                && completeMoney.getAmount() > 0
-                && completeMoney.getCurrency() == authorizationMoney.getCurrency()
-                && completeMoney.getAmount() <= authorizationMoney.getAmount();
+                && successorMoney.getAmount() > 0
+                && successorMoney.getCurrency() == authorizationMoney.getCurrency()
+                && successorMoney.getAmount() <= authorizationMoney.getAmount();
     }
 
     private boolean matchesConsumedReplayLegs(FundsTransactionDetail detail, Map<String, Long> expectedAmounts) {
@@ -817,13 +1028,13 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         } catch (ArithmeticException exception) {
             return false;
         }
-        Map<AuthorizationCompleteActionKey, List<FundsTransactionDetail>> groups = new LinkedHashMap<>();
+        Map<AuthorizationSuccessorActionKey, List<FundsTransactionDetail>> groups = new LinkedHashMap<>();
         for (FundsTransactionDetail detail : completeDetails) {
-            groups.computeIfAbsent(new AuthorizationCompleteActionKey(
+            groups.computeIfAbsent(new AuthorizationSuccessorActionKey(
                     detail.getBusinessScene(), detail.getBusinessSn()), ignored -> new ArrayList<>()).add(detail);
         }
         long verifiedCompleted = 0L;
-        for (Map.Entry<AuthorizationCompleteActionKey, List<FundsTransactionDetail>> entry : groups.entrySet()) {
+        for (Map.Entry<AuthorizationSuccessorActionKey, List<FundsTransactionDetail>> entry : groups.entrySet()) {
             List<FundsTransactionDetail> group = entry.getValue();
             long succeededCount = group.stream()
                     .filter(detail -> detail.getState() == FundsTransactionDetailState.SUCCEEDED)
@@ -846,6 +1057,190 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
             }
         }
         return verifiedCompleted == completedAmount;
+    }
+
+    private @Nullable AuthorizationReleaseActionProjection verifiedAuthorizationReleaseActionProjection(
+            FundsTransaction transaction,
+            String businessScene,
+            String businessSn) {
+        if (!StringUtils.hasText(businessScene) || !StringUtils.hasText(businessSn)) {
+            return null;
+        }
+        AuthorizationActionProjection authorization = verifiedAuthorizationActionProjection(transaction);
+        if (authorization == null || !authorization.succeeded()) {
+            return null;
+        }
+        List<FundsTransactionDetail> transactionDetails = queryTransactionDetails(transaction);
+        List<FundsTransactionDetail> completeDetails = transactionDetails.stream()
+                .filter(detail -> detail.getEventType() == FundsTransactionEventType.COMPLETE)
+                .toList();
+        List<FundsTransactionDetail> releaseDetails = transactionDetails.stream()
+                .filter(detail -> detail.getEventType() == FundsTransactionEventType.REVERSAL)
+                .toList();
+        List<FundsTransactionDetail> actionDetails = releaseDetails.stream()
+                .filter(detail -> businessScene.equals(detail.getBusinessScene()))
+                .filter(detail -> businessSn.equals(detail.getBusinessSn()))
+                .toList();
+        AuthorizationReleaseActionProjection projection = verifiedAuthorizationReleaseGroup(
+                transaction, authorization, businessScene, businessSn, actionDetails);
+        return projection != null
+                && matchesAuthorizationCompleteCumulative(transaction, authorization, completeDetails)
+                && matchesAuthorizationReleaseCumulative(transaction, authorization, releaseDetails)
+                ? projection : null;
+    }
+
+    private @Nullable AuthorizationReleaseActionProjection verifiedAuthorizationReleaseGroup(
+            FundsTransaction transaction,
+            AuthorizationActionProjection authorization,
+            String businessScene,
+            String businessSn,
+            List<FundsTransactionDetail> details) {
+        if (details.isEmpty()) {
+            return null;
+        }
+        FundsTransactionDetail first = details.getFirst();
+        if (first.getAmount() == null || first.getAmount() <= 0 || first.getCurrency() == null) {
+            return null;
+        }
+        Money money = Money.immutable(first.getAmount(), first.getCurrency());
+        String authorizationLedgerSn = authorization.details().getFirst().getLedgerTransactionSn();
+        String releaseLedgerSn = first.getLedgerTransactionSn();
+        if (!StringUtils.hasText(authorizationLedgerSn) || !StringUtils.hasText(releaseLedgerSn)
+                || Objects.equals(authorizationLedgerSn, releaseLedgerSn)
+                || details.stream().anyMatch(detail -> !matchesAuthorizationReleaseDetail(
+                transaction, detail, businessScene, businessSn, money, authorizationLedgerSn, releaseLedgerSn))) {
+            return null;
+        }
+        List<FundsTransactionDetail> responsibilityDetails = matchAuthorizationReleaseResponsibilities(
+                transaction, authorization.routeSnapshot(), details, money);
+        if (responsibilityDetails.size() != details.size()
+                || !matchesAuthorizationReleaseReplay(
+                authorization.routeSnapshot(), responsibilityDetails, money)) {
+            return null;
+        }
+        return new AuthorizationReleaseActionProjection(
+                authorization, details, money, businessScene, businessSn, releaseLedgerSn);
+    }
+
+    private boolean matchesAuthorizationReleaseDetail(FundsTransaction transaction,
+                                                       FundsTransactionDetail detail,
+                                                       String businessScene,
+                                                       String businessSn,
+                                                       Money money,
+                                                       String authorizationLedgerSn,
+                                                       String releaseLedgerSn) {
+        return Objects.equals(detail.getTenantId(), transaction.getTenantId())
+                && Objects.equals(detail.getTransactionSn(), transaction.getSn())
+                && Objects.equals(detail.getBusinessScene(), businessScene)
+                && Objects.equals(detail.getBusinessSn(), businessSn)
+                && detail.getTransactionType() == DefaultFundsTransactionType.PAY
+                && detail.getEventType() == FundsTransactionEventType.REVERSAL
+                && detail.getFundsEffectType() == FundsEffectType.RELEASE
+                && detail.getState() == FundsTransactionDetailState.SUCCEEDED
+                && !StringUtils.hasText(detail.getErrorCode())
+                && !StringUtils.hasText(detail.getErrorMessage())
+                && Objects.equals(detail.getAmount(), money.getAmount())
+                && detail.getCurrency() == money.getCurrency()
+                && Objects.equals(detail.getReferenceDetailSn(), transaction.getSn())
+                && Objects.equals(detail.getReferenceLedgerTransactionSn(), authorizationLedgerSn)
+                && Objects.equals(detail.getLedgerTransactionSn(), releaseLedgerSn);
+    }
+
+    private List<FundsTransactionDetail> matchAuthorizationReleaseResponsibilities(
+            FundsTransaction transaction,
+            RouteSnapshotSpec routeSnapshot,
+            List<FundsTransactionDetail> details,
+            Money money) {
+        Map<String, FundsTransactionDetail> matches = new LinkedHashMap<>();
+        for (RouteParticipantSpec participant : routeSnapshot.getParticipants()) {
+            SubjectRef subjectRef = participant.getSubjectRef();
+            if (subjectRef == null) {
+                return List.of();
+            }
+            List<FundsTransactionDetail> candidates = details.stream()
+                    .filter(detail -> matchesAuthorizationSuccessorSubject(
+                            transaction, detail, subjectRef, participant.getParticipantRole(), money))
+                    .toList();
+            if (candidates.size() != 1
+                    || matches.put(candidates.getFirst().getSn(), candidates.getFirst()) != null) {
+                return List.of();
+            }
+        }
+        return matches.size() == routeSnapshot.getParticipants().size()
+                ? new ArrayList<>(matches.values()) : List.of();
+    }
+
+    private boolean matchesAuthorizationReleaseReplay(RouteSnapshotSpec routeSnapshot,
+                                                       List<FundsTransactionDetail> details,
+                                                       Money money) {
+        if (routeSnapshot.getLegs().size() != details.size()) {
+            return false;
+        }
+        Map<String, FundsTransactionDetail> matches = new LinkedHashMap<>();
+        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
+            List<FundsTransactionDetail> candidates = details.stream()
+                    .filter(detail -> matchesNode(leg.getSourceNode(), detail)
+                            && matchesNode(leg.getTargetNode(), detail))
+                    .toList();
+            if (candidates.size() != 1 || !validAuthorizationSuccessorMoney(money, leg.getAmount())) {
+                return false;
+            }
+            FundsTransactionDetail detail = candidates.getFirst();
+            if (matches.put(detail.getSn(), detail) != null
+                    || !matchesConsumedReplayLegs(detail, Map.of(leg.getLegId(), money.getAmount()))) {
+                return false;
+            }
+        }
+        return matches.size() == details.size();
+    }
+
+    private boolean matchesAuthorizationReleaseCumulative(
+            FundsTransaction transaction,
+            AuthorizationActionProjection authorization,
+            List<FundsTransactionDetail> releaseDetails) {
+        Long authorizedAmount = transaction.getAuthorizedAmount();
+        Long completedAmount = transaction.getCompletedAmount();
+        Long reversedAmount = transaction.getReversedAmount();
+        if (authorizedAmount == null || authorizedAmount <= 0 || completedAmount == null || completedAmount < 0
+                || reversedAmount == null || reversedAmount < 0) {
+            return false;
+        }
+        try {
+            if (Math.addExact(completedAmount, reversedAmount) > authorizedAmount) {
+                return false;
+            }
+        } catch (ArithmeticException exception) {
+            return false;
+        }
+        Map<AuthorizationSuccessorActionKey, List<FundsTransactionDetail>> groups = new LinkedHashMap<>();
+        for (FundsTransactionDetail detail : releaseDetails) {
+            groups.computeIfAbsent(new AuthorizationSuccessorActionKey(
+                    detail.getBusinessScene(), detail.getBusinessSn()), ignored -> new ArrayList<>()).add(detail);
+        }
+        long verifiedReversed = 0L;
+        for (Map.Entry<AuthorizationSuccessorActionKey, List<FundsTransactionDetail>> entry : groups.entrySet()) {
+            List<FundsTransactionDetail> group = entry.getValue();
+            long succeededCount = group.stream()
+                    .filter(detail -> detail.getState() == FundsTransactionDetailState.SUCCEEDED)
+                    .count();
+            if (succeededCount == 0) {
+                continue;
+            }
+            if (succeededCount != group.size()) {
+                return false;
+            }
+            AuthorizationReleaseActionProjection projection = verifiedAuthorizationReleaseGroup(
+                    transaction, authorization, entry.getKey().businessScene(), entry.getKey().businessSn(), group);
+            if (projection == null) {
+                return false;
+            }
+            try {
+                verifiedReversed = Math.addExact(verifiedReversed, projection.money().getAmount());
+            } catch (ArithmeticException exception) {
+                return false;
+            }
+        }
+        return verifiedReversed == reversedAmount;
     }
 
     private boolean matchesAuthorizationRoot(FundsTransaction transaction, RouteSnapshotSpec routeSnapshot) {
@@ -1382,6 +1777,50 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 provenance);
     }
 
+    private FundsActionFactDTO toAuthorizationReleaseActionFact(
+            FundsTransaction transaction,
+            AuthorizationReleaseActionProjection projection) {
+        FundsActionFactDTO authorizationFact = toAuthorizationActionFact(
+                transaction, projection.authorization());
+        Money money = projection.money();
+        FundsActionFactDTO.OriginalFundsFactRef originalFactRef =
+                new FundsActionFactDTO.OriginalFundsFactRef(
+                        transaction.getTenantId(), ORIGINAL_FACT_TYPE,
+                        authorizationFact.getIdentity().getIdentity(),
+                        AUTHORIZATION_RELEASE_ORIGINAL_FACT_RELATION, money);
+        FundsActionFactDTO.RouteSnapshotRef routeSnapshotRef = authorizationFact
+                .getRouteProvenance().getFirst().getRouteSnapshotRef();
+        List<FundsActionFactDTO.FundsRouteProvenance> provenance = projection.authorization()
+                .routeSnapshot().getLegs().stream()
+                .map(ignored -> new FundsActionFactDTO.FundsRouteProvenance(
+                        originalFactRef, money, routeSnapshotRef, PROVENANCE_REPLAYED_ORIGINAL_ROUTE))
+                .toList();
+        FundsActionFactDTO.DomainOutcome outcome = new FundsActionFactDTO.DomainOutcome(
+                DOMAIN_OUTCOME_OWNER, OUTCOME_SUCCEEDED);
+        FundsActionFactDTO.FundsEffect fundsEffect = new FundsActionFactDTO.FundsEffect(
+                EFFECT_PROVEN_FULL, money);
+        String identity = releaseActionIdentity(
+                transaction.getSn(), projection.businessScene(), projection.businessSn());
+        String intentRef = releaseIntentRef(
+                transaction.getSn(), projection.businessScene(), projection.businessSn());
+        String attemptRef = releaseAttemptRef(
+                transaction.getSn(), projection.businessScene(), projection.businessSn());
+        FundsActionFactDTO.SemanticDigest semanticDigest = releaseActionSemanticDigest(
+                transaction, projection, authorizationFact, identity, intentRef, attemptRef,
+                outcome, fundsEffect, originalFactRef, routeSnapshotRef);
+        return new FundsActionFactDTO(
+                new FundsActionFactRef(transaction.getTenantId(), identity),
+                intentRef,
+                attemptRef,
+                ACTION_KIND_RELEASE,
+                money,
+                outcome,
+                fundsEffect,
+                semanticDigest,
+                List.of(originalFactRef),
+                provenance);
+    }
+
     private FundsActionFactDTO toRecoveryActionFact(FundsTransaction transaction,
                                                     RecoveryActionProjection projection) {
         Money money = Money.immutable(projection.principal().getAmount(), projection.principal().getCurrency());
@@ -1505,6 +1944,95 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         return values;
     }
 
+    private FundsActionFactDTO.SemanticDigest releaseActionSemanticDigest(
+            FundsTransaction transaction,
+            AuthorizationReleaseActionProjection projection,
+            FundsActionFactDTO authorizationFact,
+            String identity,
+            String intentRef,
+            String attemptRef,
+            FundsActionFactDTO.DomainOutcome outcome,
+            FundsActionFactDTO.FundsEffect fundsEffect,
+            FundsActionFactDTO.OriginalFundsFactRef originalFactRef,
+            FundsActionFactDTO.RouteSnapshotRef routeSnapshotRef) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("tenantId", transaction.getTenantId());
+        values.put("identity", identity);
+        values.put("intentRef", intentRef);
+        values.put("attemptRef", attemptRef);
+        values.put("actionKind", ACTION_KIND_RELEASE);
+        values.put("businessScene", projection.businessScene());
+        values.put("businessSn", projection.businessSn());
+        values.put("amount", projection.money().getAmount());
+        values.put("currency", projection.money().getCurrency().name());
+        values.put("outcomeOwner", outcome.getOwner());
+        values.put("outcomeCode", outcome.getCode());
+        values.put("effectKind", fundsEffect.getEffectKind());
+        values.put("provenAmount", fundsEffect.getProvenMoney().getAmount());
+        values.put("provenCurrency", fundsEffect.getProvenMoney().getCurrency().name());
+        values.put("originalFactType", originalFactRef.getFactType());
+        values.put("originalFactId", originalFactRef.getFactId());
+        values.put("originalFactSemanticDigestAlgorithm",
+                authorizationFact.getSemanticDigest().getAlgorithm());
+        values.put("originalFactSemanticDigest", authorizationFact.getSemanticDigest().getValue());
+        values.put("originalFactSemanticDigestFieldsVersion",
+                authorizationFact.getSemanticDigest().getCoveredFieldsVersion());
+        values.put("originalRelationRole", originalFactRef.getRelationRole());
+        values.put("originalAllocatedAmount", originalFactRef.getAllocatedMoney().getAmount());
+        values.put("originalAllocatedCurrency", originalFactRef.getAllocatedMoney().getCurrency().name());
+        values.put("routeSnapshotOwner", routeSnapshotRef.getIdentity().getOwnerNamespace());
+        values.put("routeSnapshotId", routeSnapshotRef.getIdentity().getValue());
+        values.put("releaseLedgerTransactionSn", projection.releaseLedgerSn());
+        values.put("releaseDetails", projection.details().stream()
+                .sorted(java.util.Comparator.comparing((FundsTransactionDetail detail) ->
+                                detail.getParticipantRole().name())
+                        .thenComparing(FundsTransactionDetail::getSubjectId)
+                        .thenComparing(FundsTransactionDetail::getSubjectType))
+                .map(this::releaseDetailDigestValues)
+                .toList());
+        values.put("route", RouteSnapshotJsonSupport.pathOnlyRouteSummary(
+                RouteSnapshotJsonSupport.routeSummary(projection.authorization().routeSnapshot())));
+        return new FundsActionFactDTO.SemanticDigest(
+                SEMANTIC_DIGEST_ALGORITHM,
+                FundsStableHashSupport.sha256CanonicalJson(RELEASE_SEMANTIC_DIGEST_DOMAIN, values),
+                RELEASE_SEMANTIC_DIGEST_FIELDS_VERSION);
+    }
+
+    private Map<String, Object> releaseDetailDigestValues(FundsTransactionDetail detail) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("businessScene", detail.getBusinessScene());
+        values.put("businessSn", detail.getBusinessSn());
+        values.put("eventType", detail.getEventType().name());
+        values.put("fundsEffectType", detail.getFundsEffectType().name());
+        values.put("state", detail.getState().name());
+        values.put("subjectId", detail.getSubjectId());
+        values.put("subjectType", detail.getSubjectType());
+        values.put("participantRole", detail.getParticipantRole().name());
+        values.put("amount", detail.getAmount());
+        values.put("currency", detail.getCurrency().name());
+        values.put("ledgerTransactionSn", detail.getLedgerTransactionSn());
+        values.put("referenceDetailSn", detail.getReferenceDetailSn());
+        values.put("referenceLedgerTransactionSn", detail.getReferenceLedgerTransactionSn());
+        values.put("replayConsumedLegAmounts", releaseReplayConsumedLegAmounts(detail));
+        return values;
+    }
+
+    private Map<String, Long> releaseReplayConsumedLegAmounts(FundsTransactionDetail detail) {
+        Map<String, Object> context = parseContextVariables(detail.getContextVariables());
+        Object amountsValue = context.get(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
+        if (!(amountsValue instanceof Map<?, ?> amounts)) {
+            throw new IllegalArgumentException("release replay consumed leg amounts are missing");
+        }
+        Map<String, Long> result = new TreeMap<>();
+        for (Map.Entry<?, ?> entry : amounts.entrySet()) {
+            if (!(entry.getKey() instanceof String legId) || !(entry.getValue() instanceof Number amount)) {
+                throw new IllegalArgumentException("release replay consumed leg amount is invalid");
+            }
+            result.put(legId, new BigDecimal(amount.toString()).longValueExact());
+        }
+        return result;
+    }
+
     private FundsActionFactDTO.SemanticDigest actionSemanticDigest(
             FundsTransaction transaction,
             FundsTransactionDetail detail,
@@ -1589,6 +2117,55 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         return values;
     }
 
+    private String releaseActionIdentity(String authorizationSn, String businessScene, String businessSn) {
+        return RELEASE_ACTION_IDENTITY_PREFIX + encodeReleaseIdentityPart(authorizationSn) + ":"
+                + encodeReleaseIdentityPart(businessScene) + ":" + encodeReleaseIdentityPart(businessSn);
+    }
+
+    private String releaseIntentRef(String authorizationSn, String businessScene, String businessSn) {
+        return RELEASE_INTENT_REF_PREFIX + encodeReleaseIdentityPart(authorizationSn) + ":"
+                + encodeReleaseIdentityPart(businessScene) + ":" + encodeReleaseIdentityPart(businessSn);
+    }
+
+    private String releaseAttemptRef(String authorizationSn, String businessScene, String businessSn) {
+        return RELEASE_ATTEMPT_REF_PREFIX + encodeReleaseIdentityPart(authorizationSn) + ":"
+                + encodeReleaseIdentityPart(businessScene) + ":" + encodeReleaseIdentityPart(businessSn)
+                + ":" + FundsTransactionEventType.REVERSAL.name();
+    }
+
+    private @Nullable ReleaseActionIdentity parseReleaseActionIdentity(String identity) {
+        if (!identity.startsWith(RELEASE_ACTION_IDENTITY_PREFIX)) {
+            return null;
+        }
+        String[] encodedParts = identity.substring(RELEASE_ACTION_IDENTITY_PREFIX.length()).split(":", -1);
+        if (encodedParts.length != 3) {
+            return null;
+        }
+        String authorizationSn = decodeReleaseIdentityPart(encodedParts[0]);
+        String businessScene = decodeReleaseIdentityPart(encodedParts[1]);
+        String businessSn = decodeReleaseIdentityPart(encodedParts[2]);
+        if (!StringUtils.hasText(authorizationSn)
+                || !StringUtils.hasText(businessScene)
+                || !StringUtils.hasText(businessSn)
+                || !identity.equals(releaseActionIdentity(authorizationSn, businessScene, businessSn))) {
+            return null;
+        }
+        return new ReleaseActionIdentity(authorizationSn, businessScene, businessSn);
+    }
+
+    private String encodeReleaseIdentityPart(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private @Nullable String decodeReleaseIdentityPart(String encodedValue) {
+        try {
+            String value = new String(Base64.getUrlDecoder().decode(encodedValue), StandardCharsets.UTF_8);
+            return encodedValue.equals(encodeReleaseIdentityPart(value)) ? value : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
     private String actionIdentity(String transactionSn, int actionIndex) {
         return transactionSn + ACTION_IDENTITY_MARKER + actionIndex;
     }
@@ -1613,10 +2190,26 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                                                          String completeLedgerSn) {
     }
 
-    private record AuthorizationCompleteActionKey(String businessScene, String businessSn) {
+    private record AuthorizationReleaseActionProjection(AuthorizationActionProjection authorization,
+                                                        List<FundsTransactionDetail> details,
+                                                        Money money,
+                                                        String businessScene,
+                                                        String businessSn,
+                                                        String releaseLedgerSn) {
+    }
+
+    private record AuthorizationSuccessorActionKey(String businessScene, String businessSn) {
+    }
+
+    private record AuthorizationSuccessorActionGroup(FundsTransaction transaction,
+                                                     FundsTransactionEventType eventType) {
+    }
+
+    private record ReleaseActionIdentity(String authorizationSn, String businessScene, String businessSn) {
     }
 
     private record PayActionProjection(RouteSnapshotSpec routeSnapshot,
+                                       List<FundsTransactionDetail> matchedDetails,
                                        FundsTransactionDetail principal,
                                        @Nullable FundsTransactionDetail fee,
                                        boolean succeeded) {

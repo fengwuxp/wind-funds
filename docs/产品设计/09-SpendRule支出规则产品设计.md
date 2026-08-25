@@ -146,7 +146,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 5. `remainingControlAmount` 在当前 DTO 中表达“未终局释放的控制占用”，后续如改名为 `occupiedControlAmount` 需单独评估兼容。
 6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减策略授权的退款控制补偿后的净消耗。资金退款本身不自动恢复周期控制额度，只有产品策略明确允许且请求携带 `reasonCode + operatorId + auditReferenceSn` 时才记录 `REFUND_COMPENSATED`；任一证据缺失必须拒绝且不得新增控制流水。
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类”的分类口径；服务实现不得再各自硬编码一套类型解释。
-8. `controlScopeId` 是支出控制范围的公共契约和落库字段，`ResolveSpendControlAdmissionRequest`、`AuthorizeByPaymentInstrumentRequest`、控制额度变动流水和预算控制投影统一使用该字段。
+8. `controlScopeId` 是支出控制范围的公共契约和落库字段，`ResolveSpendControlAdmissionRequest`、Transaction Provider 内部授权命令、控制额度变动流水和预算控制投影统一使用该字段。
 9. `periodId` 是 Spend Rule 控制周期标识，例如 `2026-07`，用于当前周期和历史周期查询；它不是账本周期 bucket，不会生成支出控制范围账本。
 10. 支付工具决策必须固化 `instrumentBindingVersion`；`controlScopeId + periodId` 同时提供或同时省略；可选 `targetAccountId` 只允许 Funding Account 或 Credit Account。wallet 准入按当前快照逐项核对，缺失或漂移均 fail-closed，不推断补齐历史证据。
 
@@ -163,7 +163,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | --- | --- | --- | --- |
 | 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
 | 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 可信规则或业务决策方可按单条 rule / binding / scope 固化 `PASSED` 或 `REJECTED` 决策结果、拒绝原因、`decisionDigest`、支付工具绑定版本、完整控制窗口和可选目标账户；这些上下文同时参与幂等一致性和准入验真。支持窄条件只读查询和证据解释。 | `recordDecision` 不是开放给普通交易调用方的放行入口；不接受 `NO_APPLICABLE_RULE`，也不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
-| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`、`SpendControlTransactionConsumptionApplicationService`。 | 支持调额、预留、消耗、可信释放、策略授权的退款控制补偿和预算控制投影；所有 `REFUND_COMPENSATED` 在共享写入边界强制校验原因码、操作者和审计引用；支付工具可信授权完成与撤销由 `PaymentInstrumentTransactionApplicationService#completeAuthorizationByInstrument` / `#reverseAuthorizationByInstrument` 从原授权事实恢复账务主体和 `controlReservationSn`，在同一本地事务中分别写入资金完成与 `CONSUMED`、资金撤销与 `RELEASED`；累计消费/释放分别不得超过资金聚合的 `completedAmount` / `reversedAmount`。 | 不代表控制事实是资金交易、账本交易或账本余额；退款资金与可选控制补偿仍是分层事实，不代表已完成原子编排；强制完成、超时、expired 或本地推断不是可信控制事实；跨库或远程调用不适用本地原子性结论。 |
+| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`、`SpendControlMovementService`。 | 支持调额、预留、消耗、可信释放、策略授权的退款控制补偿和预算控制投影；所有 `REFUND_COMPENSATED` 在共享写入边界强制校验原因码、操作者和审计引用；支付工具可信授权完成与撤销由 Transaction Provider 内部编排从原授权事实恢复账务主体和 `controlReservationSn`，在同一本地事务中分别写入资金完成与 `CONSUMED`、资金撤销与 `RELEASED`；累计消费/释放分别不得超过资金聚合的 `completedAmount` / `reversedAmount`。该编排不是 Consumer Public API。 | 不代表控制事实是资金交易、账本交易或账本余额；退款资金与可选控制补偿仍是分层事实；强制完成、超时、expired 或本地推断不是可信控制事实；跨库或远程调用不适用本地原子性结论。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按 `controlScopeId + periodId` 查询当前或历史周期，并按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表支出控制范围、Spend Rule 或控制视图可以作为账务主体。 |
 
 产品到工程分层口径：

@@ -11,7 +11,7 @@ import org.jspecify.annotations.NonNull;
  * <ul>
  *   <li>把资金指令解析为运行态资金路径</li>
  *   <li>根据交易类型、主体关系、外部账户、支付工具等信息选择 Route</li>
- *   <li>输出 LedgerPostingAssembler 可消费的 ResolvedRouteSpec</li>
+ *   <li>输出 Ledger 高阶入账命令可消费的 ResolvedRouteSpec</li>
  * </ul>
  *
  * <p>非职责：

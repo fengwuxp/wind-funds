@@ -5,7 +5,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
@@ -158,7 +158,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     private LedgerService ledgerService;
 
     @Autowired
-    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
+    private LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -561,7 +561,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledger,
                     initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
-                    Math.abs(initialBalance))));
+                    Math.abs(initialBalance))), LedgerPostingAccessType.NORMAL);
         }
     }
 

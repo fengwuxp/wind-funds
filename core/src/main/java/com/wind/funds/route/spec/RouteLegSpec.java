@@ -16,7 +16,7 @@ import java.util.Map;
  * <ul>
  *   <li>描述一笔路径中的最小资金移动单元</li>
  *   <li>承载来源/去向、金额和回放策略</li>
- *   <li>作为 LedgerPostingAssembler 生成 LedgerPostingPlan 的基础输入</li>
+ *   <li>作为 Ledger 内部生成 LedgerPostingPlan 的基础路径输入</li>
  * </ul>
  *
  * <p>边界：

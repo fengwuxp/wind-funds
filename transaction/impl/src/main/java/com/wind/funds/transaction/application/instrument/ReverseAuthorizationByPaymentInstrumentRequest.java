@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.instrument;
 
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,12 +13,12 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 支付工具授权撤销请求。
+ * Transaction Provider 内部支付工具授权撤销命令。
  *
  * <p>调用方只提供原授权引用和本次可信撤销事实；账务主体、支付工具快照和控制预留关系必须从原授权事实回放。</p>
  *
  * @author Codex
- * @date 2026-07-29
+ * @since 2026-07-29
  */
 @Schema(description = "支付工具授权撤销请求")
 @Data

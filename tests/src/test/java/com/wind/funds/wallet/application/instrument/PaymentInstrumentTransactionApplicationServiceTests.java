@@ -3,7 +3,7 @@ package com.wind.funds.wallet.application.instrument;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
@@ -27,6 +27,7 @@ import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.wind.funds.transaction.application.instrument.ReceiveByInstrumentRequest;
 import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentAuthorizationProcessor;
 import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentTransactionApplicationServiceImpl;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
@@ -66,7 +67,6 @@ import com.wind.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
-import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
@@ -177,13 +177,13 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     private LedgerService ledgerService;
 
     @Autowired
-    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
+    private LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
 
     @Autowired
-    private PaymentInstrumentTransactionApplicationService paymentInstrumentTransactionApplicationService;
+    private PaymentInstrumentTransactionApplicationServiceImpl paymentInstrumentTransactionApplicationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -535,7 +535,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledger,
                     initialBalance > 0L ? ledger.getNormalBalanceSide() : ledger.getNormalBalanceSide().reverse(),
-                    Math.abs(initialBalance))));
+                    Math.abs(initialBalance))), LedgerPostingAccessType.NORMAL);
         }
     }
 

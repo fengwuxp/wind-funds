@@ -15,6 +15,7 @@ import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionDetailState;
 import com.wind.funds.transaction.model.dto.FundsActionFactDTO;
+import com.wind.funds.transaction.model.dto.FundsActionRecordedEvidenceDTO;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -42,6 +43,7 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.support.FundsRouteLegIds;
+import com.wind.funds.transaction.services.FundsActionRecordedEvidenceQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountState;
@@ -112,6 +114,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     @Autowired
     private JdbcTemplate core1bJdbcTemplate;
+
+    @Autowired
+    private FundsActionRecordedEvidenceQueryService fundsActionRecordedEvidenceQueryService;
 
     /**
      * 场景：历史直接充值的三条参与方明细已保存 legacy 摘要，当前版本收到相同请求和金额冲突请求。
@@ -3996,6 +4001,113 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 "succeeded", "proven-full", 40L);
         assertActionFactReferenceBoundary(actionFactsByBusiness("PAY", "DIRECT_IDEMPOTENT_PAY").getFirst(),
                 "PAY", "DIRECT_IDEMPOTENT_PAY");
+    }
+
+    /**
+     * 场景：direct PAY 分别以无手续费和带手续费完成，并在之后发生无关余额动作。
+     * 结果：principal ActionFact 始终返回完整 recorded sibling group，后续余额变化不改写历史证据。
+     * 红线：Transaction 只返回自有 recorded refs，不读取或声明 Ledger/Balance 完成。
+     */
+    @Test
+    void testRecordedEvidenceShouldExposeCompletePayGroupAndRemainStableAfterLaterBalanceChange() {
+        FundsAccountId payer = fundingAccount("recorded_evidence_payer");
+        FundsAccountId payee = fundingAccount("recorded_evidence_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 200L, "RECORDED_EVIDENCE_TOPUP");
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L, "RECORDED_EVIDENCE_NO_FEE");
+        FundsActionFactDTO noFeeAction = actionFactsByBusiness("PAY", "RECORDED_EVIDENCE_NO_FEE").getFirst();
+        FundsActionRecordedEvidenceDTO noFeeEvidence = fundsActionRecordedEvidenceQueryService
+                .findRecordedEvidence(noFeeAction.getIdentity())
+                .orElseThrow();
+
+        assertThat(noFeeEvidence.getActionFact()).isEqualTo(noFeeAction);
+        assertThat(noFeeEvidence.getMatchedSiblings())
+                .extracting(FundsActionRecordedEvidenceDTO.RecordedSiblingRef::getParticipantRole)
+                .containsExactlyInAnyOrder(RouteParticipantRole.PAYER, RouteParticipantRole.PAYEE);
+        assertThat(noFeeEvidence.getMatchedSiblings())
+                .extracting(FundsActionRecordedEvidenceDTO.RecordedSiblingRef::getRecordedLedgerTransactionSn)
+                .containsOnly(noFeeEvidence.getRecordedLedgerTransactionSn());
+        assertThat(noFeeEvidence.getRecordedReferenceDigest().getAlgorithm()).isEqualTo("SHA-256");
+        assertThat(noFeeEvidence.getRecordedReferenceDigest().getCoveredFieldsVersion())
+                .isEqualTo("transaction.action.recorded-reference.v1");
+
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 50L, 5L,
+                "RECORDED_EVIDENCE_WITH_FEE");
+        FundsActionFactDTO feeBearingPrincipal = actionFactsByBusiness("PAY", "RECORDED_EVIDENCE_WITH_FEE")
+                .getFirst();
+        FundsActionRecordedEvidenceDTO feeEvidence = fundsActionRecordedEvidenceQueryService
+                .findRecordedEvidence(feeBearingPrincipal.getIdentity())
+                .orElseThrow();
+        assertThat(feeEvidence.getMatchedSiblings())
+                .extracting(FundsActionRecordedEvidenceDTO.RecordedSiblingRef::getParticipantRole)
+                .containsExactlyInAnyOrder(
+                        RouteParticipantRole.PAYER, RouteParticipantRole.PAYEE, RouteParticipantRole.FEE_RECEIVER);
+        assertThat(feeEvidence.getMatchedSiblings())
+                .extracting(FundsActionRecordedEvidenceDTO.RecordedSiblingRef::getRecordedLedgerTransactionSn)
+                .containsOnly(feeEvidence.getRecordedLedgerTransactionSn());
+
+        topup(payer, 10L, "RECORDED_EVIDENCE_LATER_TOPUP");
+
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(noFeeAction.getIdentity()))
+                .contains(noFeeEvidence);
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(feeBearingPrincipal.getIdentity()))
+                .contains(feeEvidence);
+    }
+
+    /**
+     * 场景：调用方查询 fee action、proven-zero、缺失 sibling 或跨 LedgerTransaction 的动作组。
+     * 结果：窄查询全部返回 empty，不输出可被清分误用的半套 recorded evidence。
+     */
+    @Test
+    void testRecordedEvidenceShouldFailClosedForFeeActionProvenZeroAndIncompleteGroup() {
+        FundsAccountId payer = fundingAccount("recorded_failure_payer");
+        FundsAccountId payee = fundingAccount("recorded_failure_payee");
+        ensureLedger(payer, LedgerSubjectCode.AVAILABLE);
+        ensureFundingAccount(payee, LedgerProfileCode.FUNDING_MERCHANT);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 200L, "RECORDED_FAILURE_TOPUP");
+
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L, 5L,
+                "RECORDED_FAILURE_FEE_PAY");
+        List<FundsActionFactDTO> feeActions = actionFactsByBusiness("PAY", "RECORDED_FAILURE_FEE_PAY");
+        assertThat(feeActions).hasSize(2);
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(feeActions.getLast().getIdentity()))
+                .isEmpty();
+
+        FundsAccountId emptyPayer = fundingAccount("rec_fail_empty");
+        ensureLedger(emptyPayer, LedgerSubjectCode.AVAILABLE);
+        FundsTransactionPayRequest rejectedRequest = new FundsTransactionPayRequest()
+                .setAccountId(emptyPayer)
+                .setPayeeId(payee)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("RECORDED_FAILURE_PROVEN_ZERO")
+                .setDescription("recorded evidence proven zero");
+        assertThatThrownBy(() -> directTransactionService.pay(rejectedRequest, WindOperatorFactory.system()))
+                .hasMessageContaining("账本余额不足");
+        FundsActionFactDTO provenZero = actionFactsByBusiness("PAY", "RECORDED_FAILURE_PROVEN_ZERO").getFirst();
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(provenZero.getIdentity())).isEmpty();
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 30L, "RECORDED_FAILURE_MISSING_SIBLING");
+        FundsActionFactDTO missingSibling = actionFactsByBusiness("PAY", "RECORDED_FAILURE_MISSING_SIBLING")
+                .getFirst();
+        deleteFundsTransactionDetail(fundsTransactionDetailsByBusinessSn("RECORDED_FAILURE_MISSING_SIBLING")
+                .getLast().getSn());
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(missingSibling.getIdentity()))
+                .isEmpty();
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 20L, "RECORDED_FAILURE_DIFFERENT_LEDGER");
+        FundsActionFactDTO differentLedger = actionFactsByBusiness("PAY", "RECORDED_FAILURE_DIFFERENT_LEDGER")
+                .getFirst();
+        updateFundsTransactionDetailLedgerRef(
+                fundsTransactionDetailsByBusinessSn("RECORDED_FAILURE_DIFFERENT_LEDGER").getLast().getSn(),
+                "different-ledger-transaction");
+        assertThat(fundsActionRecordedEvidenceQueryService.findRecordedEvidence(differentLedger.getIdentity()))
+                .isEmpty();
     }
 
     /**

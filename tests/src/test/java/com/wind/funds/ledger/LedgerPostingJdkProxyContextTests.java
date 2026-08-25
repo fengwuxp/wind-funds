@@ -3,7 +3,9 @@ package com.wind.funds.ledger;
 import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
+import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.ledger.service.LedgerTransactionService;
 import org.junit.jupiter.api.Test;
@@ -67,8 +69,13 @@ class LedgerPostingJdkProxyContextTests {
         }
 
         @Bean
-        LedgerBalanceProjectionService ledgerBalanceProjectionService() {
-            return mock(LedgerBalanceProjectionService.class);
+        LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService() {
+            return mock(LedgerBalanceProjectionServiceImpl.class);
+        }
+
+        @Bean
+        DefaultLedgerPostingAssembler ledgerPostingAssembler() {
+            return mock(DefaultLedgerPostingAssembler.class);
         }
 
         @Bean

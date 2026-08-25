@@ -5,19 +5,18 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionState;
+import com.wind.funds.transaction.application.spend.SpendControlBusinessConfirmedRefundCompensationRequest;
+import com.wind.funds.transaction.application.spend.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
-import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
-import com.wind.funds.wallet.model.request.SpendControlBusinessConfirmedRefundCompensationRequest;
-import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
@@ -31,15 +30,14 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * 交易结果消费控制额度变动流水应用服务实现。
+ * Transaction Provider 内部交易结果消费控制额度变动编排服务。
  *
  * @author Codex
  * @date 2026-06-20
  */
 @Service
 @AllArgsConstructor
-public class SpendControlTransactionConsumptionApplicationServiceImpl
-        implements SpendControlTransactionConsumptionApplicationService {
+public class SpendControlTransactionConsumptionApplicationServiceImpl {
 
     private static final String SHA256_PREFIX = "sha256:";
 
@@ -51,7 +49,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlMovementDTO consume(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
@@ -71,7 +68,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         return consumedMovement;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
@@ -92,7 +88,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         return releasedMovement;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlMovementDTO refund(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
@@ -115,7 +110,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 toRecordRequest(request, originalMovement, SpendControlMovementType.REFUND_COMPENSATED));
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlMovementDTO compensateBusinessConfirmedRefund(
             @NonNull SpendControlBusinessConfirmedRefundCompensationRequest request) {

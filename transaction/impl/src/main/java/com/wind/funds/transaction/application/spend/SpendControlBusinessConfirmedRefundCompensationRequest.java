@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.application.spend;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -15,13 +15,13 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * Spend Rule 业务确认型退款控制补偿请求。
+ * Transaction Provider 内部 Spend Rule 业务确认型退款控制补偿命令。
  *
  * <p>用于业务侧已确认退款可以恢复支付工具周期控制额度，但找不到原控制额度变动流水的场景。
  * 资金退款本身仍由交易服务处理；本请求只写 Spend Rule 控制补偿事实。</p>
  *
  * @author Codex
- * @date 2026-07-10
+ * @since 2026-07-10
  */
 @Data
 @NoArgsConstructor

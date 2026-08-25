@@ -1,5 +1,6 @@
 package com.wind.funds.reconciliation.application.clearing.impl;
 
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
@@ -22,7 +23,6 @@ import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
 import com.wind.funds.reconciliation.model.value.GateStageRef;
-import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -32,6 +32,9 @@ import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.model.dto.FundsActionFactRef;
+import com.wind.funds.transaction.model.dto.FundsActionRecordedEvidenceDTO;
+import com.wind.funds.transaction.services.FundsActionRecordedEvidenceQueryService;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -48,6 +51,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 
 import tools.jackson.databind.JsonNode;
@@ -64,9 +68,13 @@ public class ClearingSplittableDetailApplicationServiceImpl
     private static final WindSequenceType SPLITTABLE_DETAIL_SEQUENCE_TYPE =
             WindSequenceType.immutable("CLEARING_SPLITTABLE_DETAIL", "CSD", 6);
 
+    private static final String RECORDED_REFERENCE_DIGEST_DOMAIN = "transaction.action.recorded-reference";
+
     private final ClearingSplittableDetailMapper clearingSplittableDetailMapper;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
+
+    private final FundsActionRecordedEvidenceQueryService fundsActionRecordedEvidenceQueryService;
 
     private final LedgerTransactionService ledgerTransactionService;
 
@@ -77,27 +85,30 @@ public class ClearingSplittableDetailApplicationServiceImpl
     public ClearingSplittableDetailDTO identifySplittableDetail(IdentifyClearingSplittableDetailRequest request,
                                                                WindOperator operator) {
         validateRequest(request, operator);
+        FundsActionRecordedEvidenceDTO evidence = requiredRecordedEvidence(request);
         FundsTransactionDTO transaction = fundsTransactionQueryService
-                .queryFundsTransaction(request.getFundsTransactionSn())
+                .queryFundsTransaction(evidence.getActionFact().getIntentRef())
                 .orElse(null);
         AssertUtils.notNull(transaction, "可清分来源资金交易不存在，fundsTransactionSn = {}",
-                request.getFundsTransactionSn());
-        FundsTransactionDetailDTO detail = requiredDetail(request);
-        LedgerEntryDTO entry = ledgerTransactionService.getLedgerEntryBySn(
-                request.getTenantId(), request.getLedgerEntrySn());
+                evidence.getActionFact().getIntentRef());
         LedgerTransactionDTO ledgerTransaction = ledgerTransactionService.getLedgerTransactionBySn(
-                request.getTenantId(), entry.getLedgerTransactionSn());
+                request.getTenantId(), evidence.getRecordedLedgerTransactionSn());
+        List<LedgerEntryDTO> ledgerEntries = exactLedgerEntries(
+                request.getTenantId(), evidence.getRecordedLedgerTransactionSn());
+        AssertUtils.isTrue(recordedReferenceDigestMatches(evidence),
+                "可清分来源 ActionFact recorded digest 不一致");
+        ResolvedClearingSource source = resolveClearingSource(evidence, transaction, ledgerEntries);
         ReconciliationGateDecisionDTO reconciliationDecision = checkReconciliationGate(request, operator);
-        ClearingSplittableDetail candidate = toCandidate(request, operator, transaction, detail, entry,
-                ledgerTransaction, reconciliationDecision);
+        ClearingSplittableDetail candidate = toCandidate(request, operator, evidence, transaction,
+                source.detail(), source.entry(), ledgerTransaction, reconciliationDecision);
         if (candidate.getExclusionReason() == ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED) {
             log.info("可清分明细被对账 Gate 临时阻断，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}",
-                    request.getTenantId(), request.getFundsTransactionSn(), request.getLedgerEntrySn());
+                    request.getTenantId(), transaction.getSn(), source.entry().getSn());
             return ClearingSplittableDetailConverter.INSTANCE.toDTO(candidate);
         }
 
         ClearingSplittableDetail existing = clearingSplittableDetailMapper.selectByLedgerEntrySn(
-                request.getTenantId(), request.getLedgerEntrySn());
+                request.getTenantId(), source.entry().getSn());
         if (existing != null) {
             return reuseExisting(existing, candidate);
         }
@@ -105,28 +116,165 @@ public class ClearingSplittableDetailApplicationServiceImpl
             clearingSplittableDetailMapper.insertSelective(candidate);
         } catch (DuplicateKeyException exception) {
             ClearingSplittableDetail winner = clearingSplittableDetailMapper.selectByLedgerEntrySn(
-                    request.getTenantId(), request.getLedgerEntrySn());
+                    request.getTenantId(), source.entry().getSn());
             AssertUtils.notNull(winner, "可清分明细唯一键冲突后未找到幂等结果");
             return reuseExisting(winner, candidate);
         }
         AssertUtils.notNull(candidate.getId(), "创建可清分明细准入结果失败");
         ClearingSplittableDetail saved = clearingSplittableDetailMapper.selectByLedgerEntrySn(
-                request.getTenantId(), request.getLedgerEntrySn());
+                request.getTenantId(), source.entry().getSn());
         log.info("可清分明细准入完成，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}, status = {}, exclusionReason = {}",
-                request.getTenantId(), request.getFundsTransactionSn(), request.getLedgerEntrySn(),
+                request.getTenantId(), transaction.getSn(), source.entry().getSn(),
                 candidate.getAdmissionResult(), candidate.getExclusionReason());
         return ClearingSplittableDetailConverter.INSTANCE.toDTO(saved);
     }
 
-    private FundsTransactionDetailDTO requiredDetail(IdentifyClearingSplittableDetailRequest request) {
+    private FundsActionRecordedEvidenceDTO requiredRecordedEvidence(IdentifyClearingSplittableDetailRequest request) {
+        FundsActionFactRef actionFactRef = new FundsActionFactRef(
+                request.getTenantId(), request.getSourceActionFactRef().getValue());
+        FundsActionRecordedEvidenceDTO result = fundsActionRecordedEvidenceQueryService
+                .findRecordedEvidence(actionFactRef)
+                .orElse(null);
+        AssertUtils.notNull(result, "可清分来源资金动作不存在、不支持或记录不完整，sourceActionFactRef = {}",
+                request.getSourceActionFactRef().getValue());
+        return result;
+    }
+
+    private List<LedgerEntryDTO> exactLedgerEntries(Long tenantId, String ledgerTransactionSn) {
+        var countPage = ledgerTransactionService.queryLedgerEntries(
+                new com.wind.funds.ledger.query.LedgerEntryQuery()
+                        .setTenantId(tenantId)
+                        .setLedgerTransactionSn(ledgerTransactionSn),
+                DefaultPageQueryOptions.defaults(1));
+        long count = countPage.getTotal();
+        AssertUtils.isTrue(count > 0 && count <= Integer.MAX_VALUE,
+                "可清分来源账本分录数量非法，ledgerTransactionSn = {}, count = {}",
+                ledgerTransactionSn, count);
+        var exactPage = ledgerTransactionService.queryLedgerEntries(
+                new com.wind.funds.ledger.query.LedgerEntryQuery()
+                        .setTenantId(tenantId)
+                        .setLedgerTransactionSn(ledgerTransactionSn),
+                DefaultPageQueryOptions.defaults(Math.toIntExact(count)));
+        AssertUtils.isTrue(exactPage.getTotal() == count && exactPage.getRecords().size() == count,
+                "可清分来源账本分录读取不完整，ledgerTransactionSn = {}, expected = {}, actual = {}",
+                ledgerTransactionSn, count, exactPage.getRecords().size());
+        return List.copyOf(exactPage.getRecords());
+    }
+
+    private boolean recordedReferenceDigestMatches(FundsActionRecordedEvidenceDTO evidence) {
+        if (evidence.getRecordedReferenceDigest() == null
+                || !"SHA-256".equals(evidence.getRecordedReferenceDigest().getAlgorithm())
+                || !"transaction.action.recorded-reference.v1"
+                .equals(evidence.getRecordedReferenceDigest().getCoveredFieldsVersion())) {
+            return false;
+        }
+        Map<String, Object> values = new TreeMap<>();
+        values.put("actionSemanticDigest", evidence.getActionFact().getSemanticDigest().getValue());
+        values.put("recordedLedgerTransactionSn", evidence.getRecordedLedgerTransactionSn());
+        values.put("matchedSiblings", evidence.getMatchedSiblings().stream().map(sibling -> Map.of(
+                "detailSn", sibling.getDetailSn(),
+                "participantRole", sibling.getParticipantRole().name(),
+                "subjectId", sibling.getSubjectId(),
+                "subjectType", sibling.getSubjectType(),
+                "amount", sibling.getMoney().getAmount(),
+                "currency", sibling.getMoney().getCurrency().name(),
+                "recordedLedgerTransactionSn", sibling.getRecordedLedgerTransactionSn())).toList());
+        return FundsStableHashSupport.sha256CanonicalJson(RECORDED_REFERENCE_DIGEST_DOMAIN, values)
+                .equals(evidence.getRecordedReferenceDigest().getValue());
+    }
+
+    private ResolvedClearingSource resolveClearingSource(
+            FundsActionRecordedEvidenceDTO evidence,
+            FundsTransactionDTO transaction,
+            List<LedgerEntryDTO> ledgerEntries) {
+        AssertUtils.equals(transaction.getTenantId(), evidence.getActionFact().getIdentity().getTenantId(),
+                "可清分来源 ActionFact 租户不一致");
+        AssertUtils.isTrue(StringUtils.hasText(evidence.getRecordedLedgerTransactionSn())
+                        && evidence.getMatchedSiblings().size() >= 2
+                        && evidence.getMatchedSiblings().size() <= 3
+                        && evidence.getMatchedSiblings().stream()
+                        .allMatch(sibling -> evidence.getRecordedLedgerTransactionSn()
+                                .equals(sibling.getRecordedLedgerTransactionSn())),
+                "可清分来源 ActionFact recorded sibling 不完整");
+        AssertUtils.isTrue(evidence.getRecordedReferenceDigest() != null
+                        && "SHA-256".equals(evidence.getRecordedReferenceDigest().getAlgorithm())
+                        && StringUtils.hasText(evidence.getRecordedReferenceDigest().getValue())
+                        && "transaction.action.recorded-reference.v1"
+                        .equals(evidence.getRecordedReferenceDigest().getCoveredFieldsVersion()),
+                "可清分来源 ActionFact recorded digest 无效");
+        AssertUtils.isTrue(evidence.getMatchedSiblings().stream()
+                        .filter(sibling -> sibling.getParticipantRole()
+                                == com.wind.funds.route.enums.RouteParticipantRole.PAYER)
+                        .count() == 1
+                        && evidence.getMatchedSiblings().stream()
+                        .filter(sibling -> sibling.getParticipantRole()
+                                == com.wind.funds.route.enums.RouteParticipantRole.PAYEE)
+                        .count() == 1
+                        && evidence.getMatchedSiblings().stream()
+                        .filter(sibling -> sibling.getParticipantRole()
+                                == com.wind.funds.route.enums.RouteParticipantRole.FEE_RECEIVER)
+                        .count() <= 1,
+                "可清分来源 ActionFact sibling 角色不完整");
+
+        Set<String> matchedEntrySns = new java.util.HashSet<>();
+        LedgerEntryDTO clearingEntry = null;
+        FundsActionRecordedEvidenceDTO.RecordedSiblingRef clearingSibling = null;
+        for (FundsActionRecordedEvidenceDTO.RecordedSiblingRef sibling : evidence.getMatchedSiblings()) {
+            List<LedgerEntryDTO> matches = ledgerEntries.stream()
+                    .filter(entry -> siblingMatchesEntry(sibling, transaction, entry))
+                    .toList();
+            AssertUtils.isTrue(matches.size() == 1 && matchedEntrySns.add(matches.getFirst().getSn()),
+                    "可清分来源 sibling 无唯一账本分录，detailSn = {}", sibling.getDetailSn());
+            LedgerEntryDTO entry = matches.getFirst();
+            AssertUtils.isTrue(StringUtils.hasText(entry.getPostingPlanSn())
+                            && ledgerTransactionService.existsPostingPlan(
+                            transaction.getTenantId(), entry.getPostingPlanSn(), entry.getLedgerTransactionSn()),
+                    "可清分来源 sibling 记账计划不完整，detailSn = {}", sibling.getDetailSn());
+            if (sibling.getParticipantRole() == com.wind.funds.route.enums.RouteParticipantRole.PAYEE
+                    && isClearingCredit(entry)) {
+                AssertUtils.isTrue(clearingEntry == null, "可清分来源存在多个 PAYEE/CLEARING credit");
+                clearingSibling = sibling;
+                clearingEntry = entry;
+            }
+        }
+        AssertUtils.notNull(clearingSibling, "可清分来源缺少唯一 PAYEE/CLEARING credit");
+        FundsTransactionDetailDTO detail = requiredDetail(transaction.getSn(), clearingSibling.getDetailSn());
+        return new ResolvedClearingSource(detail, clearingEntry);
+    }
+
+    private boolean siblingMatchesEntry(FundsActionRecordedEvidenceDTO.RecordedSiblingRef sibling,
+                                        FundsTransactionDTO transaction,
+                                        LedgerEntryDTO entry) {
+        boolean expectedSide = sibling.getParticipantRole()
+                == com.wind.funds.route.enums.RouteParticipantRole.PAYER
+                ? entry.getEntryType() == EntrySide.DEBIT
+                : entry.getEntryType() == EntrySide.CREDIT;
+        return expectedSide
+                && Objects.equals(entry.getTenantId(), transaction.getTenantId())
+                && Objects.equals(entry.getFundsTransactionSn(), transaction.getSn())
+                && Objects.equals(entry.getLedgerTransactionSn(), sibling.getRecordedLedgerTransactionSn())
+                && Objects.equals(entry.getSubjectId(), sibling.getSubjectId())
+                && Objects.equals(entry.getSubjectType(), sibling.getSubjectType())
+                && Objects.equals(entry.getAmount(), sibling.getMoney());
+    }
+
+    private boolean isClearingCredit(LedgerEntryDTO entry) {
+        return entry.getLedgerSubjectCode() == LedgerSubjectCode.CLEARING
+                && entry.getEntryType() == EntrySide.CREDIT
+                && entry.getPostingRole() == LedgerPostingRole.DETAIL
+                && (entry.getBalanceEffectType() == LedgerBalanceEffectType.INCREASE
+                || entry.getBalanceEffectType() == LedgerBalanceEffectType.CONSUME);
+    }
+
+    private FundsTransactionDetailDTO requiredDetail(String transactionSn, String detailSn) {
         FundsTransactionDetailDTO result = fundsTransactionQueryService
-                .queryFundsTransactionDetails(request.getFundsTransactionSn())
+                .queryFundsTransactionDetails(transactionSn)
                 .stream()
-                .filter(detail -> request.getFundsTransactionDetailSn().equals(detail.getSn()))
+                .filter(detail -> detailSn.equals(detail.getSn()))
                 .findFirst()
                 .orElse(null);
         AssertUtils.notNull(result, "可清分来源资金交易明细不存在，fundsTransactionDetailSn = {}",
-                request.getFundsTransactionDetailSn());
+                detailSn);
         return result;
     }
 
@@ -136,13 +284,12 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 .setTenantId(request.getTenantId())
                 .setStageRef(new GateStageRef()
                         .setStageKind("CLEARING_SPLITTABLE_IDENTIFY")
-                        .setStageIdentity(new StableIdentity()
-                                .setOwnerNamespace("funds-transaction-detail")
-                                .setValue(request.getFundsTransactionDetailSn()))), operator);
+                        .setStageIdentity(request.getSourceActionFactRef())), operator);
     }
 
     private ClearingSplittableDetail toCandidate(IdentifyClearingSplittableDetailRequest request,
                                                  WindOperator operator,
+                                                 FundsActionRecordedEvidenceDTO evidence,
                                                  FundsTransactionDTO transaction,
                                                  FundsTransactionDetailDTO detail,
                                                  LedgerEntryDTO entry,
@@ -183,7 +330,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
             result.setRouteSnapshotDigest(FundsStableHashSupport.sha256Json(
                     Map.of("routeSnapshot", transaction.getRouteSnapshot())));
         }
-        result.setSourceDigest(sourceDigest(request, transaction, detail, entry, ledgerTransaction,
+        result.setSourceDigest(sourceDigest(request, evidence, transaction, detail, entry, ledgerTransaction,
                 reconciliationDecision));
         result.setCreatedBy(operator.getOperatorAsText());
         return result;
@@ -290,6 +437,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
     }
 
     private String sourceDigest(IdentifyClearingSplittableDetailRequest request,
+                                FundsActionRecordedEvidenceDTO evidence,
                                 FundsTransactionDTO transaction,
                                 FundsTransactionDetailDTO detail,
                                 LedgerEntryDTO entry,
@@ -297,6 +445,9 @@ public class ClearingSplittableDetailApplicationServiceImpl
                                 ReconciliationGateDecisionDTO reconciliationDecision) {
         TreeMap<String, Object> facts = new TreeMap<>();
         facts.put("tenantId", request.getTenantId());
+        facts.put("sourceActionFactRef", request.getSourceActionFactRef());
+        facts.put("recordedReferenceDigest", evidence.getRecordedReferenceDigest());
+        facts.put("recordedSiblings", evidence.getMatchedSiblings());
         facts.put("fundsTransactionSn", transaction.getSn());
         facts.put("fundsTransactionStatus", transaction.getState());
         facts.put("fundsTransactionMode", transaction.getTransactionMode());
@@ -366,9 +517,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
         AssertUtils.notNull(request.getTenantId(), "可清分明细租户 ID 不能为空");
         AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "可清分明细 tenantId 与当前租户不一致");
-        AssertUtils.hasText(request.getFundsTransactionSn(), "来源资金交易流水号不能为空");
-        AssertUtils.hasText(request.getFundsTransactionDetailSn(), "来源资金交易明细流水号不能为空");
-        AssertUtils.hasText(request.getLedgerEntrySn(), "来源账本分录流水号不能为空");
+        AssertUtils.notNull(request.getSourceActionFactRef(), "来源资金动作事实引用不能为空");
+        AssertUtils.equals("funds", request.getSourceActionFactRef().getOwnerNamespace(),
+                "来源资金动作事实 ownerNamespace 必须为 funds");
+        AssertUtils.hasText(request.getSourceActionFactRef().getValue(), "来源资金动作事实稳定身份不能为空");
         AssertUtils.hasText(request.getBusinessLine(), "业务线不能为空");
         AssertUtils.hasText(request.getSplitPeriod(), "清分周期不能为空");
         AssertUtils.hasText(request.getSplitRuleCode(), "清分规则编码不能为空");
@@ -379,4 +531,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
     private long defaultAmount(Long value) {
         return value == null ? 0L : value;
     }
+
+    private record ResolvedClearingSource(FundsTransactionDetailDTO detail, LedgerEntryDTO entry) {
+    }
+
 }

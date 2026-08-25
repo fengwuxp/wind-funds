@@ -23,7 +23,6 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.common.util.WindObjectDigestUtils;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -43,13 +42,20 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -64,7 +70,11 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class LedgerTransactionServiceImpl implements LedgerTransactionService, LedgerTransactionCommandService {
 
-    private static final String LEDGER_TRANSACTION_DIGEST_DOMAIN = "ledger.transaction.request";
+    private static final String LEDGER_TRANSACTION_DIGEST_DOMAIN = "ledger.persisted-transaction.v1";
+
+    private static final String LEDGER_POSTING_PLAN_DIGEST_DOMAIN = "ledger.persisted-plan.v1";
+
+    private static final String LEDGER_ENTRY_DIGEST_DOMAIN = "ledger.persisted-entry.v1";
 
     private static final WindSequenceType LEDGER_ENTRY_SEQUENCE_TYPE = WindSequenceType.immutable(
             "LEDGER_ENTRY", "LGE", 6);
@@ -100,7 +110,10 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
     );
 
     private static final List<String> LEDGER_POSTING_PLAN_SHA256_FIELDS = List.of(
+            LedgerPostingPlan.Fields.sn,
             LedgerPostingPlan.Fields.tenantId,
+            LedgerPostingPlan.Fields.ledgerTransactionSn,
+            LedgerPostingPlan.Fields.fundsTransactionSn,
             LedgerPostingPlan.Fields.routeLegId,
             LedgerPostingPlan.Fields.intent,
             LedgerPostingPlan.Fields.postingScope,
@@ -113,6 +126,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
     );
 
     private static final List<String> LEDGER_TRANSACTION_SHA256_FIELDS = List.of(
+            LedgerTransaction.Fields.sn,
             LedgerTransaction.Fields.tenantId,
             LedgerTransaction.Fields.instructionType,
             LedgerTransaction.Fields.eventType,
@@ -141,52 +155,111 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
     @Transactional(rollbackFor = Exception.class)
     public @NonNull LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
         assertNoSensitiveContextVariables(transaction);
-        LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
-        entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
-        entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
-        entity.setContextVariables(WindJson.toJsonString(transaction.getContextVariables()));
-        entity.setSha256(FundsStableHashSupport.sha256CanonicalJson(
-                LEDGER_TRANSACTION_DIGEST_DOMAIN, canonicalLedgerTransactionDigestFacts(entity, transaction)));
-        LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity, transaction);
+        LedgerTransaction ledgerTransaction = materializeLedgerTransaction(transaction);
+        LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(ledgerTransaction, transaction);
         if (existingResult != null) {
             return existingResult;
         }
+        LedgerAggregate aggregate = materializeLedgerAggregate(ledgerTransaction, transaction, null);
         try {
-            ledgerTransactionMapper.insertSelective(entity);
+            ledgerTransactionMapper.insertSelective(aggregate.transaction());
         } catch (DuplicateKeyException exception) {
-            LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(entity, transaction);
+            LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(ledgerTransaction, transaction);
             if (retryResult != null) {
                 return retryResult;
             }
             throw exception;
         }
-        AssertUtils.notNull(entity.getId(), "创建账户账本交易失败");
-        for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
-            String postingPlanSn = createPostingPlan(entity, plan);
-            for (LedgerPostingPhaseSpec phase : plan.getPostingPhases()) {
-                for (LedgerEntrySpec entry : phase.getEntries()) {
-                    createLedgerEntry(entity, plan, phase, postingPlanSn, entry);
+        AssertUtils.notNull(aggregate.transaction().getId(), "创建账户账本交易失败");
+        for (LedgerPostingPlan postingPlan : aggregate.postingPlans()) {
+            ledgerPostingPlanMapper.insertSelective(postingPlan);
+            AssertUtils.notNull(postingPlan.getId(), "创建账户账本记账计划失败");
+        }
+        for (LedgerEntry entry : aggregate.entries()) {
+            ledgerEntryMapper.insertSelective(entry);
+            AssertUtils.notNull(entry.getId(), "创建账户账本条目失败");
+        }
+        verifiedLedgerAggregate(aggregate.transaction());
+        return toPostResult(aggregate.transaction().getId(), true);
+    }
+
+    private LedgerTransaction materializeLedgerTransaction(LedgerTransactionSpec transaction) {
+        LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
+        entity.setInstructionType(defaultIfBlank(entity.getInstructionType(), ""));
+        entity.setTransactionTime(entity.getTransactionTime().truncatedTo(ChronoUnit.SECONDS));
+        entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
+        entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
+        entity.setContextVariables(WindJson.toJsonString(transaction.getContextVariables()));
+        return entity;
+    }
+
+    private LedgerAggregate materializeLedgerAggregate(LedgerTransaction transaction,
+                                                        LedgerTransactionSpec transactionSpec,
+                                                        @Nullable LedgerAggregate existingAggregate) {
+        Map<String, List<String>> existingEntrySnsByPlan = existingEntrySnsByPlan(existingAggregate);
+        if (existingAggregate != null) {
+            AssertUtils.isTrue(existingAggregate.postingPlans().size() == transactionSpec.getPostingPlans().size(),
+                    "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", transaction.getSn());
+        }
+        List<LedgerPostingPlan> postingPlans = new ArrayList<>();
+        List<LedgerEntry> entries = new ArrayList<>();
+        for (LedgerPostingPlanSpec planSpec : transactionSpec.getPostingPlans()) {
+            LedgerPostingPlan postingPlan = materializePostingPlan(transaction, planSpec);
+            List<String> existingEntrySns = existingAggregate == null
+                    ? List.of()
+                    : existingEntrySnsByPlan.get(planSpec.getPlanId());
+            if (existingAggregate != null) {
+                AssertUtils.notNull(existingEntrySns,
+                        "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", transaction.getSn());
+            }
+            int entryIndex = 0;
+            for (LedgerPostingPhaseSpec phase : planSpec.getPostingPhases()) {
+                for (LedgerEntrySpec entrySpec : phase.getEntries()) {
+                    String entrySn = existingAggregate == null
+                            ? TemporalSequenceFactory.hourNext(LEDGER_ENTRY_SEQUENCE_TYPE)
+                            : replayEntrySn(existingEntrySns, entryIndex, transaction.getSn());
+                    LedgerEntry entry = materializeLedgerEntry(
+                            transaction, planSpec, phase, postingPlan.getSn(), entrySpec, entrySn);
+                    entry.setSha256(FundsStableHashSupport.sha256CanonicalJson(
+                            LEDGER_ENTRY_DIGEST_DOMAIN, ledgerEntryDigestFacts(entry)));
+                    entries.add(entry);
+                    entryIndex++;
                 }
             }
+            if (existingAggregate != null) {
+                AssertUtils.isTrue(entryIndex == existingEntrySns.size(),
+                        "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", transaction.getSn());
+            }
+            postingPlan.setSha256(FundsStableHashSupport.sha256CanonicalJson(
+                    LEDGER_POSTING_PLAN_DIGEST_DOMAIN, postingPlanDigestFacts(postingPlan)));
+            postingPlans.add(postingPlan);
         }
-        return toPostResult(entity.getId(), true);
+        transaction.setSha256(FundsStableHashSupport.sha256CanonicalJson(
+                LEDGER_TRANSACTION_DIGEST_DOMAIN,
+                ledgerAggregateDigestFacts(transaction, postingPlans, entries)));
+        return new LedgerAggregate(transaction, postingPlans, entries);
     }
 
-    private Map<String, Object> legacyLedgerTransactionDigestFacts(LedgerTransaction entity,
-                                                                   LedgerTransactionSpec transaction) {
-        Map<String, Object> facts = new TreeMap<>();
-        facts.put("transaction",
-                WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
-        facts.put("postingPlans", transaction.getPostingPlans()
-                .stream()
-                .map(plan -> postingPlanDigestFacts(plan, false))
-                .toList());
-        return facts;
+    private Map<String, List<String>> existingEntrySnsByPlan(@Nullable LedgerAggregate existingAggregate) {
+        if (existingAggregate == null) {
+            return Map.of();
+        }
+        return existingAggregate.entries().stream()
+                .collect(Collectors.groupingBy(
+                        LedgerEntry::getPostingPlanSn,
+                        TreeMap::new,
+                        Collectors.mapping(LedgerEntry::getSn, Collectors.toList())));
     }
 
-    private Map<String, Object> canonicalLedgerTransactionDigestFacts(LedgerTransaction entity,
-                                                                      LedgerTransactionSpec transaction) {
+    private String replayEntrySn(List<String> existingEntrySns, int entryIndex, String ledgerTransactionSn) {
+        AssertUtils.isTrue(entryIndex < existingEntrySns.size(),
+                "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", ledgerTransactionSn);
+        return existingEntrySns.get(entryIndex);
+    }
+
+    private Map<String, Object> ledgerTransactionDigestFacts(LedgerTransaction entity) {
         Map<String, Object> transactionFacts = new TreeMap<>();
+        transactionFacts.put("sn", entity.getSn());
         transactionFacts.put("tenantId", entity.getTenantId());
         transactionFacts.put("instructionType", entity.getInstructionType());
         transactionFacts.put("eventType", entity.getEventType());
@@ -201,99 +274,111 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         transactionFacts.put("exchangeRate", entity.getExchangeRate());
         transactionFacts.put("debitAmount", entity.getDebitAmount());
         transactionFacts.put("creditAmount", entity.getCreditAmount());
-        transactionFacts.put("transactionTime", entity.getTransactionTime().toString());
+        transactionFacts.put("transactionTime", entity.getTransactionTime().truncatedTo(ChronoUnit.SECONDS));
         transactionFacts.put("referenceLedgerTransactionSn", entity.getReferenceLedgerTransactionSn());
-        Map<String, Object> facts = new TreeMap<>();
-        facts.put("transaction", transactionFacts);
-        facts.put("postingPlans", transaction.getPostingPlans()
-                .stream()
-                .map(plan -> postingPlanDigestFacts(plan, true))
-                .toList());
-        return facts;
+        assertDigestFields(LEDGER_TRANSACTION_SHA256_FIELDS, transactionFacts, "transaction", entity.getSn());
+        return transactionFacts;
     }
 
-    private Map<String, Object> postingPlanDigestFacts(LedgerPostingPlanSpec plan, boolean canonical) {
-        String phaseCode = resolvePhaseCode(plan);
+    private Map<String, Object> postingPlanDigestFacts(LedgerPostingPlan plan) {
         Map<String, Object> facts = new TreeMap<>();
-        facts.put("sn", plan.getPlanId());
+        facts.put("sn", plan.getSn());
+        facts.put("tenantId", plan.getTenantId());
         facts.put("ledgerTransactionSn", plan.getLedgerTransactionSn());
+        facts.put("fundsTransactionSn", plan.getFundsTransactionSn());
         facts.put("routeLegId", plan.getRouteLegId());
-        facts.put("intent", plan.getIntent().name());
-        facts.put("postingScope", resolvePostingScope(plan, phaseCode).name());
-        facts.put("balanceEffectType", resolveBalanceEffectType(plan, phaseCode).name());
-        facts.put("phaseCode", phaseCode);
-        facts.put("amount", plan.getAmount().getAmount());
-        facts.put("currency", plan.getAmount().getCurrency());
-        facts.put("debitAmount", plan.getTotalDebitAmount().getAmount());
-        facts.put("creditAmount", plan.getTotalCreditAmount().getAmount());
-        facts.put("postingPhases", plan.getPostingPhases()
-                .stream()
-                .map(phase -> postingPhaseDigestFacts(plan, phase, canonical))
-                .toList());
+        facts.put("intent", plan.getIntent());
+        facts.put("postingScope", plan.getPostingScope());
+        facts.put("balanceEffectType", plan.getBalanceEffectType());
+        facts.put("phaseCode", plan.getPhaseCode());
+        facts.put("amount", plan.getAmount());
+        facts.put("currency", plan.getCurrency());
+        facts.put("debitAmount", plan.getDebitAmount());
+        facts.put("creditAmount", plan.getCreditAmount());
+        assertDigestFields(LEDGER_POSTING_PLAN_SHA256_FIELDS, facts, "posting plan", plan.getSn());
         return facts;
     }
 
-    private Map<String, Object> postingPhaseDigestFacts(LedgerPostingPlanSpec plan,
-                                                        LedgerPostingPhaseSpec phase,
-                                                        boolean canonical) {
+    private Map<String, Object> ledgerEntryDigestFacts(LedgerEntry entry) {
         Map<String, Object> facts = new TreeMap<>();
-        facts.put("phaseCode", phase.getPhaseCode().name());
-        facts.put("entries", phase.getEntries()
-                .stream()
-                .map(entry -> ledgerEntryDigestFacts(plan, phase, entry, canonical))
-                .toList());
-        return facts;
-    }
-
-    private Map<String, Object> ledgerEntryDigestFacts(LedgerPostingPlanSpec plan,
-                                                       LedgerPostingPhaseSpec phase,
-                                                       LedgerEntrySpec entry,
-                                                       boolean canonical) {
-        String phaseCode = phase.getPhaseCode().name();
-        Map<String, Object> facts = new TreeMap<>();
+        facts.put("sn", entry.getSn());
+        facts.put("tenantId", entry.getTenantId());
         facts.put("ledgerTransactionSn", entry.getLedgerTransactionSn());
+        facts.put("postingPlanSn", entry.getPostingPlanSn());
+        facts.put("fundsTransactionSn", entry.getFundsTransactionSn());
         facts.put("ledgerId", entry.getLedgerId());
-        facts.put("periodType", entry.getPeriodType().name());
+        facts.put("periodType", entry.getPeriodType());
         facts.put("periodId", entry.getPeriodId());
         facts.put("subjectId", entry.getSubjectId());
         facts.put("subjectType", entry.getSubjectType());
-        facts.put("ledgerSubjectCode", entry.getLedgerSubjectCode().name());
-        facts.put("ledgerSubjectCategory", entry.getLedgerSubjectCategory().name());
-        facts.put("entrySide", entry.getEntrySide().name());
-        facts.put("postingRole", entry.getPostingRole().name());
-        facts.put("balanceConstraintType", defaultIfNull(
-                entry.getBalanceConstraintType(), LedgerBalanceConstraintType.PROFILE_DEFAULT).name());
-        facts.put("intent", defaultIfNull(entry.getIntent(), plan.getIntent()).name());
-        facts.put("postingScope", defaultIfNull(
-                entry.getPostingScope(), resolvePostingScope(plan, phaseCode)).name());
-        facts.put("balanceEffectType", defaultIfNull(
-                entry.getBalanceEffectType(), resolveBalanceEffectType(plan, phaseCode)).name());
-        facts.put("phaseCode", defaultIfNull(entry.getPhaseCode(), phase.getPhaseCode()).name());
+        facts.put("ledgerSubjectCode", entry.getLedgerSubjectCode());
+        facts.put("ledgerSubjectCategory", entry.getLedgerSubjectCategory());
+        facts.put("entrySide", entry.getEntrySide());
+        facts.put("postingRole", entry.getPostingRole());
+        facts.put("balanceConstraintType", entry.getBalanceConstraintType());
+        facts.put("intent", entry.getIntent());
+        facts.put("postingScope", entry.getPostingScope());
+        facts.put("balanceEffectType", entry.getBalanceEffectType());
+        facts.put("phaseCode", entry.getPhaseCode());
         facts.put("businessScene", entry.getBusinessScene());
         facts.put("businessSn", entry.getBusinessSn());
-        facts.put("amount", entry.getAmount().getAmount());
-        facts.put("currency", entry.getAmount().getCurrency());
-        facts.put("originalAmount", entry.getOriginalAmount().getAmount());
-        facts.put("originalCurrency", entry.getOriginalAmount().getCurrency());
+        facts.put("amount", entry.getAmount());
+        facts.put("currency", entry.getCurrency());
+        facts.put("originalAmount", entry.getOriginalAmount());
+        facts.put("originalCurrency", entry.getOriginalCurrency());
         facts.put("exchangeRate", entry.getExchangeRate());
-        facts.put("transactionTime", canonical ? entry.getTransactionTime().toString() : entry.getTransactionTime());
+        facts.put("transactionTime", entry.getTransactionTime().truncatedTo(ChronoUnit.SECONDS));
+        assertDigestFields(LEDGER_ENTRY_SHA256_FIELDS, facts, "ledger entry", entry.getSn());
         return facts;
     }
 
-    private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity,
+    private Map<String, Object> ledgerAggregateDigestFacts(LedgerTransaction transaction,
+                                                           List<LedgerPostingPlan> postingPlans,
+                                                           List<LedgerEntry> entries) {
+        Map<String, List<LedgerEntry>> entriesByPlan = entries.stream()
+                .sorted(Comparator.comparing(LedgerEntry::getSn))
+                .collect(Collectors.groupingBy(
+                        LedgerEntry::getPostingPlanSn,
+                        TreeMap::new,
+                        Collectors.toList()));
+        List<Map<String, Object>> planAggregates = postingPlans.stream()
+                .sorted(Comparator.comparing(LedgerPostingPlan::getSn))
+                .map(plan -> {
+                    Map<String, Object> aggregate = new TreeMap<>();
+                    aggregate.put("plan", postingPlanDigestFacts(plan));
+                    aggregate.put("entries", entriesByPlan.getOrDefault(plan.getSn(), List.of())
+                            .stream()
+                            .map(this::ledgerEntryDigestFacts)
+                            .toList());
+                    return aggregate;
+                })
+                .toList();
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("transaction", ledgerTransactionDigestFacts(transaction));
+        facts.put("postingPlans", planAggregates);
+        return facts;
+    }
+
+    private void assertDigestFields(List<String> expectedFields,
+                                    Map<String, Object> facts,
+                                    String layer,
+                                    String sn) {
+        AssertUtils.isTrue(facts.keySet().equals(Set.copyOf(expectedFields)),
+                "持久化 {} 摘要字段集不一致，sn = {}", layer, sn);
+    }
+
+    private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction requested,
                                                                           LedgerTransactionSpec transaction) {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(entity.getSn()));
+        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(requested.getSn()));
         LedgerTransaction existing = ledgerTransactionMapper.selectOneByQuery(wrapper);
         if (existing == null) {
             return null;
         }
-        AssertUtils.isTrue(FundsStableHashSupport.matchesCanonicalOrLegacyJson(
-                        existing.getSha256(),
-                        LEDGER_TRANSACTION_DIGEST_DOMAIN,
-                        canonicalLedgerTransactionDigestFacts(entity, transaction),
-                        legacyLedgerTransactionDigestFacts(entity, transaction)),
-                "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", entity.getSn());
+        LedgerAggregate existingAggregate = verifiedLedgerAggregate(existing);
+        LedgerAggregate replayAggregate = materializeLedgerAggregate(requested, transaction, existingAggregate);
+        AssertUtils.isTrue(existing.getSha256().equals(replayAggregate.transaction().getSha256()),
+                "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", requested.getSn());
         return toPostResult(existing.getId(), false);
     }
 
@@ -303,12 +388,11 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
                 .setNewlyPosted(newlyPosted);
     }
 
-    private String createPostingPlan(LedgerTransaction transaction, LedgerPostingPlanSpec plan) {
-        String postingPlanSn = plan.getPlanId();
+    private LedgerPostingPlan materializePostingPlan(LedgerTransaction transaction, LedgerPostingPlanSpec plan) {
         Money amount = plan.getAmount();
         String phaseCode = resolvePhaseCode(plan);
         LedgerPostingPlan entity = new LedgerPostingPlan();
-        entity.setSn(postingPlanSn);
+        entity.setSn(plan.getPlanId());
         entity.setTenantId(transaction.getTenantId());
         entity.setLedgerTransactionSn(transaction.getSn());
         entity.setFundsTransactionSn(transaction.getFundsTransactionSn());
@@ -323,10 +407,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         entity.setCreditAmount(plan.getTotalCreditAmount().getAmount());
         entity.setDescription(defaultIfBlank(plan.getDescription(), transaction.getDescription()));
         entity.setContextVariables(WindJson.toJsonString(plan.getContextVariables()));
-        entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_POSTING_PLAN_SHA256_FIELDS));
-        ledgerPostingPlanMapper.insertSelective(entity);
-        AssertUtils.notNull(entity.getId(), "创建账户账本记账计划失败");
-        return postingPlanSn;
+        return entity;
     }
 
     private String resolvePhaseCode(LedgerPostingPlanSpec plan) {
@@ -338,17 +419,20 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
                 .collect(Collectors.joining(","));
     }
 
-    private void createLedgerEntry(LedgerTransaction transaction,
-                                   LedgerPostingPlanSpec plan,
-                                   LedgerPostingPhaseSpec phase,
-                                   String postingPlanSn,
-                                   LedgerEntrySpec entry) {
+    private LedgerEntry materializeLedgerEntry(LedgerTransaction transaction,
+                                               LedgerPostingPlanSpec plan,
+                                               LedgerPostingPhaseSpec phase,
+                                               String postingPlanSn,
+                                               LedgerEntrySpec entry,
+                                               String entrySn) {
         LedgerEntry ledgerEntry = LedgerConverter.INSTANCE.convertToLedgerEntry(entry);
-        ledgerEntry.setSn(TemporalSequenceFactory.hourNext(LEDGER_ENTRY_SEQUENCE_TYPE));
+        ledgerEntry.setSn(entrySn);
         ledgerEntry.setTenantId(transaction.getTenantId());
         ledgerEntry.setLedgerTransactionSn(transaction.getSn());
         ledgerEntry.setPostingPlanSn(postingPlanSn);
         ledgerEntry.setFundsTransactionSn(transaction.getFundsTransactionSn());
+        ledgerEntry.setLedgerId(defaultIfNull(ledgerEntry.getLedgerId(), 0L));
+        ledgerEntry.setTransactionTime(ledgerEntry.getTransactionTime().truncatedTo(ChronoUnit.SECONDS));
         AssertUtils.notNull(entry.getPostingRole(), "账本分录记账角色不能为空，ledgerTransactionSn = {}",
                 transaction.getSn());
         ledgerEntry.setPostingRole(entry.getPostingRole());
@@ -360,9 +444,115 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         ledgerEntry.setBalanceConstraintType(defaultIfNull(
                 entry.getBalanceConstraintType(), LedgerBalanceConstraintType.PROFILE_DEFAULT).name());
         ledgerEntry.setPhaseCode(defaultIfNull(entry.getPhaseCode(), phase.getPhaseCode()).name());
-        ledgerEntry.setSha256(WindObjectDigestUtils.sha256WithNames(ledgerEntry, LEDGER_ENTRY_SHA256_FIELDS));
-        ledgerEntryMapper.insertSelective(ledgerEntry);
-        AssertUtils.notNull(ledgerEntry.getId(), "创建账户账本条目失败");
+        return ledgerEntry;
+    }
+
+    private LedgerAggregate verifiedLedgerAggregate(LedgerTransaction transaction) {
+        List<LedgerPostingPlan> postingPlans = findLedgerPostingPlans(
+                transaction.getTenantId(), transaction.getSn());
+        List<LedgerEntry> entries = findLedgerEntries(transaction.getTenantId(), transaction.getSn());
+        Map<String, LedgerPostingPlan> postingPlansBySn = new TreeMap<>();
+        for (LedgerPostingPlan postingPlan : postingPlans) {
+            assertPostingPlanParent(transaction, postingPlan);
+            AssertUtils.isTrue(postingPlansBySn.put(postingPlan.getSn(), postingPlan) == null,
+                    "持久化 posting plan 身份重复，sn = {}", postingPlan.getSn());
+            assertStoredDigest(
+                    postingPlan.getSha256(),
+                    LEDGER_POSTING_PLAN_DIGEST_DOMAIN,
+                    postingPlanDigestFacts(postingPlan),
+                    "posting plan",
+                    postingPlan.getSn());
+        }
+        for (LedgerEntry entry : entries) {
+            assertLedgerEntryParent(transaction, postingPlansBySn, entry);
+            assertStoredDigest(
+                    entry.getSha256(),
+                    LEDGER_ENTRY_DIGEST_DOMAIN,
+                    ledgerEntryDigestFacts(entry),
+                    "ledger entry",
+                    entry.getSn());
+        }
+        assertStoredDigest(
+                transaction.getSha256(),
+                LEDGER_TRANSACTION_DIGEST_DOMAIN,
+                ledgerAggregateDigestFacts(transaction, postingPlans, entries),
+                "transaction",
+                transaction.getSn());
+        return new LedgerAggregate(transaction, postingPlans, entries);
+    }
+
+    private void assertPostingPlanParent(LedgerTransaction transaction, LedgerPostingPlan postingPlan) {
+        AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), postingPlan.getTenantId())
+                        && Objects.equals(transaction.getSn(), postingPlan.getLedgerTransactionSn())
+                        && Objects.equals(transaction.getFundsTransactionSn(), postingPlan.getFundsTransactionSn()),
+                "持久化 posting plan 父引用不一致，sn = {}", postingPlan.getSn());
+    }
+
+    private void assertLedgerEntryParent(LedgerTransaction transaction,
+                                         Map<String, LedgerPostingPlan> postingPlansBySn,
+                                         LedgerEntry entry) {
+        AssertUtils.isTrue(entry.getPostingPlanSn() != null
+                        && postingPlansBySn.containsKey(entry.getPostingPlanSn())
+                        && Objects.equals(transaction.getTenantId(), entry.getTenantId())
+                        && Objects.equals(transaction.getSn(), entry.getLedgerTransactionSn())
+                        && Objects.equals(transaction.getFundsTransactionSn(), entry.getFundsTransactionSn()),
+                "持久化 ledger entry 父引用不一致，sn = {}", entry.getSn());
+    }
+
+    private void assertStoredDigest(String storedDigest,
+                                    String domain,
+                                    Map<String, Object> facts,
+                                    String layer,
+                                    String sn) {
+        AssertUtils.isTrue(Objects.equals(storedDigest, FundsStableHashSupport.sha256CanonicalJson(domain, facts)),
+                "持久化 {} 摘要不一致，sn = {}", layer, sn);
+    }
+
+    private List<LedgerPostingPlan> findLedgerPostingPlans(Long tenantId, String ledgerTransactionSn) {
+        LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
+        return ledgerPostingPlanMapper.selectListByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.ledgerTransactionSn.eq(ledgerTransactionSn))
+                .orderBy(ref.sn.asc()));
+    }
+
+    private List<LedgerEntry> findLedgerEntries(Long tenantId, String ledgerTransactionSn) {
+        LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
+        return ledgerEntryMapper.selectListByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.ledgerTransactionSn.eq(ledgerTransactionSn))
+                .orderBy(ref.sn.asc()));
+    }
+
+    private LedgerAggregate verifiedLedgerAggregateBySn(Long tenantId, String ledgerTransactionSn) {
+        LedgerTransaction transaction = findLedgerTransactionBySn(tenantId, ledgerTransactionSn);
+        AssertUtils.notNull(transaction,
+                "账户账本交易不存在，tenantId = {}, sn = {}", tenantId, ledgerTransactionSn);
+        return verifiedLedgerAggregate(transaction);
+    }
+
+    private @Nullable LedgerTransaction findLedgerTransactionBySn(Long tenantId, String sn) {
+        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
+        return ledgerTransactionMapper.selectOneByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn)));
+    }
+
+    private LedgerEntry verifiedLedgerEntry(LedgerEntry entry) {
+        LedgerAggregate aggregate = verifiedLedgerAggregateBySn(
+                entry.getTenantId(), entry.getLedgerTransactionSn());
+        assertAggregateContainsEntry(aggregate, entry);
+        return entry;
+    }
+
+    private void assertAggregateContainsEntry(LedgerAggregate aggregate, LedgerEntry entry) {
+        AssertUtils.isTrue(aggregate.entries().stream().anyMatch(persisted ->
+                        Objects.equals(persisted.getId(), entry.getId())
+                                && Objects.equals(persisted.getSn(), entry.getSn())),
+                "持久化 ledger entry 父引用不一致，sn = {}", entry.getSn());
     }
 
     private void assertNoSensitiveContextVariables(LedgerTransactionSpec transaction) {
@@ -394,7 +584,9 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
     @Override
     @NonNull
     public LedgerTransactionDTO getLedgerTransactionById(@NonNull Long id) {
-        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(findAccountLedgerTransaction(id));
+        LedgerTransaction transaction = findAccountLedgerTransaction(id);
+        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(
+                verifiedLedgerAggregate(transaction).transaction());
     }
 
     @Override
@@ -402,13 +594,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
     public LedgerTransactionDTO getLedgerTransactionBySn(@NonNull Long tenantId, @NonNull String sn) {
         AssertUtils.notNull(tenantId, "账本交易查询 tenantId 不能为空");
         AssertUtils.hasText(sn, "账本交易流水号不能为空");
-        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
-        LedgerTransaction result = ledgerTransactionMapper.selectOneByQuery(QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(sn)));
-        AssertUtils.notNull(result, "账户账本交易不存在，tenantId = {}, sn = {}", tenantId, sn);
-        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(result);
+        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(
+                verifiedLedgerAggregateBySn(tenantId, sn).transaction());
     }
 
     @Override
@@ -514,7 +701,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
 
     @Override
     public @NonNull LedgerEntryDTO getLedgerEntryById(@NonNull Long id) {
-        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(findAccountLedgerEntry(id));
+        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(verifiedLedgerEntry(findAccountLedgerEntry(id)));
     }
 
     @Override
@@ -528,7 +715,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.sn.eq(sn)));
         AssertUtils.notNull(result, "账户账本条目不存在，tenantId = {}, sn = {}", tenantId, sn);
-        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(result);
+        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(verifiedLedgerEntry(result));
     }
 
     @Override
@@ -539,11 +726,18 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         AssertUtils.hasText(postingPlanSn, "记账计划流水号不能为空");
         AssertUtils.hasText(ledgerTransactionSn, "账本交易流水号不能为空");
         LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
-        return ledgerPostingPlanMapper.selectCountByQuery(QueryWrapper.create()
+        LedgerPostingPlan postingPlan = ledgerPostingPlanMapper.selectOneByQuery(QueryWrapper.create()
                 .from(ref)
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.sn.eq(postingPlanSn))
-                .and(ref.ledgerTransactionSn.eq(ledgerTransactionSn))) == 1;
+                .and(ref.ledgerTransactionSn.eq(ledgerTransactionSn)));
+        if (postingPlan == null) {
+            return false;
+        }
+        LedgerAggregate aggregate = verifiedLedgerAggregateBySn(tenantId, ledgerTransactionSn);
+        return aggregate.postingPlans().stream()
+                .anyMatch(persisted -> Objects.equals(persisted.getId(), postingPlan.getId())
+                        && Objects.equals(persisted.getSn(), postingPlanSn));
     }
 
     @Override
@@ -572,10 +766,19 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
                 .and(ledgerEntry.gmtModified.ge(query.getGmtModifiedMin()))
                 .and(ledgerEntry.gmtModified.le(query.getGmtModifiedMax()));
 
+        Map<String, LedgerAggregate> verifiedAggregates = new HashMap<>();
         return MybatisQueryHelper.<LedgerEntry, LedgerEntryDTO>query(queryWrapper)
                 .counter(ledgerEntryMapper::selectCountByQuery)
                 .resultQueryFunc(ledgerEntryMapper::selectListByQuery)
-                .converter(LedgerConverter.INSTANCE::convertToLedgerEntryDTO)
+                .converter(entry -> {
+                    String aggregateKey = entry.getTenantId() + ":" + entry.getLedgerTransactionSn();
+                    LedgerAggregate aggregate = verifiedAggregates.computeIfAbsent(
+                            aggregateKey,
+                            ignored -> verifiedLedgerAggregateBySn(
+                                    entry.getTenantId(), entry.getLedgerTransactionSn()));
+                    assertAggregateContainsEntry(aggregate, entry);
+                    return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(entry);
+                })
                 .query(options);
     }
 
@@ -584,5 +787,24 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         LedgerEntry result = ledgerEntryMapper.selectOneById(id);
         AssertUtils.notNull(result, "账户账本条目不存在");
         return result;
+    }
+
+    /**
+     * Ledger 持久化聚合的内部校验载体。
+     *
+     * @param transaction  账本交易根事实
+     * @param postingPlans 记账计划事实
+     * @param entries      账本分录事实
+     * @author wuxp
+     * @since 2026-08-23
+     */
+    private record LedgerAggregate(LedgerTransaction transaction,
+                                   List<LedgerPostingPlan> postingPlans,
+                                   List<LedgerEntry> entries) {
+
+        private LedgerAggregate {
+            postingPlans = List.copyOf(postingPlans);
+            entries = List.copyOf(entries);
+        }
     }
 }

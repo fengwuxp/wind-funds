@@ -334,7 +334,7 @@ public final class ReconciliationTestFixture {
 
     private static String stageOwner(String stageKind) {
         return switch (stageKind) {
-            case "CLEARING_SPLITTABLE_IDENTIFY" -> "funds-transaction-detail";
+            case "CLEARING_SPLITTABLE_IDENTIFY" -> "funds";
             case "CLEARING_SPLIT_CONFIRM_ITEM" -> "clearing-split-item";
             case "CLEARING_CONFIRM_ITEM" -> "clearing-candidate";
             case "SETTLEMENT_LOCK", "SETTLEMENT_RELEASE", "PAYOUT_CREATE_PREFLIGHT" -> "settlement-order";

@@ -11,6 +11,12 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.application.instrument.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.instrument.CompleteAuthorizationByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.instrument.ReceiveByInstrumentRequest;
+import com.wind.funds.transaction.application.instrument.ReverseAuthorizationByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.spend.SpendControlTransactionConsumptionRequest;
+import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver.ExternalFundsRailDecision;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -26,9 +32,7 @@ import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.application.instrument.PaymentInstrumentTransactionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
-import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
@@ -36,12 +40,7 @@ import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
-import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
-import com.wind.funds.wallet.model.request.CompleteAuthorizationByPaymentInstrumentRequest;
-import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
-import com.wind.funds.wallet.model.request.ReverseAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
-import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -60,15 +59,14 @@ import java.util.Optional;
 import java.util.TreeMap;
 
 /**
- * 支付工具交易应用服务实现。
+ * Transaction Provider 内部支付工具交易编排服务。
  *
  * @author Codex
  * @date 2026-06-21
  */
 @Service
 @AllArgsConstructor
-public class PaymentInstrumentTransactionApplicationServiceImpl
-        implements PaymentInstrumentTransactionApplicationService {
+public class PaymentInstrumentTransactionApplicationServiceImpl {
 
     private static final String SHA256_PREFIX = "sha256:";
 
@@ -90,18 +88,16 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
 
     private final FundsAuthorizationTransactionService authorizationTransactionService;
 
-    private final SpendControlTransactionConsumptionApplicationService spendControlConsumptionService;
+    private final SpendControlTransactionConsumptionApplicationServiceImpl spendControlConsumptionService;
 
     private final SpendControlMovementService spendControlMovementService;
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                  @NonNull WindOperator operator) {
         return authorizationProcessor.authorizeByInstrument(request, operator);
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String completeAuthorizationByInstrument(
             @NonNull CompleteAuthorizationByPaymentInstrumentRequest request,
@@ -117,7 +113,6 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         return authorizationSn;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String reverseAuthorizationByInstrument(
             @NonNull ReverseAuthorizationByPaymentInstrumentRequest request,
@@ -133,7 +128,6 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         return authorizationSn;
     }
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String receiveByInstrument(@NonNull ReceiveByInstrumentRequest request,
                                                @NonNull WindOperator operator) {

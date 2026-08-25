@@ -1,7 +1,6 @@
 package com.wind.funds.ledger;
 
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -13,19 +12,32 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerState;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteLegType;
+import com.wind.funds.route.enums.RouteNodeRole;
+import com.wind.funds.route.enums.RouteNodeType;
+import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
+import com.wind.funds.route.model.ImmutableRouteLegSpec;
+import com.wind.funds.route.model.ImmutableRouteNodeSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.ledger.spec.LedgerPostingPhaseSpec;
 import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
 import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -38,12 +50,16 @@ import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.ledger.profile.LedgerProfileCatalog;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -67,6 +83,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFa
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 import static org.assertj.core.api.Assertions.tuple;
 
@@ -104,14 +121,25 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     private static final String MONTHLY_PERIOD_ID = "2026-06";
 
+    private static final String COMMAND_FUNDS_TRANSACTION_SN = "FT-POSTING-COMMAND-ROOT-001";
+
+    private static final String COMMAND_BUSINESS_SCENE = "LEDGER_POSTING_COMMAND";
+
+    private static final String COMMAND_BUSINESS_SN = "BIZ-POSTING-COMMAND-001";
+
+    private static final String COMMAND_ROUTE_LEG_ID = "LEG-POSTING-COMMAND-001";
+
     @Autowired
-    private LedgerTransactionPostingService postingService;
+    private DefaultLedgerTransactionPostingServiceImpl postingService;
 
     @Autowired
     private LedgerService ledgerService;
 
     @Autowired
-    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
+    private LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
+
+    @Autowired
+    private LedgerProfileCatalog ledgerProfileCatalog;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -142,7 +170,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     void testPostShouldRejectPostingPlanWithoutEntriesBeforeLedgerFacts() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of())))))
                 .hasMessageContaining("账务计划 entries 不能为空");
 
@@ -164,7 +192,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         for (InvalidAmountCase invalidCase : cases) {
             LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-            assertThatThrownBy(() -> postingService.post(transaction(
+            assertThatThrownBy(() -> postingService.postAssembled(transaction(
                     List.of(postingPlan(List.of(
                             debitEntry(SOURCE_SUBJECT_ID, null, invalidCase.amount()),
                             creditEntry(TARGET_SUBJECT_ID, null, TRANSACTION_AMOUNT)))))))
@@ -184,7 +212,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     void testPostShouldRejectEntryTransactionSnMismatchBeforeLedgerFacts() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, null, TRANSACTION_AMOUNT, "LT-OTHER-001"),
                         creditEntry(TARGET_SUBJECT_ID, null, TRANSACTION_AMOUNT)))))))
@@ -203,7 +231,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     void testPostShouldRejectMissingLedgerIdBeforeLedgerFacts() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(validPostingPlan(null)))))
                 .hasMessageContaining("账本分录 ledgerId 不能为空");
 
@@ -221,7 +249,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long mismatchLedgerId = createAvailableLedger(MISMATCH_LEDGER_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, mismatchLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, mismatchLedgerId, TRANSACTION_AMOUNT)))))))
@@ -248,7 +276,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
@@ -275,7 +303,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
@@ -296,7 +324,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         ledgerEntry(
                                 SOURCE_SUBJECT_ID,
@@ -326,7 +354,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         markLedgerNormalBalanceSide(sourceLedgerId, EntrySide.CREDIT);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
                 .hasMessageContaining("账本科目类别与正常余额方向不一致");
 
@@ -348,7 +376,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         markLedgerState(sourceLedgerId, LedgerState.SUSPENDED);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
                 .hasMessageContaining("账本状态不允许入账");
 
@@ -369,7 +397,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
         markLedgerState(sourceLedgerId, LedgerState.SUSPENDED);
 
-        postingService.post(transaction(
+        postingService.postAssembled(transaction(
                 List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
                         ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
                                 TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
@@ -398,7 +426,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         markLedgerState(sourceLedgerId, LedgerState.CLOSED);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
                         ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
                                 TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
@@ -424,7 +452,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         creditEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
                                 SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
@@ -451,7 +479,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 LedgerSubjectCode.AVAILABLE);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.postAssembled(transaction(
                 List.of(postingPlan(List.of(
                         debitEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
                                 SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
@@ -488,14 +516,14 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)));
 
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        postingService.post(transaction);
+        postingService.postAssembled(transaction);
         LedgerFactSnapshot afterFirstPost = ledgerFactSnapshot(jdbcTemplate);
 
         assertThat(afterFirstPost.transactions()).hasSize(before.transactions().size() + 1);
         assertThat(afterFirstPost.postingPlans()).hasSize(before.postingPlans().size() + 1);
         assertThat(afterFirstPost.entries()).hasSize(before.entries().size() + 2);
 
-        postingService.post(transaction);
+        postingService.postAssembled(transaction);
 
         assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
     }
@@ -520,10 +548,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                         LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE),
                 debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))));
 
-        postingService.post(original);
+        postingService.postAssembled(original);
         LedgerFactSnapshot afterFirstPost = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> postingService.post(conflicting))
+        assertThatThrownBy(() -> postingService.postAssembled(conflicting))
                 .hasMessageContaining("账本交易已存在但摘要不一致");
         assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
     }
@@ -546,7 +574,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 List.of(availableTransferPostingPlan(
                         sourceLedgerId, targetLedgerId, AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID)));
 
-        postingService.post(transaction);
+        postingService.postAssembled(transaction);
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT period_type, period_id
@@ -596,6 +624,273 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         }
     }
 
+    /**
+     * 场景：调用方提交的资金指令与已解析路径在六个稳定身份字段之一不一致。
+     * 输入：tenant、业务场景、业务号、指令类型、事件类型或交易类型发生单字段漂移。
+     * 输出：Ledger 在组装和持久化前拒绝命令，账务事实和余额保持不变。
+     * 红线：Ledger 不能只信任 RouteResolver 的调用顺序或任一侧自报身份。
+     */
+    @ParameterizedTest(name = "reject instruction/route identity mismatch: {0}")
+    @ValueSource(strings = {
+            "tenantId",
+            "businessScene",
+            "businessSn",
+            "instructionType",
+            "eventType",
+            "transactionType"
+    })
+    void testPostShouldRejectInstructionRouteIdentityMismatch(String mismatchField) {
+        CommandLedgerPair ledgers = prepareCommandTransferLedgers(200L);
+        FundsInstructionSpec instruction = commandInstruction(
+                "tenantId".equals(mismatchField) ? TENANT_ID + 1 : TENANT_ID,
+                FundsInstructionType.DIRECT_TRANSACTION,
+                FundsTransactionEventType.TRANSFER,
+                DefaultFundsTransactionType.TRANSFER,
+                TRANSACTION_AMOUNT,
+                "businessScene".equals(mismatchField) ? "LEDGER_POSTING_COMMAND_OTHER" : COMMAND_BUSINESS_SCENE,
+                "businessSn".equals(mismatchField) ? "BIZ-POSTING-COMMAND-OTHER" : COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec route = commandRoute(
+                TENANT_ID,
+                COMMAND_BUSINESS_SCENE,
+                COMMAND_BUSINESS_SN,
+                "instructionType".equals(mismatchField)
+                        ? FundsInstructionType.AUTHORIZATION_TRANSACTION : FundsInstructionType.DIRECT_TRANSACTION,
+                "eventType".equals(mismatchField)
+                        ? FundsTransactionEventType.PAY : FundsTransactionEventType.TRANSFER,
+                "transactionType".equals(mismatchField)
+                        ? DefaultFundsTransactionType.PAY : DefaultFundsTransactionType.TRANSFER,
+                TRANSACTION_AMOUNT,
+                SOURCE_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC,
+                TARGET_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertCommandRejectedWithoutSideEffects(
+                () -> postingService.post(instruction, COMMAND_FUNDS_TRANSACTION_SN, route),
+                mismatchField,
+                before);
+        assertThat(ledgerService.getLedgerById(ledgers.sourceLedgerId()).getNormalBalance()).isEqualTo(200L);
+        assertThat(ledgerService.getLedgerById(ledgers.targetLedgerId()).getNormalBalance()).isZero();
+    }
+
+    /**
+     * 场景：高阶账本命令缺少租户身份。
+     * 输入：instruction.tenantId 为空，route 和账本事实完整。
+     * 输出：Ledger 在访问或写入账务事实前拒绝命令。
+     * 红线：数据库非空约束不能替代公共资金写边界的租户校验。
+     */
+    @Test
+    void testPostShouldRejectMissingTenantIdBeforeLedgerFacts() {
+        prepareCommandTransferLedgers(200L);
+        FundsInstructionSpec instruction = commandInstruction(
+                null,
+                FundsInstructionType.DIRECT_TRANSACTION,
+                FundsTransactionEventType.TRANSFER,
+                DefaultFundsTransactionType.TRANSFER,
+                TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE,
+                COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec route = commandTransferRoute(TRANSACTION_AMOUNT, COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertCommandRejectedWithoutSideEffects(
+                () -> postingService.post(instruction, COMMAND_FUNDS_TRANSACTION_SN, route),
+                "tenantId",
+                before);
+    }
+
+    /**
+     * 场景：调用方没有提供资金动作根流水。
+     * 输入：instruction 与 route 完整，但 fundsTransactionSn 为空白。
+     * 输出：Ledger 在组装和持久化前拒绝命令。
+     * 红线：空身份不能退化为时序 Ledger SN 或匿名幂等域。
+     */
+    @Test
+    void testPostShouldRejectBlankFundsTransactionSnBeforeLedgerFacts() {
+        prepareCommandTransferLedgers(200L);
+        FundsInstructionSpec instruction = commandTransferInstruction(TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec route = commandTransferRoute(TRANSACTION_AMOUNT, COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertCommandRejectedWithoutSideEffects(
+                () -> postingService.post(instruction, " ", route),
+                "fundsTransactionSn",
+                before);
+    }
+
+    /**
+     * 场景：调用超时后以同一动作身份和同一事实重放高阶账本命令。
+     * 输入：完全相同的 instruction、fundsTransactionSn 与 route 顺序提交两次。
+     * 输出：两次返回同一 persisted LedgerTransaction SN，只形成一套账务事实和一次余额变化。
+     * 红线：同义重放不能依赖调用方记住首次时序 Ledger SN。
+     */
+    @Test
+    void testPostShouldReturnSamePersistedLedgerTransactionSnForSameCommand() {
+        CommandLedgerPair ledgers = prepareCommandTransferLedgers(300L);
+        FundsInstructionSpec instruction = commandTransferInstruction(TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec route = commandTransferRoute(TRANSACTION_AMOUNT, COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        String firstSn = postingService.post(instruction, COMMAND_FUNDS_TRANSACTION_SN, route);
+        LedgerFactSnapshot afterFirstPost = ledgerFactSnapshot(jdbcTemplate);
+        String replaySn = postingService.post(instruction, COMMAND_FUNDS_TRANSACTION_SN, route);
+
+        assertThat(replaySn).as("same command persisted ledger transaction sn").isEqualTo(firstSn);
+        assertThat(firstSn).matches("LE[0-9a-f]{48}");
+        assertThat(afterFirstPost.transactions()).hasSize(before.transactions().size() + 1);
+        assertThat(afterFirstPost.postingPlans()).hasSize(before.postingPlans().size() + 1);
+        assertThat(afterFirstPost.entries()).hasSize(before.entries().size() + 2);
+        assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
+        assertThat(ledgerService.getLedgerById(ledgers.sourceLedgerId()).getNormalBalance()).isEqualTo(200L);
+        assertThat(ledgerService.getLedgerById(ledgers.targetLedgerId()).getNormalBalance()).isEqualTo(100L);
+    }
+
+    /**
+     * 场景：同一动作身份被重放，但 Money 和 route 已经改变。
+     * 输入：首次以 100 USD 成功，第二次沿同 identity 提交 50 USD。
+     * 输出：Ledger 以 persisted aggregate digest 冲突拒绝，原事实和余额不变。
+     * 红线：稳定身份只负责定位动作，不能把异义事实吞成幂等成功。
+     */
+    @Test
+    void testPostShouldRejectSameCommandIdentityWithDifferentFacts() {
+        prepareCommandTransferLedgers(300L);
+        FundsInstructionSpec originalInstruction = commandTransferInstruction(TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec originalRoute = commandTransferRoute(TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        Money conflictingAmount = Money.immutable(50L, CURRENCY);
+        FundsInstructionSpec conflictingInstruction = commandTransferInstruction(conflictingAmount,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec conflictingRoute = commandTransferRoute(conflictingAmount,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+
+        postingService.post(originalInstruction, COMMAND_FUNDS_TRANSACTION_SN, originalRoute);
+        LedgerFactSnapshot afterFirstPost = ledgerFactSnapshot(jdbcTemplate);
+        Throwable failure = catchThrowable(() -> postingService.post(
+                conflictingInstruction, COMMAND_FUNDS_TRANSACTION_SN, conflictingRoute));
+
+        assertThat(failure).as("same identity with different facts").isNotNull();
+        assertThat(failure).hasMessageContaining("账本交易已存在但摘要不一致");
+        assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
+    }
+
+    /**
+     * 场景：两个线程并发提交同一高阶账本命令。
+     * 输入：相同 instruction、root identity 与 route 同时放行。
+     * 输出：两个调用返回同一 SN，最终只有一套 transaction/plan/entry 和一次余额投影。
+     * 红线：并发 winner 不能迫使 loser 换一个时序 SN 重试或重复扣款。
+     */
+    @Test
+    void testPostShouldPostOnceForConcurrentSameCommand() throws Exception {
+        CommandLedgerPair ledgers = prepareCommandTransferLedgers(300L);
+        FundsInstructionSpec instruction = commandTransferInstruction(TRANSACTION_AMOUNT,
+                COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        ResolvedRouteSpec route = commandTransferRoute(TRANSACTION_AMOUNT, COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<CommandPostAttemptResult> first = executor.submit(
+                    concurrentCommandPostAttempt(startGate, instruction, route));
+            Future<CommandPostAttemptResult> second = executor.submit(
+                    concurrentCommandPostAttempt(startGate, instruction, route));
+
+            startGate.countDown();
+
+            List<CommandPostAttemptResult> results = List.of(first.get(), second.get());
+            LedgerFactSnapshot after = ledgerFactSnapshot(jdbcTemplate);
+            assertThat(results).allMatch(CommandPostAttemptResult::succeeded);
+            assertThat(results.stream().map(CommandPostAttemptResult::ledgerTransactionSn).distinct().toList())
+                    .as("concurrent same command ledger transaction sn")
+                    .hasSize(1);
+            assertThat(after.transactions()).hasSize(before.transactions().size() + 1);
+            assertThat(after.postingPlans()).hasSize(before.postingPlans().size() + 1);
+            assertThat(after.entries()).hasSize(before.entries().size() + 2);
+            assertThat(ledgerService.getLedgerById(ledgers.sourceLedgerId()).getNormalBalance()).isEqualTo(200L);
+            assertThat(ledgerService.getLedgerById(ledgers.targetLedgerId()).getNormalBalance()).isEqualTo(100L);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * 场景：同一 authorization root 下存在两个不同的 COMPLETE action，随后分别重放。
+     * 输入：共享 fundsTransactionSn，但 businessSn 不同的两个完成动作。
+     * 输出：两个动作生成不同稳定 SN；各自动作重放返回自己的原 SN，余额只按两个动作变化。
+     * 红线：root 不是 posting action，不能把合法后继动作合并成同一账本交易。
+     */
+    @Test
+    void testPostShouldSeparateAndReplayDifferentActionsOnSameFundsTransactionRoot() {
+        String firstActionSn = "AUTH-COMPLETE-ACTION-001";
+        String secondActionSn = "AUTH-COMPLETE-ACTION-002";
+        seedFundingAccount(SOURCE_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC);
+        seedFundingAccount(TARGET_SUBJECT_ID, LedgerProfileCode.FUNDING_MERCHANT);
+        Long sourceLedgerId = createProfileLedger(
+                SOURCE_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE, 300L);
+        Long targetLedgerId = createProfileLedger(
+                TARGET_SUBJECT_ID, LedgerProfileCode.FUNDING_MERCHANT, LedgerSubjectCode.SETTLEMENT, 0L);
+        Money actionAmount = Money.immutable(40L, CURRENCY);
+        FundsInstructionSpec firstInstruction = commandInstruction(
+                TENANT_ID,
+                FundsInstructionType.AUTHORIZATION_TRANSACTION,
+                FundsTransactionEventType.COMPLETE,
+                DefaultFundsTransactionType.PAY,
+                actionAmount,
+                "AUTHORIZATION_COMPLETE",
+                firstActionSn);
+        FundsInstructionSpec secondInstruction = commandInstruction(
+                TENANT_ID,
+                FundsInstructionType.AUTHORIZATION_TRANSACTION,
+                FundsTransactionEventType.COMPLETE,
+                DefaultFundsTransactionType.PAY,
+                actionAmount,
+                "AUTHORIZATION_COMPLETE",
+                secondActionSn);
+        ResolvedRouteSpec firstRoute = commandRoute(
+                TENANT_ID,
+                "AUTHORIZATION_COMPLETE",
+                firstActionSn,
+                FundsInstructionType.AUTHORIZATION_TRANSACTION,
+                FundsTransactionEventType.COMPLETE,
+                DefaultFundsTransactionType.PAY,
+                actionAmount,
+                SOURCE_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC,
+                TARGET_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_MERCHANT);
+        ResolvedRouteSpec secondRoute = commandRoute(
+                TENANT_ID,
+                "AUTHORIZATION_COMPLETE",
+                secondActionSn,
+                FundsInstructionType.AUTHORIZATION_TRANSACTION,
+                FundsTransactionEventType.COMPLETE,
+                DefaultFundsTransactionType.PAY,
+                actionAmount,
+                SOURCE_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC,
+                TARGET_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_MERCHANT);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        String firstLedgerSn = postingService.post(firstInstruction, COMMAND_FUNDS_TRANSACTION_SN, firstRoute);
+        String secondLedgerSn = postingService.post(secondInstruction, COMMAND_FUNDS_TRANSACTION_SN, secondRoute);
+        String firstReplaySn = postingService.post(firstInstruction, COMMAND_FUNDS_TRANSACTION_SN, firstRoute);
+        String secondReplaySn = postingService.post(secondInstruction, COMMAND_FUNDS_TRANSACTION_SN, secondRoute);
+        LedgerFactSnapshot after = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThat(firstLedgerSn).isNotEqualTo(secondLedgerSn);
+        assertThat(firstReplaySn).isEqualTo(firstLedgerSn);
+        assertThat(secondReplaySn).isEqualTo(secondLedgerSn);
+        assertThat(after.transactions()).hasSize(before.transactions().size() + 2);
+        assertThat(after.postingPlans()).hasSize(before.postingPlans().size() + 2);
+        assertThat(after.entries()).hasSize(before.entries().size() + 4);
+        assertThat(ledgerService.getLedgerById(sourceLedgerId).getNormalBalance()).isEqualTo(220L);
+        assertThat(ledgerService.getLedgerById(targetLedgerId).getNormalBalance()).isEqualTo(80L);
+    }
+
     private LedgerTransactionSpec transaction(List<LedgerPostingPlanSpec> postingPlans) {
         return new TestLedgerTransactionSpec(postingPlans);
     }
@@ -629,10 +924,157 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         return () -> {
             startGate.await();
             try {
-                postingService.post(transaction);
+                postingService.postAssembled(transaction);
                 return new PostAttemptResult(true, null);
             } catch (RuntimeException ex) {
                 return new PostAttemptResult(false, ex.getMessage());
+            }
+        };
+    }
+
+    private CommandLedgerPair prepareCommandTransferLedgers(long sourceBalance) {
+        seedFundingAccount(SOURCE_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC);
+        seedFundingAccount(TARGET_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC);
+        return new CommandLedgerPair(
+                createProfileLedger(
+                        SOURCE_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE, sourceBalance),
+                createProfileLedger(
+                        TARGET_SUBJECT_ID, LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE, 0L));
+    }
+
+    private FundsInstructionSpec commandTransferInstruction(Money amount,
+                                                            String businessScene,
+                                                            String businessSn) {
+        return commandInstruction(
+                TENANT_ID,
+                FundsInstructionType.DIRECT_TRANSACTION,
+                FundsTransactionEventType.TRANSFER,
+                DefaultFundsTransactionType.TRANSFER,
+                amount,
+                businessScene,
+                businessSn);
+    }
+
+    private FundsInstructionSpec commandInstruction(Long tenantId,
+                                                    FundsInstructionType instructionType,
+                                                    FundsTransactionEventType eventType,
+                                                    DefaultFundsTransactionType transactionType,
+                                                    Money amount,
+                                                    String businessScene,
+                                                    String businessSn) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(tenantId)
+                .instructionType(instructionType)
+                .eventType(eventType)
+                .transactionType(transactionType)
+                .amount(amount)
+                .originalAmount(amount)
+                .exchangeRate(BigDecimal.ONE)
+                .ledgerPeriodType(AccountBalancePeriodType.LIFETIME)
+                .payeeLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .businessScene(businessScene)
+                .businessSn(businessSn)
+                .eventTime(TRANSACTION_TIME)
+                .operator(WindOperatorFactory.system())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ResolvedRouteSpec commandTransferRoute(Money amount,
+                                                   String businessScene,
+                                                   String businessSn) {
+        return commandRoute(
+                TENANT_ID,
+                businessScene,
+                businessSn,
+                FundsInstructionType.DIRECT_TRANSACTION,
+                FundsTransactionEventType.TRANSFER,
+                DefaultFundsTransactionType.TRANSFER,
+                amount,
+                SOURCE_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC,
+                TARGET_SUBJECT_ID,
+                LedgerProfileCode.FUNDING_BASIC);
+    }
+
+    private ResolvedRouteSpec commandRoute(Long tenantId,
+                                           String businessScene,
+                                           String businessSn,
+                                           FundsInstructionType instructionType,
+                                           FundsTransactionEventType eventType,
+                                           DefaultFundsTransactionType transactionType,
+                                           Money amount,
+                                           String sourceSubjectId,
+                                           LedgerProfileCode sourceProfile,
+                                           String targetSubjectId,
+                                           LedgerProfileCode targetProfile) {
+        ImmutableRouteNodeSpec source = commandRouteNode(
+                tenantId, sourceSubjectId, sourceProfile, RouteNodeRole.SOURCE);
+        ImmutableRouteNodeSpec target = commandRouteNode(
+                tenantId, targetSubjectId, targetProfile, RouteNodeRole.TARGET);
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(tenantId)
+                .routeCode("LEDGER_POSTING_COMMAND_ROUTE")
+                .routeVersion("v1")
+                .businessScene(businessScene)
+                .businessSn(businessSn)
+                .instructionType(instructionType)
+                .eventType(eventType)
+                .transactionType(transactionType)
+                .participants(List.of())
+                .legs(List.of(ImmutableRouteLegSpec.builder()
+                        .legId(COMMAND_ROUTE_LEG_ID)
+                        .sequence(1)
+                        .legType(RouteLegType.INTERNAL_TRANSFER)
+                        .sourceNode(source)
+                        .targetNode(target)
+                        .amount(amount)
+                        .originalAmount(amount)
+                        .exchangeRate(BigDecimal.ONE)
+                        .contextVariables(Map.of())
+                        .build()))
+                .resolvedAt(TRANSACTION_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteNodeSpec commandRouteNode(Long tenantId,
+                                                    String subjectId,
+                                                    LedgerProfileCode profileCode,
+                                                    RouteNodeRole role) {
+        return ImmutableRouteNodeSpec.builder()
+                .nodeType(RouteNodeType.SUBJECT)
+                .nodeRole(role)
+                .subjectRef(ImmutableSubjectRef.builder()
+                        .tenantId(tenantId)
+                        .subjectId(subjectId)
+                        .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .currency(CURRENCY.name())
+                        .ledgerProfileCode(profileCode.name())
+                        .build())
+                .build();
+    }
+
+    private void assertCommandRejectedWithoutSideEffects(Callable<String> command,
+                                                         String expectedMessage,
+                                                         LedgerFactSnapshot before) {
+        Throwable failure = catchThrowable(command::call);
+        assertThat(failure).as("ledger posting command rejection").isNotNull();
+        assertThat(failure).hasMessageContaining(expectedMessage);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    private Callable<CommandPostAttemptResult> concurrentCommandPostAttempt(
+            CountDownLatch startGate,
+            FundsInstructionSpec instruction,
+            ResolvedRouteSpec route) {
+        return () -> {
+            startGate.await();
+            try {
+                return new CommandPostAttemptResult(
+                        postingService.post(instruction, COMMAND_FUNDS_TRANSACTION_SN, route), null);
+            } catch (RuntimeException exception) {
+                return new CommandPostAttemptResult(null, exception.getMessage());
             }
         };
     }
@@ -850,7 +1292,36 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledgerService.getLedgerById(ledgerId),
                     EntrySide.DEBIT,
-                    initialBalance)));
+                    initialBalance)), LedgerPostingAccessType.NORMAL);
+        }
+        return ledgerId;
+    }
+
+    private Long createProfileLedger(String subjectId,
+                                     LedgerProfileCode profileCode,
+                                     LedgerSubjectCode subjectCode,
+                                     long initialBalance) {
+        CreateLedgerRequest request = ledgerProfileCatalog.requiredLedgerRequests(
+                        new InitializeSubjectLedgerRequest()
+                                .setTenantId(TENANT_ID)
+                                .setSubjectId(subjectId)
+                                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                                .setCurrency(CURRENCY)
+                                .setLedgerProfileCode(profileCode)
+                                .setLedgerProfileVersion(1)
+                                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()))
+                .stream()
+                .filter(candidate -> candidate.getLedgerSubjectCode() == subjectCode)
+                .findFirst()
+                .orElseThrow();
+        Long ledgerId = ledgerService.createLedger(request);
+        if (initialBalance != 0L) {
+            LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+            ledgerBalanceProjectionService.project(List.of(balanceEntry(
+                    ledger,
+                    ledger.getNormalBalanceSide(),
+                    initialBalance)), LedgerPostingAccessType.NORMAL);
         }
         return ledgerId;
     }
@@ -878,12 +1349,16 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledgerService.getLedgerById(ledgerId),
                     EntrySide.DEBIT,
-                    initialBalance)));
+                    initialBalance)), LedgerPostingAccessType.NORMAL);
         }
         return ledgerId;
     }
 
     private void seedFundingAccount(String accountSn) {
+        seedFundingAccount(accountSn, LedgerProfileCode.FUNDING_BASIC);
+    }
+
+    private void seedFundingAccount(String accountSn, LedgerProfileCode profileCode) {
         FundingAccount account = new FundingAccount();
         account.setTenantId(TENANT_ID);
         account.setSn(accountSn);
@@ -892,7 +1367,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         account.setAccountType(FundingAccountType.USER_WALLET.getAccountType().name());
         account.setPlatform(Boolean.FALSE);
         account.setCurrency(CURRENCY);
-        account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
+        account.setLedgerProfileCode(profileCode);
         account.setLedgerProfileVersion(1);
         account.setState(FundsAccountState.ACTIVE);
         account.setDescription("ledger posting boundary funding account");
@@ -915,6 +1390,17 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private void cleanupPostingBoundaryTestData() {
+        List<String> commandLedgerTransactionSns = jdbcTemplate.queryForList("""
+                SELECT sn
+                FROM t_ledger_transaction
+                WHERE funds_transaction_sn = ?
+                """, String.class, COMMAND_FUNDS_TRANSACTION_SN);
+        for (String ledgerTransactionSn : commandLedgerTransactionSns) {
+            jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", ledgerTransactionSn);
+            jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
+                    ledgerTransactionSn);
+            jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE sn = ?", ledgerTransactionSn);
+        }
         jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", LEDGER_TRANSACTION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
                 LEDGER_TRANSACTION_SN);
@@ -1176,9 +1662,20 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private record PostAttemptResult(boolean succeeded, String message) {
     }
 
+    private record CommandLedgerPair(Long sourceLedgerId, Long targetLedgerId) {
+    }
+
+    private record CommandPostAttemptResult(String ledgerTransactionSn, String failureMessage) {
+
+        private boolean succeeded() {
+            return ledgerTransactionSn != null && failureMessage == null;
+        }
+    }
+
     @Configuration
     @Import({
             DefaultLedgerTransactionPostingServiceImpl.class,
+            DefaultLedgerPostingAssembler.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
             SpendControlScopeServiceImpl.class,

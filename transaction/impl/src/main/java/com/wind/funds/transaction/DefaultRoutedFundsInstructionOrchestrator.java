@@ -5,14 +5,12 @@ import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublishContext;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionPublisher;
 import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.wind.funds.ledger.LedgerPostingAssembler;
 import com.wind.funds.ledger.LedgerPostingRejectedException;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.route.RouteResolver;
 import com.wind.funds.route.RouteSnapshotFactory;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.ledger.spec.LedgerTransactionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.spec.FundsInstructionReferenceSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
@@ -43,8 +41,7 @@ import java.util.List;
  * <p>边界：
  * <ul>
  *   <li>不自行解析资金路径，路径解析委托 RouteResolver</li>
- *   <li>不自行生成账本交易，账务翻译委托 LedgerPostingAssembler</li>
- *   <li>不直接操作账本表，账本写入委托 LedgerTransactionPostingService</li>
+ *   <li>不自行生成账本交易或操作账本表，账务翻译与写入委托 LedgerTransactionPostingService</li>
  *   <li>不承接交易投影重放，重放与生产修复由治理模块负责</li>
  * </ul>
  */
@@ -57,8 +54,6 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     private final RouteResolver routeResolver;
 
     private final RouteSnapshotFactory routeSnapshotFactory;
-
-    private final LedgerPostingAssembler<ResolvedRouteSpec> postingAssembler;
 
     private final LedgerTransactionPostingService ledgerTransactionPostingService;
 
@@ -89,7 +84,7 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                             + "businessScene={}, businessSn={}, transactionSn={}",
                     instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
                     instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn());
-            publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult, null);
+            publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult);
             return lifecycleResult.getTransactionSn();
         }
         try {
@@ -102,20 +97,19 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                         instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
                         instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
                 publishProjection(instruction, resolvedRoute, routeSnapshot,
-                        completedLifecycleResult(lifecycleResult, null), null);
+                        completedLifecycleResult(lifecycleResult, null));
                 return lifecycleResult.getTransactionSn();
             }
-            LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
-                    resolvedRoute);
-            ledgerTransactionPostingService.post(transaction);
-            fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, transaction.getSn());
+            String ledgerTransactionSn = ledgerTransactionPostingService.post(
+                    instruction, lifecycleResult.getTransactionSn(), resolvedRoute);
+            fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, ledgerTransactionSn);
             logAfterCommit(() -> LOGGER.info("资金指令执行完成，instructionType={}, eventType={}, transactionType={}, businessScene={}, "
                             + "businessSn={}, transactionSn={}, ledgerTransactionSn={}, amount={}, currency={}",
                     instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
                     instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
-                    transaction.getSn(), instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
+                    ledgerTransactionSn, instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
             publishProjection(instruction, resolvedRoute, routeSnapshot,
-                    completedLifecycleResult(lifecycleResult, transaction.getSn()), transaction);
+                    completedLifecycleResult(lifecycleResult, ledgerTransactionSn));
             return lifecycleResult.getTransactionSn();
         } catch (RuntimeException | Error exception) {
             fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, exception);
@@ -231,8 +225,7 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     private void publishProjection(FundsInstructionSpec instruction,
                                    ResolvedRouteSpec resolvedRoute,
                                    RouteSnapshotSpec routeSnapshot,
-                                   FundsInstructionLifecycleResult lifecycleResult,
-                                   LedgerTransactionSpec ledgerTransaction) {
+                                   FundsInstructionLifecycleResult lifecycleResult) {
         if (projectionPublishers.isEmpty()) {
             return;
         }
@@ -241,7 +234,6 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                 .resolvedRoute(resolvedRoute)
                 .routeSnapshot(routeSnapshot)
                 .lifecycleResult(lifecycleResult)
-                .ledgerTransaction(ledgerTransaction)
                 .build();
         if (TransactionSynchronizationManager.isSynchronizationActive()
                 && TransactionSynchronizationManager.isActualTransactionActive()) {

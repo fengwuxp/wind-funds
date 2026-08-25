@@ -15,8 +15,7 @@ import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.sequence.WindSequenceType;
-import com.wind.sequence.time.TemporalSequenceFactory;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -38,8 +37,11 @@ import java.util.function.Function;
  */
 public final class LedgerTransactionSpecFactory {
 
-    private static final WindSequenceType LEDGER_SEQUENCE_TYPE = WindSequenceType.immutable(
-            "LEDGER_TRANSACTION", "LE", 6);
+    private static final String LEDGER_TRANSACTION_SN_PREFIX = "LE";
+
+    private static final int LEDGER_TRANSACTION_SN_DIGEST_LENGTH = 48;
+
+    private static final String LEDGER_POSTING_COMMAND_IDENTITY_DIGEST_DOMAIN = "ledger.posting.command.identity";
 
     private LedgerTransactionSpecFactory() {
         throw new AssertionError();
@@ -48,16 +50,9 @@ public final class LedgerTransactionSpecFactory {
     @NonNull
     public static LedgerTransactionSpec createLedgerTransaction(
             @NonNull FundsInstructionSpec instruction,
+            @NonNull String fundsTransactionSn,
             Function<String, List<LedgerPostingPlanSpec>> factory) {
-        return createLedgerTransaction(instruction, null, factory);
-    }
-
-    @NonNull
-    public static LedgerTransactionSpec createLedgerTransaction(
-            @NonNull FundsInstructionSpec instruction,
-            @Nullable String fundsTransactionSn,
-            Function<String, List<LedgerPostingPlanSpec>> factory) {
-        String sn = TemporalSequenceFactory.hourNext(LEDGER_SEQUENCE_TYPE);
+        String sn = ledgerTransactionSn(instruction, fundsTransactionSn);
         return DefaultLedgerTransactionSpec.builder()
                 .sn(sn)
                 .tenantId(instruction.getTenantId())
@@ -76,6 +71,20 @@ public final class LedgerTransactionSpecFactory {
                 .postingPlans(factory.apply(sn))
                 .contextVariables(ledgerTransactionContext(instruction))
                 .build();
+    }
+
+    private static String ledgerTransactionSn(FundsInstructionSpec instruction, String fundsTransactionSn) {
+        AssertUtils.notNull(instruction.getTenantId(), "账本入账命令 tenantId 不能为空");
+        AssertUtils.hasText(fundsTransactionSn, "账本入账命令 fundsTransactionSn 不能为空");
+        String digest = FundsStableHashSupport.sha256CanonicalJson(
+                LEDGER_POSTING_COMMAND_IDENTITY_DIGEST_DOMAIN,
+                Map.of(
+                        "tenantId", instruction.getTenantId(),
+                        "fundsTransactionSn", fundsTransactionSn,
+                        "eventType", instruction.getEventType(),
+                        "businessScene", instruction.getBusinessScene(),
+                        "businessSn", instruction.getBusinessSn()));
+        return LEDGER_TRANSACTION_SN_PREFIX + digest.substring(0, LEDGER_TRANSACTION_SN_DIGEST_LENGTH);
     }
 
     private static String resolveReferenceLedgerTransactionSn(FundsInstructionSpec instruction) {

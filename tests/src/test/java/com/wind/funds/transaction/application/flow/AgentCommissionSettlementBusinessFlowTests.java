@@ -3,7 +3,6 @@ package com.wind.funds.transaction.application.flow;
 import com.wind.jackson.WindJson;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
@@ -57,10 +56,11 @@ import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchReque
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.SourceObjectType;
-import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -429,12 +429,6 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .filter(detail -> detail.getParticipantRole() == RouteParticipantRole.PAYEE)
                 .findFirst()
                 .orElseThrow();
-        LedgerEntry clearingEntry = entriesByFundsTransactionSn(transactionSn).stream()
-                .filter(entry -> beneficiary.id().equals(entry.getSubjectId()))
-                .filter(entry -> entry.getLedgerSubjectCode() == LedgerSubjectCode.CLEARING)
-                .findFirst()
-                .orElseThrow();
-
         assertThat(replay).isEqualTo(transactionSn);
         assertThat(WindJson.parseObject(payeeDetail.getContextVariables(), new TypeReference<Map<String, Object>>() {
         }))
@@ -442,9 +436,11 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .isEmpty();
         assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 1, 2);
         assertLedgerFactsFollowRouteSnapshot(businessSn);
+        String actionIdentity = actionFactsByBusiness(businessScene, businessSn)
+                .getFirst().getIdentity().getIdentity();
         return new CommissionAllocation(
                 fundingAccount(beneficiary.id()), amount, suffix, businessSn,
-                transactionSn, payeeDetail.getSn(), clearingEntry.getSn());
+                transactionSn, actionIdentity);
     }
 
     private LockedCommission clearAndLock(CommissionAllocation allocation,
@@ -481,7 +477,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
     private ClearingBatchDTO clearCommission(CommissionAllocation allocation) {
         String commissionEvidenceRef = "commission-evidence-bundle:" + allocation.suffix();
         String splitRunResultSn = prepareGate("CLEARING_SPLITTABLE_IDENTIFY",
-                allocation.detailSn(), "split-" + allocation.suffix(), commissionEvidenceRef);
+                allocation.actionIdentity(), "split-" + allocation.suffix(), commissionEvidenceRef);
         var beforeSplit = ledgerFactSnapshot();
         ClearingSplittableDetailDTO splittable = clearingSplittableDetailApplicationService
                 .identifySplittableDetail(identifyRequest(allocation, splitRunResultSn), WindOperatorFactory.system());
@@ -596,9 +592,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                                                                     String reconciliationRunResultSn) {
         return new IdentifyClearingSplittableDetailRequest()
                 .setTenantId(TENANT_ID)
-                .setFundsTransactionSn(allocation.transactionSn())
-                .setFundsTransactionDetailSn(allocation.detailSn())
-                .setLedgerEntrySn(allocation.ledgerEntrySn())
+                .setSourceActionFactRef(sourceActionFactRef(allocation.actionIdentity()))
                 .setBusinessLine(BUSINESS_LINE)
                 .setSplitPeriod(SPLIT_PERIOD)
                 .setSplitRuleCode(RULE_CODE)
@@ -655,6 +649,10 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                         .setTenantId(TENANT_ID)
                         .setReconciliationBatchSn(batchSn),
                 WindOperatorFactory.system()).getSn();
+    }
+
+    private StableIdentity sourceActionFactRef(String actionIdentity) {
+        return new StableIdentity().setOwnerNamespace("funds").setValue(actionIdentity);
     }
 
     private void prepareAccount(FundsAccountId accountId) {
@@ -715,8 +713,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                                         String suffix,
                                         String businessSn,
                                         String transactionSn,
-                                        String detailSn,
-                                        String ledgerEntrySn) {
+                                        String actionIdentity) {
     }
 
     private record LockedCommission(CommissionAllocation allocation,

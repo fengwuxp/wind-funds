@@ -26,6 +26,10 @@ import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.wind.funds.transaction.application.instrument.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.instrument.CompleteAuthorizationByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.instrument.ReverseAuthorizationByPaymentInstrumentRequest;
+import com.wind.funds.transaction.application.spend.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
@@ -54,7 +58,6 @@ import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentT
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -75,8 +78,6 @@ import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
-import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
-import com.wind.funds.wallet.model.request.CompleteAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
@@ -87,10 +88,8 @@ import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
-import com.wind.funds.wallet.model.request.ReverseAuthorizationByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
-import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.model.request.UnbindPaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
@@ -256,10 +255,11 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
-    private PaymentInstrumentTransactionApplicationService paymentInstrumentTransactionApplicationService;
+    private PaymentInstrumentTransactionApplicationServiceImpl paymentInstrumentTransactionApplicationService;
 
     @Autowired
-    private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
+    private SpendControlTransactionConsumptionApplicationServiceImpl
+            spendControlTransactionConsumptionApplicationService;
 
     @Autowired
     private FundsTransactionProjectionExplainApplicationService projectionExplainApplicationService;

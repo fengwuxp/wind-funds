@@ -7,7 +7,6 @@ import com.mybatisflex.core.util.UpdateEntity;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.dal.entities.Ledger;
 import com.wind.funds.ledger.dal.entities.table.LedgerNameRefs;
@@ -47,7 +46,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @Component
 @Slf4j
-public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjectionService {
+public class LedgerBalanceProjectionServiceImpl {
 
     private final FundsAccountQueryService fundsAccountQueryService;
 
@@ -55,7 +54,6 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
 
     private final LedgerMapper ledgerMapper;
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public void project(@NonNull List<LedgerEntrySpec> entries, @NonNull LedgerPostingAccessType postingAccessType) {
         if (entries.isEmpty()) {
@@ -379,7 +377,6 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
     }
 
 
-    @Override
     public boolean supports(@NonNull FundsAccountId accountId) {
         return fundsAccountQueryService.supports(accountId);
     }

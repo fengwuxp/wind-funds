@@ -625,7 +625,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         String referenceSourceRef = "internal:" + transactionDetailSn;
         String comparisonSourceRef = "external:" + transactionDetailSn;
         ReconciliationTestFixture.prepareReadyBatch(jdbcTemplate, TENANT_ID, reconciliationBatchSn,
-                "CLEARING_SPLITTABLE_IDENTIFY", transactionDetailSn, "recon-rule-1",
+                "CLEARING_SPLITTABLE_IDENTIFY", transactionSn + ":primary:0", "recon-rule-1",
                 "report:split-" + suffix, referenceSourceRef, comparisonSourceRef);
         String runResultSn = reconciliationRunResultApplicationService.executeStrictExact(
                 new RecordReconciliationRunResultRequest()

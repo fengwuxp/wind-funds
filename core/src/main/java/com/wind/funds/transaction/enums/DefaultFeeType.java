@@ -31,13 +31,13 @@ public enum DefaultFeeType implements DescriptiveEnum {
     /**
      * 平台服务成本
      */
-    @Schema(description = "Fee")
+    @Schema(description = "手续费")
     FEE("手续费"),
 
     /**
      * 惩罚性/附加成本
      */
-    @Schema(description = "Surcharge")
+    @Schema(description = "附加费")
     SURCHARGE_FEE("附加费"),
 
     /**

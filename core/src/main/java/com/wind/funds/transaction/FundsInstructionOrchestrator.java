@@ -19,7 +19,7 @@ import org.jspecify.annotations.NonNull;
  * <p>边界：
  * <ul>
  *   <li>不直接决定 Route，Route 由 RouteResolver 负责</li>
- *   <li>不直接拼装 LedgerEntry，账务翻译由 LedgerPostingAssembler 负责</li>
+ *   <li>不直接拼装 LedgerEntry，账务翻译由 Ledger 高阶入账命令负责</li>
  *   <li>不承担跨系统重试、清算批处理或业务订单状态机</li>
  * </ul>
  *

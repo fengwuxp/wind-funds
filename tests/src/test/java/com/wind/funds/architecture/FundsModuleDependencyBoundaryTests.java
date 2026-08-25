@@ -1,6 +1,11 @@
 package com.wind.funds.architecture;
 
+import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
+import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
 import org.w3c.dom.Document;
@@ -11,6 +16,8 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -61,6 +68,223 @@ class FundsModuleDependencyBoundaryTests {
         }
 
         assertThat(violations).isEmpty();
+    }
+
+    @Test
+    void testTransactionOrchestrationShouldNotRemainInWalletFace() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (String retiredPath : List.of(
+                "wallet/face/src/main/java/com/wind/funds/wallet/application/instrument/"
+                        + "PaymentInstrumentTransactionApplicationService.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/application/spend/"
+                        + "SpendControlTransactionConsumptionApplicationService.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
+                        + "AuthorizeByPaymentInstrumentRequest.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
+                        + "CompleteAuthorizationByPaymentInstrumentRequest.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
+                        + "ReverseAuthorizationByPaymentInstrumentRequest.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/ReceiveByInstrumentRequest.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
+                        + "SpendControlTransactionConsumptionRequest.java",
+                "wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
+                        + "SpendControlBusinessConfirmedRefundCompensationRequest.java")) {
+            if (Files.exists(workspaceRoot().resolve(retiredPath))) {
+                violations.add(retiredPath + " still exists");
+            }
+        }
+        for (String requiredPath : List.of(
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/"
+                        + "AuthorizeByPaymentInstrumentRequest.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/"
+                        + "CompleteAuthorizationByPaymentInstrumentRequest.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/"
+                        + "ReverseAuthorizationByPaymentInstrumentRequest.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/"
+                        + "ReceiveByInstrumentRequest.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/spend/"
+                        + "SpendControlTransactionConsumptionRequest.java",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/spend/"
+                        + "SpendControlBusinessConfirmedRefundCompensationRequest.java")) {
+            if (Files.notExists(workspaceRoot().resolve(requiredPath))) {
+                violations.add(requiredPath + " is missing");
+            }
+        }
+
+        Map<String, List<String>> forbiddenSourceTokens = Map.of(
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/impl/"
+                        + "PaymentInstrumentTransactionApplicationServiceImpl.java",
+                List.of(
+                        "com.wind.funds.wallet.application.instrument.PaymentInstrumentTransactionApplicationService",
+                        "implements PaymentInstrumentTransactionApplicationService",
+                        "com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService"),
+                "transaction/impl/src/main/java/com/wind/funds/transaction/application/spend/impl/"
+                        + "SpendControlTransactionConsumptionApplicationServiceImpl.java",
+                List.of(
+                        "com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService",
+                        "implements SpendControlTransactionConsumptionApplicationService"));
+        for (Map.Entry<String, List<String>> entry : forbiddenSourceTokens.entrySet()) {
+            String source = Files.readString(workspaceRoot().resolve(entry.getKey()));
+            for (String token : entry.getValue()) {
+                if (source.contains(token)) {
+                    violations.add(entry.getKey() + " still references " + token);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("transaction orchestration must be internal to transaction-impl")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：Ledger 余额投影和 posting assembler 均只有一个真实生产实现。
+     * 预期：删除单实现扩展接口、单 delegate composite 及其选择路由。
+     * 红线：宿主不得通过 Bean 列表或排序分叉账务组装与余额投影语义。
+     */
+    @Test
+    void testLedgerProjectionAndAssemblerExtensionRoutersShouldCollapse() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (String retiredPath : List.of(
+                "core/src/main/java/com/wind/funds/ledger/LedgerBalanceProjectionService.java",
+                "ledger/impl/src/main/java/com/wind/funds/ledger/CompositeLedgerPostingAssembler.java")) {
+            if (Files.exists(workspaceRoot().resolve(retiredPath))) {
+                violations.add(retiredPath + " still exists");
+            }
+        }
+
+        Map<String, List<String>> forbiddenSourceTokens = Map.of(
+                "ledger/impl/src/main/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImpl.java",
+                List.of("List<LedgerBalanceProjectionService>", "resolveProjectionServices"),
+                "ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImpl.java",
+                List.of("implements LedgerBalanceProjectionService"),
+                "ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java",
+                List.of("Ordered", "getOrder("));
+        for (Map.Entry<String, List<String>> entry : forbiddenSourceTokens.entrySet()) {
+            String source = Files.readString(workspaceRoot().resolve(entry.getKey()));
+            for (String token : entry.getValue()) {
+                if (source.contains(token)) {
+                    violations.add(entry.getKey() + " still contains " + token);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("Ledger projection and assembler semantics must not be selected by extension routing")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：Ledger 只暴露接收归一指令、资金动作身份和已解析 route 的高阶写命令。
+     * 预期：删除 core assembler 与 raw spec 写入口，Transaction 和 projection 不再持有组装后 spec。
+     * 红线：不得用兼容 overload、bridge 或 stale API baseline 保留 Consumer 拼装 posting 的能力。
+     */
+    @Test
+    void testLedgerPostingCommandShouldOwnAssemblyAndStableIdentity() throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path root = workspaceRoot();
+        Path assemblerPath = root.resolve(
+                "core/src/main/java/com/wind/funds/ledger/LedgerPostingAssembler.java");
+        if (Files.exists(assemblerPath)) {
+            violations.add("core LedgerPostingAssembler still exists");
+        }
+
+        List<Method> postingMethods = Stream.of(LedgerTransactionPostingService.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("post"))
+                .toList();
+        List<Class<?>> expectedParameterTypes = List.of(
+                FundsInstructionSpec.class,
+                String.class,
+                ResolvedRouteSpec.class);
+        if (postingMethods.size() != 1
+                || postingMethods.getFirst().getReturnType() != String.class
+                || !List.of(postingMethods.getFirst().getParameterTypes()).equals(expectedParameterTypes)) {
+            violations.add("LedgerTransactionPostingService must expose only the high-level posting signature");
+        }
+
+        List<Method> assembledSeams = Stream.of(
+                        DefaultLedgerTransactionPostingServiceImpl.class.getDeclaredMethods())
+                .filter(method -> method.getName().equals("postAssembled"))
+                .filter(method -> List.of(method.getParameterTypes()).equals(List.of(LedgerTransactionSpec.class)))
+                .toList();
+        if (assembledSeams.size() != 1) {
+            violations.add("DefaultLedgerTransactionPostingServiceImpl must keep one package-private postAssembled seam");
+        } else {
+            int modifiers = assembledSeams.getFirst().getModifiers();
+            if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers) || Modifier.isPrivate(modifiers)) {
+                violations.add("DefaultLedgerTransactionPostingServiceImpl.postAssembled must be package-private");
+            }
+        }
+        Stream.of(DefaultLedgerTransactionPostingServiceImpl.class.getDeclaredMethods())
+                .filter(method -> Stream.of(method.getParameterTypes())
+                        .anyMatch(LedgerTransactionSpec.class::equals))
+                .filter(method -> Modifier.isPublic(method.getModifiers())
+                        || Modifier.isProtected(method.getModifiers()))
+                .forEach(method -> violations.add(
+                        "DefaultLedgerTransactionPostingServiceImpl still exposes raw-spec method "
+                                + method.getName()));
+
+        String baseline = Files.readString(root.resolve("core/api-baseline/stable-api.txt"));
+        if (baseline.lines().anyMatch(line -> line.startsWith(
+                "com.wind.funds.ledger.LedgerPostingAssembler\t"))) {
+            violations.add("stable API baseline still contains LedgerPostingAssembler");
+        }
+        String expectedBaselineSignature = "com.wind.funds.ledger.LedgerTransactionPostingService\t"
+                + "public abstract java.lang.String post("
+                + "com.wind.funds.transaction.spec.FundsInstructionSpec, java.lang.String, "
+                + "com.wind.funds.route.spec.ResolvedRouteSpec);";
+        if (!baseline.lines().anyMatch(expectedBaselineSignature::equals)) {
+            violations.add("stable API baseline is missing the high-level posting signature");
+        }
+
+        String orchestratorPath =
+                "transaction/impl/src/main/java/com/wind/funds/transaction/DefaultRoutedFundsInstructionOrchestrator.java";
+        String orchestrator = Files.readString(root.resolve(orchestratorPath));
+        for (String forbidden : List.of(
+                "LedgerPostingAssembler",
+                "LedgerTransactionSpec",
+                "postingAssembler",
+                "ledgerTransactionPostingService.post(transaction)",
+                ".ledgerTransaction(")) {
+            if (orchestrator.contains(forbidden)) {
+                violations.add(orchestratorPath + " still contains " + forbidden);
+            }
+        }
+        if (!orchestrator.contains("ledgerTransactionPostingService.post(")) {
+            violations.add(orchestratorPath + " is missing the high-level posting call");
+        }
+
+        String projectionContextPath = "transaction/face/src/main/java/com/wind/funds/transaction/projection/"
+                + "FundsTransactionProjectionPublishContext.java";
+        String projectionContext = Files.readString(root.resolve(projectionContextPath));
+        if (projectionContext.contains("LedgerTransactionSpec")) {
+            violations.add(projectionContextPath + " still exposes LedgerTransactionSpec");
+        }
+
+        String defaultAssemblerPath =
+                "ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java";
+        String defaultAssembler = Files.readString(root.resolve(defaultAssemblerPath));
+        for (String forbidden : List.of(
+                "import com.wind.funds.ledger.LedgerPostingAssembler",
+                "implements LedgerPostingAssembler")) {
+            if (defaultAssembler.contains(forbidden)) {
+                violations.add(defaultAssemblerPath + " still contains " + forbidden);
+            }
+        }
+
+        for (String path : List.of(
+                "core/src/main/java/com/wind/funds/route/RouteResolver.java",
+                "core/src/main/java/com/wind/funds/route/spec/ResolvedRouteSpec.java",
+                "core/src/main/java/com/wind/funds/route/spec/RouteLegSpec.java",
+                "core/src/main/java/com/wind/funds/transaction/FundsInstructionOrchestrator.java")) {
+            if (Files.readString(root.resolve(path)).contains("LedgerPostingAssembler")) {
+                violations.add(path + " still describes LedgerPostingAssembler as a core responsibility");
+            }
+        }
+
+        assertThat(violations)
+                .as("ledger posting command surface must be owned by Ledger and hide assembled specs")
+                .isEmpty();
     }
 
     private static final List<String> PRODUCTION_MODULE_POMS = List.of(

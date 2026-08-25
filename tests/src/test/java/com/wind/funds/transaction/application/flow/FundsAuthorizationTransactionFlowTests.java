@@ -10,6 +10,7 @@ import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -34,6 +35,7 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.MerchantInfoRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
@@ -48,7 +50,9 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.jackson.WindJson;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -966,6 +970,382 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .orElseThrow();
         deleteFundsTransactionDetail(settlementDetail.getSn());
         assertCompleteActionFactUnavailable(authorizationSn, "AUTH_COMPLETE_ROUTE_TAMPER_CAPTURE");
+    }
+
+    /**
+     * 场景：普通授权部分完成后释放一部分未完成额度。
+     * 输入：authorize100 -> complete30 -> release20。
+     * 输出：形成唯一 release20 ActionFact，并保留原授权引用和原 route provenance。
+     * 红线：同步 REVERSAL 成功不能替代可按业务键和 identity 查询的 release 事实。
+     */
+    @Test
+    void testSuccessfulAuthorizationReleaseShouldExposeStableActionFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        String authorizationBusinessSn = "AUTH_RELEASE_ACTION_AUTHORIZE";
+        String completeBusinessSn = "AUTH_RELEASE_ACTION_COMPLETE";
+        String releaseBusinessSn = "AUTH_RELEASE_ACTION_RELEASE";
+        topup(user, 100L, "AUTH_RELEASE_ACTION_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 100L, "succeeded", "proven-full");
+        completeAuthorization(user, 30L, authorizationSn, completeBusinessSn);
+        assertCompleteActionFact(authorizationSn, authorizationFact, completeBusinessSn, 30L, 1);
+
+        BalanceSnapshot beforeRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, releaseBusinessSn);
+        assertFundingReleaseBalanceDelta(beforeRelease, user, 20L);
+
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1, 1, 2);
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getCompletedAmount()).isEqualTo(30L);
+        assertThat(transaction.getReversedAmount()).isEqualTo(20L);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 50L, CURRENCY);
+        assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1);
+    }
+
+    /**
+     * 场景：同一授权分两次释放未完成额度。
+     * 输入：authorize100 -> release20 -> release30。
+     * 输出：形成两条身份独立、Money 分别为 20/30 的 release ActionFact。
+     * 红线：后继 release 不得改写或重复贡献前一条 release 事实。
+     */
+    @Test
+    void testMultipleAuthorizationReleasesShouldExposeIndependentStableActionFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        String authorizationBusinessSn = "AUTH_RELEASE_MULTIPLE_AUTHORIZE";
+        topup(user, 100L, "AUTH_RELEASE_MULTIPLE_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 100L, "succeeded", "proven-full");
+
+        BalanceSnapshot beforeFirstRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, "AUTH_RELEASE_MULTIPLE_FIRST");
+        BalanceSnapshot afterFirstRelease = assertFundingReleaseBalanceDelta(beforeFirstRelease, user, 20L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_MULTIPLE_FIRST", 20L, 1, 1, 2);
+        FundsActionFactDTO first = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_MULTIPLE_FIRST", 20L, 1);
+
+        reverseAuthorization(user, 30L, authorizationSn, "AUTH_RELEASE_MULTIPLE_SECOND");
+        assertFundingReleaseBalanceDelta(afterFirstRelease, user, 30L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_MULTIPLE_SECOND", 30L, 1, 1, 2);
+        assertThat(fundsTransaction(authorizationSn).getReversedAmount()).isEqualTo(50L);
+        FundsActionFactDTO second = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_MULTIPLE_SECOND", 30L, 1);
+        assertThat(first.getIdentity()).isNotEqualTo(second.getIdentity());
+        assertReleaseActionFactAvailable(first, "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_MULTIPLE_FIRST");
+    }
+
+    /**
+     * 场景：共享卡授权同时占用信用子账户和父资金账户后执行释放。
+     * 输入：SHARED authorize60 -> release60。
+     * 输出：两组责任和 replay provenance 完整，但公共 ActionFact Money 只计一次 60。
+     * 红线：多 sibling 不得把 release 金额重复累计为 120。
+     */
+    @Test
+    void testSharedAuthorizationReleaseShouldExposeOneActionFactWithoutDoublingMoney() {
+        FundsAccountId parentAccount = fundingAccount("auth_rel_shared_parent");
+        FundsAccountId cardAccount = creditAccount("auth_release_shared_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount, parentAccount);
+        topup(parentAccount, 100L, "AUTH_RELEASE_SHARED_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_RELEASE_SHARED_LIMIT");
+        String authorizationBusinessSn = "AUTH_RELEASE_SHARED_AUTHORIZE";
+        String releaseBusinessSn = "AUTH_RELEASE_SHARED_RELEASE";
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 60L, "succeeded", "proven-full");
+
+        BalanceSnapshot beforeRelease = snapshot(balances(cardAccount, parentAccount));
+        reverseAuthorization(cardAccount, 60L, authorizationSn, releaseBusinessSn);
+        assertSharedReleaseBalanceDelta(beforeRelease, cardAccount, parentAccount, 60L);
+
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 60L, 2, 2, 4);
+        assertBucket(balance(cardAccount), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        FundsActionFactDTO releaseFact = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 60L, 2);
+        assertThat(releaseFact.getMoney()).isEqualTo(Money.immutable(60L, CURRENCY));
+    }
+
+    /**
+     * 场景：release 重放、分隔符碰撞和跨事实族业务键冲突。
+     * 输入：合法 release、含冒号业务键，以及主表/detail、action family、authorization root 冲突。
+     * 输出：合法身份稳定且无碰撞；歧义业务键的列表与 identity 查询共同 fail-closed。
+     * 红线：不得按字符串分隔或主表优先顺序遮蔽另一条资金动作事实。
+     */
+    @Test
+    void testAuthorizationReleaseActionFactShouldRemainStableAcrossReplayConflictAndLifecycleProgress() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 500L, "AUTH_RELEASE_IDENTITY_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, "AUTH_RELEASE_IDENTITY_AUTHORIZE");
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                "AUTH_RELEASE_IDENTITY_AUTHORIZE", 100L, "succeeded", "proven-full");
+        BalanceSnapshot beforeRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, "AUTH_RELEASE_IDENTITY_RELEASE");
+        assertFundingReleaseBalanceDelta(beforeRelease, user, 20L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, "AUTH_RELEASE_IDENTITY_AUTHORIZE",
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_IDENTITY_RELEASE", 20L, 1, 1, 2);
+        FundsActionFactDTO firstFact = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_IDENTITY_RELEASE", 20L, 1);
+
+        assertThat(reverseAuthorization(user, 20L, authorizationSn, "AUTH_RELEASE_IDENTITY_RELEASE"))
+                .isEqualTo(authorizationSn);
+        assertReleaseActionFactAvailable(firstFact, "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_IDENTITY_RELEASE");
+        assertThatThrownBy(() -> reverseAuthorization(user, 21L, authorizationSn,
+                "AUTH_RELEASE_IDENTITY_RELEASE"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+        assertReleaseActionFactAvailable(firstFact, "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_IDENTITY_RELEASE");
+
+        BalanceSnapshot beforeComplete = snapshot(balances(user, settlementAccount()));
+        completeAuthorization(user, 10L, authorizationSn, "AUTH_RELEASE_IDENTITY_COMPLETE");
+        assertOnlyBalanceDeltas(beforeComplete, snapshot(balances(user, settlementAccount())),
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -10L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 10L, CURRENCY));
+        assertCompleteActionFact(authorizationSn, authorizationFact,
+                "AUTH_RELEASE_IDENTITY_COMPLETE", 10L, 1);
+        assertReleaseActionFactAvailable(firstFact, "AUTHORIZATION_REVERSAL", "AUTH_RELEASE_IDENTITY_RELEASE");
+
+        String delimiterAuthorizationOne = authorize(user, 30L, true, "AUTH_RELEASE_DELIMITER_AUTH_1");
+        FundsActionFactDTO delimiterAuthorizationFactOne = assertAuthorizationActionFact(
+                "AUTH_RELEASE_DELIMITER_AUTH_1", 30L, "succeeded", "proven-full");
+        BalanceSnapshot beforeDelimiterReleaseOne = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, delimiterAuthorizationOne, "A", "B:C");
+        assertFundingReleaseBalanceDelta(beforeDelimiterReleaseOne, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(delimiterAuthorizationOne, "AUTH_RELEASE_DELIMITER_AUTH_1",
+                "A", "B:C", 5L, 1, 1, 2);
+        String delimiterAuthorizationTwo = authorize(user, 30L, true, "AUTH_RELEASE_DELIMITER_AUTH_2");
+        FundsActionFactDTO delimiterAuthorizationFactTwo = assertAuthorizationActionFact(
+                "AUTH_RELEASE_DELIMITER_AUTH_2", 30L, "succeeded", "proven-full");
+        BalanceSnapshot beforeDelimiterReleaseTwo = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, delimiterAuthorizationTwo, "A:B", "C");
+        assertFundingReleaseBalanceDelta(beforeDelimiterReleaseTwo, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(delimiterAuthorizationTwo, "AUTH_RELEASE_DELIMITER_AUTH_2",
+                "A:B", "C", 5L, 1, 1, 2);
+        FundsActionFactDTO delimiterFactOne = assertReleaseActionFact(delimiterAuthorizationOne,
+                delimiterAuthorizationFactOne, "A", "B:C", 5L, 1);
+        FundsActionFactDTO delimiterFactTwo = assertReleaseActionFact(delimiterAuthorizationTwo,
+                delimiterAuthorizationFactTwo, "A:B", "C", 5L, 1);
+        assertThat(delimiterFactOne.getIdentity()).isNotEqualTo(delimiterFactTwo.getIdentity());
+
+        String tableCollisionScene = "AUTHORIZATION_REVERSAL";
+        String tableCollisionSn = "AUTH_RELEASE_TABLE_COLLISION";
+        authorizeWithBusinessKey(user, 20L, tableCollisionScene, tableCollisionSn);
+        String tableCollisionAuthorization = authorize(user, 20L, true,
+                "AUTH_RELEASE_TABLE_COLLISION_PARENT");
+        BalanceSnapshot beforeTableCollisionRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, tableCollisionAuthorization,
+                tableCollisionScene, tableCollisionSn);
+        assertFundingReleaseBalanceDelta(beforeTableCollisionRelease, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(tableCollisionAuthorization,
+                "AUTH_RELEASE_TABLE_COLLISION_PARENT", tableCollisionScene, tableCollisionSn, 5L, 1, 1, 2);
+        assertReleaseActionFactUnavailable(tableCollisionAuthorization, tableCollisionScene, tableCollisionSn);
+
+        String familyCollisionAuthorization = authorize(user, 20L, true,
+                "AUTH_RELEASE_FAMILY_COLLISION_PARENT");
+        String familyCollisionScene = "AUTH_RELEASE_FAMILY_COLLISION";
+        String familyCollisionSn = "AUTH_RELEASE_FAMILY_COLLISION_KEY";
+        BalanceSnapshot beforeFamilyCollisionComplete = snapshot(balances(user, settlementAccount()));
+        completeAuthorizationWithBusinessKey(user, 5L, familyCollisionAuthorization,
+                familyCollisionScene, familyCollisionSn);
+        assertOnlyBalanceDeltas(beforeFamilyCollisionComplete, snapshot(balances(user, settlementAccount())),
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -5L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 5L, CURRENCY));
+        BalanceSnapshot beforeFamilyCollisionRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, familyCollisionAuthorization,
+                familyCollisionScene, familyCollisionSn);
+        assertFundingReleaseBalanceDelta(beforeFamilyCollisionRelease, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(familyCollisionAuthorization,
+                "AUTH_RELEASE_FAMILY_COLLISION_PARENT", familyCollisionScene, familyCollisionSn, 5L, 1, 1, 2);
+        assertReleaseActionFactUnavailable(familyCollisionAuthorization,
+                familyCollisionScene, familyCollisionSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(new FundsActionFactRef(TENANT_ID,
+                familyCollisionAuthorization + ":complete:" + familyCollisionScene + ":" + familyCollisionSn)))
+                .isEmpty();
+
+        String rootCollisionScene = "AUTH_RELEASE_ROOT_COLLISION";
+        String rootCollisionSn = "AUTH_RELEASE_ROOT_COLLISION_KEY";
+        String firstRoot = authorize(user, 20L, true, "AUTH_RELEASE_ROOT_COLLISION_PARENT_1");
+        String secondRoot = authorize(user, 20L, true, "AUTH_RELEASE_ROOT_COLLISION_PARENT_2");
+        BalanceSnapshot beforeFirstRootRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, firstRoot, rootCollisionScene, rootCollisionSn);
+        assertFundingReleaseBalanceDelta(beforeFirstRootRelease, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(firstRoot, "AUTH_RELEASE_ROOT_COLLISION_PARENT_1",
+                rootCollisionScene, rootCollisionSn, 5L, 1, 1, 2);
+        BalanceSnapshot beforeSecondRootRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorizationWithBusinessKey(user, 5L, secondRoot, rootCollisionScene, rootCollisionSn);
+        assertFundingReleaseBalanceDelta(beforeSecondRootRelease, user, 5L);
+        assertAuthorizationReleasePhysicalFacts(secondRoot, "AUTH_RELEASE_ROOT_COLLISION_PARENT_2",
+                rootCollisionScene, rootCollisionSn, 5L, 1, 1, 2);
+        assertReleaseActionFactUnavailable(firstRoot, rootCollisionScene, rootCollisionSn);
+        assertReleaseActionFactUnavailable(secondRoot, rootCollisionScene, rootCollisionSn);
+    }
+
+    /**
+     * 场景：合法 release 形成后篡改耐久 detail 事实。
+     * 输入：依次篡改状态、Ledger 引用、原授权引用、context 和 sibling 完整性。
+     * 输出：任一篡改都使列表与 identity 查询共同返回空。
+     * 红线：FAILED/PROCESSING 标签或残缺 sibling 不得被猜成 proven-full/proven-zero。
+     */
+    @Test
+    void testAuthorizationReleaseActionFactShouldFailClosedForDurableFactTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        String authorizationBusinessSn = "AUTH_RELEASE_TAMPER_AUTHORIZE";
+        String releaseBusinessSn = "AUTH_RELEASE_TAMPER_RELEASE";
+        topup(user, 100L, "AUTH_RELEASE_TAMPER_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 60L, "succeeded", "proven-full");
+        BalanceSnapshot beforeRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, releaseBusinessSn);
+        assertFundingReleaseBalanceDelta(beforeRelease, user, 20L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1, 1, 2);
+        FundsActionFactDTO releaseFact = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1);
+
+        FundsTransactionDetail detail = fundsTransactionDetailsByBusinessSn(releaseBusinessSn).getFirst();
+        String ledgerTransactionSn = detail.getLedgerTransactionSn();
+        String referenceDetailSn = detail.getReferenceDetailSn();
+        String contextVariables = detail.getContextVariables();
+
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailState(detail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), null);
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailLedgerRef(detail.getSn(), ledgerTransactionSn);
+        updateFundsTransactionDetailReferenceDetailSn(detail.getSn(), "wrong_authorization");
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailReferenceDetailSn(detail.getSn(), referenceDetailSn);
+        updateFundsTransactionDetailContextVariables(detail.getSn(), "{}");
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailContextVariables(detail.getSn(), contextVariables);
+        deleteFundsTransactionDetail(detail.getSn());
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+    }
+
+    /**
+     * 场景：release 已成立后篡改原 route、complete/release sibling 和 root 累计。
+     * 输入：authorize100 -> complete30 -> release20 后逐项修改承重事实。
+     * 输出：complete 与 release 两类累计任一不闭合时 release 双查询返回空。
+     * 红线：不得只信 root 数字或当前余额补推 release 事实。
+     */
+    @Test
+    void testAuthorizationReleaseActionFactShouldRejectRouteAndCumulativeTamper() {
+        FundsAccountId user = fundingAccount("funding_user");
+        String authorizationBusinessSn = "AUTH_RELEASE_CUMULATIVE_AUTHORIZE";
+        String completeBusinessSn = "AUTH_RELEASE_CUMULATIVE_COMPLETE";
+        String releaseBusinessSn = "AUTH_RELEASE_CUMULATIVE_RELEASE";
+        topup(user, 100L, "AUTH_RELEASE_CUMULATIVE_TOPUP");
+        String authorizationSn = authorize(user, 100L, true, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 100L, "succeeded", "proven-full");
+        completeAuthorization(user, 30L, authorizationSn, completeBusinessSn);
+        assertCompleteActionFact(authorizationSn, authorizationFact, completeBusinessSn, 30L, 1);
+        BalanceSnapshot beforeRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, releaseBusinessSn);
+        assertFundingReleaseBalanceDelta(beforeRelease, user, 20L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1, 1, 2);
+        FundsActionFactDTO releaseFact = assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", releaseBusinessSn, 20L, 1);
+
+        updateFundsTransactionCompletedAmount(authorizationSn, 29L);
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionCompletedAmount(authorizationSn, 30L);
+        FundsTransactionDetail completeDetail = fundsTransactionDetailsByBusinessSn(completeBusinessSn).getFirst();
+        updateFundsTransactionDetailState(completeDetail.getSn(), FundsTransactionDetailState.PROCESSING);
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailState(completeDetail.getSn(), FundsTransactionDetailState.SUCCEEDED);
+        updateFundsTransactionReversedAmount(authorizationSn, 21L);
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionReversedAmount(authorizationSn, 20L);
+
+        String routeSnapshot = fundsTransactionsByBusinessSn(authorizationBusinessSn).getFirst().getRouteSnapshot();
+        ObjectNode missingLegs = WindJson.parseObject(routeSnapshot, ObjectNode.class);
+        missingLegs.putArray("legs");
+        updateFundsTransactionRouteSnapshot(authorizationSn, WindJson.toJsonString(missingLegs));
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionRouteSnapshot(authorizationSn, routeSnapshot);
+
+        FundsTransactionDetail releaseDetail = fundsTransactionDetailsByBusinessSn(releaseBusinessSn).getFirst();
+        String releaseContext = releaseDetail.getContextVariables();
+        updateFundsTransactionDetailContextVariables(releaseDetail.getSn(), "{}");
+        assertReleaseActionFactUnavailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+        updateFundsTransactionDetailContextVariables(releaseDetail.getSn(), releaseContext);
+        assertReleaseActionFactAvailable(releaseFact, "AUTHORIZATION_REVERSAL", releaseBusinessSn);
+    }
+
+    /**
+     * 场景：同一授权并发完成与释放后继续释放剩余额度。
+     * 输入：authorize100，并发 complete60/release60，随后 release20。
+     * 输出：竞态仅一方成功，后续 release20 形成稳定 ActionFact，输家无动作事实。
+     * 红线：并发失败方不得贡献 ActionFact，成功方与后续 release 不得突破授权上限。
+     */
+    @Test
+    void testConcurrentAuthorizationCompleteAndReleaseShouldExposeOnlyWinnerActionFact() throws Exception {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_RELEASE_RACE_TOPUP");
+        String authorizationBusinessSn = "AUTH_RELEASE_RACE_AUTHORIZE";
+        String authorizationSn = authorize(user, 100L, true, authorizationBusinessSn);
+        FundsActionFactDTO authorizationFact = assertAuthorizationActionFact(
+                authorizationBusinessSn, 100L, "succeeded", "proven-full");
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        RaceOutcome winner;
+        RaceOutcome loser;
+        try {
+            Future<RaceOutcome> completeFuture = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_RELEASE_RACE_COMPLETE", FundsTransactionEventType.COMPLETE,
+                    () -> completeAuthorization(user, 60L, authorizationSn, "AUTH_RELEASE_RACE_COMPLETE")));
+            Future<RaceOutcome> releaseFuture = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_RELEASE_RACE_RELEASE", FundsTransactionEventType.REVERSAL,
+                    () -> reverseAuthorization(user, 60L, authorizationSn, "AUTH_RELEASE_RACE_RELEASE")));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            List<RaceOutcome> outcomes = List.of(awaitOutcome(completeFuture), awaitOutcome(releaseFuture));
+            assertThat(outcomes.stream().filter(RaceOutcome::succeeded).toList()).singleElement();
+            assertThat(outcomes.stream().filter(outcome -> !outcome.succeeded()).toList()).singleElement();
+            winner = outcomes.stream().filter(RaceOutcome::succeeded).findFirst().orElseThrow();
+            loser = outcomes.stream().filter(outcome -> !outcome.succeeded()).findFirst().orElseThrow();
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+        }
+
+        String followUpReleaseSn = "AUTH_RELEASE_RACE_FOLLOW_UP";
+        BalanceSnapshot beforeFollowUpRelease = snapshot(balances(user, settlementAccount()));
+        reverseAuthorization(user, 20L, authorizationSn, followUpReleaseSn);
+        assertFundingReleaseBalanceDelta(beforeFollowUpRelease, user, 20L);
+        assertAuthorizationReleasePhysicalFacts(authorizationSn, authorizationBusinessSn,
+                "AUTHORIZATION_REVERSAL", followUpReleaseSn, 20L, 1, 1, 2);
+        assertReleaseActionFact(authorizationSn, authorizationFact,
+                "AUTHORIZATION_REVERSAL", followUpReleaseSn, 20L, 1);
+
+        if (winner.eventType() == FundsTransactionEventType.COMPLETE) {
+            assertCompleteActionFact(authorizationSn, authorizationFact, winner.businessSn(), 60L, 1);
+        } else {
+            assertReleaseActionFact(authorizationSn, authorizationFact,
+                    "AUTHORIZATION_REVERSAL", winner.businessSn(), 60L, 1);
+        }
+        String loserScene = loser.eventType() == FundsTransactionEventType.COMPLETE
+                ? "AUTHORIZATION_COMPLETE" : "AUTHORIZATION_REVERSAL";
+        assertNoActionFacts(loserScene, loser.businessSn());
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getCompletedAmount() + transaction.getReversedAmount()).isEqualTo(80L);
     }
 
     /**
@@ -3709,7 +4089,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledgerService.getLedgerById(ledgerId),
                     initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
-                    Math.abs(initialBalance))));
+                    Math.abs(initialBalance))), LedgerPostingAccessType.NORMAL);
         }
     }
 
@@ -3872,6 +4252,270 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         });
         assertThat(fundsTransactionQueryService.findFundsActionFact(actionFact.getIdentity())).hasValue(actionFact);
         return actionFact;
+    }
+
+    private void assertAuthorizationReleasePhysicalFacts(String authorizationSn,
+                                                         String authorizationBusinessSn,
+                                                         String releaseBusinessScene,
+                                                         String releaseBusinessSn,
+                                                         long releaseAmount,
+                                                         int expectedDetails,
+                                                         int expectedPostingPlans,
+                                                         int expectedEntries) {
+        LedgerTransaction authorizationLedger = ledgerTransactionByBusinessSn(authorizationBusinessSn);
+        List<LedgerTransaction> releaseLedgers = ledgerTransactionsForBusinessSn(releaseBusinessSn).stream()
+                .filter(ledger -> authorizationSn.equals(ledger.getFundsTransactionSn()))
+                .filter(ledger -> FundsTransactionEventType.REVERSAL.name().equals(ledger.getEventType()))
+                .filter(ledger -> releaseBusinessScene.equals(ledger.getBusinessScene()))
+                .toList();
+        assertThat(releaseLedgers).singleElement();
+        LedgerTransaction releaseLedger = releaseLedgers.getFirst();
+        assertThat(releaseLedger.getAmount()).isEqualTo(releaseAmount);
+        assertThat(releaseLedger.getCurrency()).isEqualTo(CURRENCY);
+        assertThat(releaseLedger.getReferenceLedgerTransactionSn()).isEqualTo(authorizationLedger.getSn());
+        var authorizationRoute = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn)
+                .orElseThrow();
+        List<FundsTransactionDetail> releaseDetails = fundsTransactionDetailsByBusinessSn(releaseBusinessSn).stream()
+                .filter(detail -> authorizationSn.equals(detail.getTransactionSn()))
+                .filter(detail -> releaseBusinessScene.equals(detail.getBusinessScene()))
+                .filter(detail -> detail.getEventType() == FundsTransactionEventType.REVERSAL)
+                .toList();
+        assertThat(releaseDetails)
+                .hasSize(expectedDetails)
+                .allSatisfy(detail -> {
+                    assertThat(detail.getTransactionSn()).isEqualTo(authorizationSn);
+                    assertThat(detail.getBusinessScene()).isEqualTo(releaseBusinessScene);
+                    assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.REVERSAL);
+                    assertThat(detail.getFundsEffectType()).isEqualTo(FundsEffectType.RELEASE);
+                    assertThat(detail.getState()).isEqualTo(FundsTransactionDetailState.SUCCEEDED);
+                    assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
+                    assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationLedger.getSn());
+                    assertThat(detail.getLedgerTransactionSn()).isEqualTo(releaseLedger.getSn());
+                    assertThat(detail.getAmount()).isEqualTo(releaseAmount);
+                    assertThat(detail.getCurrency()).isEqualTo(CURRENCY);
+
+                    var matchingAuthorizationLegs = authorizationRoute.getLegs().stream()
+                            .filter(leg -> detail.getSubjectId()
+                                    .equals(leg.getSourceNode().getSubjectRef().getSubjectId()))
+                            .filter(leg -> detail.getSubjectType()
+                                    .equals(leg.getSourceNode().getSubjectRef().getSubjectType().name()))
+                            .toList();
+                    assertThat(matchingAuthorizationLegs).singleElement();
+                    var authorizationLeg = matchingAuthorizationLegs.getFirst();
+                    assertThat(authorizationLeg.getTargetNode().getSubjectRef().getSubjectId())
+                            .isEqualTo(detail.getSubjectId());
+                    assertThat(authorizationLeg.getTargetNode().getSubjectRef().getSubjectType().name())
+                            .isEqualTo(detail.getSubjectType());
+
+                    Map<String, Object> context = contextVariablesOf(detail.getContextVariables());
+                    Object replayLegIdsValue = context.get(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
+                    Object replayAmountsValue = context.get(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
+                    assertThat(replayLegIdsValue).isInstanceOf(List.class);
+                    assertThat(((List<?>) replayLegIdsValue).stream().map(Object::toString).toList())
+                            .containsExactly(authorizationLeg.getLegId());
+                    assertThat(replayAmountsValue).isInstanceOf(Map.class);
+                    Map<?, ?> replayAmounts = (Map<?, ?>) replayAmountsValue;
+                    assertThat(replayAmounts).hasSize(1);
+                    assertThat(replayAmounts.containsKey(authorizationLeg.getLegId())).isTrue();
+                    assertThat(replayAmounts.get(authorizationLeg.getLegId())).isInstanceOf(Number.class);
+                    Number replayAmount = (Number) replayAmounts.get(authorizationLeg.getLegId());
+                    assertThat(new BigDecimal(replayAmount.toString()))
+                            .isEqualByComparingTo(BigDecimal.valueOf(releaseAmount));
+                });
+        List<LedgerPostingPlan> releasePlans = postingPlansOf(releaseLedger);
+        assertThat(releasePlans)
+                .hasSize(expectedPostingPlans)
+                .extracting(LedgerPostingPlan::getRouteLegId)
+                .containsExactlyInAnyOrderElementsOf(authorizationRoute.getLegs().stream()
+                        .map(leg -> "RELEASE_" + leg.getLegId())
+                        .toList());
+        assertThat(releasePlans).allSatisfy(plan -> {
+            assertThat(plan.getAmount()).isEqualTo(releaseAmount);
+            assertThat(plan.getCurrency()).isEqualTo(CURRENCY);
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.AUTHORIZATION_REVERSAL.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.CONTROL_HOLD.name());
+            assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.REVERSAL.name());
+        });
+        assertThat(entriesOf(releaseLedger))
+                .hasSize(expectedEntries)
+                .allSatisfy(entry -> assertThat(entry.getLedgerTransactionSn()).isEqualTo(releaseLedger.getSn()));
+    }
+
+    private BalanceSnapshot assertFundingReleaseBalanceDelta(BalanceSnapshot beforeRelease,
+                                                              FundsAccountId accountId,
+                                                              long releaseAmount) {
+        BalanceSnapshot afterRelease = snapshot(balances(accountId, settlementAccount()));
+        assertOnlyBalanceDeltas(beforeRelease, afterRelease,
+                delta(accountId, LedgerSubjectCode.AVAILABLE, releaseAmount, CURRENCY),
+                delta(accountId, LedgerSubjectCode.AUTHORIZATION, -releaseAmount, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        return afterRelease;
+    }
+
+    private void assertSharedReleaseBalanceDelta(BalanceSnapshot beforeRelease,
+                                                 FundsAccountId cardAccount,
+                                                 FundsAccountId parentAccount,
+                                                 long releaseAmount) {
+        assertOnlyBalanceDeltas(beforeRelease, snapshot(balances(cardAccount, parentAccount)),
+                delta(cardAccount, LedgerSubjectCode.AVAILABLE, releaseAmount, CURRENCY),
+                delta(cardAccount, LedgerSubjectCode.AUTHORIZATION, -releaseAmount, CURRENCY),
+                delta(parentAccount, LedgerSubjectCode.AVAILABLE, releaseAmount, CURRENCY),
+                delta(parentAccount, LedgerSubjectCode.AUTHORIZATION, -releaseAmount, CURRENCY));
+    }
+
+    private FundsActionFactDTO assertReleaseActionFact(String authorizationSn,
+                                                       FundsActionFactDTO authorizationFact,
+                                                       String businessScene,
+                                                       String businessSn,
+                                                       long amount,
+                                                       int provenanceCount) {
+        List<FundsActionFactDTO> actionFacts = actionFactsByBusiness(businessScene, businessSn);
+        assertThat(actionFacts)
+                .as("release action fact missing for %s/%s", businessScene, businessSn)
+                .singleElement();
+        FundsActionFactDTO actionFact = actionFacts.getFirst();
+        Money expectedMoney = Money.immutable(amount, CURRENCY);
+        assertThat(actionFact.getIdentity().getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(actionFact.getIdentity().getIdentity())
+                .isEqualTo(releaseIdentity(authorizationSn, businessScene, businessSn));
+        assertThat(actionFact.getIntentRef())
+                .isEqualTo(releaseIntentRef(authorizationSn, businessScene, businessSn));
+        assertThat(actionFact.getAttemptRef())
+                .isEqualTo(releaseAttemptRef(authorizationSn, businessScene, businessSn));
+        assertThat(actionFact.getActionKind()).isEqualTo("release");
+        assertThat(actionFact.getMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getOutcome().getOwner()).isEqualTo("funds-transaction");
+        assertThat(actionFact.getOutcome().getCode()).isEqualTo("succeeded");
+        assertThat(actionFact.getFundsEffect().getEffectKind()).isEqualTo("proven-full");
+        assertThat(actionFact.getFundsEffect().getProvenMoney()).isEqualTo(expectedMoney);
+        assertThat(actionFact.getSemanticDigest().getAlgorithm()).isEqualTo("SHA-256");
+        assertThat(actionFact.getSemanticDigest().getValue()).matches("[0-9a-f]{64}");
+        assertThat(actionFact.getSemanticDigest().getCoveredFieldsVersion())
+                .isEqualTo("transaction.action.release.projection.v1");
+        assertThat(actionFact.getOriginalFundsFactRefs()).singleElement().satisfies(originalRef -> {
+            assertThat(originalRef.getTenantId()).isEqualTo(TENANT_ID);
+            assertThat(originalRef.getFactType()).isEqualTo("funds-action");
+            assertThat(originalRef.getFactId()).isEqualTo(authorizationFact.getIdentity().getIdentity());
+            assertThat(originalRef.getRelationRole()).isEqualTo("releases-authorized-effect");
+            assertThat(originalRef.getAllocatedMoney()).isEqualTo(expectedMoney);
+        });
+        assertThat(actionFact.getRouteProvenance()).hasSize(provenanceCount).allSatisfy(provenance -> {
+            assertThat(provenance.getOriginalFundsFactRef())
+                    .isEqualTo(actionFact.getOriginalFundsFactRefs().getFirst());
+            assertThat(provenance.getAllocatedMoney()).isEqualTo(expectedMoney);
+            assertThat(provenance.getRouteSnapshotRef())
+                    .isEqualTo(authorizationFact.getRouteProvenance().getFirst().getRouteSnapshotRef());
+            assertThat(provenance.getProvenanceRole()).isEqualTo("replayed-original-route");
+        });
+        assertThat(fundsTransactionQueryService.findFundsActionFact(actionFact.getIdentity())).hasValue(actionFact);
+        return actionFact;
+    }
+
+    private void assertReleaseActionFactUnavailable(FundsActionFactDTO originalFact,
+                                                    String businessScene,
+                                                    String businessSn) {
+        assertNoActionFacts(businessScene, businessSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFact.getIdentity())).isEmpty();
+    }
+
+    private void assertReleaseActionFactUnavailable(String authorizationSn,
+                                                    String businessScene,
+                                                    String businessSn) {
+        assertNoActionFacts(businessScene, businessSn);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(new FundsActionFactRef(
+                TENANT_ID, releaseIdentity(authorizationSn, businessScene, businessSn)))).isEmpty();
+    }
+
+    private void assertReleaseActionFactAvailable(FundsActionFactDTO originalFact,
+                                                  String businessScene,
+                                                  String businessSn) {
+        assertThat(actionFactsByBusiness(businessScene, businessSn)).containsExactly(originalFact);
+        assertThat(fundsTransactionQueryService.findFundsActionFact(originalFact.getIdentity()))
+                .hasValue(originalFact);
+    }
+
+    private static String releaseIdentity(String authorizationSn, String businessScene, String businessSn) {
+        return "release:v1:" + encodedIdentityPart(authorizationSn) + ":"
+                + encodedIdentityPart(businessScene) + ":" + encodedIdentityPart(businessSn);
+    }
+
+    private static String releaseIntentRef(String authorizationSn, String businessScene, String businessSn) {
+        return "release-intent:v1:" + encodedIdentityPart(authorizationSn) + ":"
+                + encodedIdentityPart(businessScene) + ":" + encodedIdentityPart(businessSn);
+    }
+
+    private static String releaseAttemptRef(String authorizationSn, String businessScene, String businessSn) {
+        return "release-attempt:v1:" + encodedIdentityPart(authorizationSn) + ":"
+                + encodedIdentityPart(businessScene) + ":" + encodedIdentityPart(businessSn) + ":REVERSAL";
+    }
+
+    private static String encodedIdentityPart(String value) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String authorizeWithBusinessKey(FundsAccountId accountId,
+                                            long amount,
+                                            String businessScene,
+                                            String businessSn) {
+        return authorizationTransactionService.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setApproved(true)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setDescription("authorization collision seed"), WindOperatorFactory.system());
+    }
+
+    private String completeAuthorizationWithBusinessKey(FundsAccountId accountId,
+                                                        long amount,
+                                                        String authorizationSn,
+                                                        String businessScene,
+                                                        String businessSn) {
+        return authorizationTransactionService.complete(new FundsAuthorizationTransactionCompleteRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setDescription("authorization complete collision seed"), WindOperatorFactory.system());
+    }
+
+    private String reverseAuthorizationWithBusinessKey(FundsAccountId accountId,
+                                                       long amount,
+                                                       String authorizationSn,
+                                                       String businessScene,
+                                                       String businessSn) {
+        return authorizationTransactionService.reversal(new FundsAuthorizationTransactionReversalRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setDescription("authorization release collision seed"), WindOperatorFactory.system());
+    }
+
+    private void updateFundsTransactionReversedAmount(String transactionSn, long reversedAmount) {
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET reversed_amount = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, reversedAmount, TENANT_ID, transactionSn)).isOne();
+    }
+
+    private void updateFundsTransactionDetailReferenceDetailSn(String detailSn, String referenceDetailSn) {
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET reference_detail_sn = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, referenceDetailSn, TENANT_ID, detailSn)).isOne();
+    }
+
+    private void updateFundsTransactionDetailContextVariables(String detailSn, String contextVariables) {
+        assertThat(authorizationJdbcTemplate.update("""
+                UPDATE t_funds_transaction_detail
+                SET context_variables = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, contextVariables, TENANT_ID, detailSn)).isOne();
     }
 
     private void assertCompleteActionFactUnavailable(FundsActionFactDTO originalFact, String businessSn) {

@@ -13,11 +13,11 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerState;
@@ -74,7 +74,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
 
     @Autowired
-    private LedgerBalanceProjectionService projectionService;
+    private LedgerBalanceProjectionServiceImpl projectionService;
 
     @Autowired
     private LedgerService ledgerService;
@@ -103,7 +103,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         });
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        projectionService.project(List.of(ledgerEntry(25L)));
+        projectionService.project(List.of(ledgerEntry(25L)), LedgerPostingAccessType.NORMAL);
 
         LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
         assertThat(eventAttempts).hasValue(1);
@@ -126,7 +126,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         setTestApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        projectionService.project(List.of(ledgerEntry(25L)));
+        projectionService.project(List.of(ledgerEntry(25L)), LedgerPostingAccessType.NORMAL);
 
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
         assertThat(publishedEvents).singleElement().satisfies(event -> {
@@ -164,7 +164,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         projectionService.project(List.of(ledgerEntry(25L,
-                Map.of("processorPayload", processorPayload))));
+                Map.of("processorPayload", processorPayload))), LedgerPostingAccessType.NORMAL);
         processorPayload.put("pan", "PAN_AFTER_BALANCE_EVENT_SHOULD_NOT_LEAK");
 
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
@@ -194,7 +194,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 Map.of("benefitPayload",
                         Map.of(
                                 "amount", Money.immutable(2000L, CURRENCY),
-                                "fundingNature", "PLATFORM_BORNE"))))))
+                                "fundingNature", "PLATFORM_BORNE")))), LedgerPostingAccessType.NORMAL))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining(
                         "ledgerBalanceProjection.entry.contextVariables must not contain core benefit field");
@@ -219,7 +219,8 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
 
         assertThatThrownBy(() -> projectionService.project(List.of(
                 ledgerEntry(frozenLedgerId, LedgerSubjectCode.FROZEN, EntrySide.CREDIT, 10L),
-                ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT, 200L))))
+                ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT, 200L)),
+                LedgerPostingAccessType.NORMAL))
                 .hasMessageContaining("账本余额不足");
 
         LedgerDTO availableLedger = ledgerService.getLedgerById(availableLedgerId);
@@ -242,7 +243,8 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         markLedgerNormalBalanceSide(availableLedgerId, EntrySide.CREDIT);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L))))
+        assertThatThrownBy(() -> projectionService.project(
+                List.of(ledgerEntry(25L)), LedgerPostingAccessType.NORMAL))
                 .hasMessageContaining("账本科目类别与正常余额方向不一致");
 
         LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
@@ -264,7 +266,8 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 .setState(LedgerState.SUSPENDED));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L))))
+        assertThatThrownBy(() -> projectionService.project(
+                List.of(ledgerEntry(25L)), LedgerPostingAccessType.NORMAL))
                 .hasMessageContaining("账本状态不允许入账");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -299,7 +302,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 availableLedgerId,
                 LedgerSubjectCode.AVAILABLE,
                 EntrySide.CREDIT,
-                100L)));
+                100L)), LedgerPostingAccessType.NORMAL);
 
         ledgerService.updateLedgerState(new UpdateLedgerStateRequest()
                 .setId(availableLedgerId)
@@ -369,7 +372,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                     ledgerId,
                     LedgerSubjectCode.AVAILABLE,
                     EntrySide.DEBIT,
-                    initialBalance)));
+                    initialBalance)), LedgerPostingAccessType.NORMAL);
         }
         return ledgerId;
     }
@@ -395,7 +398,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                     ledgerId,
                     LedgerSubjectCode.FROZEN,
                     initialBalance > 0L ? EntrySide.CREDIT : EntrySide.DEBIT,
-                    Math.abs(initialBalance))));
+                    Math.abs(initialBalance))), LedgerPostingAccessType.NORMAL);
         }
         return ledgerId;
     }

@@ -484,7 +484,7 @@ mindmap
 | 核心资金账务主体 | 可进入 route leg、posting plan、LedgerEntry 和余额投影的主体。 | `SubjectRef`、`FundsSubjectType`。 | 是。 | 默认允许资金账户、信用账户和解析后的平台资金账户；VCC 场景允许资金子账户或信用子账户。支出控制范围、支付工具、业务主体、VA 和外部账户不得直接入账。 |
 | 营销账户 | 已决策权益资金影响的账户 profile，可承接平台营销成本、权益负债、合作方补贴、营销留置和商户让利归因。 | 最小交付按 `FundingAccount`、平台资金账户角色或等价账户 profile 承接；若提升为独立 subject type，必须进入独立工程边界。 | 是，前提是已经解析为资金账户或平台责任资金账户。 | 不是支付工具，不是营销规则或券包库存，不因存在优惠字段自动入账；非入账解释事实不得生成营销账户分录。 |
 | 账本 / 账目 | 账务事实容器和余额 bucket。 | `Ledger`、`LedgerTransaction`、`LedgerPostingPlan`、`LedgerEntry`、`LedgerSubjectCode`。 | 不适用。 | 账本不是钱包或报表；账目不是账户主体。 |
-| 余额投影 | 由分录派生的余额读模型。 | `LedgerBalanceProjectionService`、`LedgerBalanceView`、`FundsSubjectBalanceQueryService`。 | 否。 | 可重建，不反写分录。 |
+| 余额投影 | 由分录派生的余额读模型。 | Ledger 内部唯一投影器、`LedgerBalanceView`、`FundsSubjectBalanceQueryService`。 | 否。 | 可重建，不反写分录；不向宿主暴露投影实现选择。 |
 | 交易投影 | 面向用户、商户、运营、财务核对和指标项输入的只读视图。 | transaction projection、`FundsTransactionProjectionPublisher`、reporting metric input boundary。 | 否。 | 不承接正式报表计算、会计确认、监管报送或事实修复。 |
 | 对账清算域 | 对账、清分、内部清算、结算、出款和差错运营闭环。 | `reconciliation-face`、`reconciliation-impl` 或后续确认模块。 | 否。 | 运营对象独立建模；不得直接写分录或改余额。 |
 | 资金治理域 | 归档、Manifest、checkpoint、watermark、重放和差异报告。 | `governance-face`、`governance-impl` 或后续确认模块。 | 否。 | 只治理事实和只读投影，不改变事实身份，不实现指标计算。 |

@@ -378,7 +378,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         assertThat(rawPlanId).hasSizeGreaterThan(64);
         assertThat(planId).hasSizeLessThanOrEqualTo(64);
         assertThat(planId).isNotEqualTo(rawPlanId);
-        assertThat(planId).startsWith("TRANSFER_" + transaction.getSn() + "_");
+        assertThat(planId).startsWith("TRANSFER_");
         assertThat(digest).matches(SHORT_HEX_DIGEST_PATTERN);
         assertThat(transaction.isBalanced()).isTrue();
         assertThat(plan.isBalanced()).isTrue();

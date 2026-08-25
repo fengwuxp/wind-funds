@@ -1,5 +1,6 @@
 package com.wind.funds.reconciliation.model.request;
 
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,17 +32,9 @@ public class IdentifyClearingSplittableDetailRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "来源资金交易流水号")
-    @NotBlank
-    private String fundsTransactionSn;
-
-    @Schema(description = "来源资金交易明细流水号")
-    @NotBlank
-    private String fundsTransactionDetailSn;
-
-    @Schema(description = "来源账本分录流水号")
-    @NotBlank
-    private String ledgerEntrySn;
+    @Schema(description = "来源资金动作事实稳定引用")
+    @NotNull
+    private StableIdentity sourceActionFactRef;
 
     @Schema(description = "上层清分策略已经确认的业务线")
     @NotBlank

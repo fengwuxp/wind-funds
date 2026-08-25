@@ -2,7 +2,6 @@ package com.wind.funds.ledger.service;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.dto.LedgerDTO;
@@ -13,27 +12,34 @@ import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
+import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
-import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.ledger.spec.LedgerEntrySpec;
-import com.wind.funds.ledger.spec.LedgerPostingPhaseSpec;
-import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
 import com.wind.funds.ledger.spec.LedgerTransactionSpec;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteLegType;
+import com.wind.funds.route.enums.RouteNodeRole;
+import com.wind.funds.route.enums.RouteNodeType;
+import com.wind.funds.route.model.ImmutableResolvedRouteSpec;
+import com.wind.funds.route.model.ImmutableRouteLegSpec;
+import com.wind.funds.route.model.ImmutableRouteNodeSpec;
+import com.wind.funds.route.model.ImmutableSubjectRef;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.transaction.instruction.ImmutableFundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -41,13 +47,17 @@ import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.ledger.profile.LedgerProfileCatalog;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -61,12 +71,16 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账本交易基础服务事实查询契约测试。
@@ -78,9 +92,11 @@ import static com.wind.funds.support.LedgerProjectionTestFixture.balanceEntry;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
 
-    private static final String LEDGER_TRANSACTION_SN = "LT-TRX-SERVICE-FACT-001";
+    private static final String FUNDS_TRANSACTION_SN = "FT-TRX-SERVICE-FACT-001";
 
-    private static final String POSTING_PLAN_ID = "PLAN-TRX-SERVICE-FACT-001";
+    private static final String BUSINESS_SCENE = "LEDGER_TRANSACTION_SERVICE_FACT";
+
+    private static final String BUSINESS_SN = "BIZ-TRX-SERVICE-FACT-001";
 
     private static final String SOURCE_SUBJECT_ID = "ledger_trx_service_fact_source";
 
@@ -104,7 +120,7 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
     private LedgerService ledgerService;
 
     @Autowired
-    private LedgerBalanceProjectionService ledgerBalanceProjectionService;
+    private LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -275,21 +291,21 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
 
-        ledgerTransactionPostingService.post(transaction(sourceLedgerId, targetLedgerId));
+        String ledgerTransactionSn = postTransfer();
 
         LedgerTransactionDTO transaction = ledgerTransactionService.getLedgerTransactionBySn(
-                TENANT_ID, LEDGER_TRANSACTION_SN);
+                TENANT_ID, ledgerTransactionSn);
         List<LedgerEntryDTO> entries = ledgerTransactionService.queryLedgerEntries(
                         new LedgerEntryQuery()
                                 .setTenantId(TENANT_ID)
-                                .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
+                                .setLedgerTransactionSn(ledgerTransactionSn),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
         LedgerEntryDTO firstEntry = ledgerTransactionService.getLedgerEntryBySn(TENANT_ID, entries.getFirst().getSn());
         List<LedgerEntryDTO> foreignTenantEntries = ledgerTransactionService.queryLedgerEntries(
                         new LedgerEntryQuery()
                                 .setTenantId(TENANT_ID + 1)
-                                .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
+                                .setLedgerTransactionSn(ledgerTransactionSn),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
         LedgerDTO sourceLedger = ledgerService.getLedgerById(sourceLedgerId);
@@ -301,7 +317,7 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
 
-        assertThat(transaction.getSn()).isEqualTo(LEDGER_TRANSACTION_SN);
+        assertThat(transaction.getSn()).isEqualTo(ledgerTransactionSn);
         assertThat(transaction.getEventType()).isEqualTo(FundsTransactionEventType.TRANSFER);
         assertThat(transaction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TRANSFER);
@@ -309,11 +325,11 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         assertThat(transaction.getCreditAmount()).isEqualTo(TRANSACTION_AMOUNT);
         assertThat(transaction.getSha256()).isNotBlank();
         assertThat(entries).hasSize(2);
-        assertThat(firstEntry.getLedgerTransactionSn()).isEqualTo(LEDGER_TRANSACTION_SN);
+        assertThat(firstEntry.getLedgerTransactionSn()).isEqualTo(ledgerTransactionSn);
         assertThat(firstEntry.getPostingRole()).isEqualTo(LedgerPostingRole.DETAIL);
         assertThat(foreignTenantEntries).isEmpty();
         assertThatThrownBy(() -> ledgerTransactionService.getLedgerTransactionBySn(
-                TENANT_ID + 1, LEDGER_TRANSACTION_SN))
+                TENANT_ID + 1, ledgerTransactionSn))
                 .hasMessageContaining("账户账本交易不存在");
         assertThatThrownBy(() -> ledgerTransactionService.getLedgerEntryBySn(
                 TENANT_ID + 1, firstEntry.getSn()))
@@ -325,23 +341,210 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 .containsExactly(sourceLedgerId);
     }
 
-    private LedgerTransactionSpec transaction(Long sourceLedgerId, Long targetLedgerId) {
-        return new TestLedgerTransactionSpec(List.of(new TestLedgerPostingPlanSpec(List.of(
-                new TestLedgerPostingPhaseSpec(LedgerPhaseCode.TRANSFER, List.of(
-                        creditEntry(SOURCE_SUBJECT_ID, sourceLedgerId),
-                        debitEntry(TARGET_SUBJECT_ID, targetLedgerId)))))));
+    /**
+     * 场景：持久化 Ledger transaction/plan/entry 任一层摘要被改写后执行稳定流水查询。
+     * 输入：真实 posting gateway 形成完整账务事实，再仅篡改目标层 sha256。
+     * 输出：Ledger read boundary 抛出包含 layer/SN 的完整性错误，全部账务与余额事实不变。
+     * 红线：查询不得返回未验证 DTO，也不得修复摘要或产生资金副作用。
+     */
+    @ParameterizedTest(name = "tampered persisted {0} digest")
+    @ValueSource(strings = {"TRANSACTION", "POSTING_PLAN", "LEDGER_ENTRY"})
+    void testStableSnQueriesShouldRejectTamperedPersistedLedgerAggregate(String layer) {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        String ledgerTransactionSn = postTransfer();
+        String postingPlanSn = jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_ledger_posting_plan
+                WHERE ledger_transaction_sn = ?
+                """, String.class, ledgerTransactionSn);
+        String entrySn = jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_ledger_entry
+                WHERE ledger_transaction_sn = ?
+                ORDER BY sn LIMIT 1
+                """, String.class, ledgerTransactionSn);
+        Long transactionId = jdbcTemplate.queryForObject(
+                "SELECT id FROM t_ledger_transaction WHERE sn = ?", Long.class, ledgerTransactionSn);
+        Long entryId = jdbcTemplate.queryForObject(
+                "SELECT id FROM t_ledger_entry WHERE sn = ?", Long.class, entrySn);
+        String targetSn = tamperPersistedDigest(layer, ledgerTransactionSn, postingPlanSn, entrySn);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<String> guardGaps = exactReadGuardGaps(
+                layer, transactionId, entryId, ledgerTransactionSn, postingPlanSn, entrySn, targetSn);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+        assertThat(guardGaps)
+                .as("stable-sn ledger read must reject tampered " + stableLayerLabel(layer) + " digest")
+                .isEmpty();
     }
 
-    private LedgerEntrySpec debitEntry(String subjectId, Long ledgerId) {
-        return ledgerEntry(subjectId, ledgerId, EntrySide.DEBIT);
+    private String tamperPersistedDigest(String layer,
+                                         String ledgerTransactionSn,
+                                         String postingPlanSn,
+                                         String entrySn) {
+        return switch (layer) {
+            case "TRANSACTION" -> {
+                jdbcTemplate.update("UPDATE t_ledger_transaction SET sha256 = ? WHERE sn = ?",
+                        "tampered-transaction-digest", ledgerTransactionSn);
+                yield ledgerTransactionSn;
+            }
+            case "POSTING_PLAN" -> {
+                jdbcTemplate.update("UPDATE t_ledger_posting_plan SET sha256 = ? WHERE sn = ?",
+                        "tampered-posting-plan-digest", postingPlanSn);
+                yield postingPlanSn;
+            }
+            case "LEDGER_ENTRY" -> {
+                jdbcTemplate.update("UPDATE t_ledger_entry SET sha256 = ? WHERE sn = ?",
+                        "tampered-ledger-entry-digest", entrySn);
+                yield entrySn;
+            }
+            default -> throw new IllegalArgumentException("Unsupported persisted digest layer: " + layer);
+        };
     }
 
-    private LedgerEntrySpec creditEntry(String subjectId, Long ledgerId) {
-        return ledgerEntry(subjectId, ledgerId, EntrySide.CREDIT);
+    private List<String> exactReadGuardGaps(String layer,
+                                            Long transactionId,
+                                            Long entryId,
+                                            String ledgerTransactionSn,
+                                            String postingPlanSn,
+                                            String entrySn,
+                                            String targetSn) {
+        List<String> result = new ArrayList<>();
+        switch (layer) {
+            case "TRANSACTION" -> {
+                collectGuardGap(result, "getLedgerTransactionById",
+                        () -> ledgerTransactionService.getLedgerTransactionById(transactionId), layer, targetSn);
+                collectGuardGap(result, "getLedgerTransactionBySn",
+                        () -> ledgerTransactionService.getLedgerTransactionBySn(TENANT_ID, ledgerTransactionSn),
+                        layer, targetSn);
+            }
+            case "POSTING_PLAN" -> {
+                collectGuardGap(result, "getLedgerTransactionBySn",
+                        () -> ledgerTransactionService.getLedgerTransactionBySn(TENANT_ID, ledgerTransactionSn),
+                        layer, targetSn);
+                collectGuardGap(result, "existsPostingPlan",
+                        () -> ledgerTransactionService.existsPostingPlan(
+                                TENANT_ID, postingPlanSn, ledgerTransactionSn), layer, targetSn);
+            }
+            case "LEDGER_ENTRY" -> {
+                collectGuardGap(result, "getLedgerEntryById",
+                        () -> ledgerTransactionService.getLedgerEntryById(entryId), layer, targetSn);
+                collectGuardGap(result, "getLedgerEntryBySn",
+                        () -> ledgerTransactionService.getLedgerEntryBySn(TENANT_ID, entrySn), layer, targetSn);
+                collectGuardGap(result, "queryLedgerEntries",
+                        () -> ledgerTransactionService.queryLedgerEntries(
+                                new LedgerEntryQuery()
+                                        .setTenantId(TENANT_ID)
+                                        .setLedgerTransactionSn(ledgerTransactionSn),
+                                DefaultPageQueryOptions.defaults(10)), layer, targetSn);
+            }
+            default -> throw new IllegalArgumentException("Unsupported persisted digest layer: " + layer);
+        }
+        return result;
     }
 
-    private LedgerEntrySpec ledgerEntry(String subjectId, Long ledgerId, EntrySide entrySide) {
-        return new TestLedgerEntrySpec(subjectId, ledgerId, entrySide);
+    private void collectGuardGap(List<String> result,
+                                 String entryPoint,
+                                 ThrowingCallable read,
+                                 String layer,
+                                 String targetSn) {
+        Throwable failure = catchThrowable(read);
+        if (failure == null) {
+            result.add(entryPoint + " returned an unverified fact");
+            return;
+        }
+        String message = failure.getMessage();
+        if (message == null
+                || !message.contains(integrityLayerName(layer))
+                || !message.contains(targetSn)) {
+            result.add(entryPoint + " returned an incomplete integrity error: " + message);
+        }
+    }
+
+    private String stableLayerLabel(String layer) {
+        return switch (layer) {
+            case "TRANSACTION" -> "transaction";
+            case "POSTING_PLAN" -> "plan";
+            case "LEDGER_ENTRY" -> "entry";
+            default -> throw new IllegalArgumentException("Unsupported persisted digest layer: " + layer);
+        };
+    }
+
+    private String integrityLayerName(String layer) {
+        return switch (layer) {
+            case "TRANSACTION" -> "transaction";
+            case "POSTING_PLAN" -> "posting plan";
+            case "LEDGER_ENTRY" -> "ledger entry";
+            default -> throw new IllegalArgumentException("Unsupported persisted digest layer: " + layer);
+        };
+    }
+
+    private String postTransfer() {
+        return ledgerTransactionPostingService.post(
+                transferInstruction(), FUNDS_TRANSACTION_SN, transferRoute());
+    }
+
+    private FundsInstructionSpec transferInstruction() {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(TENANT_ID)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.TRANSFER)
+                .transactionType(DefaultFundsTransactionType.TRANSFER)
+                .amount(TRANSACTION_AMOUNT)
+                .originalAmount(TRANSACTION_AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .ledgerPeriodType(AccountBalancePeriodType.LIFETIME)
+                .businessScene(BUSINESS_SCENE)
+                .businessSn(BUSINESS_SN)
+                .eventTime(TRANSACTION_TIME)
+                .operator(WindOperatorFactory.system())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ResolvedRouteSpec transferRoute() {
+        ImmutableRouteNodeSpec source = routeNode(SOURCE_SUBJECT_ID, RouteNodeRole.SOURCE);
+        ImmutableRouteNodeSpec target = routeNode(TARGET_SUBJECT_ID, RouteNodeRole.TARGET);
+        ImmutableRouteLegSpec leg = ImmutableRouteLegSpec.builder()
+                .legId("LEG-TRX-SERVICE-FACT-001")
+                .sequence(1)
+                .legType(RouteLegType.INTERNAL_TRANSFER)
+                .sourceNode(source)
+                .targetNode(target)
+                .amount(TRANSACTION_AMOUNT)
+                .originalAmount(TRANSACTION_AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .contextVariables(Map.of())
+                .build();
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("LEDGER_TRANSACTION_SERVICE_FACT_ROUTE")
+                .routeVersion("v1")
+                .businessScene(BUSINESS_SCENE)
+                .businessSn(BUSINESS_SN)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.TRANSFER)
+                .transactionType(DefaultFundsTransactionType.TRANSFER)
+                .participants(List.of())
+                .legs(List.of(leg))
+                .resolvedAt(TRANSACTION_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteNodeSpec routeNode(String subjectId, RouteNodeRole role) {
+        return ImmutableRouteNodeSpec.builder()
+                .nodeType(RouteNodeType.SUBJECT)
+                .nodeRole(role)
+                .subjectRef(ImmutableSubjectRef.builder()
+                        .tenantId(TENANT_ID)
+                        .subjectId(subjectId)
+                        .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .currency(CURRENCY.name())
+                        .ledgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                        .build())
+                .build();
     }
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {
@@ -352,9 +555,9 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
                 .setLedgerProfileVersion(1)
                 .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                .setLedgerSubjectCategory(LedgerSubjectCategory.ASSET)
-                .setNormalBalanceSide(EntrySide.DEBIT)
-                .setAllowNegative(Boolean.FALSE)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.TRUE)
                 .setCurrency(CURRENCY)
                 .setSettlementPolicy("RT")
                 .setCutOffTime(LocalTime.MIDNIGHT)
@@ -363,8 +566,8 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         if (initialBalance != 0L) {
             ledgerBalanceProjectionService.project(List.of(balanceEntry(
                     ledgerService.getLedgerById(ledgerId),
-                    EntrySide.DEBIT,
-                    initialBalance)));
+                    EntrySide.CREDIT,
+                    initialBalance)), LedgerPostingAccessType.NORMAL);
         }
         return ledgerId;
     }
@@ -387,10 +590,16 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupLedgerTransactionServiceFactQueryTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", LEDGER_TRANSACTION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
-                LEDGER_TRANSACTION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE sn = ?", LEDGER_TRANSACTION_SN);
+        List<String> ledgerTransactionSns = jdbcTemplate.queryForList("""
+                SELECT sn FROM t_ledger_transaction
+                WHERE tenant_id = ? AND business_scene = ? AND business_sn = ?
+                """, String.class, TENANT_ID, BUSINESS_SCENE, BUSINESS_SN);
+        for (String ledgerTransactionSn : ledgerTransactionSns) {
+            jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", ledgerTransactionSn);
+            jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
+                    ledgerTransactionSn);
+            jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE sn = ?", ledgerTransactionSn);
+        }
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
                 SOURCE_SUBJECT_ID,
                 TARGET_SUBJECT_ID);
@@ -406,230 +615,10 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 tableName);
     }
 
-    private record TestLedgerTransactionSpec(List<LedgerPostingPlanSpec> postingPlans)
-            implements LedgerTransactionSpec {
-
-        private TestLedgerTransactionSpec {
-            postingPlans = List.copyOf(postingPlans);
-        }
-
-        @Override
-        public Long getTenantId() {
-            return TENANT_ID;
-        }
-
-        @Override
-        public String getSn() {
-            return LEDGER_TRANSACTION_SN;
-        }
-
-        @Override
-        public FundsInstructionType getInstructionType() {
-            return FundsInstructionType.DIRECT_TRANSACTION;
-        }
-
-        @Override
-        public FundsTransactionEventType getEventType() {
-            return FundsTransactionEventType.TRANSFER;
-        }
-
-        @Override
-        public Money getAmount() {
-            return TRANSACTION_AMOUNT;
-        }
-
-        @Override
-        public String getBusinessSn() {
-            return "BIZ-TRX-SERVICE-FACT-001";
-        }
-
-        @Override
-        public DefaultFundsTransactionType getTransactionType() {
-            return DefaultFundsTransactionType.TRANSFER;
-        }
-
-        @Override
-        public String getBusinessScene() {
-            return "LEDGER_TRANSACTION_SERVICE_FACT";
-        }
-
-        @Override
-        public String getReferenceLedgerTransactionSn() {
-            return null;
-        }
-
-        @Override
-        public LocalDateTime getTransactionTime() {
-            return TRANSACTION_TIME;
-        }
-
-        @Override
-        public String getDescription() {
-            return "ledger transaction service fact query contract";
-        }
-
-        @Override
-        public List<LedgerPostingPlanSpec> getPostingPlans() {
-            return postingPlans;
-        }
-
-        @Override
-        public Map<String, Object> getContextVariables() {
-            return Map.of("traceId", "TRACE-TRX-SERVICE-FACT-001");
-        }
-    }
-
-    private record TestLedgerPostingPlanSpec(List<LedgerPostingPhaseSpec> postingPhases)
-            implements LedgerPostingPlanSpec {
-
-        private TestLedgerPostingPlanSpec {
-            postingPhases = List.copyOf(postingPhases);
-        }
-
-        @Override
-        public String getPlanId() {
-            return POSTING_PLAN_ID;
-        }
-
-        @Override
-        public String getLedgerTransactionSn() {
-            return LEDGER_TRANSACTION_SN;
-        }
-
-        @Override
-        public LedgerPostingIntentType getIntent() {
-            return LedgerPostingIntentType.TRANSFER;
-        }
-
-        @Override
-        public List<LedgerPostingPhaseSpec> getPostingPhases() {
-            return postingPhases;
-        }
-
-        @Override
-        public Map<String, Object> getContextVariables() {
-            return Map.of("routeTraceId", "ROUTE-TRX-SERVICE-FACT-001");
-        }
-    }
-
-    private record TestLedgerPostingPhaseSpec(LedgerPhaseCode phaseCode,
-                                              List<LedgerEntrySpec> entries)
-            implements LedgerPostingPhaseSpec {
-
-        private TestLedgerPostingPhaseSpec {
-            entries = List.copyOf(entries);
-        }
-
-        @Override
-        public LedgerPhaseCode getPhaseCode() {
-            return phaseCode;
-        }
-
-        @Override
-        public List<LedgerEntrySpec> getEntries() {
-            return entries;
-        }
-    }
-
-    private record TestLedgerEntrySpec(String subjectId,
-                                       Long ledgerId,
-                                       EntrySide entryType)
-            implements LedgerEntrySpec {
-
-        @Override
-        public String getSubjectId() {
-            return subjectId;
-        }
-
-        @Override
-        public String getSubjectType() {
-            return SUBJECT_TYPE;
-        }
-
-        @Override
-        public LedgerSubjectCode getLedgerSubjectCode() {
-            return LedgerSubjectCode.AVAILABLE;
-        }
-
-        @Override
-        public LedgerSubjectCategory getLedgerSubjectCategory() {
-            return LedgerSubjectCategory.ASSET;
-        }
-
-        @Override
-        public Long getLedgerId() {
-            return ledgerId;
-        }
-
-        @Override
-        public String getLedgerTransactionSn() {
-            return LEDGER_TRANSACTION_SN;
-        }
-
-        @Override
-        public EntrySide getEntryType() {
-            return entryType;
-        }
-
-        @Override
-        public LedgerPhaseCode getPhaseCode() {
-            return LedgerPhaseCode.TRANSFER;
-        }
-
-        @Override
-        public LedgerPostingRole getPostingRole() {
-            return LedgerPostingRole.DETAIL;
-        }
-
-        @Override
-        public LedgerBalanceConstraintType getBalanceConstraintType() {
-            return null;
-        }
-
-        @Override
-        public String getBusinessScene() {
-            return "LEDGER_TRANSACTION_SERVICE_FACT";
-        }
-
-        @Override
-        public String getBusinessSn() {
-            return "BIZ-TRX-SERVICE-FACT-001";
-        }
-
-        @Override
-        public Money getAmount() {
-            return TRANSACTION_AMOUNT;
-        }
-
-        @Override
-        public Money getOriginalAmount() {
-            return TRANSACTION_AMOUNT;
-        }
-
-        @Override
-        public BigDecimal getExchangeRate() {
-            return BigDecimal.ONE;
-        }
-
-        @Override
-        public LocalDateTime getTransactionTime() {
-            return TRANSACTION_TIME;
-        }
-
-        @Override
-        public String getDescription() {
-            return "ledger transaction service fact query contract";
-        }
-
-        @Override
-        public Map<String, Object> getContextVariables() {
-            return Map.of("ledgerEntryTraceId", "LE-TRX-SERVICE-FACT-001");
-        }
-    }
-
     @Configuration
     @Import({
             DefaultLedgerTransactionPostingServiceImpl.class,
+            DefaultLedgerPostingAssembler.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
             LedgerProfileCatalog.class,

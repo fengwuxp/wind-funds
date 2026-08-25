@@ -8,7 +8,7 @@
 | Goal key | `CORE-STABILITY-20260804` |
 | Runtime Goal thread | `019fc59d-b771-75b0-b5bc-6f9e366e30d8` |
 | Goal state | `ACTIVE` |
-| Current stage | `CORE_API_BASELINE_SUPERSEDING_REBASE` |
+| Current stage | `MIG05D_POSTING_COMMAND_A / BEHAVIORAL_GREEN_EXECUTION_COMPLETE / BEHAVIORAL_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / NEXT_SLICE_ENTRY_CARD_REQUIRED / CODE_FREEZE` |
 | Date | `2026-08-22` |
 | Baseline HEAD | `ac9d1565` |
 | Maker | `wind-funds` maintainer or assigned implementation Agent |
@@ -28,7 +28,8 @@
 - 余额 View 已按 Profile 多态契约冻结，route/path 与 posting/accounting 目标边界已实现；其余摘要批次和 `D-CS-004` 时间语义仍存在长期风险，必须按独立 Owner Gate 继续验证。
 - `core` 继续只承载跨能力稳定事实、值对象、不变量和引擎 SPI；场景编排、默认不可变实现、产品目录、应用服务和测试验证器按既有模块归属演进，不新建 Maven 模块。
 - Owner 已批准当前 `1.0.1-SNAPSHOT` 直接按目标契约收敛，不保留旧 FQN、旧 getter、deprecated 适配、双写、双读或 V2 平行类型；该授权不降低资金平衡、幂等、回放依据和拒绝无副作用门禁。
-- `D-CS-006-R` supersede 2026-08-11 的 `107/99/4/4` 基线：MIG-05B 已接受删除两个错误公开的 profile spec 和 consumer 自报负余额 surface，当前 Core 直接冻结 `105 public / 97 stable / 4 experimental / 4 internal / 1043 baseline lines / FundsAccount#getState()`，不恢复旧类型或兼容 getter。
+- `D-CS-006-S` supersede `D-CS-006-R`：MIG-05C 已接受删除只有一个生产实现、没有真实变化轴的 `LedgerBalanceProjectionService`，当前 Core 直接冻结 `104 public / 96 stable / 4 experimental / 4 internal / 1039 baseline lines / FundsAccount#getState()`，不恢复旧类型、兼容接口或平行投影入口。
+- Human Owner 已接受 MIG-05D A：Contract Surface Green 已无兼容删除 `LedgerPostingAssembler` 并把 `LedgerTransactionPostingService` 收窄为高阶命令；Behavioral Green 已补齐六字段复验、动作级确定性 SN、重放/冲突与并发收敛。当前物理基线为 `103 public / 95 stable / 4 experimental / 4 internal / 1036 lines`，Surface 与 Behavioral 均通过独立 Checker。
 
 ### Success Criteria
 
@@ -62,6 +63,8 @@
 | `D-CS-005` | route 只保留路径与来源证据；posting 独立拥有科目、期间、阶段、余额效果和约束，直接切换目标契约，不保留 hybrid route 或可恢复旧会计成员的领域/public snapshot reader。 | `CONFIRMED_BREAKING` | 实施必须分切片保持现有资金行为并通过 route/posting、回放、幂等和 H2 业务流；内部历史摘要核验可读取 generic map，但不得恢复旧 route 会计契约。 |
 | `D-CS-006` | 2026-08-11 历史裁决：默认不可变 route/instruction 实现退出 Core 后，分类为 107 public 顶层类型、99 stable / 4 experimental / 4 internal。 | `HISTORICAL_SUPERSEDED_BY_D_CS_006_R` | 只保留为当时基线证据，不再代表当前 cardinality 或 stable signature。 |
 | `D-CS-006-R` | 2026-08-22 superseding decision：在已接受删除两个错误公开的 profile spec、`ALLOW_NEGATIVE_BALANCE` 与旧 `FundsAccount#getStatus()` 后，当前基线为 105 public / 97 stable / 4 experimental / 4 internal、1043 行，并冻结 `FundsAccount#getState()`。 | `CONFIRMED_SUPERSEDING_REBASE` | `api-policy.tsv`、core Java 与其他 signature immutable；任何额外 diff 停止，不恢复旧类型、getter、alias 或兼容桥。 |
+| `D-CS-006-S` | 2026-08-24 superseding decision：MIG-05C 删除无第二生产实现的 `LedgerBalanceProjectionService` 后，当前基线为 104 public / 96 stable / 4 experimental / 4 internal、1039 行。 | `CONFIRMED_SUPERSEDING_REBASE` | 只删除该接口四条 stable signature；`api-policy.tsv`、其他 core Java 与其他 signature immutable，不新增 alias、V2、bridge 或 concrete 公共替代。 |
+| `D-CS-006-T` | 2026-08-24 superseding decision：MIG-05D A 无兼容删除 `LedgerPostingAssembler`，`LedgerTransactionPostingService` 保持 stable type 但收窄为 instruction + funds transaction identity + resolved route 的唯一高阶写命令；当前基线为 103/95/4/4、1036 行。 | `CONFIRMED_BEHAVIOR_IMPLEMENTED / INDEPENDENT_CHECKER_PASS` | Surface 删除 assembler 三条 signature 并替换 posting service 单签名；Behavioral 以 root + action identity 生成稳定 SN，复用 persisted aggregate digest 和现有唯一键。`api-policy.tsv`、其他 signature 与 schema immutable。 |
 | `D-CS-007` | Core DSL 是资金主链内部规范事实和引擎 SPI，不是业务直接拼装 SDK；契约按 transaction/route/ledger/wallet/fx capability 归属，业务调用方使用 `*-face` 和稳定叶子值对象。 | `CONFIRMED_VERIFIED` | 禁止顶层 `com.wind.funds.spec` / `model`、Core public `Immutable*`、`com.wind.funds.dsl` facade、兼容桥和 V2 平行类型图。 |
 
 ### 2.1 Balance Semantics Evidence
@@ -101,16 +104,16 @@
 
 ### 2.3 Public API Baseline Evidence
 
-- 初始源码曾有 121 个 public 顶层类型；2026-08-11 将其中 14 个 public `Immutable*` 默认实现下沉到 `transaction-impl` 后形成 107 个 public 顶层类型。2026-08-22 又按 MIG-05B 已接受的无兼容边界删除两个错误公开的 profile spec，当前 Core 为 105 个 public 顶层类型和 1 个 package-private 顶层 class entry。
-- 使用 JDK `javap -public` 并在类型内规范化排序后，当前 97 个 stable public 类型形成 Owner 批准基线。测试专用 `FundsDslJsonContractVerifier` 和默认不可变实现均不进入 Core stable baseline；Jar checksum 不同只证明构件字节不同，不能替代 signature 比较。
+- 初始源码曾有 121 个 public 顶层类型；2026-08-11 将其中 14 个 public `Immutable*` 默认实现下沉到 `transaction-impl` 后形成 107 个 public 顶层类型。2026-08-22 按 MIG-05B 删除两个错误公开的 profile spec；2026-08-24 按 MIG-05C 删除单实现投影接口，当前 Core 为 104 个 public 顶层类型和 1 个 package-private 顶层 class entry。
+- 使用 JDK `javap -public` 并在类型内规范化排序后，当前 96 个 stable public 类型形成 Owner 批准基线。测试专用 `FundsDslJsonContractVerifier` 和默认不可变实现均不进入 Core stable baseline；Jar checksum 不同只证明构件字节不同，不能替代 signature 比较。
 - 两个早期 `jdk21` Snapshot 各有 131 个顶层 class entry；相对当前存在 8 个类型移除、2 个类型新增，其中 public 类型为 6 个移除、2 个新增，并伴随 `FundsInstructionSpec#getOperator` 类型、record canonical constructor、账户层级快照和枚举值变化。它们只能证明历史上发生过破坏性演进，不能作为当前冻结基线。
 - 仓库没有 japicmp、Revapi 或等价自动兼容门禁；`core` 也没有统一的稳定/实验/内部注解，现有 `@Deprecated(forRemoval = true)` 只覆盖一个旧交易类型判断方法。
 
-当前批准分类以“例外清单 + 默认 stable”穷举全部 105 个 public 顶层类型：
+当前批准分类以“例外清单 + 默认 stable”穷举全部 104 个 public 顶层类型：
 
 | 分类 | 数量 | 类型范围 | 冻结条件 |
 | --- | ---: | --- | --- |
-| `STABLE` | 97 | 除下方 8 个例外外的全部 public 顶层类型。 | 仓库内 baseline 冻结批准的 public signature；差异必须 fail closed 或有 Owner 批准的直接切换记录。 |
+| `STABLE` | 96 | 除下方 8 个例外外的全部 public 顶层类型。 | 仓库内 baseline 冻结批准的 public signature；差异必须 fail closed 或有 Owner 批准的直接切换记录。 |
 | `EXPERIMENTAL` | 4 | `CreditFundsAccountType`、`FundingAccountType`、`ExternalFundsAccountType`、`DefaultFeeType`。 | 4 个枚举只有测试证据、无本仓生产消费者，本轮不冻结。 |
 | `INTERNAL` | 4 | `FundsBenefitLedgerEffect`、`LedgerNormalBalanceUtils`、`MerchantInfoSpec`、`UserWalletFundsAccountType`。 | 无跨模块生产消费者或只在 core 内部自用。本轮不冻结，也不据此授权删除。 |
 
@@ -121,12 +124,14 @@
 - `FundsInstructionSpec`、ledger fact、route snapshot/replay、`LedgerBalanceBucket`、`SettlementPolicySpec` 和 `AccountBalancePeriodType` 中暴露 `LocalDateTime` 或读取宿主时钟的成员：受 `D-CS-004` 约束。
 - route/spec 与 `LedgerPostingAssembler`、`LedgerTransactionPostingService` 的路径/会计效果边界成员：受 `D-CS-005` 约束。
 
-`D-CS-006-R` 当前裁决：接受 105/97/4/4 分类，以已接受的无兼容目标和当前源码构建结果重建 baseline；自动门禁只冻结 Owner 批准的 stable 类型和成员，不把实现构造器、legacy hash、含糊余额聚合或未完成的 route/posting 目标语义误固化。基线是仓库内受控文本，构建时不依赖会漂移的远端 Snapshot。
+`D-CS-006-S` 是 MIG-05D Surface 执行前的历史基线：104/96/4/4、1039 行。它继续作为迁移前证据，不再代表当前物理 API。
+
+`D-CS-006-T` 当前裁决：Surface Green 删除 `LedgerPostingAssembler` 三条 stable signature，并把 `LedgerTransactionPostingService#post(LedgerTransactionSpec)` 单条替换为 `post(FundsInstructionSpec, String, ResolvedRouteSpec): String`；Behavioral Green 以 `tenantId + fundsTransactionSn + eventType + businessScene + businessSn` 派生稳定 SN，并复用既有 aggregate digest/唯一键完成重放、冲突和并发收敛。当前物理基线为 `103 public / 95 stable / 4 experimental / 4 internal / 1036 baseline lines`；`api-policy.tsv` 的 4/4 分类与 20 个成员例外不变，Java 21 compile、baseline、扩大测试与独立 Checker 均 PASS。
 
 正式执行证据：
 
-- `core/api-baseline/api-policy.tsv` 继续固化 4 个 experimental、4 个 internal 和 20 个精确成员例外；其余 97 个 public 顶层类型及继承 stable 分类的 public nested 类型生成 1043 行 stable signature baseline。`BOUNDARY-C` 删除的 route 会计成员不再进入基线；`BOUNDARY-B` 新增的 `LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已显式进入基线；2026-08-11 曾稳定共享 `FundsContextVariables.INCREASE / ALLOW_NEGATIVE_BALANCE`，其中 `ALLOW_NEGATIVE_BALANCE` 已于 2026-08-22 因缺少 Consumer authority 证据而无兼容删除，当前只保留被实际共享的稳定 context 语义；进入 `CORE-1E` 前工作树已有的 `FundsTransactionEventType.SETTLEMENT_RELEASE` 继续由精确成员例外隔离。
-- `scripts/verify-core-api-baseline.sh` 仅使用 JDK `javap -public` 和系统命令，校验 105/97/4/4 数量、public nested 继承分类、重复或失效分类、重复或失效成员例外，并对规范化结果做精确 diff；`just verify-core-api` 强制先执行 clean compile，只有显式 `--update` 才能重建批准基线，未增加构建或运行时依赖。
+- `core/api-baseline/api-policy.tsv` 继续固化 4 个 experimental、4 个 internal 和 20 个精确成员例外；其余 95 个 public 顶层稳定类型及继承 stable 分类的 public nested 类型生成 1036 行 stable signature baseline。`LedgerBalanceProjectionService` 与 `LedgerPostingAssembler` 已分别按 MIG-05C/MIG-05D 删除，posting service 只保留高阶单签名；`FundsTransactionEventType.SETTLEMENT_RELEASE` 继续由精确成员例外隔离。
+- `scripts/verify-core-api-baseline.sh` 仅使用 JDK `javap -public` 和系统命令，校验 103/95/4/4 数量、public nested 继承分类、重复或失效分类、重复或失效成员例外，并对规范化结果做精确 diff；`just verify-core-api` 强制先执行 clean compile，只有显式 `--update` 才能重建批准基线，未增加构建或运行时依赖。
 - `Justfile` 增加独立 `verify-core-api` 门禁，并在 `verify-cad` 的 clean compile 后、全量测试前执行。缺少 policy 的 RED、正式 baseline 的 GREEN 和删除一行 baseline 的 drift probe 均按预期 fail closed。
 - `getLedgerProfileCode()`、`getAuthorizationBalance()`、`getTotalBalance()`、`FundsAccount#getState()`、`LedgerPostingIntentType.RELEASE` 与 `LedgerPostingScope.CONTROL_RELEASE` 已进入 stable baseline；route/path 与 posting/accounting 目标归属已冻结，`sha256Json` 和时间/宿主时钟成员继续按各自 Owner Gate 排除；具体 `Immutable*` 和两个旧 profile spec 已退出 Core 构件。
 - Java 21 的 21 模块 clean compile、本轮聚焦 58/58、`test-transaction` 149/149、`test-boundary` 199/199、`test-business-flow`、PMD 和当前共享工作区完整 `verify-cad` 均通过；完整 CAD 为 112 suites / 1104 tests / 0 failures / 0 errors / 1 expected MySQL skip，API、public contract、classfile 和 codegen 门禁通过。
@@ -203,7 +208,7 @@
 
 `BOUNDARY-C/D` 最终执行证据：route 六类会计成员及新写 wire 字段已删除；DSL JSON 契约 32/32、RouteSnapshot 历史边界 5/5、core 106/106、ledger 55/55、transaction 148/148、boundary 197/197、四组业务 H2 43/43 和 21 模块 compile/PMD 均通过。四组业务证据由 `GlobalAccountAchBusinessFlowTests`、`AcquiringSettlementBusinessFlowTests`、`AgentCommissionSettlementBusinessFlowTests`、`ClearingBatchApplicationServiceTests` 与 `ReconciliationGateApplicationServiceTests` 组成，继续复用同一 FundsTransaction/Route/Ledger/Balance 主链。完整 `verify-cad` 为 112 suites / 1100 tests / 0 failures / 0 errors / 1 expected MySQL skip；1060 行 stable API baseline、public contract、classfile 和 codegen 门禁均通过。Checker 发现的两项 P1 已分别以完成态、逐 leg 严格 legacy fallback 和拒绝旧 route 会计字段的 DSL verifier 关闭；P2 措辞漂移同步修正，最终结论为 `P0=0 / P1=0 / P2=0`，状态为 `BOUNDARY_D_VERIFIED`。
 
-后续工程 CR 历史证据（2026-08-11）：冻结单旧 full-route 摘要兼容、resolver 输出身份、原账本交易归属、费用腿强身份与同主体角色消歧均已补回归；当时两个 instruction context 共享 key 归属 Core。聚焦测试 58/58、transaction 149/149、boundary 199/199、business-flow、PMD 与完整 CAD 均通过；完整 CAD 为 112 suites / 1104 tests / 0 failures / 0 errors / 1 expected MySQL skip，当时 stable API baseline 为 1062 行。当前 baseline 由 `D-CS-006-R` supersede 为 1043 行。
+后续工程 CR 历史证据（2026-08-11）：冻结单旧 full-route 摘要兼容、resolver 输出身份、原账本交易归属、费用腿强身份与同主体角色消歧均已补回归；当时两个 instruction context 共享 key 归属 Core。聚焦测试 58/58、transaction 149/149、boundary 199/199、business-flow、PMD 与完整 CAD 均通过；完整 CAD 为 112 suites / 1104 tests / 0 failures / 0 errors / 1 expected MySQL skip，当时 stable API baseline 为 1062 行。当前 baseline 由 `D-CS-006-S` supersede 为 1039 行。
 
 `D-CS-005` 停止条件：任一切片无法同时证明 posting 平衡、LedgerTransaction/LedgerEntry 可追溯、逆向累计上限、幂等和拒绝无副作用时停止；不回退到兼容桥或 hybrid route。
 
@@ -223,11 +228,11 @@ Core-0 准出：`SC-CS-001` 完成，`D-CS-002` 和 `D-CS-003` 均有 Owner 决�
 
 | Task | 状态 | 目标 | 准出证据 |
 | --- | --- | --- | --- |
-| `CORE-1A` 公共 API 分级与冻结 | `API_BASELINE_SUPERSEDED_BY_D_CS_006_R` | 首轮曾按 121 public / 99 stable / 18 experimental / 4 internal 分类；2026-08-11 默认实现下沉与 route 会计成员删除后为 107/99/4/4、1062 行；2026-08-22 当前基线由 `D-CS-006-R` 收敛为 105/97/4/4、1043 行并冻结 `FundsAccount#getState()` | 历史 CORE-1A/C/E 证据保留；当前门禁以 `D-CS-006-R`、`just verify-core-api` 和独立 Checker 为准。 |
+| `CORE-1A` 公共 API 分级与冻结 | `CURRENT_D_CS_006_T_BEHAVIOR_IMPLEMENTED` | 当前基线为 103/95/4/4、1036 行，仍冻结 `FundsAccount#getState()` | `D-CS-006-S` 作为历史证据保留；`D-CS-006-T` Surface/Behavioral 已通过 Core API、Public Contract、资金回归与独立 Checker。 |
 | `CORE-1B` 版本化摘要协议 | `CORE1B_A_VERIFIED` | 显式 schema/hash version，规范化输入，旧版本可读/可比；ledger/detail persisted-legacy 边界专测已完成 | CORE-1B-A golden、双版本读取、幂等和重放测试已通过；其余摘要批次仍待后续 Owner Gate。 |
 | `CORE-1C` 时间与重放语义 | `ANALYZED_OWNER_GATE` | 已区分绝对事实、业务日历和宿主时钟，形成 `TIME-A` 至 `TIME-E` 分批迁移 | `D-CS-004` 批准历史 zone/破坏边界后，补 JSON、H2 持久化和跨时区重放测试。 |
 | `CORE-1D` route/posting 边界 | `BOUNDARY_D_VERIFIED` | `BOUNDARY-A/B` 已固定现状、release 与 refund provenance；`BOUNDARY-C` 已删除 route 会计成员，由 posting/ledger 从 instruction、path、Profile 和原账本事实推导。 | compile、PMD、core/ledger/transaction/boundary、四组 H2 与完整 CAD 已通过；独立 Checker `P0/P1/P2=0/0/0`。 |
-| `CORE-1E` DSL 包与实现归属 | `PACKAGE_CONVERGENCE_VERIFIED` | capability-first 包名；默认 route/instruction 实现下沉 `transaction-impl`；face 请求只暴露稳定账户值对象。 | 当前 105/97/4/4 API 门禁、Core 包边界测试、让利契约与 H2 资金流、compile/PMD 和 Checker。 |
+| `CORE-1E` DSL 包与实现归属 | `PACKAGE_CONVERGENCE_VERIFIED` | capability-first 包名；默认 route/instruction 实现下沉 `transaction-impl`；face 请求只暴露稳定账户值对象。 | 当前 104/96/4/4 API 门禁、Core 包边界测试、让利契约与 H2 资金流、compile 和 Checker。 |
 
 `CORE-1B-A` persisted-legacy compatibility 状态为 `VERIFIED_TEST_ONLY`。仅在
 `LedgerTransactionServiceImplTests` 和 `FundsDirectTransactionFlowTests` 增加真实 Spring/H2 持久边界测试：固定历史
@@ -292,6 +297,8 @@ Core-2 准出：`SC-CS-001` 至 `SC-CS-008` 全部有新鲜证据，Goal 才能�
 
 当前 Plan Grant 为 `CORE_1_BOUNDARY_D_VERIFIED`：Owner 已批准当前 `1.0.1-SNAPSHOT` 按推荐实践直接进行破坏式收敛；`BOUNDARY-C/D` 实现、扩大测试、API baseline、PMD、完整 CAD 和独立 Checker 已完成。
 
+Human Owner 现另行接受 `D-CS-006-T / MIG-05D A`，Contract Surface 与 Behavioral RED/Green 均已按无兼容设计执行并通过独立 Checker。该接受不复活 Core-2 兼容窗口；旧 assembler/raw post、时序 Ledger SN 与无 root factory overload 已直接删除。MIG-05D 当前范围完成，下一切片必须回到主 OpenSpec 重新形成 Entry Card。
+
 本轮停止在 `CORE-1D / BOUNDARY-D` 封板；下一循环不得默认实施时间迁移、其余摘要批次或工作树中的 settlement release，须按各自 Owner Gate 重新授权。
 
 以下动作仍需单独授权或 Owner 决策：
@@ -312,14 +319,15 @@ Core-2 准出：`SC-CS-001` 至 `SC-CS-008` 全部有新鲜证据，Goal 才能�
 8. `CORE-1D / BOUNDARY-C` 删除 route 会计成员和新写 snapshot 会计字段；posting/ledger 复用现有 instruction、route path、账户 Profile、posting/entry 与原账本引用推导会计效果，不新增公共 API、DDL、依赖、平行模型或兼容桥。
 9. `CORE-1D / BOUNDARY-D` 同步 DSL verifier、五份 transaction-layer fixture、权威文档和 API 门禁；legacy detail fallback 仅接受完成态、完整逐 leg 会计事实与规范化账期严格匹配，独立 Checker `P0/P1/P2=0/0/0`。
 10. `D-CS-006-R` 按 2026-08-22 已接受的无兼容迁移，把当前 API 基线从历史 `107/99/4/4 / 1062 lines / getStatus()` supersede 为 `105/97/4/4 / 1043 lines / getState()`；不恢复两个旧 profile spec、`ALLOW_NEGATIVE_BALANCE` 或兼容入口。
+11. `D-CS-006-S` 按 2026-08-24 已接受的 MIG-05C 无兼容迁移，删除 `LedgerBalanceProjectionService` 四条 stable signature，把当前 API 基线 supersede 为 `104/96/4/4 / 1039 lines / getState()`；不新增 concrete 公共替代或兼容入口。
 
 ## 5. Goal Ledger
 
 | Field | Current value |
 | --- | --- |
-| Latest completed action | `CORE-1D / BOUNDARY-D` 后续工程 CR 已完成：冻结单旧 full-route 摘要兼容、resolver 输出身份校验、原账本交易归属校验、费用腿强身份与同主体角色消歧均已回归；2026-08-11 当时 API baseline 为 1062 行。其后 MIG-05B 已接受删除两个错误 profile spec、`ALLOW_NEGATIVE_BALANCE` 与旧 `getStatus()`，当前 `D-CS-006-R` baseline 为 1043 行。历史完整 CAD 为 112 suites / 1104 tests / 0 failures / 0 errors / 1 expected skip，独立 Checker `P0/P1/P2=0/0/0`。 |
-| Current task | `D-CS-006-R / CORE_API_BASELINE_SUPERSEDING_REBASE`；仅校准已接受破坏式删除后的机械 API 治理事实，不重开资金 DSL 或生产行为。 |
-| Current write set | 仅本规格、`scripts/verify-core-api-baseline.sh` 与 `core/api-baseline/stable-api.txt`；`api-policy.tsv`、core Java、其他 signature、Consumer 与 Git immutable。 |
-| Next action | 执行 `just verify-core-api` 与独立 Checker；结果由 `funds-public-capability-redesign` 当前状态统一回写。PASS 后本 Goal 继续等待 `D-CS-004` 与其余摘要批次 Owner Gate。 |
-| Stop condition | 出现 105/97/4/4 之外的 cardinality、额外 signature diff、stale/duplicate policy、旧类型或 `getStatus()` 兼容恢复、core Java/`api-policy.tsv` 修改；Git、安装和生产动作仍未授权。 |
+| Latest completed action | MIG-05D A Behavioral Green 仅修改 posting service impl 与 spec factory；fresh focused=`73/0`、扩大去重=`638/0`、Core API=`103/95/4/4 / 1036`，独立 Checker=`PASS / 0 P0 / 0 P1 / 0 P2`。 |
+| Current task | `D-CS-006-T / MIG05D_POSTING_COMMAND_A / BEHAVIORAL_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / NEXT_SLICE_ENTRY_CARD_REQUIRED / CODE_FREEZE`。 |
+| Current write set | MIG-05D 代码、测试和文档授权均已消耗；下一切片执行未授权。 |
+| Next action | 回到主 OpenSpec 由 Human Owner 选择新的 Entry Card；本 Goal 不单独产生执行授权。 |
+| Stop condition | 未另获联网授权却执行非 offline Maven；把 Provider Green 外推为 Consumer/HOST/生产完成；`api-policy.tsv`、额外 signature/schema/Consumer/兼容路径进入；Git、安装和生产动作仍未授权。 |
 | Deferred owners | Architecture/Payment Owner：其余摘要；Architecture Owner：时间；settlement release 变更 Owner：独立 API/资金切片收口 |

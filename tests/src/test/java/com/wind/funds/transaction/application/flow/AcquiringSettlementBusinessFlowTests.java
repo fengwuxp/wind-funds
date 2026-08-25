@@ -1,7 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.reconciliation.ReconciliationTestFixture;
@@ -60,9 +59,9 @@ import com.wind.funds.reconciliation.model.request.SubmitClearingSplitBatchReque
 import com.wind.funds.reconciliation.model.request.SubmitPayoutOrderRequest;
 import com.wind.funds.reconciliation.model.request.SubmitSettlementOrderRequest;
 import com.wind.funds.reconciliation.service.PayoutSubmissionAuthority;
+import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -240,15 +239,13 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                     FundsTransactionEventType.REFUND, sourceLegId, CURRENCY).getAmount()).isEqualTo(100L);
         });
 
-        String runResultSn = prepareGate("CLEARING_SPLITTABLE_IDENTIFY", capture.detailSn(),
+        String runResultSn = prepareGate("CLEARING_SPLITTABLE_IDENTIFY", capture.actionIdentity(),
                 "refund-before-split", "acquiring-refund-before-split-evidence:001");
         var beforeIdentify = ledgerFactSnapshot();
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
                 new IdentifyClearingSplittableDetailRequest()
                         .setTenantId(TENANT_ID)
-                        .setFundsTransactionSn(capture.transactionSn())
-                        .setFundsTransactionDetailSn(capture.detailSn())
-                        .setLedgerEntrySn(capture.ledgerEntrySn())
+                        .setSourceActionFactRef(sourceActionFactRef(capture.actionIdentity()))
                         .setBusinessLine(BUSINESS_LINE)
                         .setSplitPeriod(PERIOD)
                         .setSplitRuleCode(RULE_CODE)
@@ -361,16 +358,6 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
 
         String transactionSn = directTransactionService.pay(request, WindOperatorFactory.system());
         String replay = directTransactionService.pay(request, WindOperatorFactory.system());
-        FundsTransactionDetailDTO payeeDetail = fundsTransactionDetails(transactionSn).stream()
-                .filter(detail -> detail.getParticipantRole() == RouteParticipantRole.PAYEE)
-                .findFirst()
-                .orElseThrow();
-        LedgerEntry clearingEntry = entriesByFundsTransactionSn(transactionSn).stream()
-                .filter(entry -> merchant.id().equals(entry.getSubjectId()))
-                .filter(entry -> entry.getLedgerSubjectCode() == LedgerSubjectCode.CLEARING)
-                .findFirst()
-                .orElseThrow();
-
         assertThat(replay).isEqualTo(transactionSn);
         assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getParticipants())
@@ -379,19 +366,19 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                         .containsExactly(LedgerProfileCode.FUNDING_MERCHANT.name()));
         assertSingleFundsAndLedgerFactsForBusinessSn("ACQUIRING_CAPTURE_001", 2, 1, 2);
         assertLedgerFactsFollowRouteSnapshot("ACQUIRING_CAPTURE_001");
-        return new CaptureFact(merchant, transactionSn, payeeDetail.getSn(), clearingEntry.getSn());
+        String actionIdentity = actionFactsByBusiness("ACQUIRING_CAPTURE", "ACQUIRING_CAPTURE_001")
+                .getFirst().getIdentity().getIdentity();
+        return new CaptureFact(merchant, transactionSn, actionIdentity);
     }
 
     private ClearingBatchDTO clear(CaptureFact capture) {
         String evidenceRef = "acquiring-capture-evidence:001";
         String runResultSn = prepareGate(
-                "CLEARING_SPLITTABLE_IDENTIFY", capture.detailSn(), "split", evidenceRef);
+                "CLEARING_SPLITTABLE_IDENTIFY", capture.actionIdentity(), "split", evidenceRef);
         var beforeSplit = ledgerFactSnapshot();
         IdentifyClearingSplittableDetailRequest identifyRequest = new IdentifyClearingSplittableDetailRequest()
                 .setTenantId(TENANT_ID)
-                .setFundsTransactionSn(capture.transactionSn())
-                .setFundsTransactionDetailSn(capture.detailSn())
-                .setLedgerEntrySn(capture.ledgerEntrySn())
+                .setSourceActionFactRef(sourceActionFactRef(capture.actionIdentity()))
                 .setBusinessLine(BUSINESS_LINE)
                 .setSplitPeriod(PERIOD)
                 .setSplitRuleCode(RULE_CODE)
@@ -558,6 +545,10 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 WindOperatorFactory.system()).getSn();
     }
 
+    private StableIdentity sourceActionFactRef(String actionIdentity) {
+        return new StableIdentity().setOwnerNamespace("funds").setValue(actionIdentity);
+    }
+
     private ExternalRuleVerificationEvidenceDTO verifiedPayoutRule() {
         return new ExternalRuleVerificationEvidenceDTO()
                 .setEvidenceRef("acquiring-payout-rule-evidence:001")
@@ -622,7 +613,6 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
 
     private record CaptureFact(FundsAccountId merchant,
                                String transactionSn,
-                               String detailSn,
-                               String ledgerEntrySn) {
+                               String actionIdentity) {
     }
 }

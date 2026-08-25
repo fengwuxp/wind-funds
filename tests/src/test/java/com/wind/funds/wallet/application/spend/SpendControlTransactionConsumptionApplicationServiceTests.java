@@ -7,6 +7,8 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.application.spend.SpendControlBusinessConfirmedRefundCompensationRequest;
+import com.wind.funds.transaction.application.spend.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
@@ -37,8 +39,6 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
-import com.wind.funds.wallet.model.request.SpendControlBusinessConfirmedRefundCompensationRequest;
-import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendControlMovementService;
@@ -210,7 +210,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private SpendControlMovementService spendControlMovementService;
 
     @Autowired
-    private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
+    private SpendControlTransactionConsumptionApplicationServiceImpl
+            spendControlTransactionConsumptionApplicationService;
 
     @Autowired
     private FundsAccountCapabilityApplicationService fundsAccountCapabilityApplicationService;
@@ -571,7 +572,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         int versionBeforeConsumption = creditAccountVersion();
-        SpendControlTransactionConsumptionApplicationService concurrentService = concurrentConsumptionService(3);
+        SpendControlTransactionConsumptionApplicationServiceImpl concurrentService = concurrentConsumptionService(3);
         ExecutorService executor = Executors.newFixedThreadPool(3);
         try {
             Callable<SpendControlMovementDTO> command = () -> withTenant(() -> concurrentService.consume(
@@ -1370,7 +1371,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 CREDIT_ACCOUNT_SN);
     }
 
-    private SpendControlTransactionConsumptionApplicationService concurrentConsumptionService(int concurrentInserts) {
+    private SpendControlTransactionConsumptionApplicationServiceImpl concurrentConsumptionService(
+            int concurrentInserts) {
         CountDownLatch recordReady = new CountDownLatch(concurrentInserts);
         SpendControlMovementService activityService = (SpendControlMovementService) Proxy.newProxyInstance(
                 SpendControlMovementService.class.getClassLoader(),

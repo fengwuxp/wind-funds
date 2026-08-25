@@ -99,8 +99,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(transactionSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
-            assertThat(context.ledgerTransaction()).isNotNull();
-            assertThat(context.ledgerTransaction().getSn()).isEqualTo(ledgerTransaction.getSn());
             var explanation = context.explanation();
             assertThat(explanation.businessScene()).isEqualTo("PAY");
             assertThat(explanation.businessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
@@ -254,7 +252,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(authorizationSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isNull();
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
-            assertThat(context.ledgerTransaction()).isNull();
             assertThat(context.routeSnapshot().getLegs()).isEmpty();
             var explanation = context.explanation();
             assertThat(explanation.factStatus()).isEqualTo("REJECTED");
