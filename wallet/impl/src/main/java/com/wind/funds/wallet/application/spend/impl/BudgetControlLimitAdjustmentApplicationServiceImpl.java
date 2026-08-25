@@ -15,6 +15,7 @@ import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import java.util.List;
  * @author Codex
  * @date 2026-06-21
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class BudgetControlLimitAdjustmentApplicationServiceImpl
@@ -51,7 +53,13 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 recordRequest);
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery);
-        return toResult(request, activity, projection);
+        BudgetControlLimitAdjustmentResultDTO result = toResult(request, activity, projection);
+        log.info("预算控制额度调整完成，等待事务提交，tenantId={}, movementSn={}, businessScene={}, businessSn={}, "
+                        + "controlScopeId={}, periodId={}, increase={}, amount={}, currency={}",
+                request.getTenantId(), request.getMovementSn(), request.getBusinessScene(), request.getBusinessSn(),
+                controlScopeId(request), request.getPeriodId(), request.getIncrease(), request.getAmount(),
+                request.getCurrency());
+        return result;
     }
 
     private void validateRequest(AdjustBudgetControlLimitRequest request) {

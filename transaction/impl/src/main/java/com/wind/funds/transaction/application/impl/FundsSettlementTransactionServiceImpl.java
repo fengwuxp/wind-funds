@@ -37,6 +37,7 @@ import com.wind.integration.operator.WindOperator;
 import com.wind.transaction.core.Money;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 结算锁定资金命令服务实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 @NullMarked
@@ -71,7 +73,13 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
     @Transactional(rollbackFor = Exception.class, noRollbackFor = LedgerPostingRejectedException.class)
     public String lock(FundsSettlementLockRequest request, WindOperator operator) {
         validateRequest(request, operator);
-        return fundsInstructionOrchestrator.execute(settlementInstructionConverter.convert(request, operator));
+        String transactionSn = fundsInstructionOrchestrator.execute(
+                settlementInstructionConverter.convert(request, operator));
+        log.info("结算资金锁定完成，等待事务提交，settlementOrderSn={}, transactionSn={}, accountType={}, "
+                        + "accountId={}, amount={}, currency={}",
+                request.getSettlementOrderSn(), transactionSn, request.getAccountId().type(), request.getAccountId().id(),
+                request.getAmount().getAmount(), request.getAmount().getCurrency());
+        return transactionSn;
     }
 
     @Override
@@ -101,6 +109,10 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
                     completedReleaseHold.getSn());
             requireCompletedReleaseTransaction(releaseTransactionSn, lockTransaction, accountId, amount,
                     request.getSettlementOrderSn());
+            log.info("结算资金释放幂等复用，settlementOrderSn={}, lockTransactionSn={}, releaseTransactionSn={}, "
+                            + "freezeOrderSn={}, amount={}, currency={}",
+                    request.getSettlementOrderSn(), request.getLockFundsTransactionSn(), releaseTransactionSn,
+                    completedReleaseHold.getSn(), amount.getAmount(), amount.getCurrency());
             return releaseResult(releaseTransactionSn, completedReleaseHold.getSn());
         }
 
@@ -122,6 +134,10 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
         FundsFrozenOrder releaseHold = findReleaseHold(request.getSettlementOrderSn());
         AssertUtils.notNull(releaseHold, "结算释放冻结单不存在，freezeOrderSn = {}", freezeOrderSn);
         assertSameReleaseHold(releaseHold, accountId, amount, releaseTransactionSn, freezeOrderSn);
+        log.info("结算资金释放完成，等待事务提交，settlementOrderSn={}, lockTransactionSn={}, "
+                        + "releaseTransactionSn={}, freezeOrderSn={}, amount={}, currency={}",
+                request.getSettlementOrderSn(), request.getLockFundsTransactionSn(), releaseTransactionSn,
+                freezeOrderSn, amount.getAmount(), amount.getCurrency());
         return releaseResult(releaseTransactionSn, freezeOrderSn);
     }
 

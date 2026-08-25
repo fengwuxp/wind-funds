@@ -8,6 +8,7 @@ import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicati
 import com.wind.funds.wallet.model.dto.FundsAccountCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.request.ResolveFundsAccountCapabilityRequest;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.util.Objects;
  * @author Codex
  * @date 2026-06-19
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class FundsAccountCapabilityApplicationServiceImpl implements FundsAccountCapabilityApplicationService {
@@ -40,7 +42,13 @@ public class FundsAccountCapabilityApplicationServiceImpl implements FundsAccoun
                 "资金账户币种与请求币种不一致，accountId = {}，currency = {}",
                 request.getAccountId(),
                 request.getCurrency());
-        return toDecision(account);
+        FundsAccountCapabilityDecisionDTO decision = toDecision(account);
+        log.info("资金账户能力准入完成，tenantId={}, accountType={}, accountId={}, state={}, currency={}, "
+                        + "canReceive={}, canPay={}, canWithdraw={}",
+                request.getTenantId(), request.getAccountId().type(), request.getAccountId().id(),
+                decision.getState(), decision.getCurrency(), decision.getCanReceive(), decision.getCanPay(),
+                decision.getCanWithdraw());
+        return decision;
     }
 
     private void validateRequest(ResolveFundsAccountCapabilityRequest request) {

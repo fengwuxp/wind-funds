@@ -45,6 +45,7 @@ import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -64,6 +65,7 @@ import java.util.TreeMap;
  * @author Codex
  * @date 2026-06-21
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class PaymentInstrumentTransactionApplicationServiceImpl {
@@ -95,7 +97,12 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                  @NonNull WindOperator operator) {
-        return authorizationProcessor.authorizeByInstrument(request, operator);
+        String transactionSn = authorizationProcessor.authorizeByInstrument(request, operator);
+        log.info("支付工具授权完成，等待事务提交，tenantId={}, businessScene={}, businessSn={}, "
+                        + "transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(), transactionSn,
+                request.getAmount(), request.getCurrency());
+        return transactionSn;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -110,6 +117,10 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
         String authorizationSn = authorizationTransactionService.complete(
                 toCompleteRequest(request, authorizationAccountId), operator);
         consumeControlReservation(request, authorization, authorizationSn);
+        log.info("支付工具授权完成扣款处理完成，等待事务提交，tenantId={}, authorizationTransactionSn={}, "
+                        + "businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getAuthorizationTransactionSn(), request.getBusinessScene(),
+                request.getBusinessSn(), authorizationSn, request.getAmount(), request.getCurrency());
         return authorizationSn;
     }
 
@@ -125,6 +136,10 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
         String authorizationSn = authorizationTransactionService.reversal(
                 toReversalRequest(request, authorizationAccountId), operator);
         releaseControlReservation(request, authorization, authorizationSn);
+        log.info("支付工具授权撤销处理完成，等待事务提交，tenantId={}, authorizationTransactionSn={}, "
+                        + "businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getAuthorizationTransactionSn(), request.getBusinessScene(),
+                request.getBusinessSn(), authorizationSn, request.getAmount(), request.getCurrency());
         return authorizationSn;
     }
 
@@ -134,12 +149,23 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
         validateReceiveRequest(request);
         String establishedTransactionSn = findEstablishedReceiveReplay(request);
         if (establishedTransactionSn != null) {
+            log.info("支付工具收款幂等复用，tenantId={}, externalSourceCode={}, externalFundsFactSn={}, "
+                            + "businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                    request.getTenantId(), request.getExternalSourceCode(), request.getExternalFundsFactSn(),
+                    request.getBusinessScene(), request.getBusinessSn(), establishedTransactionSn,
+                    request.getAmount(), request.getCurrency());
             return establishedTransactionSn;
         }
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toPreTransactionRequest(request));
         AssertUtils.isTrue(Boolean.TRUE.equals(snapshot.getReady()), "支付工具收款预交易快照未就绪");
-        return directTransactionService.topup(convertToTopupRequest(request, snapshot), operator);
+        String transactionSn = directTransactionService.topup(convertToTopupRequest(request, snapshot), operator);
+        log.info("支付工具收款完成，等待事务提交，tenantId={}, externalSourceCode={}, externalFundsFactSn={}, "
+                        + "businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getExternalSourceCode(), request.getExternalFundsFactSn(),
+                request.getBusinessScene(), request.getBusinessSn(), transactionSn, request.getAmount(),
+                request.getCurrency());
+        return transactionSn;
     }
 
     private @Nullable String findEstablishedReceiveReplay(ReceiveByInstrumentRequest request) {

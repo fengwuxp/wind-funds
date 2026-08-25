@@ -37,6 +37,7 @@ import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.jackson.WindJson;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ import java.util.TreeMap;
  * @since 2026-08-19
  */
 @NullMarked
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ReconciliationGateApplicationServiceImpl implements ReconciliationGateApplicationService {
@@ -126,7 +128,13 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         if (head != null) {
             publishHead(requirement, head);
         }
-        return toRequirementRef(requirement);
+        GateRequirementRef result = toRequirementRef(requirement);
+        log.info("对账 Gate 要求记录完成，等待事务提交，tenantId={}, stageKind={}, stageOwnerNamespace={}, "
+                        + "stageIdentity={}, requirementVersion={}, requiredPairCount={}",
+                request.getTenantId(), request.getStageRef().getStageKind(),
+                request.getStageRef().getStageIdentity().getOwnerNamespace(),
+                request.getStageRef().getStageIdentity().getValue(), request.getRequirementVersion(), pairs.size());
+        return result;
     }
 
     @Override
@@ -137,13 +145,28 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
             ReconciliationStageGateEvidence evidence = saveConsumedEvidence(decision, operator);
             decision.setEvidenceRefs(withFirst(evidence.getSn(), decision.getEvidenceRefs()));
         }
+        logGateDecision("check", request, decision);
         return decision;
     }
 
     @Override
     @Transactional(readOnly = true, rollbackFor = Exception.class)
     public ReconciliationGateDecisionDTO inspectGate(CheckReconciliationGateRequest request, WindOperator operator) {
-        return evaluate(request, operator, false);
+        ReconciliationGateDecisionDTO decision = evaluate(request, operator, false);
+        logGateDecision("inspect", request, decision);
+        return decision;
+    }
+
+    private void logGateDecision(String action,
+                                 CheckReconciliationGateRequest request,
+                                 ReconciliationGateDecisionDTO decision) {
+        log.info("对账 Gate 决策完成，action={}, tenantId={}, stageKind={}, stageOwnerNamespace={}, "
+                        + "stageIdentity={}, passed={}, decisionResult={}, pairCount={}, evidenceCount={}",
+                action, request.getTenantId(), request.getStageRef().getStageKind(),
+                request.getStageRef().getStageIdentity().getOwnerNamespace(),
+                request.getStageRef().getStageIdentity().getValue(), decision.isPassed(), decision.getDecisionResult(),
+                decision.getPairDecisions() == null ? 0 : decision.getPairDecisions().size(),
+                decision.getEvidenceRefs() == null ? 0 : decision.getEvidenceRefs().size());
     }
 
     private ReconciliationGateDecisionDTO evaluate(CheckReconciliationGateRequest request,

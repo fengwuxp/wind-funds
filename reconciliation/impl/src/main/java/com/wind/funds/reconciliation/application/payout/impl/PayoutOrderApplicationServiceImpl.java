@@ -40,6 +40,7 @@ import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,7 @@ import java.util.Objects;
 /**
  * 出款事实应用服务实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplicationService {
@@ -90,6 +92,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         PayoutOrder existing = payoutOrderMapper.selectBySettlementOrderSn(
                 request.getTenantId(), request.getSettlementOrderSn());
         if (existing != null) {
+            log.info("出款单创建幂等复用，tenantId={}, settlementOrderSn={}, payoutOrderSn={}, state={}",
+                    request.getTenantId(), request.getSettlementOrderSn(), existing.getSn(), existing.getState());
             return toDTO(existing);
         }
         assertSettlementReady(settlement);
@@ -106,6 +110,10 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setVersion(0);
         payoutOrderMapper.insertSelective(order);
         AssertUtils.notNull(order.getId(), "创建出款单失败");
+        log.info("出款单创建完成，等待事务提交，tenantId={}, settlementOrderSn={}, payoutOrderSn={}, "
+                        + "state={}, amount={}, currency={}",
+                order.getTenantId(), order.getSettlementOrderSn(), order.getSn(), order.getState(), order.getAmount(),
+                order.getCurrency());
         return toDTO(order);
     }
 
@@ -120,6 +128,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         String submitDigest = submitDigest(request);
         if (order.getState() != PayoutOrderState.CREATED) {
             AssertUtils.equals(order.getSubmitDigest(), submitDigest, "出款单已使用不同提交参数完成提交");
+            log.info("出款单提交幂等复用，tenantId={}, payoutOrderSn={}, settlementOrderSn={}, state={}",
+                    order.getTenantId(), order.getSn(), order.getSettlementOrderSn(), order.getState());
             return toDTO(order);
         }
         assertSettlementReady(settlement);
@@ -153,6 +163,10 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         order.setSubmittedBy(operator.getOperatorAsText());
         order.setSubmittedTime(LocalDateTime.now());
         update(order, "提交出款单失败");
+        log.info("出款单提交完成，等待事务提交，tenantId={}, payoutOrderSn={}, settlementOrderSn={}, state={}, "
+                        + "amount={}, currency={}",
+                order.getTenantId(), order.getSn(), order.getSettlementOrderSn(), order.getState(), order.getAmount(),
+                order.getCurrency());
         return toDTO(order);
     }
 
@@ -227,6 +241,10 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                     throw new IllegalArgumentException("外部回单状态不支持：" + request.getState());
         }
         update(order, "更新出款回单结果失败");
+        log.info("出款回单处理完成，等待事务提交，tenantId={}, payoutOrderSn={}, receiptState={}, orderState={}, "
+                        + "completionTransactionSn={}, rollbackTransactionSn={}",
+                order.getTenantId(), order.getSn(), request.getState(), order.getState(),
+                order.getCompletionFundsTransactionSn(), order.getRollbackFundsTransactionSn());
         return toDTO(order);
     }
 

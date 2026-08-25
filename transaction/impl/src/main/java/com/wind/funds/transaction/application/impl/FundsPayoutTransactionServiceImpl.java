@@ -14,10 +14,12 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.operator.WindOperator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 @NullMarked
@@ -47,7 +49,13 @@ public class FundsPayoutTransactionServiceImpl implements FundsPayoutTransaction
                            FundsTransactionEventType eventType,
                            WindOperator operator) {
         validateRequest(request, operator);
-        return fundsInstructionOrchestrator.execute(payoutInstructionConverter.convert(request, eventType, operator));
+        String transactionSn = fundsInstructionOrchestrator.execute(
+                payoutInstructionConverter.convert(request, eventType, operator));
+        log.info("出款资金事件处理完成，等待事务提交，eventType={}, payoutOrderSn={}, transactionSn={}, "
+                        + "accountType={}, accountId={}, amount={}, currency={}",
+                eventType, request.getPayoutOrderSn(), transactionSn, request.getAccountId().type(),
+                request.getAccountId().id(), request.getAmount().getAmount(), request.getAmount().getCurrency());
+        return transactionSn;
     }
 
     private void validateRequest(FundsPayoutRequest request, WindOperator operator) {

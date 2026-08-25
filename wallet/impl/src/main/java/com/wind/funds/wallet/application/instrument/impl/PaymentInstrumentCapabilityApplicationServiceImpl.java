@@ -16,6 +16,7 @@ import com.wind.funds.wallet.model.query.PaymentInstrumentQuery;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import java.util.List;
  * @author Codex
  * @date 2026-06-16
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class PaymentInstrumentCapabilityApplicationServiceImpl
@@ -45,7 +47,11 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
         assertInstrumentCanUse(instrument, request);
         PaymentInstrumentBindingDTO binding = request.getBindingRole() == null ? null : resolveBinding(request);
         assertBindingVersionMatched(binding, request);
-        return toDecision(instrument, binding, request);
+        PaymentInstrumentCapabilityDecisionDTO decision = toDecision(instrument, binding, request);
+        log.info("支付工具能力准入完成，tenantId={}, instrumentSn={}, action={}, state={}, currency={}, bindingSn={}",
+                request.getTenantId(), request.getInstrumentSn(), request.getAction(), decision.getState(),
+                decision.getCurrency(), decision.getBindingSn());
+        return decision;
     }
 
     private void validateRequest(ResolvePaymentInstrumentCapabilityRequest request) {

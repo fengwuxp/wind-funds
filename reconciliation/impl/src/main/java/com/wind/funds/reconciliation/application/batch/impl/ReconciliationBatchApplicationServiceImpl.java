@@ -31,6 +31,7 @@ import com.wind.integration.operator.WindOperator;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,7 @@ import java.util.TreeMap;
 /**
  * 对账批次应用服务实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ReconciliationBatchApplicationServiceImpl implements ReconciliationBatchApplicationService {
@@ -106,7 +108,10 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
             }
             reconciliationBatchMapper.insertSelective(candidate);
             AssertUtils.notNull(candidate.getId(), "创建对账批次失败");
-            return toBatchDTO(reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+            ReconciliationBatchDTO result = toBatchDTO(
+                    reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+            logBatch("create", result);
+            return result;
         }
 
         AssertUtils.notNull(lineage, "对账重跑缺少 current lineage，previousBatchSn = {}", previous.getSn());
@@ -146,7 +151,10 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
             throw exception;
         }
         AssertUtils.notNull(candidate.getId(), "创建对账批次失败");
-        return toBatchDTO(reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+        ReconciliationBatchDTO result = toBatchDTO(
+                reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+        logBatch("rerun", result);
+        return result;
     }
 
     @Override
@@ -176,7 +184,10 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         AssertUtils.isTrue(reconciliationBatchMapper.abort(batch.getTenantId(), batch.getSn(), batch.getState().name(),
                         abortedBy, LocalDateTime.now(), abortReason) == 1,
                 "终止对账批次失败，reconciliationBatchSn = {}", batch.getSn());
-        return toBatchDTO(reconciliationBatchMapper.selectBySn(batch.getTenantId(), batch.getSn()));
+        ReconciliationBatchDTO result = toBatchDTO(
+                reconciliationBatchMapper.selectBySn(batch.getTenantId(), batch.getSn()));
+        logBatch("abort", result);
+        return result;
     }
 
     @Override
@@ -208,7 +219,10 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                         candidate.getPairOwnerNamespace(), candidate.getPairIdentityValue(), replaced.getSn(), candidate.getSn()) == 1,
                 "推进替代对账 current lineage 失败，reconciliationBatchSn = {}", replaced.getSn());
         reconciliationDifferenceMapper.invalidateByCurrentBatch(candidate.getTenantId(), replaced.getSn());
-        return toBatchDTO(reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+        ReconciliationBatchDTO result = toBatchDTO(
+                reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn()));
+        logBatch("replace", result);
+        return result;
     }
 
     @Override
@@ -250,8 +264,21 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         reconciliationSourceSnapshotMapper.insertSelective(snapshot);
         facts.forEach(fact -> persistFact(request.getTenantId(), snapshot.getSn(), operator, fact));
         advanceBatchSourceState(batch);
-        return toSourceSnapshotDTO(reconciliationSourceSnapshotMapper.selectByBatchAndRole(
-                request.getTenantId(), batch.getSn(), request.getSourceRole().name()));
+        ReconciliationSourceSnapshotDTO result = toSourceSnapshotDTO(
+                reconciliationSourceSnapshotMapper.selectByBatchAndRole(
+                        request.getTenantId(), batch.getSn(), request.getSourceRole().name()));
+        log.info("对账来源快照记录完成，等待事务提交，tenantId={}, batchSn={}, snapshotSn={}, sourceRole={}, "
+                        + "sourceNamespace={}, factCount={}",
+                request.getTenantId(), batch.getSn(), result.getSn(), result.getSourceRole(),
+                result.getSourceNamespace(), facts.size());
+        return result;
+    }
+
+    private void logBatch(String action, ReconciliationBatchDTO batch) {
+        log.info("对账批次处理完成，等待事务提交，action={}, tenantId={}, batchSn={}, previousBatchSn={}, "
+                        + "state={}, currency={}",
+                action, batch.getTenantId(), batch.getSn(), batch.getPreviousBatchSn(), batch.getState(),
+                batch.getCurrency());
     }
 
     private void validateCreateRequest(CreateReconciliationBatchRequest request, WindOperator operator) {

@@ -21,6 +21,7 @@ import com.wind.integration.operator.WindOperator;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import java.util.Objects;
 /**
  * 追偿责任与已完成资金结果登记实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplicationService {
@@ -58,7 +60,11 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         String digest = createDigest(request);
         RecoveryOrder existing = selectBySource(request);
         if (existing != null) {
-            return sameSource(existing, digest);
+            RecoveryOrderDTO result = sameSource(existing, digest);
+            log.info("追偿单创建幂等复用，tenantId={}, sourceType={}, sourceSn={}, recoveryOrderSn={}, state={}",
+                    request.getTenantId(), request.getSourceType(), request.getSourceSn(), result.getSn(),
+                    result.getState());
+            return result;
         }
 
         RecoveryOrder order = newOrder(request, digest, operator);
@@ -67,10 +73,19 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         } catch (DuplicateKeyException exception) {
             existing = selectBySourceForUpdate(request);
             AssertUtils.notNull(existing, "追偿来源唯一键冲突但未找到已有追偿单");
-            return sameSource(existing, digest);
+            RecoveryOrderDTO result = sameSource(existing, digest);
+            log.info("追偿单并发幂等复用，tenantId={}, sourceType={}, sourceSn={}, recoveryOrderSn={}, state={}",
+                    request.getTenantId(), request.getSourceType(), request.getSourceSn(), result.getSn(),
+                    result.getState());
+            return result;
         }
         AssertUtils.notNull(order.getId(), "创建追偿单失败");
-        return toDTO(order);
+        RecoveryOrderDTO result = toDTO(order);
+        log.info("追偿单创建完成，等待事务提交，tenantId={}, sourceType={}, sourceSn={}, recoveryOrderSn={}, "
+                        + "expectedAmount={}, currency={}, state={}",
+                request.getTenantId(), request.getSourceType(), request.getSourceSn(), result.getSn(),
+                result.getExpectedAmount(), result.getCurrency(), result.getState());
+        return result;
     }
 
     @Override
@@ -82,7 +97,11 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         RecoveryResult replay = recoveryResultMapper.selectByIdempotencyKey(
                 request.getTenantId(), request.getIdempotencyKey());
         if (replay != null) {
-            return sameResult(order, replay, request, requestDigest);
+            RecoveryOrderDTO result = sameResult(order, replay, request, requestDigest);
+            log.info("追偿结果幂等复用，tenantId={}, recoveryOrderSn={}, fundsTransactionSn={}, state={}",
+                    request.getTenantId(), request.getRecoveryOrderSn(), request.getFundsTransactionSn(),
+                    result.getState());
+            return result;
         }
         RecoveryResult claimed = recoveryResultMapper.selectByFundsTransactionSn(
                 request.getTenantId(), request.getFundsTransactionSn());
@@ -100,7 +119,11 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
             RecoveryResult concurrentReplay = recoveryResultMapper.selectByIdempotencyKeyForUpdate(
                     request.getTenantId(), request.getIdempotencyKey());
             if (concurrentReplay != null) {
-                return sameResult(order, concurrentReplay, request, requestDigest);
+                RecoveryOrderDTO concurrentResult = sameResult(order, concurrentReplay, request, requestDigest);
+                log.info("追偿结果并发幂等复用，tenantId={}, recoveryOrderSn={}, fundsTransactionSn={}, state={}",
+                        request.getTenantId(), request.getRecoveryOrderSn(), request.getFundsTransactionSn(),
+                        concurrentResult.getState());
+                return concurrentResult;
             }
             RecoveryResult concurrentClaim = recoveryResultMapper.selectByFundsTransactionSnForUpdate(
                     request.getTenantId(), request.getFundsTransactionSn());
@@ -118,7 +141,13 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
             order.setState(RecoveryOrderState.PARTIALLY_RECOVERED);
         }
         AssertUtils.isTrue(recoveryOrderMapper.update(order) == 1, "更新追偿单累计结果失败");
-        return toDTO(order);
+        RecoveryOrderDTO resultDto = toDTO(order);
+        log.info("追偿结果记录完成，等待事务提交，tenantId={}, recoveryOrderSn={}, fundsTransactionSn={}, "
+                        + "recoveredAmount={}, expectedAmount={}, currency={}, state={}",
+                request.getTenantId(), request.getRecoveryOrderSn(), request.getFundsTransactionSn(),
+                resultDto.getRecoveredAmount(), resultDto.getExpectedAmount(), resultDto.getCurrency(),
+                resultDto.getState());
+        return resultDto;
     }
 
     @Override

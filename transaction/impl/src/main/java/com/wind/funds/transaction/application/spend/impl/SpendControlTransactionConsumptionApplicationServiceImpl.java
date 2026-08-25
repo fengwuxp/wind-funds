@@ -20,6 +20,7 @@ import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityReq
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ import java.util.TreeMap;
  * @author Codex
  * @date 2026-06-20
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class SpendControlTransactionConsumptionApplicationServiceImpl {
@@ -65,6 +67,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
         SpendControlMovementDTO consumedMovement = spendControlMovementService.recordMovement(
                 toRecordRequest(request, originalMovement, SpendControlMovementType.CONSUMED));
         assertConsumeBackedByTrustedCompletion(request, transaction);
+        logMovement("控制消费", request, consumedMovement);
         return consumedMovement;
     }
 
@@ -85,6 +88,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
         SpendControlMovementDTO releasedMovement = spendControlMovementService.recordMovement(
                 toRecordRequest(request, originalMovement, SpendControlMovementType.RELEASED));
         assertReleaseBackedByTrustedReversal(request, transaction);
+        logMovement("控制释放", request, releasedMovement);
         return releasedMovement;
     }
 
@@ -106,8 +110,10 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
         assertRefundDoesNotExceedNetConsumedAmount(request, originalMovement);
         assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.REFUND_COMPENSATED,
                 "退款控制补偿");
-        return spendControlMovementService.recordMovement(
+        SpendControlMovementDTO movement = spendControlMovementService.recordMovement(
                 toRecordRequest(request, originalMovement, SpendControlMovementType.REFUND_COMPENSATED));
+        logMovement("退款控制补偿", request, movement);
+        return movement;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -116,10 +122,30 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
         validateBusinessConfirmedRefundRequest(request);
         RecordSpendControlMovementRequest recordRequest = toRecordRequest(request);
         if (hasRecordedMovement(request)) {
-            return spendControlMovementService.recordMovement(recordRequest);
+            SpendControlMovementDTO movement = spendControlMovementService.recordMovement(recordRequest);
+            log.info("业务确认退款控制补偿幂等复用，tenantId={}, movementSn={}, businessScene={}, businessSn={}, "
+                            + "amount={}, currency={}",
+                    request.getTenantId(), request.getMovementSn(), request.getBusinessScene(), request.getBusinessSn(),
+                    request.getAmount(), request.getCurrency());
+            return movement;
         }
         assertPaymentInstrumentAvailable(request);
-        return spendControlMovementService.recordMovement(recordRequest);
+        SpendControlMovementDTO movement = spendControlMovementService.recordMovement(recordRequest);
+        log.info("业务确认退款控制补偿完成，等待事务提交，tenantId={}, movementSn={}, businessScene={}, "
+                        + "businessSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getMovementSn(), request.getBusinessScene(), request.getBusinessSn(),
+                request.getAmount(), request.getCurrency());
+        return movement;
+    }
+
+    private void logMovement(String action,
+                             SpendControlTransactionConsumptionRequest request,
+                             SpendControlMovementDTO movement) {
+        log.info("{}完成，等待事务提交，tenantId={}, movementSn={}, originalMovementSn={}, transactionSn={}, "
+                        + "businessScene={}, businessSn={}, movementType={}, amount={}, currency={}",
+                action, request.getTenantId(), request.getMovementSn(), request.getOriginalMovementSn(),
+                request.getTransactionSn(), request.getBusinessScene(), request.getBusinessSn(),
+                movement.getMovementType(), request.getAmount(), request.getCurrency());
     }
 
     private void validateTransactionControlRequest(SpendControlTransactionConsumptionRequest request) {

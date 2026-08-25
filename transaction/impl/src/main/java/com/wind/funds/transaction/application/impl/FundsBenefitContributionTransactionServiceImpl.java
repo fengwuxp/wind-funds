@@ -17,6 +17,7 @@ import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ import java.util.Set;
  * @author Codex
  * @date 2026-06-16
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class FundsBenefitContributionTransactionServiceImpl implements FundsBenefitContributionTransactionService {
@@ -89,7 +91,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         assertLightweightContext(request.getContextVariables());
         FundsAccountId costBearer = requireAccountId(request.getCostBearerAccountId(), "权益让利承担方");
         FundsAccountId receiver = requireAccountId(request.getBenefitReceiverAccountId(), "权益让利承接账务主体");
-        return directTransactionService.pay(new FundsTransactionPayRequest()
+        String transactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(costBearer)
                 .setPayeeId(receiver)
                 .setPayeeLedgerSubjectCode(request.getBenefitReceiverLedgerSubjectCode())
@@ -98,6 +100,12 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(settleContext(request)))
                 .setDescription("benefit contribution settle"), operator);
+        log.info("权益让利结算完成，等待事务提交，tenantId={}, businessScene={}, businessSn={}, originalOrderSn={}, "
+                        + "fundingNature={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(), request.getOriginalOrderSn(),
+                request.getFundingNature(), transactionSn, request.getAmount().getAmount(),
+                request.getAmount().getCurrency());
+        return transactionSn;
     }
 
     @Override
@@ -106,13 +114,19 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                                   @NonNull WindOperator operator) {
         assertRefundRequest(request);
         assertLightweightContext(request.getContextVariables());
-        return directTransactionService.refund(new FundsTransactionRefundRequest()
+        String transactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setReferenceTransactionSn(request.getReferenceBenefitTransactionSn())
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(refundContext(request)))
                 .setDescription("benefit contribution refund"), operator);
+        log.info("权益让利退款完成，等待事务提交，tenantId={}, businessScene={}, businessSn={}, "
+                        + "referenceTransactionSn={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(),
+                request.getReferenceBenefitTransactionSn(), transactionSn, request.getAmount().getAmount(),
+                request.getAmount().getCurrency());
+        return transactionSn;
     }
 
     private void assertSettleRequest(@NonNull FundsBenefitContributionSettleRequest request) {

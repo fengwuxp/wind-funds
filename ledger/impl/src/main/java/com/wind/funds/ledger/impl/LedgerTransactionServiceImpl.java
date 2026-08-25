@@ -158,6 +158,10 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         LedgerTransaction ledgerTransaction = materializeLedgerTransaction(transaction);
         LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(ledgerTransaction, transaction);
         if (existingResult != null) {
+            log.info("账本交易幂等复用，tenantId={}, ledgerTransactionSn={}, fundsTransactionSn={}, "
+                            + "businessScene={}, businessSn={}",
+                    transaction.getTenantId(), transaction.getSn(), transaction.getFundsTransactionSn(),
+                    transaction.getBusinessScene(), transaction.getBusinessSn());
             return existingResult;
         }
         LedgerAggregate aggregate = materializeLedgerAggregate(ledgerTransaction, transaction, null);
@@ -166,6 +170,10 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         } catch (DuplicateKeyException exception) {
             LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(ledgerTransaction, transaction);
             if (retryResult != null) {
+                log.info("账本交易并发幂等复用，tenantId={}, ledgerTransactionSn={}, fundsTransactionSn={}, "
+                                + "businessScene={}, businessSn={}",
+                        transaction.getTenantId(), transaction.getSn(), transaction.getFundsTransactionSn(),
+                        transaction.getBusinessScene(), transaction.getBusinessSn());
                 return retryResult;
             }
             throw exception;
@@ -180,6 +188,11 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
             AssertUtils.notNull(entry.getId(), "创建账户账本条目失败");
         }
         verifiedLedgerAggregate(aggregate.transaction());
+        log.info("账本交易事实写入完成，等待事务提交，tenantId={}, ledgerTransactionSn={}, fundsTransactionSn={}, "
+                        + "businessScene={}, businessSn={}, planCount={}, entryCount={}, amount={}, currency={}",
+                transaction.getTenantId(), transaction.getSn(), transaction.getFundsTransactionSn(),
+                transaction.getBusinessScene(), transaction.getBusinessSn(), aggregate.postingPlans().size(),
+                aggregate.entries().size(), transaction.getAmount().getAmount(), transaction.getCurrency());
         return toPostResult(aggregate.transaction().getId(), true);
     }
 

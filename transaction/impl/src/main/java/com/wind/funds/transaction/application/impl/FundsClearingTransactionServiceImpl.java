@@ -17,6 +17,7 @@ import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import java.util.List;
 /**
  * 清算确认资金命令服务实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 @NullMarked
@@ -46,7 +48,13 @@ public class FundsClearingTransactionServiceImpl implements FundsClearingTransac
     public String confirm(FundsClearingConfirmRequest request, WindOperator operator) {
         validateRequest(request, operator);
         lockAndValidateSourceTransactions(request);
-        return fundsInstructionOrchestrator.execute(clearingInstructionConverter.convert(request, operator));
+        String transactionSn = fundsInstructionOrchestrator.execute(clearingInstructionConverter.convert(request, operator));
+        log.info("清算确认处理完成，等待事务提交，clearingBatchSn={}, transactionSn={}, accountType={}, "
+                        + "accountId={}, sourceCount={}, amount={}, currency={}",
+                request.getClearingBatchSn(), transactionSn, request.getAccountId().type(), request.getAccountId().id(),
+                request.getSourceTransactionSns().size(), request.getAmount().getAmount(),
+                request.getAmount().getCurrency());
+        return transactionSn;
     }
 
     private void validateRequest(FundsClearingConfirmRequest request, WindOperator operator) {

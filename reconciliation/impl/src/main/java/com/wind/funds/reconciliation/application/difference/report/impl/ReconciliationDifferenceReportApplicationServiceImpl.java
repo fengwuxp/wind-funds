@@ -16,6 +16,7 @@ import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
 import com.wind.funds.reconciliation.model.value.StableIdentity;
 import com.wind.integration.core.context.TenantContextHolder;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ import java.util.Set;
 /**
  * 对账差异报告应用服务实现。
  */
+@Slf4j
 @NullMarked
 @Service
 @AllArgsConstructor
@@ -53,7 +55,12 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
 
         List<ReconciliationDifferenceAction> actionHistory = reconciliationDifferenceActionMapper.selectByDifferenceSn(
                 request.getTenantId(), request.getDifferenceSn());
-        return toReportDTO(request, difference, actionHistory, operator);
+        ReconciliationDifferenceReportDTO report = toReportDTO(request, difference, actionHistory, operator);
+        log.info("对账差异报告查询完成，tenantId={}, differenceSn={}, batchSn={}, state={}, completeness={}, "
+                        + "actionCount={}",
+                request.getTenantId(), request.getDifferenceSn(), report.getReconciliationBatchSn(),
+                report.getState(), report.getCompleteness(), actionHistory.size());
+        return report;
     }
 
     private void validateRequest(GetReconciliationDifferenceReportRequest request, WindOperator operator) {

@@ -63,6 +63,7 @@ import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +79,7 @@ import java.util.TreeMap;
 /**
  * 结算单公共应用服务实现。
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class SettlementOrderApplicationServiceImpl implements SettlementOrderApplicationService {
@@ -129,7 +131,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         SettlementOrder existing = settlementOrderMapper.selectByDigest(
                 request.getTenantId(), candidate.getOrderDigest());
         if (existing != null) {
-            return toDTO(existing);
+            return logOrderResult("create", existing, true);
         }
         AssertUtils.isTrue(settlementOrderItemMapper.countActiveSourceClaims(
                 request.getTenantId(), sourceSns) == 0, "清算来源已被其他有效结算单占用");
@@ -138,7 +140,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         for (ClearingBatch source : sources) {
             settlementOrderItemMapper.insertSelective(newItem(candidate, source, operator));
         }
-        return toDTO(requiredOrder(request.getTenantId(), candidate.getSn()));
+        return logOrderResult("create", requiredOrder(request.getTenantId(), candidate.getSn()), false);
     }
 
     @Override
@@ -148,7 +150,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
         if (order.getState() == SettlementOrderState.REVIEWING) {
-            return toDTO(order);
+            return logOrderResult("submit", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT,
                 "只有 DRAFT 结算单可以提交复核，status = {}", order.getState());
@@ -156,7 +158,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setSubmittedBy(operator.getOperatorAsText());
         order.setSubmittedTime(LocalDateTime.now());
         update(order, "提交结算单复核失败");
-        return toDTO(order);
+        return logOrderResult("submit", order, false);
     }
 
     @Override
@@ -167,7 +169,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         validateReason(request.getReason(), ReturnSettlementOrderToDraftRequest.MAX_REASON_LENGTH, "结算单退回原因");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
         if (order.getState() == SettlementOrderState.DRAFT) {
-            return toDTO(order);
+            return logOrderResult("return-to-draft", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
                 "只有 REVIEWING 结算单可以退回草稿，status = {}", order.getState());
@@ -176,7 +178,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setReturnedTime(LocalDateTime.now());
         order.setReturnReason(request.getReason());
         update(order, "退回结算单草稿失败");
-        return toDTO(order);
+        return logOrderResult("return-to-draft", order, false);
     }
 
     @Override
@@ -189,7 +191,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         if (order.getState() == SettlementOrderState.APPROVED) {
             AssertUtils.equals(order.getSettlementApprovalRef(), request.getSettlementApprovalRef(),
                     "结算单已使用不同审批引用完成审批");
-            return toDTO(order);
+            return logOrderResult("approve", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
                 "只有 REVIEWING 结算单可以审批，status = {}", order.getState());
@@ -198,7 +200,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setApprovedBy(operator.getOperatorAsText());
         order.setApprovedTime(LocalDateTime.now());
         update(order, "审批结算单失败");
-        return toDTO(order);
+        return logOrderResult("approve", order, false);
     }
 
     @Override
@@ -209,7 +211,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         validateReason(request.getReason(), CancelSettlementOrderRequest.MAX_REASON_LENGTH, "结算单取消原因");
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
         if (order.getState() == SettlementOrderState.CANCELLED) {
-            return toDTO(order);
+            return logOrderResult("cancel", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT
                         || order.getState() == SettlementOrderState.REVIEWING,
@@ -223,7 +225,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setCancelledTime(LocalDateTime.now());
         order.setCancelReason(request.getReason());
         update(order, "取消结算单失败");
-        return toDTO(order);
+        return logOrderResult("cancel", order, false);
     }
 
     @Override
@@ -233,7 +235,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                 request == null ? null : request.getSettlementOrderSn(), operator);
         SettlementOrder order = requiredOrderForUpdate(request.getTenantId(), request.getSettlementOrderSn());
         if (order.getState() == SettlementOrderState.LOCKED) {
-            return toDTO(order);
+            return logOrderResult("lock", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.APPROVED,
                 "只有 APPROVED 结算单可以锁定资金，status = {}", order.getState());
@@ -260,7 +262,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             order.setLockedBy(operator.getOperatorAsText());
             order.setLockedTime(LocalDateTime.now());
             update(order, "锁定结算单资金失败");
-            return toDTO(order);
+            return logOrderResult("lock", order, false);
         } catch (LedgerPostingRejectedException exception) {
             recordDeterministicFailure(order, items, exception, operator);
             throw exception;
@@ -277,6 +279,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         String releaseDigest = releaseDigest(order, request);
         SettlementOrderDTO replay = completedReleaseReplay(order, releaseDigest);
         if (replay != null) {
+            logOrder("release", order, true);
             return replay;
         }
 
@@ -346,7 +349,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         order.setReleasedBy(operator.getOperatorAsText());
         order.setReleasedTime(releasedAt);
         update(order, "记录结算释放结果失败");
-        return toDTO(order);
+        return logOrderResult("release", order, false);
     }
 
     @Override
@@ -354,6 +357,18 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     public SettlementOrderDTO getOrder(Long tenantId, String settlementOrderSn) {
         validateQuery(tenantId, settlementOrderSn);
         return toDTO(requiredOrder(tenantId, settlementOrderSn));
+    }
+
+    private SettlementOrderDTO logOrderResult(String action, SettlementOrder order, boolean replay) {
+        logOrder(action, order, replay);
+        return toDTO(order);
+    }
+
+    private void logOrder(String action, SettlementOrder order, boolean replay) {
+        log.info("结算单处理完成，等待事务提交，action={}, replay={}, tenantId={}, settlementOrderSn={}, "
+                        + "state={}, netAmount={}, currency={}, lockTransactionSn={}, releaseTransactionSn={}",
+                action, replay, order.getTenantId(), order.getSn(), order.getState(), order.getNetAmount(),
+                order.getCurrency(), order.getLockFundsTransactionSn(), order.getReleaseFundsTransactionSn());
     }
 
     private SettlementOrderDTO completedReleaseReplay(SettlementOrder order, String releaseDigest) {

@@ -10,6 +10,7 @@ import com.wind.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
 import com.wind.funds.wallet.model.request.ResolveFundingResponsibilityRequest;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.List;
  * @author Codex
  * @date 2026-06-16
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class FundingResponsibilityResolutionApplicationServiceImpl
@@ -52,7 +54,13 @@ public class FundingResponsibilityResolutionApplicationServiceImpl
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency());
-        return toDecision(records.getFirst());
+        FundingResponsibilityDecisionDTO decision = toDecision(records.getFirst());
+        log.info("资金责任解析完成，tenantId={}, spendSubjectType={}, spendSubjectId={}, relationType={}, "
+                        + "targetSubjectType={}, targetSubjectId={}, currency={}, relationSn={}",
+                request.getTenantId(), request.getSpendSubjectType(), request.getSpendSubjectId(),
+                request.getRelationType(), decision.getTargetSubjectType(), decision.getTargetSubjectId(),
+                decision.getCurrency(), decision.getRelationSn());
+        return decision;
     }
 
     private void validateRequest(ResolveFundingResponsibilityRequest request) {

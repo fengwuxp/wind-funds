@@ -17,6 +17,7 @@ import com.wind.funds.wallet.model.request.ResolveFundsAccountCapabilityRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import java.util.Objects;
  * @author Codex
  * @date 2026-06-19
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
@@ -57,7 +59,14 @@ public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
         }
         FundsAccountCapabilityDecisionDTO accountDecision = resolveFundsAccountCapability(request, targetAccountId);
         assertAccountCapabilitySupportsAction(request, accountDecision);
-        return toSnapshot(request, instrumentDecision, fundingDecision, targetAccountId, accountDecision);
+        PaymentInstrumentPreTransactionSnapshotDTO snapshot =
+                toSnapshot(request, instrumentDecision, fundingDecision, targetAccountId, accountDecision);
+        log.info("支付工具预交易快照解析完成，tenantId={}, businessScene={}, businessSn={}, instrumentSn={}, "
+                        + "action={}, targetAccountType={}, targetAccountId={}, amount={}, currency={}, ready={}",
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(), request.getInstrumentSn(),
+                request.getAction(), targetAccountId.type(), targetAccountId.id(), request.getAmount(),
+                request.getCurrency(), snapshot.getReady());
+        return snapshot;
     }
 
     private void validateRequest(ResolvePaymentInstrumentPreTransactionSnapshotRequest request) {

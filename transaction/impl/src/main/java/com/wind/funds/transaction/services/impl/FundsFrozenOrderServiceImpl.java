@@ -18,6 +18,7 @@ import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author Codex
  * @date 2026-05-07
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
@@ -41,6 +43,11 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
         FundsFrozenOrder entity = FundsFrozenOrderConverter.INSTANCE.convertToFundsFrozenOrder(request);
         fundsFrozenOrderMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金冻结订单失败");
+        log.info("资金冻结订单创建完成，等待事务提交，tenantId={}, freezeOrderId={}, freezeOrderSn={}, "
+                        + "businessScene={}, businessSn={}, transactionSn={}, state={}, amount={}, currency={}",
+                request.getTenantId(), entity.getId(), request.getSn(), request.getBusinessScene(),
+                request.getBusinessSn(), request.getTransactionSn(), request.getState(), request.getAmount(),
+                request.getCurrency());
         return entity.getId();
     }
 

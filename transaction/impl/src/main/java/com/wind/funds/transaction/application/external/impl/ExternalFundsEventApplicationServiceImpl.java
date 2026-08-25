@@ -17,6 +17,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import java.util.Map;
  * @author Codex
  * @date 2026-06-21
  */
+@Slf4j
 @Service
 @AllArgsConstructor
 public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEventApplicationService {
@@ -48,7 +50,13 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         validateConsumeRequest(request);
         ExternalFundsRailDecision railDecision =
                 ExternalFundsRailResolver.requireConfirmedCreditRailDecision(request.getExternalEventType());
-        return directTransactionService.topup(toTopupRequest(request, railDecision), operator);
+        String transactionSn = directTransactionService.topup(toTopupRequest(request, railDecision), operator);
+        log.info("外部资金事件处理完成，等待事务提交，tenantId={}, externalSourceCode={}, externalFundsFactSn={}, "
+                        + "externalEventType={}, businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                request.getTenantId(), request.getExternalSourceCode(), request.getExternalFundsFactSn(),
+                request.getExternalEventType(), request.getBusinessScene(), request.getBusinessSn(), transactionSn,
+                request.getAmount(), request.getCurrency());
+        return transactionSn;
     }
 
     private void validateConsumeRequest(ConsumeExternalFundsEventRequest request) {
