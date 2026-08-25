@@ -193,7 +193,8 @@ public final class ExternalAccountSensitiveValueValidator {
         return switch (normalized) {
             case "authorizationtransactionsn", "sourcesn" ->
                     INTERNAL_FUNDS_TRANSACTION_SN_PATTERN.matcher(value).matches();
-            case "referencefreezesn" -> INTERNAL_FREEZE_ORDER_SN_PATTERN.matcher(value).matches();
+            case "referencefreezesn" -> INTERNAL_FREEZE_ORDER_SN_PATTERN.matcher(value).matches()
+                    || INTERNAL_FUNDS_TRANSACTION_SN_PATTERN.matcher(value).matches();
             default -> false;
         };
     }

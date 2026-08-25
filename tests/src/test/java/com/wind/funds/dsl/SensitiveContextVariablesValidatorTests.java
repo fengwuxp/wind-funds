@@ -99,16 +99,18 @@ class SensitiveContextVariablesValidatorTests {
     }
 
     /**
-     * 场景：内部来源交易号偶然满足 IBAN 校验规则。
-     * 预期：仅 sourceSn 语义下允许该稳定引用，普通字段下仍按敏感值拒绝。
+     * 场景：内部交易引用偶然满足 IBAN 校验规则。
+     * 预期：仅内部引用字段允许对应稳定引用，普通字段下仍按敏感值拒绝。
      * 红线：内部引用白名单不得放宽其他扩展字段的外部账号检测。
      */
     @Test
-    void testSourceSnShouldNotBeMisclassifiedAsExternalAccountNumber() {
+    void testInternalReferenceSnShouldNotBeMisclassifiedAsExternalAccountNumber() {
         String sourceSn = "FT2000000000000027";
 
         assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
                 java.util.Map.of("sourceSn", sourceSn))).isFalse();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("referenceFreezeSn", sourceSn))).isFalse();
         assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
                 java.util.Map.of("networkReference", sourceSn))).isTrue();
         assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
