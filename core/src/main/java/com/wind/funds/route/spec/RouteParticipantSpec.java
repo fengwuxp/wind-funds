@@ -3,6 +3,7 @@ package com.wind.funds.route.spec;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -38,7 +39,7 @@ public interface RouteParticipantSpec {
     }
 
     @Nullable
-    default String getCurrency() {
+    default CurrencyIsoCode getCurrency() {
         return null;
     }
 

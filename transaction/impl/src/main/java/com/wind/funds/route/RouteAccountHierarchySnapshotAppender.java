@@ -73,7 +73,7 @@ public class RouteAccountHierarchySnapshotAppender {
                         .tenantId(relation.getTenantId())
                         .subjectId(relation.getParentAccountId())
                         .subjectType(relation.getParentAccountType())
-                        .currency(relation.getCurrency().name())
+                        .currency(relation.getCurrency())
                         .build())
                 .build();
     }

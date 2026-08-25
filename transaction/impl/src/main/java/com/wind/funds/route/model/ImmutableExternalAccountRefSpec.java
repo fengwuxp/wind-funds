@@ -3,6 +3,7 @@ package com.wind.funds.route.model;
 import com.wind.funds.transaction.support.FundsContextVariables;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -20,7 +21,7 @@ public record ImmutableExternalAccountRefSpec(String externalAccountId,
                                               @Nullable String externalAccountNo,
                                               @Nullable String providerCode,
                                               @Nullable String channelCode,
-                                              @Nullable String currency,
+                                              @Nullable CurrencyIsoCode currency,
                                               @Nullable String countryCode,
                                               @Nullable String description,
                                               Map<String, Object> contextVariables)
@@ -62,7 +63,7 @@ public record ImmutableExternalAccountRefSpec(String externalAccountId,
     }
 
     @Override
-    public @Nullable String getCurrency() {
+    public @Nullable CurrencyIsoCode getCurrency() {
         return currency;
     }
 

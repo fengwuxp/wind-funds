@@ -471,9 +471,9 @@ com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.ro
 com.wind.funds.route.enums.RouteReplayType	public static final com.wind.funds.route.enums.RouteReplayType UNFREEZE;
 com.wind.funds.route.ref.ExternalAccountRefSpec	public abstract java.lang.String getExternalAccountId();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public abstract java.lang.String getExternalAccountType();
+com.wind.funds.route.ref.ExternalAccountRefSpec	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getChannelCode();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getCountryCode();
-com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getCurrency();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getDescription();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getExternalAccountNo();
 com.wind.funds.route.ref.ExternalAccountRefSpec	public default java.lang.String getProviderCode();
@@ -484,8 +484,8 @@ com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.Stri
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getInstrumentType();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getOwnerId();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public abstract java.lang.String getOwnerType();
+com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.Long getTenantId();
-com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getCurrency();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getDescription();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.lang.String getStatus();
 com.wind.funds.route.ref.PaymentInstrumentRefSpec	public default java.util.Map<java.lang.String, java.lang.Object> getBindingSnapshot();
@@ -493,7 +493,7 @@ com.wind.funds.route.ref.PaymentInstrumentRefSpec	public interface com.wind.fund
 com.wind.funds.route.ref.SubjectRef	public abstract com.wind.funds.route.enums.FundsSubjectType getSubjectType();
 com.wind.funds.route.ref.SubjectRef	public abstract java.lang.Long getTenantId();
 com.wind.funds.route.ref.SubjectRef	public abstract java.lang.String getSubjectId();
-com.wind.funds.route.ref.SubjectRef	public default java.lang.String getCurrency();
+com.wind.funds.route.ref.SubjectRef	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
 com.wind.funds.route.ref.SubjectRef	public default java.lang.String getLedgerProfileCode();
 com.wind.funds.route.ref.SubjectRef	public default java.lang.String getSubjectName();
 com.wind.funds.route.ref.SubjectRef	public interface com.wind.funds.route.ref.SubjectRef {
@@ -559,7 +559,7 @@ com.wind.funds.route.spec.RouteParticipantSpec	public abstract com.wind.funds.ro
 com.wind.funds.route.spec.RouteParticipantSpec	public abstract com.wind.funds.route.ref.SubjectRef getSubjectRef();
 com.wind.funds.route.spec.RouteParticipantSpec	public default com.wind.funds.route.spec.AccountHierarchySnapshotSpec getAccountHierarchySnapshot();
 com.wind.funds.route.spec.RouteParticipantSpec	public default com.wind.transaction.core.Money getAmount();
-com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getCurrency();
+com.wind.funds.route.spec.RouteParticipantSpec	public default com.wind.transaction.core.enums.CurrencyIsoCode getCurrency();
 com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getDescription();
 com.wind.funds.route.spec.RouteParticipantSpec	public default java.lang.String getLedgerProfileCode();
 com.wind.funds.route.spec.RouteParticipantSpec	public default java.util.Map<java.lang.String, java.lang.Object> getContextVariables();

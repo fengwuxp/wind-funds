@@ -103,7 +103,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .participantRole(RouteParticipantRole.PAYER)
                 .subjectRef(cardCreditAccount)
                 .ledgerProfileCode("CREDIT_BASIC")
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .accountHierarchySnapshot(hierarchySnapshot)
                 .contextVariables(Map.of())
@@ -412,13 +412,13 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {
-        return accountSubject(subjectId, subjectType, 1L, CurrencyIsoCode.USD.name());
+        return accountSubject(subjectId, subjectType, 1L, CurrencyIsoCode.USD);
     }
 
     private SubjectRef accountSubject(String subjectId,
                                       FundsSubjectType subjectType,
                                       Long tenantId,
-                                      String currency) {
+                                      CurrencyIsoCode currency) {
         return ImmutableSubjectRef.builder()
                 .tenantId(tenantId)
                 .subjectId(subjectId)
@@ -444,7 +444,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .instrumentNo(instrumentNo)
                 .ownerId("USER-001")
                 .ownerType("USER")
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .status("ACTIVE")
                 .bindingSnapshot(bindingSnapshot)
                 .build();
@@ -465,7 +465,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .externalAccountNo(externalAccountNo)
                 .providerCode("BANK")
                 .channelCode("ACH")
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .countryCode("US")
                 .contextVariables(contextVariables)
                 .build();

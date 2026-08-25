@@ -5,6 +5,7 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -64,10 +65,10 @@ public class LedgerEntryQuery {
     private String businessSn;
 
     @Schema(description = "币种")
-    private String currency;
+    private CurrencyIsoCode currency;
 
     @Schema(description = "原始金额币种")
-    private String originalCurrency;
+    private CurrencyIsoCode originalCurrency;
 
     @Schema(description = "查询到最小 gmtCreate")
     private LocalDateTime gmtCreateMin;

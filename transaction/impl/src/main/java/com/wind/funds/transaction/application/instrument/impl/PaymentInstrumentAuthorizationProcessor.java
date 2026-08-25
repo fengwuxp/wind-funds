@@ -480,7 +480,7 @@ public class PaymentInstrumentAuthorizationProcessor {
                 .instrumentNo(instrumentDecision.getInstrumentNo())
                 .ownerId(instrumentDecision.getOwnerId())
                 .ownerType(instrumentDecision.getOwnerType().name())
-                .currency(instrumentDecision.getCurrency().name())
+                .currency(instrumentDecision.getCurrency())
                 .status(instrumentDecision.getState().name())
                 .bindingSnapshot(bindingSnapshot(request, instrumentDecision))
                 .description(instrumentDecision.getDescription())

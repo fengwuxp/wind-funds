@@ -2,6 +2,7 @@ package com.wind.funds.route.model;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -16,7 +17,7 @@ public record ImmutableSubjectRef(@Nullable Long tenantId,
                                   String subjectId,
                                   FundsSubjectType subjectType,
                                   @Nullable String subjectName,
-                                  @Nullable String currency,
+                                  @Nullable CurrencyIsoCode currency,
                                   @Nullable String ledgerProfileCode) implements SubjectRef {
 
     @Override
@@ -41,7 +42,7 @@ public record ImmutableSubjectRef(@Nullable Long tenantId,
     }
 
     @Override
-    public @Nullable String getCurrency() {
+    public @Nullable CurrencyIsoCode getCurrency() {
         return currency;
     }
 

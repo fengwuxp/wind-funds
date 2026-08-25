@@ -1049,7 +1049,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                         .tenantId(tenantId)
                         .subjectId(subjectId)
                         .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                        .currency(CURRENCY.name())
+                        .currency(CURRENCY)
                         .ledgerProfileCode(profileCode.name())
                         .build())
                 .build();

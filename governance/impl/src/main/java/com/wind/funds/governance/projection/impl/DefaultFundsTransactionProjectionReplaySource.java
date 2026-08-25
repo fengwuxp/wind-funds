@@ -97,7 +97,7 @@ public class DefaultFundsTransactionProjectionReplaySource implements FundsTrans
                 .displayType(explanation.eventType().name())
                 .displayStatus(explanation.displayStatus())
                 .amount(explanation.amount())
-                .currency(explanation.currency().name())
+                .currency(explanation.currency())
                 .occurredTime(explanation.occurredTime())
                 .payload(explanation.payload())
                 .build();

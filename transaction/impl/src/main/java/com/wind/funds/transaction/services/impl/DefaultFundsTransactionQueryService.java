@@ -920,8 +920,7 @@ public class DefaultFundsTransactionQueryService
                 && Objects.equals(subjectRef.getSubjectId(), detail.getSubjectId())
                 && subjectRef.getSubjectType() != null
                 && Objects.equals(subjectRef.getSubjectType().name(), detail.getSubjectType())
-                && (!StringUtils.hasText(subjectRef.getCurrency())
-                || Objects.equals(subjectRef.getCurrency(), detail.getCurrency().name()))
+                && (subjectRef.getCurrency() == null || subjectRef.getCurrency() == detail.getCurrency())
                 && detail.getParticipantRole() == role
                 && Objects.equals(detail.getAmount(), money.getAmount())
                 && detail.getCurrency() == money.getCurrency();
@@ -1300,9 +1299,9 @@ public class DefaultFundsTransactionQueryService
         return Objects.equals(hierarchySubject.getTenantId(), participantSubject.getTenantId())
                 && hierarchySubject.getSubjectType() == participantSubject.getSubjectType()
                 && Objects.equals(hierarchySubject.getSubjectId(), participantSubject.getSubjectId())
-                && StringUtils.hasText(hierarchySubject.getCurrency())
-                && StringUtils.hasText(participant.getCurrency())
-                && Objects.equals(hierarchySubject.getCurrency(), participant.getCurrency());
+                && hierarchySubject.getCurrency() != null
+                && participant.getCurrency() != null
+                && hierarchySubject.getCurrency() == participant.getCurrency();
     }
 
     private boolean matchesAuthorizationLegs(RouteSnapshotSpec routeSnapshot,
@@ -1411,9 +1410,9 @@ public class DefaultFundsTransactionQueryService
                 && Objects.equals(detail.getSubjectId(), participantSubject.getSubjectId())
                 && Objects.equals(detail.getSubjectType(), participantSubject.getSubjectType().name())
                 && Objects.equals(participantSubject.getTenantId(), transaction.getTenantId())
-                && Objects.equals(participant.getCurrency(), detail.getCurrency().name())
-                && (!StringUtils.hasText(participantSubject.getCurrency())
-                || Objects.equals(participantSubject.getCurrency(), detail.getCurrency().name()))
+                && participant.getCurrency() == detail.getCurrency()
+                && (participantSubject.getCurrency() == null
+                || participantSubject.getCurrency() == detail.getCurrency())
                 && detail.getParticipantRole() == participant.getParticipantRole()
                 && Objects.equals(detail.getAmount(), participantMoney.getAmount())
                 && detail.getCurrency() == participantMoney.getCurrency()
@@ -1575,8 +1574,7 @@ public class DefaultFundsTransactionQueryService
                 && Objects.equals(subjectRef.getTenantId(), detail.getTenantId())
                 && Objects.equals(subjectRef.getSubjectId(), detail.getSubjectId())
                 && Objects.equals(subjectRef.getSubjectType().name(), detail.getSubjectType())
-                && (!StringUtils.hasText(subjectRef.getCurrency())
-                || Objects.equals(subjectRef.getCurrency(), detail.getCurrency().name()));
+                && (subjectRef.getCurrency() == null || subjectRef.getCurrency() == detail.getCurrency());
     }
 
     private boolean isProvenFull(FundsTransaction transaction,

@@ -541,7 +541,7 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                         .tenantId(TENANT_ID)
                         .subjectId(subjectId)
                         .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                        .currency(CURRENCY.name())
+                        .currency(CURRENCY)
                         .ledgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
                         .build())
                 .build();

@@ -29,7 +29,7 @@ public class RouteParticipantFactory {
                 .participantRole(role)
                 .subjectRef(subjectRef)
                 .ledgerProfileCode(ledgerProfileCode)
-                .currency(amount == null ? null : amount.getCurrency().name())
+                .currency(amount == null ? null : amount.getCurrency())
                 .amount(amount)
                 .description(description)
                 .contextVariables(contextVariables)

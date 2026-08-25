@@ -434,7 +434,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         assertFactHasText(fact.sourceSn(), "sourceSn");
         assertFactHasText(fact.displayType(), "displayType");
         assertFactHasText(fact.displayStatus(), "displayStatus");
-        assertFactHasText(fact.currency(), "currency");
+        assertFactNotNull(fact.currency(), "currency");
         assertFactNotNull(fact.occurredTime(), "occurredTime");
         assertFactNotNull(fact.payload(), "payload");
     }

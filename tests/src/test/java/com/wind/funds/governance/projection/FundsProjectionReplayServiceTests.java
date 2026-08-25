@@ -2,6 +2,7 @@ package com.wind.funds.governance.projection;
 
 import com.wind.funds.governance.enums.ProjectionCheckpointType;
 import com.wind.funds.governance.enums.ProjectionReplayMode;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -485,7 +486,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(explainablePayload())
                     .build());
@@ -519,7 +520,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(Map.of("businessScene", "ORDER_PAY", "factStatus", "POSTED"))
                     .build());
@@ -538,7 +539,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(explainablePayload())
                     .build());
@@ -557,7 +558,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(explainablePayload())
                     .build());
@@ -576,7 +577,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(explainablePayload())
                     .build());
@@ -595,7 +596,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .build());
         }
@@ -613,7 +614,7 @@ class FundsProjectionReplayServiceTests {
                     .displayType("PAYMENT")
                     .displayStatus("SUCCEEDED")
                     .amount(100L)
-                    .currency("USD")
+                    .currency(CurrencyIsoCode.USD)
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(Map.of(
                             "businessScene", "ORDER_PAY",

@@ -1,6 +1,7 @@
 package com.wind.funds.route.ref;
 
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -24,7 +25,7 @@ public interface SubjectRef {
     }
 
     @Nullable
-    default String getCurrency() {
+    default CurrencyIsoCode getCurrency() {
         return null;
     }
 

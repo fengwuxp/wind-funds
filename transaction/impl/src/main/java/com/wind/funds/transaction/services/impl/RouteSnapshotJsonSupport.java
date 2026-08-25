@@ -359,7 +359,8 @@ final class RouteSnapshotJsonSupport {
         values.put(ImmutableSubjectRef.Fields.subjectType, subjectRef.getSubjectType().name());
         values.put(ImmutableSubjectRef.Fields.tenantId, subjectRef.getTenantId());
         values.put(ImmutableSubjectRef.Fields.subjectName, subjectRef.getSubjectName());
-        values.put(ImmutableSubjectRef.Fields.currency, subjectRef.getCurrency());
+        values.put(ImmutableSubjectRef.Fields.currency,
+                subjectRef.getCurrency() == null ? null : subjectRef.getCurrency().name());
         values.put(ImmutableSubjectRef.Fields.ledgerProfileCode, subjectRef.getLedgerProfileCode());
         return values;
     }
@@ -391,7 +392,7 @@ final class RouteSnapshotJsonSupport {
                     .subjectRef(parseSubjectRef(objectValue(value,
                             ImmutableRouteParticipantSpec.Fields.subjectRef)))
                     .ledgerProfileCode(textValue(value, ImmutableRouteParticipantSpec.Fields.ledgerProfileCode))
-                    .currency(textValue(value, ImmutableRouteParticipantSpec.Fields.currency))
+                    .currency(currencyValue(value, ImmutableRouteParticipantSpec.Fields.currency))
                     .amount(parseMoney(objectValue(value, ImmutableRouteParticipantSpec.Fields.amount)))
                     .description(textValue(value, ImmutableRouteParticipantSpec.Fields.description))
                     .accountHierarchySnapshot(parseAccountHierarchySnapshot(objectValue(value,
@@ -449,7 +450,7 @@ final class RouteSnapshotJsonSupport {
                 .subjectId(textValue(value, ImmutableSubjectRef.Fields.subjectId))
                 .subjectType(FundsSubjectType.valueOf(textValue(value, ImmutableSubjectRef.Fields.subjectType)))
                 .subjectName(textValue(value, ImmutableSubjectRef.Fields.subjectName))
-                .currency(textValue(value, ImmutableSubjectRef.Fields.currency))
+                .currency(currencyValue(value, ImmutableSubjectRef.Fields.currency))
                 .ledgerProfileCode(textValue(value, ImmutableSubjectRef.Fields.ledgerProfileCode))
                 .build();
     }
@@ -473,7 +474,7 @@ final class RouteSnapshotJsonSupport {
                 .ownerId(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerId))
                 .ownerType(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerType))
                 .tenantId(longValue(value, ImmutablePaymentInstrumentRefSpec.Fields.tenantId))
-                .currency(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.currency))
+                .currency(currencyValue(value, ImmutablePaymentInstrumentRefSpec.Fields.currency))
                 .status(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.status))
                 .bindingSnapshot(parseObjectMap(objectValue(value,
                         ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot)))
@@ -491,7 +492,7 @@ final class RouteSnapshotJsonSupport {
                 .externalAccountNo(textValue(value, ImmutableExternalAccountRefSpec.Fields.externalAccountNo))
                 .providerCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.providerCode))
                 .channelCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.channelCode))
-                .currency(textValue(value, ImmutableExternalAccountRefSpec.Fields.currency))
+                .currency(currencyValue(value, ImmutableExternalAccountRefSpec.Fields.currency))
                 .countryCode(textValue(value, ImmutableExternalAccountRefSpec.Fields.countryCode))
                 .description(textValue(value, ImmutableExternalAccountRefSpec.Fields.description))
                 .contextVariables(parseObjectMap(objectValue(value,
@@ -583,6 +584,11 @@ final class RouteSnapshotJsonSupport {
     private static @Nullable String textValue(ObjectNode values, String field) {
         JsonNode value = values.get(field);
         return value == null || value.isNull() ? null : value.asString();
+    }
+
+    private static @Nullable CurrencyIsoCode currencyValue(ObjectNode values, String field) {
+        String value = textValue(values, field);
+        return value == null ? null : CurrencyIsoCode.valueOf(value);
     }
 
     private static @Nullable Long longValue(ObjectNode values, String field) {

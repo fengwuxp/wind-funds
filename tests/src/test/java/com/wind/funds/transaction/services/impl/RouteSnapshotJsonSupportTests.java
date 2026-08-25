@@ -334,7 +334,7 @@ class RouteSnapshotJsonSupportTests {
                         .participantRole(RouteParticipantRole.PAYER)
                         .subjectRef(sourceSubjectRef)
                         .ledgerProfileCode("FUNDING_BASIC")
-                        .currency(CurrencyIsoCode.USD.name())
+                        .currency(CurrencyIsoCode.USD)
                         .amount(Money.immutable(900L, CurrencyIsoCode.USD))
                         .accountHierarchySnapshot(hierarchySnapshot)
                         .contextVariables(Map.of())
@@ -384,7 +384,7 @@ class RouteSnapshotJsonSupportTests {
                 .tenantId(1L)
                 .subjectId(subjectId)
                 .subjectType(subjectType)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
     }
 }

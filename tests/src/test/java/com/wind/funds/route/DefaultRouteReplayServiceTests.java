@@ -688,7 +688,7 @@ class DefaultRouteReplayServiceTests {
         return ImmutableRouteParticipantSpec.builder()
                 .participantRole(role)
                 .subjectRef(subjectRef)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .amount(Money.immutable(10L, CurrencyIsoCode.USD))
                 .accountHierarchySnapshot(hierarchySnapshot)
                 .contextVariables(Map.of())
@@ -700,7 +700,7 @@ class DefaultRouteReplayServiceTests {
                 .tenantId(1L)
                 .subjectId(accountId)
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .ledgerProfileCode("DEFAULT")
                 .build();
     }
@@ -710,7 +710,7 @@ class DefaultRouteReplayServiceTests {
                 .tenantId(1L)
                 .subjectId(accountId)
                 .subjectType(FundsSubjectType.CREDIT_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .ledgerProfileCode("CREDIT")
                 .build();
     }
@@ -730,7 +730,7 @@ class DefaultRouteReplayServiceTests {
                 .ownerId("PAYER-001")
                 .ownerType("USER")
                 .tenantId(1L)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .status("ACTIVE")
                 .bindingSnapshot(Map.of("bindingId", bindingId))
                 .build();
@@ -743,7 +743,7 @@ class DefaultRouteReplayServiceTests {
                 .externalAccountNo("token:" + externalAccountId)
                 .providerCode("ACH_PROVIDER")
                 .channelCode(channelCode)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .countryCode("US")
                 .contextVariables(Map.of("snapshot", externalAccountId))
                 .build();
@@ -771,7 +771,7 @@ class DefaultRouteReplayServiceTests {
         return ImmutableSubjectRef.builder()
                 .subjectId(subjectId)
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
     }
 

@@ -488,7 +488,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
                 .instrumentNo(instrument.getInstrumentNo())
                 .ownerId(instrument.getOwnerId())
                 .ownerType(instrument.getOwnerType().name())
-                .currency(instrument.getCurrency().name())
+                .currency(instrument.getCurrency())
                 .status(instrument.getState().name())
                 .bindingSnapshot(bindingSnapshot(snapshot, instrument))
                 .description(instrument.getDescription())

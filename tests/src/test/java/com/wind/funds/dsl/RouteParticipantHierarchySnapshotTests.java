@@ -32,7 +32,7 @@ class RouteParticipantHierarchySnapshotTests {
         ImmutableRouteParticipantSpec participant = ImmutableRouteParticipantSpec.builder()
                 .participantRole(RouteParticipantRole.PAYER)
                 .subjectRef(child)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .accountHierarchySnapshot(hierarchy)
                 .contextVariables(Map.of())
                 .build();
@@ -84,7 +84,7 @@ class RouteParticipantHierarchySnapshotTests {
                 .tenantId(1L)
                 .subjectId(id)
                 .subjectType(type)
-                .currency(currency.name())
+                .currency(currency)
                 .build();
     }
 }

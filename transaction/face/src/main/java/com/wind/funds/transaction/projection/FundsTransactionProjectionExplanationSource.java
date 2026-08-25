@@ -566,7 +566,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         putIfText(refValues, EXTERNAL_ACCOUNT_TYPE_FIELD, externalAccountRef.getExternalAccountType());
         putIfText(refValues, PROVIDER_CODE_FIELD, externalAccountRef.getProviderCode());
         putIfText(refValues, CHANNEL_CODE_FIELD, externalAccountRef.getChannelCode());
-        putIfText(refValues, CURRENCY_FIELD, externalAccountRef.getCurrency());
+        putIfText(refValues, CURRENCY_FIELD,
+                externalAccountRef.getCurrency() == null ? null : externalAccountRef.getCurrency().name());
         putIfText(refValues, COUNTRY_CODE_FIELD, externalAccountRef.getCountryCode());
         Object externalTransactionId = externalAccountRef.getContextVariables()
                 .get(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID);
@@ -645,7 +646,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         putIfText(refValues, OWNER_ID_FIELD, paymentInstrumentRef.getOwnerId());
         putIfText(refValues, OWNER_TYPE_FIELD, paymentInstrumentRef.getOwnerType());
         putIfNotNull(refValues, TENANT_ID_FIELD, paymentInstrumentRef.getTenantId());
-        putIfText(refValues, CURRENCY_FIELD, paymentInstrumentRef.getCurrency());
+        putIfText(refValues, CURRENCY_FIELD,
+                paymentInstrumentRef.getCurrency() == null ? null : paymentInstrumentRef.getCurrency().name());
         putIfText(refValues, STATUS_FIELD, paymentInstrumentRef.getStatus());
         refValues.put(BINDING_SNAPSHOT_FIELD, paymentInstrumentRef.getBindingSnapshot());
         putIfText(refValues, DESCRIPTION_FIELD, paymentInstrumentRef.getDescription());

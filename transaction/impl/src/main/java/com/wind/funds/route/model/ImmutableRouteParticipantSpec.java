@@ -5,6 +5,7 @@ import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -21,7 +22,7 @@ import java.util.Objects;
 public record ImmutableRouteParticipantSpec(RouteParticipantRole participantRole,
                                             SubjectRef subjectRef,
                                             @Nullable String ledgerProfileCode,
-                                            @Nullable String currency,
+                                            @Nullable CurrencyIsoCode currency,
                                             @Nullable Money amount,
                                             @Nullable String description,
                                             @Nullable AccountHierarchySnapshotSpec accountHierarchySnapshot,
@@ -48,7 +49,7 @@ public record ImmutableRouteParticipantSpec(RouteParticipantRole participantRole
     }
 
     @Override
-    public @Nullable String getCurrency() {
+    public @Nullable CurrencyIsoCode getCurrency() {
         return currency;
     }
 

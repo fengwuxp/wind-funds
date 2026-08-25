@@ -754,7 +754,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .tenantId(TENANT_ID)
                 .subjectId("platform_adjustment")
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
         RouteNodeSpec platformNode = routeNode("platform_adjustment",
                 FundsSubjectType.FUNDING_ACCOUNT, increase ? RouteNodeRole.SOURCE : RouteNodeRole.TARGET);
@@ -848,13 +848,13 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .tenantId(TENANT_ID)
                 .subjectId("cash_account")
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
         SubjectRef prepaymentAccount = ImmutableSubjectRef.builder()
                 .tenantId(TENANT_ID)
                 .subjectId("prepayment_account")
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
         return ImmutableResolvedRouteSpec.builder()
                 .tenantId(TENANT_ID)
@@ -956,7 +956,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .tenantId(TENANT_ID)
                 .subjectId(subjectId)
                 .subjectType(subjectType)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)

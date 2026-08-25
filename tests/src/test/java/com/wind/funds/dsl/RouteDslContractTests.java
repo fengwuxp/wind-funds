@@ -456,7 +456,7 @@ class RouteDslContractTests {
                 .participantRole(RouteParticipantRole.PAYER)
                 .subjectRef(fundingAccount("FA-PARTICIPANT-001"))
                 .ledgerProfileCode("DEFAULT")
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .contextVariables(contextVariables)
                 .build();
@@ -486,7 +486,7 @@ class RouteDslContractTests {
                 .tenantId(1L)
                 .subjectId(subjectId)
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .ledgerProfileCode("DEFAULT")
                 .build();
     }

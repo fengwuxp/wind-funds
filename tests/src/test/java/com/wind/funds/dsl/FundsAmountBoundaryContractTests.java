@@ -194,7 +194,7 @@ class FundsAmountBoundaryContractTests {
                 .tenantId(1L)
                 .subjectId(subjectId)
                 .subjectType(subjectType)
-                .currency(CURRENCY.name())
+                .currency(CURRENCY)
                 .ledgerProfileCode("DEFAULT")
                 .build();
     }

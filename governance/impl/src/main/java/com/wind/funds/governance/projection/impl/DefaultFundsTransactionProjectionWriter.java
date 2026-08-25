@@ -56,7 +56,7 @@ public class DefaultFundsTransactionProjectionWriter implements FundsTransaction
             addDifference(result, row.sourceSn(), "displayType", row.displayType(), current.getDisplayType());
             addDifference(result, row.sourceSn(), "displayStatus", row.displayStatus(), current.getDisplayStatus());
             addDifference(result, row.sourceSn(), "amount", row.amount(), current.getAmount());
-            addDifference(result, row.sourceSn(), "currency", row.currency(), current.getCurrency());
+            addDifference(result, row.sourceSn(), "currency", row.currency().name(), current.getCurrency());
             addDifference(result, row.sourceSn(), "occurredTime", row.occurredTime(), current.getOccurredTime());
             addDifference(result, row.sourceSn(), "payload", canonical(row.payload()), current.getPayloadJson());
         }
@@ -122,7 +122,7 @@ public class DefaultFundsTransactionProjectionWriter implements FundsTransaction
         entity.setDisplayType(row.displayType());
         entity.setDisplayStatus(row.displayStatus());
         entity.setAmount(row.amount());
-        entity.setCurrency(row.currency());
+        entity.setCurrency(row.currency().name());
         entity.setOccurredTime(row.occurredTime());
         entity.setPayloadJson(canonical(row.payload()));
         entity.setReplayTaskSn(taskSn);

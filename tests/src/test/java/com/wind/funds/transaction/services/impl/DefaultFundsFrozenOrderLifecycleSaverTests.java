@@ -172,7 +172,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 .tenantId(TENANT_ID)
                 .subjectId(ACCOUNT_ID)
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
         return ImmutableRouteSnapshotSpec.builder()
                 .tenantId(TENANT_ID)
@@ -188,7 +188,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 .participants(List.of(ImmutableRouteParticipantSpec.builder()
                         .participantRole(RouteParticipantRole.PAYER)
                         .subjectRef(subjectRef)
-                        .currency(CurrencyIsoCode.USD.name())
+                        .currency(CurrencyIsoCode.USD)
                         .amount(instruction.getAmount())
                         .contextVariables(Map.of())
                         .build()))

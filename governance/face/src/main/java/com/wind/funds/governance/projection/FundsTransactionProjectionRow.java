@@ -1,5 +1,6 @@
 package com.wind.funds.governance.projection;
 
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 
@@ -24,7 +25,7 @@ public record FundsTransactionProjectionRow(@NonNull String projectionSn,
                                             @NonNull String displayType,
                                             @NonNull String displayStatus,
                                             long amount,
-                                            @NonNull String currency,
+                                            @NonNull CurrencyIsoCode currency,
                                             @NonNull LocalDateTime occurredTime,
                                             @NonNull Map<String, Object> payload) {
 }

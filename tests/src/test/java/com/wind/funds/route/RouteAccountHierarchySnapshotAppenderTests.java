@@ -154,7 +154,7 @@ class RouteAccountHierarchySnapshotAppenderTests {
         return ImmutableRouteParticipantSpec.builder()
                 .participantRole(RouteParticipantRole.PAYER)
                 .subjectRef(account)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .contextVariables(Map.of())
                 .build();
     }
@@ -164,7 +164,7 @@ class RouteAccountHierarchySnapshotAppenderTests {
                 .tenantId(1L)
                 .subjectId(id)
                 .subjectType(type)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(CurrencyIsoCode.USD)
                 .build();
     }
 

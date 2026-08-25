@@ -3,6 +3,7 @@ package com.wind.funds.route.model;
 import com.wind.funds.transaction.support.FundsContextVariables;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -21,7 +22,7 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
                                                 String ownerId,
                                                 String ownerType,
                                                 @Nullable Long tenantId,
-                                                @Nullable String currency,
+                                                @Nullable CurrencyIsoCode currency,
                                                 @Nullable String status,
                                                 Map<String, Object> bindingSnapshot,
                                                 @Nullable String description)
@@ -69,7 +70,7 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
     }
 
     @Override
-    public @Nullable String getCurrency() {
+    public @Nullable CurrencyIsoCode getCurrency() {
         return currency;
     }
 

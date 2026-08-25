@@ -506,9 +506,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                 && detail.getParticipantRole() == participant.getParticipantRole()
                 && Objects.equals(detail.getAmount(), participantMoney.getAmount())
                 && detail.getCurrency() == participantMoney.getCurrency()
-                && Objects.equals(participant.getCurrency(), detail.getCurrency().name())
-                && (!StringUtils.hasText(subject.getCurrency())
-                || Objects.equals(subject.getCurrency(), detail.getCurrency().name()))
+                && participant.getCurrency() == detail.getCurrency()
+                && (subject.getCurrency() == null || subject.getCurrency() == detail.getCurrency())
                 && StringUtils.hasText(detail.getLedgerTransactionSn())
                 && !StringUtils.hasText(detail.getErrorCode());
     }
@@ -547,8 +546,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                 && Objects.equals(subject.getTenantId(), detail.getTenantId())
                 && Objects.equals(subject.getSubjectId(), detail.getSubjectId())
                 && Objects.equals(subject.getSubjectType().name(), detail.getSubjectType())
-                && (!StringUtils.hasText(subject.getCurrency())
-                || Objects.equals(subject.getCurrency(), detail.getCurrency().name()));
+                && (subject.getCurrency() == null || subject.getCurrency() == detail.getCurrency());
     }
 
     private String uniqueLedgerTransactionSn(List<FundsTransactionDetailDTO> details,
