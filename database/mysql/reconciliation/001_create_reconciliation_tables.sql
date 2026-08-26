@@ -25,9 +25,9 @@ CREATE TABLE `t_clearing_splittable_detail`
     `split_period`                    VARCHAR(30)  NOT NULL COMMENT '已解析清分周期',
     `split_rule_code`                 VARCHAR(64)  NOT NULL COMMENT '清分规则编码',
     `split_rule_version`              VARCHAR(64)  NOT NULL COMMENT '清分规则版本',
-    `status`                          VARCHAR(50)  NOT NULL COMMENT 'SPLIT_READY/EXCLUDED',
+    `admission_result`                VARCHAR(50)  NOT NULL COMMENT 'SPLIT_READY/EXCLUDED',
     `exclusion_reason`                VARCHAR(64)           DEFAULT NULL COMMENT '稳定排除原因',
-    `reconciliation_decision_status` VARCHAR(50)  NOT NULL COMMENT '清分前对账门禁结论',
+    `reconciliation_decision_result` VARCHAR(50)  NOT NULL COMMENT '清分前对账门禁结论',
     `gate_evidence_ref`               VARCHAR(64)  NOT NULL COMMENT '清分准入消费的 Stage Gate evidence 流水号',
     `reconciliation_evidence_refs`    MEDIUMTEXT   NOT NULL COMMENT '清分前对账证据引用 JSON',
     `route_snapshot_digest`           VARCHAR(64)           DEFAULT NULL COMMENT '来源 RouteSnapshot SHA-256；来源不完整被排除时为空',
@@ -38,7 +38,7 @@ CREATE TABLE `t_clearing_splittable_detail`
     UNIQUE KEY `uk_clearing_splittable_detail_entry` (`tenant_id`, `ledger_entry_sn`),
     KEY `idx_clearing_splittable_detail_source` (`tenant_id`, `funds_transaction_sn`, `funds_transaction_detail_sn`),
     KEY `idx_clearing_splittable_detail_subject` (`tenant_id`, `subject_type`, `subject_id`, `split_period`),
-    KEY `idx_clearing_splittable_detail_status` (`tenant_id`, `status`)
+    KEY `idx_clearing_splittable_detail_admission_result` (`tenant_id`, `admission_result`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '可清分明细准入事实表';
 
@@ -62,7 +62,7 @@ CREATE TABLE `t_clearing_split_batch`
     `member_digest`    VARCHAR(64)  NOT NULL COMMENT '成员来源摘要集合 SHA-256',
     `batch_digest`     VARCHAR(64)  NOT NULL COMMENT '批次边界和成员事实 SHA-256',
     `active_batch_digest` VARCHAR(64)        DEFAULT NULL COMMENT '有效批次幂等键；批次取消后置空',
-    `status`           VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/CONFIRMED/CANCELLED',
+    `state`            VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/CONFIRMED/CANCELLED',
     `created_by`       VARCHAR(64)  NOT NULL COMMENT '创建人',
     `submitted_by`     VARCHAR(64)           DEFAULT NULL COMMENT '提交复核人',
     `submitted_time`   DATETIME              DEFAULT NULL COMMENT '提交复核时间',
@@ -75,8 +75,8 @@ CREATE TABLE `t_clearing_split_batch`
     UNIQUE KEY `uk_clearing_split_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_clearing_split_batch_active_digest` (`tenant_id`, `active_batch_digest`),
     KEY `idx_clearing_split_batch_scope`
-        (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `split_period`, `status`),
-    KEY `idx_clearing_split_batch_status_age` (`tenant_id`, `status`, `gmt_modified`)
+        (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `split_period`, `state`),
+    KEY `idx_clearing_split_batch_state_age` (`tenant_id`, `state`, `gmt_modified`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '单账务主体清分批次表';
 
@@ -170,22 +170,22 @@ CREATE TABLE `t_clearing_candidate`
     `source_digest`                   VARCHAR(64)  NOT NULL COMMENT '来源事实摘要',
     `candidate_digest`                VARCHAR(64)  NOT NULL COMMENT '候选事实摘要',
     `active_splittable_detail_sn`     VARCHAR(64)           DEFAULT NULL COMMENT '有效候选占用键；排除后置空',
-    `status`                          VARCHAR(50)  NOT NULL COMMENT 'WAITING_PERIOD/BLOCKED/READY/LOCKED/CLEARED/EXCLUDED',
+    `state`                           VARCHAR(50)  NOT NULL COMMENT 'WAITING_PERIOD/BLOCKED/READY/LOCKED/CLEARED/EXCLUDED',
     `block_reason`                    VARCHAR(128)          DEFAULT NULL COMMENT '当前阻断原因',
     `exclusion_reason`                VARCHAR(512)          DEFAULT NULL COMMENT '排除原因',
     `locked_clearing_batch_sn`        VARCHAR(64)           DEFAULT NULL COMMENT '锁定候选的清算批次流水号',
     `created_by`                      VARCHAR(64)  NOT NULL COMMENT '创建人',
     `updated_by`                      VARCHAR(64)           DEFAULT NULL COMMENT '最后状态操作人',
-    `status_changed_time`             DATETIME              DEFAULT NULL COMMENT '状态变更时间',
+    `state_changed_time`              DATETIME              DEFAULT NULL COMMENT '状态变更时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_clearing_candidate_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_clearing_candidate_digest` (`tenant_id`, `candidate_digest`),
     UNIQUE KEY `uk_clearing_candidate_active_detail` (`tenant_id`, `active_splittable_detail_sn`),
     KEY `idx_clearing_candidate_source` (`tenant_id`, `split_result_sn`, `splittable_detail_sn`),
     KEY `idx_clearing_candidate_subject` (`tenant_id`, `subject_type`, `subject_id`, `currency`, `clearing_period`),
-    KEY `idx_clearing_candidate_status_available` (`tenant_id`, `status`, `clearing_available_time`),
-    KEY `idx_clearing_candidate_status_changed` (`tenant_id`, `status`, `status_changed_time`),
-    KEY `idx_clearing_candidate_locked_batch` (`tenant_id`, `locked_clearing_batch_sn`, `status`)
+    KEY `idx_clearing_candidate_state_available` (`tenant_id`, `state`, `clearing_available_time`),
+    KEY `idx_clearing_candidate_state_changed` (`tenant_id`, `state`, `state_changed_time`),
+    KEY `idx_clearing_candidate_locked_batch` (`tenant_id`, `locked_clearing_batch_sn`, `state`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '清算候选准入事实表';
 
@@ -210,7 +210,7 @@ CREATE TABLE `t_clearing_batch`
     `amount_digest`          VARCHAR(64)  NOT NULL COMMENT '候选经济范围 SHA-256',
     `active_amount_digest`   VARCHAR(64)           DEFAULT NULL COMMENT 'REVIEWING 经济范围占用键',
     `funds_transaction_sn`   VARCHAR(64)           DEFAULT NULL COMMENT '成功或明确失败的资金交易流水号',
-    `status`                 VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/CONFIRMED/CANCELLED/FAILED',
+    `state`                  VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/CONFIRMED/CANCELLED/FAILED',
     `created_by`             VARCHAR(64)  NOT NULL COMMENT '创建人',
     `submitted_by`           VARCHAR(64)           DEFAULT NULL COMMENT '提交人',
     `submitted_time`         DATETIME              DEFAULT NULL COMMENT '提交时间',
@@ -228,8 +228,8 @@ CREATE TABLE `t_clearing_batch`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_clearing_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_clearing_batch_active_digest` (`tenant_id`, `active_amount_digest`),
-    KEY `idx_clearing_batch_scope` (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `clearing_period`, `status`),
-    KEY `idx_clearing_batch_status_age` (`tenant_id`, `status`, `gmt_modified`),
+    KEY `idx_clearing_batch_scope` (`tenant_id`, `subject_type`, `subject_id`, `currency`, `business_line`, `clearing_period`, `state`),
+    KEY `idx_clearing_batch_state_age` (`tenant_id`, `state`, `gmt_modified`),
     KEY `idx_clearing_batch_funds_transaction` (`tenant_id`, `funds_transaction_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '清算批次表';
@@ -283,7 +283,7 @@ CREATE TABLE `t_reconciliation_batch`
     `time_semantics`             VARCHAR(64)  NOT NULL COMMENT '窗口时间语义',
     `timezone_id`                VARCHAR(64)  NOT NULL COMMENT '对账窗口时区 ID',
     `previous_batch_sn`          VARCHAR(64)           DEFAULT NULL COMMENT '重跑引用的上一批次流水号',
-    `status`                     VARCHAR(50)  NOT NULL COMMENT 'CREATED/DATA_COLLECTING/DATA_READY/COMPLETED/ABORTED',
+    `state`                      VARCHAR(50)  NOT NULL COMMENT 'CREATED/DATA_COLLECTING/DATA_READY/COMPLETED/ABORTED',
     `run_result_sn`              VARCHAR(64)           DEFAULT NULL COMMENT '完成态运行结果流水号',
     `aborted_by`                 VARCHAR(64)           DEFAULT NULL COMMENT '终止操作人',
     `aborted_time`               DATETIME              DEFAULT NULL COMMENT '终止时间',
@@ -297,8 +297,8 @@ CREATE TABLE `t_reconciliation_batch`
     UNIQUE KEY `uk_reconciliation_batch_digest` (`tenant_id`, `batch_digest`),
     UNIQUE KEY `uk_reconciliation_batch_previous` (`tenant_id`, `previous_batch_sn`),
     KEY `idx_reconciliation_batch_scope_pair`
-        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
-    KEY `idx_reconciliation_batch_status` (`tenant_id`, `status`)
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `state`),
+    KEY `idx_reconciliation_batch_state` (`tenant_id`, `state`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账批次表';
 
@@ -409,7 +409,7 @@ CREATE TABLE `t_reconciliation_run_result`
     `pair_owner_namespace`     VARCHAR(64)  NOT NULL COMMENT '对账 pair 身份 Owner namespace',
     `pair_identity_value`      VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
     `currency`                 VARCHAR(10)  NOT NULL COMMENT '对账币种',
-    `status`                   VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND',
+    `outcome`                  VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND',
     `rule_namespace`           VARCHAR(64)  NOT NULL COMMENT '比较规则 namespace',
     `rule_identity`            VARCHAR(128) NOT NULL COMMENT '比较规则稳定身份',
     `rule_version`             VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
@@ -428,7 +428,7 @@ CREATE TABLE `t_reconciliation_run_result`
     UNIQUE KEY `uk_reconciliation_run_result_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_run_result_business` (`tenant_id`, `reconciliation_batch_sn`),
     KEY `idx_reconciliation_run_result_scope_pair`
-        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `outcome`),
     KEY `idx_reconciliation_run_result_digest` (`tenant_id`, `result_digest`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '对账运行结果表';
@@ -486,7 +486,7 @@ CREATE TABLE `t_reconciliation_difference`
     `pair_identity_value`       VARCHAR(128) NOT NULL COMMENT '对账 pair 稳定身份',
     `difference_type`           VARCHAR(50) NOT NULL COMMENT '对账差错类型',
     `severity`                  VARCHAR(50) NOT NULL COMMENT '对账差错严重等级',
-    `status`                    VARCHAR(50) NOT NULL COMMENT '对账差错状态',
+    `state`                     VARCHAR(50) NOT NULL COMMENT '对账差错状态',
     `currency`                  VARCHAR(10)          DEFAULT NULL COMMENT '差异币种，金额差异时必填',
     `difference_amount`         BIGINT(20)           DEFAULT NULL COMMENT '差异金额，最小货币单位；非金额差异可空',
     `responsible_party_ref`     VARCHAR(128) NOT NULL COMMENT '责任方引用',
@@ -521,10 +521,10 @@ CREATE TABLE `t_reconciliation_difference`
     UNIQUE KEY `uk_reconciliation_difference_sn` (`tenant_id`, `difference_sn`),
     UNIQUE KEY `uk_reconciliation_difference_match_result` (`tenant_id`, `reconciliation_match_result_sn`),
     KEY `idx_reconciliation_difference_batch` (`tenant_id`, `reconciliation_batch_sn`),
-    KEY `idx_reconciliation_difference_status` (`tenant_id`, `status`),
+    KEY `idx_reconciliation_difference_state` (`tenant_id`, `state`),
     KEY `idx_reconciliation_difference_scope_pair`
-        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `status`),
-    KEY `idx_reconciliation_difference_lineage` (`tenant_id`, `current_lineage_ref`, `status`),
+        (`tenant_id`, `scope_owner_namespace`, `scope_identity_value`, `pair_owner_namespace`, `pair_identity_value`, `state`),
+    KEY `idx_reconciliation_difference_lineage` (`tenant_id`, `current_lineage_ref`, `state`),
     KEY `idx_reconciliation_difference_adjustment` (`tenant_id`, `adjustment_sn`),
     KEY `idx_reconciliation_difference_rerun` (`tenant_id`, `last_rerun_sn`),
     KEY `idx_reconciliation_difference_rerun_batch` (`tenant_id`, `last_rerun_batch_sn`)
@@ -688,7 +688,7 @@ CREATE TABLE `t_settlement_order`
     `deduct_amount`               BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '扣减金额，当前固定 0',
     `reserve_amount`              BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '准备金金额，当前固定 0',
     `net_amount`                  BIGINT(20)   NOT NULL COMMENT '净结算金额，最小货币单位',
-    `status`                      VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/APPROVED/LOCKED/FAILED/CANCELLED/RELEASED',
+    `state`                       VARCHAR(50)  NOT NULL COMMENT 'DRAFT/REVIEWING/APPROVED/LOCKED/FAILED/CANCELLED/RELEASED',
     `settlement_approval_ref`     VARCHAR(128)          DEFAULT NULL COMMENT '结算审批引用',
     `lock_funds_transaction_sn`   VARCHAR(64)           DEFAULT NULL COMMENT '锁定资金交易流水号',
     `release_funds_transaction_sn` VARCHAR(64)          DEFAULT NULL COMMENT '释放资金交易流水号',
@@ -734,7 +734,7 @@ CREATE TABLE `t_settlement_order`
     UNIQUE KEY `uk_settlement_order_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_settlement_order_active_digest` (`tenant_id`, `active_order_digest`),
     KEY `idx_settlement_order_subject` (`tenant_id`, `settlement_subject_type`, `settlement_subject_id`, `settlement_period`),
-    KEY `idx_settlement_order_status` (`tenant_id`, `status`, `gmt_modified`),
+    KEY `idx_settlement_order_state` (`tenant_id`, `state`, `gmt_modified`),
     KEY `idx_settlement_order_lock_transaction` (`tenant_id`, `lock_funds_transaction_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '结算单表';
@@ -778,7 +778,7 @@ CREATE TABLE `t_payout_order`
     `settlement_subject_id`          VARCHAR(64)  NOT NULL COMMENT '结算资金主体 ID',
     `amount`                         BIGINT(20)   NOT NULL COMMENT '出款金额，最小货币单位',
     `currency`                       VARCHAR(10)  NOT NULL COMMENT '币种',
-    `status`                         VARCHAR(30)  NOT NULL COMMENT 'CREATED/SUBMITTED/ACCEPTED/PROCESSING/SUCCEEDED/FAILED/RETURNED/MISMATCHED/CANCELLED',
+    `state`                          VARCHAR(30)  NOT NULL COMMENT 'CREATED/SUBMITTED/ACCEPTED/PROCESSING/SUCCEEDED/FAILED/RETURNED/MISMATCHED/CANCELLED',
     `payout_account_ref`             VARCHAR(128)          DEFAULT NULL COMMENT '宿主出款账户引用',
     `payee_endpoint_ref`             VARCHAR(128)          DEFAULT NULL COMMENT '宿主收款端点引用',
     `channel_ref`                    VARCHAR(128)          DEFAULT NULL COMMENT '宿主通道引用',
@@ -806,7 +806,7 @@ CREATE TABLE `t_payout_order`
     UNIQUE KEY `uk_payout_order_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_payout_order_settlement` (`tenant_id`, `settlement_order_sn`),
     UNIQUE KEY `uk_payout_order_external` (`tenant_id`, `channel_ref`, `external_reference`),
-    KEY `idx_payout_order_status` (`tenant_id`, `status`, `gmt_modified`),
+    KEY `idx_payout_order_state` (`tenant_id`, `state`, `gmt_modified`),
     KEY `idx_payout_order_completion` (`tenant_id`, `completion_funds_transaction_sn`),
     KEY `idx_payout_order_rollback` (`tenant_id`, `rollback_funds_transaction_sn`)
 ) ENGINE = InnoDB
@@ -824,7 +824,7 @@ CREATE TABLE `t_payout_receipt`
     `channel_ref`                VARCHAR(128) NOT NULL COMMENT '宿主通道引用',
     `external_receipt_ref`       VARCHAR(128) NOT NULL COMMENT '外部回单唯一引用',
     `external_reference`         VARCHAR(128) NOT NULL COMMENT '外部出款 reference',
-    `status`                     VARCHAR(30)  NOT NULL COMMENT '归一化回单状态',
+    `state`                      VARCHAR(30)  NOT NULL COMMENT '归一化回单状态',
     `amount`                     BIGINT(20)   NOT NULL COMMENT '回单金额，最小货币单位',
     `currency`                   VARCHAR(10)  NOT NULL COMMENT '回单币种',
     `source_receipt_digest`      VARCHAR(64)  NOT NULL COMMENT '来源回单 SHA-256',
@@ -855,7 +855,7 @@ CREATE TABLE `t_recovery_order`
     `expected_amount`           BIGINT(20)   NOT NULL COMMENT '应追金额，最小货币单位',
     `recovered_amount`          BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '已追金额，最小货币单位',
     `currency`                  VARCHAR(10)  NOT NULL COMMENT '币种',
-    `status`                    VARCHAR(30)  NOT NULL COMMENT 'CREATED/PARTIALLY_RECOVERED/RECOVERED',
+    `state`                     VARCHAR(30)  NOT NULL COMMENT 'CREATED/PARTIALLY_RECOVERED/RECOVERED',
     `source_digest`             VARCHAR(64)  NOT NULL COMMENT '已确认责任来源 SHA-256',
     `order_digest`              VARCHAR(64)  NOT NULL COMMENT '追偿单创建事实 SHA-256',
     `approval_ref`              VARCHAR(128) NOT NULL COMMENT '责任确认审批引用',
@@ -867,7 +867,7 @@ CREATE TABLE `t_recovery_order`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_recovery_order_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_recovery_order_source` (`tenant_id`, `source_type`, `source_sn`, `responsible_subject_type`, `responsible_subject_id`, `currency`),
-    KEY `idx_recovery_order_subject_status` (`tenant_id`, `responsible_subject_type`, `responsible_subject_id`, `status`, `gmt_modified`),
+    KEY `idx_recovery_order_subject_state` (`tenant_id`, `responsible_subject_type`, `responsible_subject_id`, `state`, `gmt_modified`),
     KEY `idx_recovery_order_last_transaction` (`tenant_id`, `last_funds_transaction_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '追偿责任事实表';

@@ -436,7 +436,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected void updateAccountState(FundsAccountId accountId, FundsAccountState state) {
         String tableName = accountId.type().equals(FundsSubjectType.CREDIT_ACCOUNT.name())
                 ? "t_credit_account" : "t_funding_account";
-        int updated = jdbcTemplate.update("UPDATE " + tableName + " SET status = ? WHERE tenant_id = ? AND sn = ?",
+        int updated = jdbcTemplate.update("UPDATE " + tableName + " SET state = ? WHERE tenant_id = ? AND sn = ?",
                 state.name(), TENANT_ID, accountId.id());
         assertThat(updated)
                 .as("account status updated for accountId %s", accountId)
@@ -797,7 +797,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected void updateFundsTransactionState(String transactionSn, FundsTransactionState state) {
         assertThat(jdbcTemplate.update("""
                 UPDATE t_funds_transaction
-                SET status = ?
+                SET state = ?
                 WHERE tenant_id = ? AND sn = ?
                 """, state.name(), TENANT_ID, transactionSn)).isOne();
     }
@@ -821,7 +821,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected void updateFundsTransactionDetailState(String detailSn, FundsTransactionDetailState state) {
         assertThat(jdbcTemplate.update("""
                 UPDATE t_funds_transaction_detail
-                SET status = ?
+                SET state = ?
                 WHERE tenant_id = ? AND sn = ?
                 """, state.name(), TENANT_ID, detailSn)).isOne();
     }

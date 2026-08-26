@@ -97,6 +97,14 @@ class FundsHostCompositionContractTests extends FundsTransactionFlowTestSupport 
         assertThat(facts).extracting(FundsTransactionProjectionExplanation::fundsTransactionSn)
                 .contains(topupTransactionSn, freezeSn)
                 .doesNotContain(lateTransactionSn);
+        assertThat(facts)
+                .filteredOn(fact -> fact.eventType() == FundsTransactionEventType.FREEZE)
+                .extracting(FundsTransactionProjectionExplanation::factStatus)
+                .containsOnly("HELD");
+        assertThat(facts)
+                .filteredOn(fact -> fact.eventType() == FundsTransactionEventType.UNFREEZE)
+                .extracting(FundsTransactionProjectionExplanation::factStatus)
+                .containsOnly("RELEASED");
         assertThat(facts).allSatisfy(fact -> {
             assertThat(fact.tenantId()).isEqualTo(TENANT_ID);
             assertThat(fact.ownerId()).isEqualTo(accountId.id());

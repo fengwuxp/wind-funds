@@ -16,13 +16,23 @@ import java.util.List;
 public interface ClearingBatchMapper extends BaseMapper<ClearingBatch> {
 
     @Select("""
-            SELECT * FROM t_clearing_batch
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, subject_type, subject_id, currency, business_line,
+                   clearing_period, clearing_rule_code, clearing_rule_version, candidate_count, total_amount,
+                   amount_digest, active_amount_digest, funds_transaction_sn, state, created_by, submitted_by,
+                   submitted_time, confirmed_by, confirmed_time, returned_by, returned_time, return_reason,
+                   cancelled_by, cancelled_time, cancel_reason, failed_by, failed_time, failure_reason
+            FROM t_clearing_batch
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             """)
     ClearingBatch selectBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_clearing_batch
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, subject_type, subject_id, currency, business_line,
+                   clearing_period, clearing_rule_code, clearing_rule_version, candidate_count, total_amount,
+                   amount_digest, active_amount_digest, funds_transaction_sn, state, created_by, submitted_by,
+                   submitted_time, confirmed_by, confirmed_time, returned_by, returned_time, return_reason,
+                   cancelled_by, cancelled_time, cancel_reason, failed_by, failed_time, failure_reason
+            FROM t_clearing_batch
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             FOR UPDATE
             """)
@@ -30,7 +40,12 @@ public interface ClearingBatchMapper extends BaseMapper<ClearingBatch> {
 
     @Select("""
             <script>
-            SELECT * FROM t_clearing_batch
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, subject_type, subject_id, currency, business_line,
+                   clearing_period, clearing_rule_code, clearing_rule_version, candidate_count, total_amount,
+                   amount_digest, active_amount_digest, funds_transaction_sn, state, created_by, submitted_by,
+                   submitted_time, confirmed_by, confirmed_time, returned_by, returned_time, return_reason,
+                   cancelled_by, cancelled_time, cancel_reason, failed_by, failed_time, failure_reason
+            FROM t_clearing_batch
             WHERE tenant_id = #{tenantId}
               AND sn IN
               <foreach collection="sns" item="sn" open="(" separator="," close=")">

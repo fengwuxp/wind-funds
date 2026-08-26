@@ -282,7 +282,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | rule_name | varchar(128) | 是 | 规则名称。 | 员工卡日限额 |
 | rule_type | varchar(50) | 是 | 规则类型。 | PERIOD_AMOUNT_LIMIT |
 | rule_domain | varchar(50) | 是 | 规则域。 | AUTHORIZATION |
-| status | varchar(32) | 是 | 定义状态。 | ACTIVE |
+| state | varchar(32) | 是 | 定义状态。 | ACTIVE |
 | description | varchar(512) | 否 | 规则定义说明。 | 员工卡日限额说明 |
 
 索引：
@@ -290,7 +290,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | 索引 | 类型 | 字段 | 用途 |
 | --- | --- | --- | --- |
 | uk_spend_rule_definition_rule | 唯一索引 | tenant_id, rule_id | 保证租户内规则标识唯一。 |
-| idx_spend_rule_definition_domain | 普通索引 | tenant_id, rule_domain, status | 支持按规则域和状态筛选。 |
+| idx_spend_rule_definition_domain | 普通索引 | tenant_id, rule_domain, state | 支持按规则域和状态筛选。 |
 
 状态说明：
 
@@ -325,7 +325,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | rule_version | varchar(64) | 是 | 规则版本。 | v1 |
 | rule_spec | text | 是 | 规则规格 JSON，承载 DSL 分组正文。 | {"limitSpec":{"amountLimit":{"amount":"100.00","currency":"USD"}}} |
 | rule_digest | varchar(128) | 是 | 规则规格摘要。 | sha256:xxx |
-| status | varchar(32) | 是 | 版本状态。 | PUBLISHED |
+| state | varchar(32) | 是 | 版本状态。 | PUBLISHED |
 | operator_id | varchar(64) | 是 | 操作者。 | ops001 |
 | audit_reference_sn | varchar(128) | 是 | 审计引用。 | AUDIT-001 |
 | description | varchar(512) | 否 | 规则版本说明。 | v1 发布 |
@@ -335,7 +335,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | 索引 | 类型 | 字段 | 用途 |
 | --- | --- | --- | --- |
 | uk_spend_rule_version_rule | 唯一索引 | tenant_id, rule_id, rule_version | 保证版本唯一。 |
-| idx_spend_rule_version_status | 普通索引 | tenant_id, status | 查询状态。 |
+| idx_spend_rule_version_state | 普通索引 | tenant_id, state | 查询状态。 |
 
 状态说明：
 
@@ -375,7 +375,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | conflict_policy | varchar(50) | 是 | 冲突策略。 | DENY_OVERRIDES |
 | effective_from | datetime(3) | 是 | 生效开始时间。 | 2026-06-22 00:00:00.000 |
 | effective_to | datetime(3) | 是 | 生效结束时间。 | 2026-07-22 00:00:00.000 |
-| status | varchar(32) | 是 | 挂载状态。 | ACTIVE |
+| state | varchar(32) | 是 | 挂载状态。 | ACTIVE |
 | audit_reference_sn | varchar(128) | 是 | 创建挂载的审计引用，参与业务幂等。 | APPROVAL-001 |
 | description | varchar(512) | 否 | 挂载说明。 | 员工卡日限额挂载 |
 
@@ -385,8 +385,8 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | --- | --- | --- | --- |
 | uk_spend_rule_binding_sn | 唯一索引 | tenant_id, sn | 保证挂载流水唯一。 |
 | uk_spend_rule_binding_scope | 唯一索引 | tenant_id, scope_type, scope_id, rule_id, rule_version, audit_reference_sn | 支撑同一上层审批或业务事实的挂载幂等。 |
-| idx_spend_rule_binding_rule | 普通索引 | tenant_id, rule_id, rule_version, status | 查询规则版本挂载。 |
-| idx_spend_rule_binding_scope | 普通索引 | tenant_id, scope_type, scope_id, status | 查询 scope 下有效规则。 |
+| idx_spend_rule_binding_rule | 普通索引 | tenant_id, rule_id, rule_version, state | 查询规则版本挂载。 |
+| idx_spend_rule_binding_scope | 普通索引 | tenant_id, scope_type, scope_id, state | 查询 scope 下有效规则。 |
 
 挂载边界：
 

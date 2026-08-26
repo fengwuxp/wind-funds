@@ -30,7 +30,7 @@ public class ClearingCandidateQuery {
     private LocalDateTime clearingAvailableTimeMax;
 
     @Schema(description = "最大状态变更时间，包含边界")
-    private LocalDateTime statusChangedTimeMax;
+    private LocalDateTime stateChangedTimeMax;
 
     @Schema(description = "当前锁定清算批次号")
     private String lockedClearingBatchSn;

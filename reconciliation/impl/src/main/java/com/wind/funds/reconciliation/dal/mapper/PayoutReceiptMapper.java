@@ -10,7 +10,9 @@ import org.apache.ibatis.annotations.Select;
 public interface PayoutReceiptMapper extends BaseMapper<PayoutReceipt> {
 
     @Select("""
-            SELECT * FROM t_payout_receipt
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, payout_order_sn, channel_ref, external_receipt_ref,
+                   external_reference, state, amount, currency, source_receipt_digest, normalized_receipt_digest,
+                   evidence_ref, external_occurred_at, received_by FROM t_payout_receipt
             WHERE tenant_id = #{tenantId}
               AND channel_ref = #{channelRef}
               AND external_receipt_ref = #{externalReceiptRef}
@@ -20,7 +22,9 @@ public interface PayoutReceiptMapper extends BaseMapper<PayoutReceipt> {
                                  @Param("externalReceiptRef") String externalReceiptRef);
 
     @Select("""
-            SELECT * FROM t_payout_receipt
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, payout_order_sn, channel_ref, external_receipt_ref,
+                   external_reference, state, amount, currency, source_receipt_digest, normalized_receipt_digest,
+                   evidence_ref, external_occurred_at, received_by FROM t_payout_receipt
             WHERE tenant_id = #{tenantId}
               AND channel_ref = #{channelRef}
               AND external_receipt_ref = #{externalReceiptRef}

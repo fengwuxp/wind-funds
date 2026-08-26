@@ -132,7 +132,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 clearingDifferenceRequest(), WindOperatorFactory.system());
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'INVALIDATED'
+                SET state = 'INVALIDATED'
                 WHERE tenant_id = ? AND difference_sn = ?
                 """, TENANT_ID, requiredDifferenceSn());
 
@@ -213,7 +213,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
 
     /**
      * 场景：历史差错已被标记为已解决，但缺少最后一次重跑结果。
-     * 输入：差错记录 status=RESOLVED，last_rerun_sn 为空。
+     * 输入：差错记录 state=RESOLVED，last_rerun_sn 为空。
      * 输出：报告返回 MISSING_RERUN_RESULT，提示闭环证据不足。
      * 红线：报告只暴露重跑证据缺口，不补事实、不重跑、不修复历史记录。
      */
@@ -223,7 +223,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = ?
+                SET state = ?
                 WHERE tenant_id = ?
                   AND difference_sn = ?
                 """, ReconciliationDifferenceState.RESOLVED.name(), TENANT_ID, requiredDifferenceSn());

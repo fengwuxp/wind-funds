@@ -392,7 +392,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     void testIdentifyShouldExcludeWhenRouteSnapshotIsMissing() {
         jdbcTemplate.update("""
                 UPDATE t_funds_transaction
-                SET status = ?, refunded_amount = ?, route_snapshot = NULL
+                SET state = ?, refunded_amount = ?, route_snapshot = NULL
                 WHERE sn = ?
                 """, FundsTransactionState.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -432,7 +432,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
 
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'RESOLVED', last_rerun_balanced = TRUE,
+                SET state = 'RESOLVED', last_rerun_balanced = TRUE,
                     last_rerun_batch_sn = 'clearing_recon_batch_balanced_001'
                 WHERE tenant_id = ?
                 """, TENANT_ID);
@@ -450,7 +450,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeOpenDirectPay() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_funds_transaction SET state = ? WHERE sn = ?",
                 FundsTransactionState.OPEN.name(), FUNDS_TRANSACTION_SN);
 
         assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -464,7 +464,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeDirectPayWhenDetailBusinessSnDiffersFromParent() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ?, refunded_amount = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_funds_transaction SET state = ?, refunded_amount = ? WHERE sn = ?",
                 FundsTransactionState.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         jdbcTemplate.update("UPDATE t_funds_transaction_detail SET business_sn = ? WHERE sn = ?",
                 OTHER_BUSINESS_SN, FUNDS_TRANSACTION_DETAIL_SN);
@@ -532,7 +532,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeFailedTransaction() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_funds_transaction SET state = ? WHERE sn = ?",
                 FundsTransactionState.FAILED.name(), FUNDS_TRANSACTION_SN);
 
         assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
@@ -685,7 +685,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldExcludeWhenRefundExists() {
-        jdbcTemplate.update("UPDATE t_funds_transaction SET status = ?, refunded_amount = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_funds_transaction SET state = ?, refunded_amount = ? WHERE sn = ?",
                 FundsTransactionState.OPEN.name(), 100L, FUNDS_TRANSACTION_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -793,7 +793,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            status, amount, currency, completed_amount, refunded_amount, declined_amount,
+                            state, amount, currency, completed_amount, refunded_amount, declined_amount,
                             route_snapshot, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
                         """,
@@ -805,7 +805,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                         INSERT INTO t_funds_transaction_detail (
                             sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
                             event_type, subject_id, subject_type, participant_role, request_hash,
-                            funds_effect_type, ledger_transaction_sn, amount, currency, status
+                            funds_effect_type, ledger_transaction_sn, amount, currency, state
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 FUNDS_TRANSACTION_DETAIL_SN, TENANT_ID, FUNDS_TRANSACTION_SN, BUSINESS_SCENE, BUSINESS_SN,
@@ -817,7 +817,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                         INSERT INTO t_funds_transaction_detail (
                             sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
                             event_type, subject_id, subject_type, participant_role, request_hash,
-                            funds_effect_type, ledger_transaction_sn, amount, currency, status
+                            funds_effect_type, ledger_transaction_sn, amount, currency, state
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 PAYER_DETAIL_SN, TENANT_ID, FUNDS_TRANSACTION_SN, BUSINESS_SCENE, BUSINESS_SN,
@@ -905,7 +905,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 INSERT INTO t_funds_transaction_detail (
                     sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
                     event_type, subject_id, subject_type, participant_role, request_hash,
-                    funds_effect_type, ledger_transaction_sn, amount, currency, status
+                    funds_effect_type, ledger_transaction_sn, amount, currency, state
                 ) VALUES ('clearing_fee_detail_001', ?, ?, ?, ?, 'PAY', 'PAY',
                     'platform_fee_001', 'FUNDING_ACCOUNT', 'FEE_RECEIVER', 'request-hash-fee-001',
                     'DIRECT', ?, ?, 'USD', 'SUCCEEDED')

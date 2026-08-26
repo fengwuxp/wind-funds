@@ -58,12 +58,7 @@ public class ReconciliationRunResult implements Serializable, TenantIsolationObj
     private CurrencyIsoCode currency;
 
     @NotNull
-    @Column("status")
     private ReconciliationRunOutcome outcome;
-
-    void setStatus(ReconciliationRunOutcome outcome) {
-        this.outcome = outcome;
-    }
 
     @NotNull
     private String ruleNamespace;

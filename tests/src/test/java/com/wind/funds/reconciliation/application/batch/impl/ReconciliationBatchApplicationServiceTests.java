@@ -138,7 +138,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 .hasMessageContaining("已完成对账批次不能终止")
                 .hasMessageContaining("replaceBatch");
 
-        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
+        assertThat(batchState(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
     }
 
     /**
@@ -160,7 +160,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(replacement.getPreviousBatchSn()).isEqualTo(aborted.getSn());
         assertThat(replacement.getState()).isEqualTo(ReconciliationBatchState.CREATED);
-        assertThat(batchStatus(aborted.getSn())).isEqualTo(ReconciliationBatchState.ABORTED.name());
+        assertThat(batchState(aborted.getSn())).isEqualTo(ReconciliationBatchState.ABORTED.name());
     }
 
     /**
@@ -201,7 +201,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 WindOperatorFactory.system()))
                 .hasMessageContaining("已完成对账批次不能终止");
 
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
     }
 
     /**
@@ -227,8 +227,8 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(replacement.getReplacementReason()).isEqualTo("外部清算文件解析版本错误");
         assertThat(replacement.getReplacementEvidenceRef()).isEqualTo("evidence:parser-incident-001");
         assertThat(replay.getSn()).isEqualTo(replacement.getSn());
-        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
-        assertThat(differenceStatus(completed.getSn() + ":DIFFERENCE")).isEqualTo("INVALIDATED");
+        assertThat(batchState(completed.getSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
+        assertThat(differenceState(completed.getSn() + ":DIFFERENCE")).isEqualTo("INVALIDATED");
         assertThat(lineageCurrentBatchSn()).isEqualTo(replacement.getSn());
         assertThat(batchCount()).isEqualTo(2);
     }
@@ -464,7 +464,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(reference.getFacts()).hasSize(2);
         assertThat(reference.getEvidenceRefs()).containsExactly("report:reference");
         assertThat(replay.getSn()).isEqualTo(reference.getSn());
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
 
         ReconciliationSourceSnapshotDTO comparison = reconciliationBatchApplicationService.recordSourceSnapshot(
                 sourceSnapshotRequest(batch.getSn(), ReconciliationSourceRole.COMPARISON,
@@ -473,7 +473,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(comparison.getCoverage().getMemberCount()).isZero();
         assertThat(comparison.getFacts()).isEmpty();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
         assertThat(snapshotCount()).isEqualTo(2);
         assertThat(sourceItemCount()).isEqualTo(2);
     }
@@ -496,7 +496,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isOne();
         assertThat(sourceItemCount()).isOne();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
     }
 
     /**
@@ -563,7 +563,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     @Test
@@ -578,7 +578,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     @Test
@@ -602,7 +602,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -621,7 +621,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
 
         assertThat(snapshotCount()).isZero();
         assertThat(sourceItemCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -641,14 +641,14 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 .hasMessageContaining("两侧来源不能同时为空");
 
         assertThat(snapshotCount()).isOne();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_COLLECTING.name());
 
         reconciliationBatchApplicationService.recordSourceSnapshot(sourceSnapshotRequest(
                 batch.getSn(), ReconciliationSourceRole.COMPARISON, "settlement",
                 List.of("comparison:001"), List.of("report:comparison")), WindOperatorFactory.system());
 
         assertThat(snapshotCount()).isEqualTo(2);
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.DATA_READY.name());
     }
 
     /**
@@ -793,7 +793,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         completeBatch(firstRerun.getSn(), "BALANCED", 1, 1, 0);
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'RESOLVED', last_rerun_batch_sn = ?, last_rerun_sn = ?,
+                SET state = 'RESOLVED', last_rerun_batch_sn = ?, last_rerun_sn = ?,
                     last_rerun_balanced = TRUE, resolved_by = 'SYSTEM', resolved_time = CURRENT_TIMESTAMP
                 WHERE tenant_id = ? AND difference_sn = ?
                 """, firstRerun.getSn(), firstRerun.getSn() + ":RUN",
@@ -889,7 +889,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 INSERT INTO t_reconciliation_difference (
                     difference_sn, tenant_id, reconciliation_batch_sn, reconciliation_match_result_sn,
                     scope_owner_namespace, scope_identity_value, pair_owner_namespace, pair_identity_value,
-                    difference_type, severity, status, responsible_party_ref,
+                    difference_type, severity, state, responsible_party_ref,
                     rule_namespace, rule_identity, rule_version, current_lineage_ref, evidence_ref, created_by)
                 VALUES (?, ?, ?, ?, 'test.scope', 'clearing:clearing-candidate-001',
                         'test.pair', 'clearing-candidate-001',
@@ -909,7 +909,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 batchSn + ":ADJUSTMENT", batchSn + ":IDEMPOTENCY");
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'ADJUSTING', action_type = 'ADJUSTMENT', adjustment_sn = ?,
+                SET state = 'ADJUSTING', action_type = 'ADJUSTMENT', adjustment_sn = ?,
                     adjustment_idempotency_key = ?, original_fact_ref = 'transaction:test-001',
                     adjustment_approval_ref = 'approval:test-001',
                     adjustment_evidence_ref = 'evidence:test-001', adjustment_reason = '测试处理动作',
@@ -930,7 +930,7 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 rerunBatchSn + ":ADJUSTMENT", rerunBatchSn + ":IDEMPOTENCY");
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'ADJUSTING', action_type = 'RECOVER', adjustment_sn = ?,
+                SET state = 'ADJUSTING', action_type = 'RECOVER', adjustment_sn = ?,
                     adjustment_idempotency_key = ?, adjustment_approval_ref = 'approval:test-002',
                     adjustment_evidence_ref = 'evidence:test-002',
                     adjustment_reason = '重跑未对平后的第二次处理动作', adjusted_by = 'SYSTEM',
@@ -943,14 +943,14 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, originalBatchSn + ":DIFFERENCE");
     }
 
-    private void completeBatch(String batchSn, String status, int totalCount, int matchedCount, int differenceCount) {
+    private void completeBatch(String batchSn, String outcome, int totalCount, int matchedCount, int differenceCount) {
         String runResultSn = batchSn + ":RUN";
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_run_result
                     (sn, tenant_id, reconciliation_batch_sn,
                      scope_owner_namespace, scope_identity_value,
                      pair_owner_namespace, pair_identity_value, currency,
-                     status, rule_namespace, rule_identity, rule_version,
+                     outcome, rule_namespace, rule_identity, rule_version,
                      reference_snapshot_sn, comparison_snapshot_sn,
                      reference_source_digest, comparison_source_digest, source_digest, result_digest,
                      total_count, matched_count, difference_count, evidence_refs, created_by)
@@ -958,11 +958,11 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                         'test.pair', 'clearing-candidate-001', 'USD', ?,
                         'test.rule', 'strict-exact', 'recon-rule-v1', ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, '["report:test"]', 'SYSTEM')
-                """, runResultSn, TENANT_ID, batchSn, status,
+                """, runResultSn, TENANT_ID, batchSn, outcome,
                 batchSn + ":REFERENCE", batchSn + ":COMPARISON",
                 "1".repeat(64), "2".repeat(64), "3".repeat(64), "4".repeat(64),
                 totalCount, matchedCount, differenceCount);
-        jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'COMPLETED', run_result_sn = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_reconciliation_batch SET state = 'COMPLETED', run_result_sn = ? WHERE sn = ?",
                 runResultSn, batchSn);
     }
 
@@ -1079,14 +1079,14 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_reconciliation_source_item", Integer.class);
     }
 
-    private String batchStatus(String batchSn) {
-        return jdbcTemplate.queryForObject("SELECT status FROM t_reconciliation_batch WHERE sn = ?",
+    private String batchState(String batchSn) {
+        return jdbcTemplate.queryForObject("SELECT state FROM t_reconciliation_batch WHERE sn = ?",
                 String.class, batchSn);
     }
 
-    private String differenceStatus(String differenceSn) {
+    private String differenceState(String differenceSn) {
         return jdbcTemplate.queryForObject(
-                "SELECT status FROM t_reconciliation_difference WHERE tenant_id = ? AND difference_sn = ?",
+                "SELECT state FROM t_reconciliation_difference WHERE tenant_id = ? AND difference_sn = ?",
                 String.class, TENANT_ID, differenceSn);
     }
 

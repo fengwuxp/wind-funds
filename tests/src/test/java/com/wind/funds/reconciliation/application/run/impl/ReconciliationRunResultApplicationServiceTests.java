@@ -153,7 +153,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         assertThat(first.getEvidenceRefs()).containsExactly("report:comparison", "report:reference");
         assertThat(replay.getSn()).isEqualTo(first.getSn());
         assertThat(replay.getResultDigest()).isEqualTo(first.getResultDigest());
-        assertThat(batchStatus(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
+        assertThat(batchState(request.getReconciliationBatchSn())).isEqualTo(ReconciliationBatchState.COMPLETED.name());
         assertThat(runResultCount()).isOne();
         assertThat(matchResultCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -276,7 +276,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
-        assertThat(batchStatus(batchSn)).isEqualTo(ReconciliationBatchState.DATA_READY.name());
+        assertThat(batchState(batchSn)).isEqualTo(ReconciliationBatchState.DATA_READY.name());
         jdbcTemplate.update("UPDATE t_reconciliation_source_snapshot SET source_digest = ? WHERE sn = ?",
                 sourceDigest, snapshotSn);
     }
@@ -453,7 +453,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
-        assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
+        assertThat(batchState(batch.getSn())).isEqualTo(ReconciliationBatchState.CREATED.name());
     }
 
     /**
@@ -559,7 +559,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                         1, 'test-watermark', 0, ?, ?, ?, '["report:comparison"]', 'SYSTEM')
                 """, batchSn + ":CORRUPT_COMPARISON", TENANT_ID, batchSn,
                 batchSn + ":COMPARISON", sourceDigest, semanticDigest, evidenceBundleDigest);
-        jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'DATA_READY' WHERE sn = ?", batchSn);
+        jdbcTemplate.update("UPDATE t_reconciliation_batch SET state = 'DATA_READY' WHERE sn = ?", batchSn);
     }
 
     private Callable<RunResultAttempt> concurrentRecordAttempt(CountDownLatch startGate,
@@ -587,8 +587,8 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_reconciliation_match_result", Integer.class);
     }
 
-    private String batchStatus(String batchSn) {
-        return jdbcTemplate.queryForObject("SELECT status FROM t_reconciliation_batch WHERE sn = ?",
+    private String batchState(String batchSn) {
+        return jdbcTemplate.queryForObject("SELECT state FROM t_reconciliation_batch WHERE sn = ?",
                 String.class, batchSn);
     }
 

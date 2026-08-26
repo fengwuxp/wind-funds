@@ -231,9 +231,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 BINDING_AUDIT_REFERENCE_PREFIX + "_retired",
                 FUTURE_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
+        jdbcTemplate.update("UPDATE t_spend_rule_binding SET state = ? WHERE tenant_id = ? AND sn = ?",
                 SpendRuleBindingState.SUSPENDED.name(), TENANT_ID, suspendedBinding.getSn());
-        jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
+        jdbcTemplate.update("UPDATE t_spend_rule_binding SET state = ? WHERE tenant_id = ? AND sn = ?",
                 SpendRuleBindingState.RETIRED.name(), TENANT_ID, retiredBinding.getSn());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 

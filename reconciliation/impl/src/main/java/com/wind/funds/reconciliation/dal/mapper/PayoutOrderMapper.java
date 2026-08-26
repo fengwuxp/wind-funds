@@ -11,27 +11,51 @@ import org.apache.ibatis.annotations.Update;
 public interface PayoutOrderMapper extends BaseMapper<PayoutOrder> {
 
     @Select("""
-            SELECT * FROM t_payout_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, settlement_order_sn, settlement_subject_type,
+                   settlement_subject_id, amount, currency, state, payout_account_ref, payee_endpoint_ref,
+                   channel_ref, approval_ref, external_rule_evidence_digest, payout_gate_evidence_ref,
+                   admission_decision_digest, admission_evidence_refs, submit_digest, external_reference,
+                   completion_funds_transaction_sn, rollback_funds_transaction_sn, last_receipt_digest,
+                   failure_code, failure_reason, created_by, submitted_by, submitted_time, completed_time,
+                   cancelled_by, cancelled_time, cancel_reason, version FROM t_payout_order
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             """)
     PayoutOrder selectBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_payout_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, settlement_order_sn, settlement_subject_type,
+                   settlement_subject_id, amount, currency, state, payout_account_ref, payee_endpoint_ref,
+                   channel_ref, approval_ref, external_rule_evidence_digest, payout_gate_evidence_ref,
+                   admission_decision_digest, admission_evidence_refs, submit_digest, external_reference,
+                   completion_funds_transaction_sn, rollback_funds_transaction_sn, last_receipt_digest,
+                   failure_code, failure_reason, created_by, submitted_by, submitted_time, completed_time,
+                   cancelled_by, cancelled_time, cancel_reason, version FROM t_payout_order
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             FOR UPDATE
             """)
     PayoutOrder selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_payout_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, settlement_order_sn, settlement_subject_type,
+                   settlement_subject_id, amount, currency, state, payout_account_ref, payee_endpoint_ref,
+                   channel_ref, approval_ref, external_rule_evidence_digest, payout_gate_evidence_ref,
+                   admission_decision_digest, admission_evidence_refs, submit_digest, external_reference,
+                   completion_funds_transaction_sn, rollback_funds_transaction_sn, last_receipt_digest,
+                   failure_code, failure_reason, created_by, submitted_by, submitted_time, completed_time,
+                   cancelled_by, cancelled_time, cancel_reason, version FROM t_payout_order
             WHERE tenant_id = #{tenantId} AND settlement_order_sn = #{settlementOrderSn}
             """)
     PayoutOrder selectBySettlementOrderSn(@Param("tenantId") Long tenantId,
                                           @Param("settlementOrderSn") String settlementOrderSn);
 
     @Select("""
-            SELECT * FROM t_payout_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, settlement_order_sn, settlement_subject_type,
+                   settlement_subject_id, amount, currency, state, payout_account_ref, payee_endpoint_ref,
+                   channel_ref, approval_ref, external_rule_evidence_digest, payout_gate_evidence_ref,
+                   admission_decision_digest, admission_evidence_refs, submit_digest, external_reference,
+                   completion_funds_transaction_sn, rollback_funds_transaction_sn, last_receipt_digest,
+                   failure_code, failure_reason, created_by, submitted_by, submitted_time, completed_time,
+                   cancelled_by, cancelled_time, cancel_reason, version FROM t_payout_order
             WHERE tenant_id = #{tenantId} AND settlement_order_sn = #{settlementOrderSn}
             FOR UPDATE
             """)

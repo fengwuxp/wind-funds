@@ -509,7 +509,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 INSERT INTO t_reconciliation_run_result (
                     sn, tenant_id, reconciliation_batch_sn,
                     scope_owner_namespace, scope_identity_value,
-                    pair_owner_namespace, pair_identity_value, currency, status,
+                    pair_owner_namespace, pair_identity_value, currency, outcome,
                     rule_namespace, rule_identity, rule_version,
                     reference_snapshot_sn, comparison_snapshot_sn,
                     reference_source_digest, comparison_source_digest, source_digest, result_digest,
@@ -520,7 +520,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 pairIdentity.getOwnerNamespace(), pairIdentity.getValue(), RULE_VERSION,
                 referenceSnapshotSn, comparisonSnapshotSn,
                 referenceDigest, comparisonDigest, sourceDigest, resultDigest, "[\"" + evidenceRef + "\"]");
-        jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'COMPLETED', run_result_sn = ? "
+        jdbcTemplate.update("UPDATE t_reconciliation_batch SET state = 'COMPLETED', run_result_sn = ? "
                 + "WHERE tenant_id = ? AND sn = ?", runSn, TENANT_ID, batchSn);
     }
 
@@ -550,7 +550,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
         jdbcTemplate.update("""
                 INSERT INTO t_funds_transaction (
                     sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                    status, amount, currency, completed_amount, refunded_amount, declined_amount,
+                    state, amount, currency, completed_amount, refunded_amount, declined_amount,
                     route_snapshot, version
                 ) VALUES (?, ?, 'DIRECT', 'PAY', 'GATE_BEHAVIOR', 'gate-stage-source',
                     'CLOSED', ?, 'USD', ?, 0, 0,
@@ -560,7 +560,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 INSERT INTO t_funds_transaction_detail (
                     sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
                     event_type, subject_id, subject_type, participant_role, request_hash,
-                    funds_effect_type, ledger_transaction_sn, amount, currency, status
+                    funds_effect_type, ledger_transaction_sn, amount, currency, state
                 ) VALUES (?, ?, ?, 'GATE_BEHAVIOR', 'gate-stage-source', 'PAY', 'PAY',
                     'gate-stage-subject', 'FUNDING_ACCOUNT', 'PAYEE', 'gate-stage-request',
                     'DIRECT', ?, ?, 'USD', 'SUCCEEDED')
@@ -570,7 +570,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 INSERT INTO t_funds_transaction_detail (
                     sn, tenant_id, transaction_sn, business_scene, business_sn, transaction_type,
                     event_type, subject_id, subject_type, participant_role, request_hash,
-                    funds_effect_type, ledger_transaction_sn, amount, currency, status
+                    funds_effect_type, ledger_transaction_sn, amount, currency, state
                 ) VALUES (?, ?, ?, 'GATE_BEHAVIOR', 'gate-stage-source', 'PAY', 'PAY',
                     'gate-stage-payer', 'FUNDING_ACCOUNT', 'PAYER', 'gate-stage-payer-request',
                     'DIRECT', ?, ?, 'USD', 'SUCCEEDED')
@@ -604,7 +604,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                     posting_plan_sn, ledger_entry_sn, route_snapshot_digest, clearing_available_time,
                     clearing_rule_code, clearing_rule_version, gate_evidence_ref,
                     reconciliation_evidence_refs, source_digest, candidate_digest,
-                    active_splittable_detail_sn, status, created_by
+                    active_splittable_detail_sn, state, created_by
                 ) VALUES (?, ?, ?, ?, ?, 'FUNDING_ACCOUNT', 'gate-stage-subject', 'USD',
                     'GATE_BEHAVIOR', '2026-08-19', 100, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP,
                     'GATE_BEHAVIOR', 'v1', ?, '["source-gate-evidence"]', ?, ?, ?, ?, 'SYSTEM')
@@ -626,7 +626,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
             jdbcTemplate.update("""
                     INSERT INTO t_funding_account (
                         sn, tenant_id, owner_id, owner_type, account_type, is_platform,
-                        currency, ledger_profile_code, ledger_profile_version, status, version
+                        currency, ledger_profile_code, ledger_profile_version, state, version
                     ) VALUES (?, ?, 'gate-stage-owner', 'USER', 'FUNDING_ACCOUNT', 0,
                         'USD', 'FUNDING_MERCHANT', 1, 'ACTIVE', 0)
                     """, STAGE_ACCOUNT_SN, TENANT_ID);
@@ -658,7 +658,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
         assertThat(failed.getState()).isEqualTo(ClearingBatchState.FAILED);
         assertThat(candidateState(stage.candidateSn())).isEqualTo(ClearingCandidateState.BLOCKED.name());
         assertThat(failed.getFundsTransactionSn()).isNotBlank();
-        assertThat(jdbcTemplate.queryForObject("SELECT status FROM t_funds_transaction WHERE sn = ?",
+        assertThat(jdbcTemplate.queryForObject("SELECT state FROM t_funds_transaction WHERE sn = ?",
                 String.class, failed.getFundsTransactionSn())).isEqualTo("FAILED");
         assertThat(jdbcTemplate.queryForObject("SELECT error_code FROM t_funds_transaction_detail "
                         + "WHERE transaction_sn = ?", String.class, failed.getFundsTransactionSn()))
@@ -676,7 +676,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 .setClearingBatchSn(stage.batchSn())
                 .setSourceTransactionSns(List.of(STAGE_FUNDS_TRANSACTION_SN))
                 .setDescription("gate behavior existing clearing fact"), WindOperatorFactory.system());
-        jdbcTemplate.update("UPDATE t_funds_transaction_detail SET status = 'PROCESSING', request_hash = ? "
+        jdbcTemplate.update("UPDATE t_funds_transaction_detail SET state = 'PROCESSING', request_hash = ? "
                         + "WHERE transaction_sn = ?",
                 FundsStableHashSupport.sha256("gate-behavior-conflicting-detail"), fundsTransactionSn);
         return fundsTransactionSn;
@@ -740,7 +740,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
     }
 
     private String candidateState(String candidateSn) {
-        return jdbcTemplate.queryForObject("SELECT status FROM t_clearing_candidate WHERE sn = ?",
+        return jdbcTemplate.queryForObject("SELECT state FROM t_clearing_candidate WHERE sn = ?",
                 String.class, candidateSn);
     }
 
@@ -960,18 +960,18 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                                 String batchSn,
                                 StableIdentity scopeIdentity,
                                 StableIdentity pairIdentity,
-                                String status) {
+                                String state) {
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_difference (
                     difference_sn, tenant_id, reconciliation_batch_sn, reconciliation_match_result_sn,
                     scope_owner_namespace, scope_identity_value, pair_owner_namespace, pair_identity_value,
-                    difference_type, severity, status, responsible_party_ref,
+                    difference_type, severity, state, responsible_party_ref,
                     rule_namespace, rule_identity, rule_version, current_lineage_ref, evidence_ref, created_by
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'STATUS_MISMATCH', 'S1_MAJOR', ?, 'owner:test',
                     'test.rule', 'strict-exact', ?, ?, ?, 'SYSTEM')
                 """, suffix, TENANT_ID, batchSn, suffix + ":match",
                 scopeIdentity.getOwnerNamespace(), scopeIdentity.getValue(),
-                pairIdentity.getOwnerNamespace(), pairIdentity.getValue(), status, RULE_VERSION,
+                pairIdentity.getOwnerNamespace(), pairIdentity.getValue(), state, RULE_VERSION,
                 batchSn, suffix + ":evidence");
     }
 
@@ -986,7 +986,7 @@ class ReconciliationGateRequirementBehaviorTests extends AbstractFundsServiceTes
                 differenceSn + ":approval", differenceSn + ":action-evidence");
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'RESOLVED', action_type = 'ADJUST', adjustment_sn = ?,
+                SET state = 'RESOLVED', action_type = 'ADJUST', adjustment_sn = ?,
                     adjustment_idempotency_key = ?, original_fact_ref = ?,
                     adjustment_approval_ref = ?, adjustment_evidence_ref = ?,
                     last_rerun_sn = ?, last_rerun_batch_sn = ?, last_rerun_rule_version = ?,

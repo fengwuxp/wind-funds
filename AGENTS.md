@@ -56,6 +56,7 @@
 - 优先复用已有服务和 helper；不新增一行透传、浅服务、伪抽象、Mapper 包装、Fake/Mock 业务实现或内存版业务 Service。
 - MyBatis Flex 使用项目既有模式和 `XxxRefs`；不要新增 `LambdaQueryWrapper` 或裸字符串字段名。
 - 模型转换使用 MapStruct converter；converter 不做业务决策、数据库读取、远程调用、权限判断或审计。
+- 领域生命周期当前值在数据库列、Entity、DTO、Request、Query 和 JSON 中统一使用 `state`，枚举类型使用 `XxxState`；一次运行、准入或决策结果使用 `outcome`、`result` 或更具体的业务名。外部、展示或发布状态必须使用 `externalStatus`、`displayStatus`、`publishStatus` 等限定名称，不得与领域生命周期混用；数据库 `is_*` 布尔列与 Java 无 `is` 前缀属性按各自语言约规命名。
 - 空值契约遵循 JSpecify：已声明非空的值不写重复防御式空判断；只有 `@Nullable`、外部输入、反序列化边界或持久化读取等不可信来源才做显式空处理。
 - 业务事件、审计展示和可回放消息优先使用稳定 `eventKey + params`，不得把中文文案或可变翻译作为业务判断依据。
 

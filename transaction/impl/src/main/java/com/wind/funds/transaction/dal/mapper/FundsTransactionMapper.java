@@ -24,7 +24,11 @@ import java.util.List;
 public interface FundsTransactionMapper extends BaseMapper<FundsTransaction> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, transaction_mode, transaction_type, business_scene,
+                   business_sn, external_source_code, external_funds_fact_sn, external_funds_effect_type,
+                   external_funds_fact_digest, reference_transaction_sn, state, amount, currency,
+                   authorized_amount, reversed_amount, completed_amount, refunded_amount, declined_amount,
+                   fee_amount, route_snapshot, description, context_variables, version
             FROM t_funds_transaction
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
@@ -33,7 +37,11 @@ public interface FundsTransactionMapper extends BaseMapper<FundsTransaction> {
     FundsTransaction selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, transaction_mode, transaction_type, business_scene,
+                   business_sn, external_source_code, external_funds_fact_sn, external_funds_effect_type,
+                   external_funds_fact_digest, reference_transaction_sn, state, amount, currency,
+                   authorized_amount, reversed_amount, completed_amount, refunded_amount, declined_amount,
+                   fee_amount, route_snapshot, description, context_variables, version
             FROM t_funds_transaction
             WHERE tenant_id = #{tenantId}
               AND external_source_code = #{externalSourceCode}
@@ -73,7 +81,12 @@ public interface FundsTransactionMapper extends BaseMapper<FundsTransaction> {
 
     @Select("""
             <script>
-            SELECT t.*
+            SELECT t.id, t.gmt_create, t.gmt_modified, t.sn, t.tenant_id, t.transaction_mode, t.transaction_type,
+                   t.business_scene, t.business_sn, t.external_source_code, t.external_funds_fact_sn,
+                   t.external_funds_effect_type, t.external_funds_fact_digest, t.reference_transaction_sn,
+                   t.state, t.amount, t.currency, t.authorized_amount, t.reversed_amount, t.completed_amount,
+                   t.refunded_amount, t.declined_amount, t.fee_amount, t.route_snapshot, t.description,
+                   t.context_variables, t.version
             FROM t_funds_transaction t
             WHERE t.tenant_id = #{tenantId}
               AND t.id &gt; #{lastId} AND t.id &lt;= #{upperBoundId}

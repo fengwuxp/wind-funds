@@ -275,7 +275,7 @@ class ReconciliationMysqlMigrationIntegrationTests {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO t_funds_transaction
                     (sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                     status, amount, currency)
+                     state, amount, currency)
                 VALUES (?, 1, 'DIRECT', 'PAY', 'MYSQL_RR', 'mysql-rr-business',
                         'SUCCEEDED', 100, 'USD')
                 """)) {
@@ -320,7 +320,7 @@ class ReconciliationMysqlMigrationIntegrationTests {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO t_payout_receipt
                     (sn, tenant_id, payout_order_sn, channel_ref, external_receipt_ref, external_reference,
-                     status, amount, currency, source_receipt_digest, normalized_receipt_digest,
+                     state, amount, currency, source_receipt_digest, normalized_receipt_digest,
                      evidence_ref, external_occurred_at, received_by)
                 VALUES (?, 1, ?, 'mysql-rr-channel', 'mysql-rr-receipt', 'mysql-rr-external',
                         'SUCCEEDED', 100, 'USD', 'source-digest', 'normalized-digest',
@@ -394,7 +394,7 @@ class ReconciliationMysqlMigrationIntegrationTests {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO t_recovery_order
                     (sn, tenant_id, source_type, source_sn, responsible_subject_type, responsible_subject_id,
-                     expected_amount, recovered_amount, currency, status, source_digest, order_digest,
+                     expected_amount, recovered_amount, currency, state, source_digest, order_digest,
                      approval_ref, evidence_ref, created_by, version)
                 VALUES (?, 1, 'MYSQL_RR', 'mysql-rr-source', 'FUNDING_ACCOUNT', 'mysql-rr-subject',
                         100, 0, 'USD', 'CREATED', 'source-digest', 'order-digest',

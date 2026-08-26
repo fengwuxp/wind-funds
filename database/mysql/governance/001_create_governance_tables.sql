@@ -20,7 +20,7 @@ CREATE TABLE `t_projection_replay_task`
     `batch_sn`                 VARCHAR(64)           DEFAULT NULL COMMENT '批次流水',
     `checkpoint_type`          VARCHAR(50)  NOT NULL COMMENT '检查点类型',
     `checkpoint_value`         VARCHAR(128) NOT NULL COMMENT '稳定扫描游标',
-    `status`                   VARCHAR(30)  NOT NULL COMMENT '任务状态',
+    `state`                    VARCHAR(30)  NOT NULL COMMENT '任务状态',
     `success_count`            BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '成功数量',
     `failed_count`             BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '失败数量',
     `skipped_count`            BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '跳过数量',
@@ -34,7 +34,7 @@ CREATE TABLE `t_projection_replay_task`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_projection_replay_task_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_projection_replay_task_request` (`tenant_id`, `request_sn`),
-    KEY `idx_projection_replay_task_backlog` (`tenant_id`, `status`, `id`)
+    KEY `idx_projection_replay_task_backlog` (`tenant_id`, `state`, `id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '投影重放任务表';
 

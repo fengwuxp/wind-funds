@@ -220,7 +220,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         createDifferenceBeforeCurrentHeadAdvance(minimumCreateRequest());
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'INVALIDATED'
+                SET state = 'INVALIDATED'
                 WHERE tenant_id = ? AND difference_sn = ?
                 """, TENANT_ID, requiredDifferenceSn(clearingMatchResultSn));
 
@@ -249,7 +249,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 INSERT INTO t_reconciliation_difference (
                     difference_sn, tenant_id, reconciliation_batch_sn,
                     reconciliation_match_result_sn, scope_owner_namespace, scope_identity_value,
-                    pair_owner_namespace, pair_identity_value, difference_type, severity, status,
+                    pair_owner_namespace, pair_identity_value, difference_type, severity, state,
                     currency, difference_amount, responsible_party_ref,
                     rule_namespace, rule_identity, rule_version, current_lineage_ref, evidence_ref
                 ) VALUES (?, ?, ?, ?, 'test.scope', 'CLEARING_CONFIRM_ITEM:clearing-candidate-001',
@@ -284,7 +284,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 INSERT INTO t_reconciliation_difference (
                     difference_sn, tenant_id, reconciliation_batch_sn,
                     reconciliation_match_result_sn, scope_owner_namespace, scope_identity_value,
-                    pair_owner_namespace, pair_identity_value, difference_type, severity, status,
+                    pair_owner_namespace, pair_identity_value, difference_type, severity, state,
                     currency, difference_amount, responsible_party_ref,
                     rule_namespace, rule_identity, rule_version, current_lineage_ref, evidence_ref
                 ) VALUES (?, ?, ?, ?, 'test.scope', 'CLEARING_CONFIRM_ITEM:clearing-candidate-001',

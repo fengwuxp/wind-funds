@@ -83,7 +83,6 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
      * 工具资金流向。
      */
     @NotNull
-    @Column("instrument_direction")
     private PaymentInstrumentFlowDirection flowDirection;
 
     /**
@@ -112,7 +111,6 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
      * 支付工具状态。
      */
     @NotNull
-    @Column("status")
     private FundsAccountState state;
 
     /**

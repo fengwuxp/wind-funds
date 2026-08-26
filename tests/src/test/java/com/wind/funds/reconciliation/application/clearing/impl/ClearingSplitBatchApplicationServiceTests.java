@@ -162,12 +162,12 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                 INSERT INTO t_clearing_split_batch (
                     sn, tenant_id, subject_type, subject_id, currency, business_line, split_period,
                     split_rule_code, split_rule_version, detail_count, total_amount, member_digest,
-                    batch_digest, active_batch_digest, status, created_by, submitted_by, submitted_time,
+                    batch_digest, active_batch_digest, state, created_by, submitted_by, submitted_time,
                     confirmed_by, confirmed_time, cancelled_by, cancelled_time, cancel_reason
                 )
                 SELECT sn, 2, subject_type, subject_id, currency, business_line, split_period,
                        split_rule_code, split_rule_version, detail_count, total_amount, member_digest,
-                       batch_digest, active_batch_digest, status, created_by, submitted_by, submitted_time,
+                       batch_digest, active_batch_digest, state, created_by, submitted_by, submitted_time,
                        confirmed_by, confirmed_time, cancelled_by, cancelled_time, cancel_reason
                 FROM t_clearing_split_batch
                 WHERE tenant_id = ? AND sn = ?
@@ -615,7 +615,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            status, amount, currency, completed_amount, refunded_amount, declined_amount,
+                            state, amount, currency, completed_amount, refunded_amount, declined_amount,
                             route_snapshot, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0)
                         """,
@@ -640,7 +640,7 @@ class ClearingSplitBatchApplicationServiceTests extends AbstractFundsServiceTest
                             funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn, ledger_entry_sn,
                             subject_type, subject_id, currency, amount, refund_amount, business_line,
                             split_period, split_rule_code, split_rule_version,
-                            status, reconciliation_decision_status,
+                            admission_result, reconciliation_decision_result,
                             gate_evidence_ref,
                             reconciliation_evidence_refs, route_snapshot_digest, source_digest, created_by
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'FUNDING_ACCOUNT', ?, ?, ?, 0, ?, ?, ?, ?,

@@ -112,7 +112,6 @@ public class CreditAccount implements Serializable, TenantIsolationObject<Long> 
      * 信用账户状态。
      */
     @NotNull
-    @Column("status")
     private FundsAccountState state;
 
     /**

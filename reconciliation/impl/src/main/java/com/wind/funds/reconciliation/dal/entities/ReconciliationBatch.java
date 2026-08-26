@@ -80,12 +80,7 @@ public class ReconciliationBatch implements Serializable, TenantIsolationObject<
     private String previousBatchSn;
 
     @NotNull
-    @Column("status")
     private ReconciliationBatchState state;
-
-    void setStatus(ReconciliationBatchState state) {
-        this.state = state;
-    }
 
     private String runResultSn;
 

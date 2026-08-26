@@ -186,6 +186,7 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
                     || order.getState() == FundsFrozenOrderState.CLOSED;
         }
         return order.getState() == FundsFrozenOrderState.FROZEN
+                || order.getState() == FundsFrozenOrderState.PARTIALLY_RELEASED
                 || order.getState() == FundsFrozenOrderState.RELEASED
                 || order.getState() == FundsFrozenOrderState.CLOSED;
     }

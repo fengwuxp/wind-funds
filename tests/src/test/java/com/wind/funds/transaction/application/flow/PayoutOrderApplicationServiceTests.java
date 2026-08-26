@@ -519,7 +519,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                         INSERT INTO t_clearing_batch (
                             sn, tenant_id, subject_type, subject_id, currency, business_line, clearing_period,
                             clearing_rule_code, clearing_rule_version, candidate_count, total_amount, amount_digest,
-                            funds_transaction_sn, status, created_by, confirmed_by, confirmed_time
+                            funds_transaction_sn, state, created_by, confirmed_by, confirmed_time
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 sn, TENANT_ID, accountId.type(), accountId.id(), CURRENCY.name(), "ACQUIRING", "2026-07",

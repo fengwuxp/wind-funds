@@ -72,6 +72,31 @@ class ReconciliationMysqlDdlContractTests {
             "t_projection_replay_difference",
             "t_funds_transaction_projection");
 
+    private static final List<String> LIFECYCLE_CORE_TABLE_NAMES = List.of(
+            "t_funding_account",
+            "t_credit_account",
+            "t_spend_control_scope",
+            "t_payment_instrument",
+            "t_payment_instrument_binding",
+            "t_spend_rule_definition",
+            "t_spend_rule_version",
+            "t_spend_rule_binding",
+            "t_funds_transaction",
+            "t_funds_transaction_detail",
+            "t_funds_frozen_order",
+            "t_ledger");
+
+    private static final List<String> LIFECYCLE_RECONCILIATION_TABLE_NAMES = List.of(
+            "t_clearing_split_batch",
+            "t_clearing_candidate",
+            "t_clearing_batch",
+            "t_reconciliation_batch",
+            "t_reconciliation_difference",
+            "t_settlement_order",
+            "t_payout_order",
+            "t_payout_receipt",
+            "t_recovery_order");
+
     @Test
     void testCoreForwardDdlShouldMatchTestSchemaWithoutDestructiveStatements() throws IOException {
         String testSchema = Files.readString(workspaceRoot().resolve("tests/src/test/resources/jdbc-schema.sql"));
@@ -125,6 +150,48 @@ class ReconciliationMysqlDdlContractTests {
         assertThat(workspaceRoot().resolve("database/mysql/governance/001_drop_governance_tables.sql"))
                 .as("production DDL must not publish a destructive table-drop rollback")
                 .doesNotExist();
+    }
+
+    /**
+     * 场景：生命周期、准入结果、对账结论和支付工具方向跨 MySQL 与 H2 持久化。
+     * 预期：物理列使用与 Java 业务属性一致的 state、result、outcome 或 direction 名称。
+     * 红线：不得继续用通用 status 或同义列名依赖注解、别名或桥接 setter 映射。
+     */
+    @Test
+    void testPhysicalColumnsShouldUseCanonicalBusinessNames() throws IOException {
+        String testSchema = Files.readString(workspaceRoot().resolve("tests/src/test/resources/jdbc-schema.sql"));
+        String coreDdl = Files.readString(
+                workspaceRoot().resolve("database/mysql/core/001_create_core_tables.sql"));
+        String reconciliationDdl = readDatabaseFile("001_create_reconciliation_tables.sql");
+        String governanceDdl = Files.readString(
+                workspaceRoot().resolve("database/mysql/governance/001_create_governance_tables.sql"));
+
+        for (String tableName : LIFECYCLE_CORE_TABLE_NAMES) {
+            assertUsesStateColumn(coreDdl, testSchema, tableName);
+        }
+        for (String tableName : LIFECYCLE_RECONCILIATION_TABLE_NAMES) {
+            assertUsesStateColumn(reconciliationDdl, testSchema, tableName);
+        }
+        assertUsesStateColumn(governanceDdl, testSchema, "t_projection_replay_task");
+
+        assertThat(extractCreateTable(reconciliationDdl, "t_clearing_splittable_detail"))
+                .contains("`admission_result`", "`reconciliation_decision_result`")
+                .doesNotContain("`status`", "`reconciliation_decision_status`");
+        assertThat(extractCreateTable(testSchema, "t_clearing_splittable_detail"))
+                .contains("`admission_result`", "`reconciliation_decision_result`")
+                .doesNotContain("`status`", "`reconciliation_decision_status`");
+        assertThat(extractCreateTable(reconciliationDdl, "t_reconciliation_run_result"))
+                .contains("`outcome`")
+                .doesNotContain("`status`");
+        assertThat(extractCreateTable(testSchema, "t_reconciliation_run_result"))
+                .contains("`outcome`")
+                .doesNotContain("`status`");
+        assertThat(extractCreateTable(coreDdl, "t_payment_instrument"))
+                .contains("`flow_direction`")
+                .doesNotContain("`instrument_direction`");
+        assertThat(extractCreateTable(testSchema, "t_payment_instrument"))
+                .contains("`flow_direction`")
+                .doesNotContain("`instrument_direction`");
     }
 
     @Test
@@ -216,18 +283,18 @@ class ReconciliationMysqlDdlContractTests {
         String forwardDdl = readDatabaseFile("001_create_reconciliation_tables.sql");
 
         assertThat(extractCreateTable(forwardDdl, "t_clearing_split_batch"))
-                .contains("KEY `idx_clearing_split_batch_status_age` "
-                        + "(`tenant_id`, `status`, `gmt_modified`)");
+                .contains("KEY `idx_clearing_split_batch_state_age` "
+                        + "(`tenant_id`, `state`, `gmt_modified`)");
         assertThat(extractCreateTable(forwardDdl, "t_clearing_candidate"))
-                .contains("KEY `idx_clearing_candidate_status_available` "
-                        + "(`tenant_id`, `status`, `clearing_available_time`)")
-                .contains("KEY `idx_clearing_candidate_status_changed` "
-                        + "(`tenant_id`, `status`, `status_changed_time`)")
+                .contains("KEY `idx_clearing_candidate_state_available` "
+                        + "(`tenant_id`, `state`, `clearing_available_time`)")
+                .contains("KEY `idx_clearing_candidate_state_changed` "
+                        + "(`tenant_id`, `state`, `state_changed_time`)")
                 .contains("KEY `idx_clearing_candidate_locked_batch` "
-                        + "(`tenant_id`, `locked_clearing_batch_sn`, `status`)");
+                        + "(`tenant_id`, `locked_clearing_batch_sn`, `state`)");
         assertThat(extractCreateTable(forwardDdl, "t_clearing_batch"))
-                .contains("KEY `idx_clearing_batch_status_age` "
-                        + "(`tenant_id`, `status`, `gmt_modified`)");
+                .contains("KEY `idx_clearing_batch_state_age` "
+                        + "(`tenant_id`, `state`, `gmt_modified`)");
         assertThat(extractCreateTable(forwardDdl, "t_settlement_order_item"))
                 .contains("UNIQUE KEY `uk_settlement_item_active_source` "
                         + "(`tenant_id`, `source_type`, `source_sn`, `active_source_claim`)");
@@ -240,6 +307,15 @@ class ReconciliationMysqlDdlContractTests {
                         + "(`tenant_id`, `funds_transaction_sn`)")
                 .contains("UNIQUE KEY `uk_recovery_result_idempotency` "
                         + "(`tenant_id`, `idempotency_key`)");
+    }
+
+    private void assertUsesStateColumn(String mysqlDdl, String testSchema, String tableName) {
+        assertThat(extractCreateTable(mysqlDdl, tableName))
+                .contains("`state`")
+                .doesNotContain("`status`");
+        assertThat(extractCreateTable(testSchema, tableName))
+                .contains("`state`")
+                .doesNotContain("`status`");
     }
 
     private String readDatabaseFile(String fileName) throws IOException {

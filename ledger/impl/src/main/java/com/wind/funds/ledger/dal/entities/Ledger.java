@@ -127,7 +127,6 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
      * 账本状态。
      */
     @NotNull
-    @Column("status")
     private LedgerState state;
 
     /**

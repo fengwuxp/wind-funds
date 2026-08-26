@@ -108,7 +108,6 @@ public class PaymentInstrumentBinding implements Serializable, TenantIsolationOb
      * 绑定生命周期状态。
      */
     @NotNull
-    @Column("status")
     private PaymentInstrumentBindingState state;
 
     /**

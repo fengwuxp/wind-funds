@@ -110,12 +110,7 @@ public class ClearingCandidate implements Serializable, TenantIsolationObject<Lo
     private String activeSplittableDetailSn;
 
     @NotNull
-    @Column("status")
     private ClearingCandidateState state;
-
-    void setStatus(ClearingCandidateState state) {
-        this.state = state;
-    }
 
     private String blockReason;
 
@@ -127,5 +122,5 @@ public class ClearingCandidate implements Serializable, TenantIsolationObject<Lo
 
     private String updatedBy;
 
-    private LocalDateTime statusChangedTime;
+    private LocalDateTime stateChangedTime;
 }

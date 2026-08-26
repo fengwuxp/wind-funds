@@ -86,22 +86,12 @@ public class ClearingSplittableDetail implements Serializable, TenantIsolationOb
     private String splitRuleVersion;
 
     @NotNull
-    @Column("status")
     private ClearingSplittableAdmissionResult admissionResult;
-
-    void setStatus(ClearingSplittableAdmissionResult admissionResult) {
-        this.admissionResult = admissionResult;
-    }
 
     private ClearingSplittableExclusionReason exclusionReason;
 
     @NotNull
-    @Column("reconciliation_decision_status")
     private ReconciliationGateDecisionResult reconciliationDecisionResult;
-
-    void setReconciliationDecisionStatus(ReconciliationGateDecisionResult reconciliationDecisionResult) {
-        this.reconciliationDecisionResult = reconciliationDecisionResult;
-    }
 
     private String gateEvidenceRef;
 

@@ -125,7 +125,6 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
      * 冻结订单状态。
      */
     @NotNull
-    @Column("status")
     private FundsFrozenOrderState state;
 
     /**

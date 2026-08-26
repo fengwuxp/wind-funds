@@ -117,7 +117,7 @@ public class ClearingCandidateDTO implements Serializable {
     private String lockedClearingBatchSn;
 
     @Schema(description = "状态变更时间")
-    private LocalDateTime statusChangedTime;
+    private LocalDateTime stateChangedTime;
 
     @Schema(description = "创建时间")
     private LocalDateTime createdTime;

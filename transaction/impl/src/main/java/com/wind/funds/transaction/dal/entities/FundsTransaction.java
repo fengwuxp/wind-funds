@@ -113,12 +113,7 @@ public class FundsTransaction implements Serializable, TenantIsolationObject<Lon
      * 资金交易状态。
      */
     @NotNull
-    @Column("status")
     private FundsTransactionState state;
-
-    void setStatus(FundsTransactionState state) {
-        this.state = state;
-    }
 
     /**
      * 交易请求金额，单位：分。

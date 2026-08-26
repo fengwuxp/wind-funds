@@ -37,13 +37,7 @@ public class PayoutReceipt implements TenantIsolationObject<Long> {
 
     private String externalReference;
 
-    @Column("status")
-
     private PayoutOrderState state;
-
-    void setStatus(PayoutOrderState state) {
-        this.state = state;
-    }
 
     private Long amount;
 

@@ -795,7 +795,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testQueryPaymentInstrumentBindingsShouldExcludeUnavailableInstrumentCandidates() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
-        jdbcTemplate.update("UPDATE t_payment_instrument SET status = ? WHERE sn = ?",
+        jdbcTemplate.update("UPDATE t_payment_instrument SET state = ? WHERE sn = ?",
                 FundsAccountState.SUSPENDED.name(),
                 PAYMENT_INSTRUMENT_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);

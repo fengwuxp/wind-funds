@@ -175,7 +175,7 @@ public final class ReconciliationTestFixture {
                      pair_owner_namespace, pair_identity_value, currency,
                      rule_namespace, rule_identity, rule_version,
                      window_start, window_end, time_semantics, timezone_id,
-                     previous_batch_sn, status, batch_digest, created_by)
+                     previous_batch_sn, state, batch_digest, created_by)
                 VALUES (?, ?, 'test.scope', ?, 'test.pair', ?, 'USD',
                         'test.rule', 'strict-exact', ?,
                         '2026-07-21 00:00:00', '2026-07-22 00:00:00', 'occurredAt',

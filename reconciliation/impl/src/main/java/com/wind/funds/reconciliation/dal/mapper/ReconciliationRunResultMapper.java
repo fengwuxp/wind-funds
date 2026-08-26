@@ -20,7 +20,11 @@ public interface ReconciliationRunResultMapper extends BaseMapper<Reconciliation
      * @return 运行结果；不存在时返回 null
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_batch_sn, scope_owner_namespace,
+                   scope_identity_value, pair_owner_namespace, pair_identity_value, currency, outcome,
+                   rule_namespace, rule_identity, rule_version, reference_snapshot_sn, comparison_snapshot_sn,
+                   reference_source_digest, comparison_source_digest, source_digest, result_digest, total_count,
+                   matched_count, difference_count, evidence_refs, created_by
             FROM t_reconciliation_run_result
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
@@ -35,7 +39,11 @@ public interface ReconciliationRunResultMapper extends BaseMapper<Reconciliation
      * @return 运行结果；不存在时返回 null
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_batch_sn, scope_owner_namespace,
+                   scope_identity_value, pair_owner_namespace, pair_identity_value, currency, outcome,
+                   rule_namespace, rule_identity, rule_version, reference_snapshot_sn, comparison_snapshot_sn,
+                   reference_source_digest, comparison_source_digest, source_digest, result_digest, total_count,
+                   matched_count, difference_count, evidence_refs, created_by
             FROM t_reconciliation_run_result
             WHERE tenant_id = #{tenantId}
               AND reconciliation_batch_sn = #{reconciliationBatchSn}

@@ -43,13 +43,7 @@ public class RecoveryOrder implements TenantIsolationObject<Long> {
 
     private CurrencyIsoCode currency;
 
-    @Column("status")
-
     private RecoveryOrderState state;
-
-    void setStatus(RecoveryOrderState state) {
-        this.state = state;
-    }
 
     private String sourceDigest;
 

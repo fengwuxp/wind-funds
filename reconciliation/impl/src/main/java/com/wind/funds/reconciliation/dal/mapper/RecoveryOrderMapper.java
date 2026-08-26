@@ -11,20 +11,29 @@ import org.apache.ibatis.annotations.Select;
 public interface RecoveryOrderMapper extends BaseMapper<RecoveryOrder> {
 
     @Select("""
-            SELECT * FROM t_recovery_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, source_type, source_sn, responsible_subject_type,
+                   responsible_subject_id, expected_amount, recovered_amount, currency, state, source_digest,
+                   order_digest, approval_ref, evidence_ref, last_funds_transaction_sn, created_by, recovered_time,
+                   version FROM t_recovery_order
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             """)
     RecoveryOrder selectBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_recovery_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, source_type, source_sn, responsible_subject_type,
+                   responsible_subject_id, expected_amount, recovered_amount, currency, state, source_digest,
+                   order_digest, approval_ref, evidence_ref, last_funds_transaction_sn, created_by, recovered_time,
+                   version FROM t_recovery_order
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             FOR UPDATE
             """)
     RecoveryOrder selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_recovery_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, source_type, source_sn, responsible_subject_type,
+                   responsible_subject_id, expected_amount, recovered_amount, currency, state, source_digest,
+                   order_digest, approval_ref, evidence_ref, last_funds_transaction_sn, created_by, recovered_time,
+                   version FROM t_recovery_order
             WHERE tenant_id = #{tenantId}
               AND source_type = #{sourceType}
               AND source_sn = #{sourceSn}
@@ -40,7 +49,10 @@ public interface RecoveryOrderMapper extends BaseMapper<RecoveryOrder> {
                                  @Param("currency") CurrencyIsoCode currency);
 
     @Select("""
-            SELECT * FROM t_recovery_order
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, source_type, source_sn, responsible_subject_type,
+                   responsible_subject_id, expected_amount, recovered_amount, currency, state, source_digest,
+                   order_digest, approval_ref, evidence_ref, last_funds_transaction_sn, created_by, recovered_time,
+                   version FROM t_recovery_order
             WHERE tenant_id = #{tenantId}
               AND source_type = #{sourceType}
               AND source_sn = #{sourceSn}

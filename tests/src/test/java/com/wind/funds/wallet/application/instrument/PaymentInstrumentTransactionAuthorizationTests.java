@@ -1642,14 +1642,14 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
 
     private String fundsTransactionState(String businessSn) {
         return jdbcTemplate.queryForObject("""
-                SELECT status FROM t_funds_transaction
+                SELECT state FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, String.class, BUSINESS_SCENE, businessSn);
     }
 
     private List<String> fundsTransactionDetailStatuses(String businessSn) {
         return jdbcTemplate.queryForList("""
-                SELECT status FROM t_funds_transaction_detail
+                SELECT state FROM t_funds_transaction_detail
                 WHERE business_scene = ? AND business_sn = ?
                 ORDER BY id ASC
                 """, String.class, BUSINESS_SCENE, businessSn);

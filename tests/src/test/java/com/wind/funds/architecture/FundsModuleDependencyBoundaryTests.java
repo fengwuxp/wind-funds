@@ -1,5 +1,7 @@
 package com.wind.funds.architecture;
 
+import com.wind.funds.governance.dal.entities.ProjectionReplayTask;
+import com.wind.funds.governance.projection.FundsProjectionReplayTaskDTO;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.service.LedgerService;
@@ -21,7 +23,9 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -972,6 +976,64 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
+     * 场景：持久化模型、数据库列和公共契约表达生命周期、结果或布尔属性。
+     * 预期：业务属性和物理列使用同一业务名，只保留数据库 is_* 与 Java 布尔属性的约规差异。
+     * 红线：不得用 status/state 双命名、SQL 别名或桥接 setter 掩盖映射不一致。
+     */
+    @Test
+    void testPersistencePropertiesShouldUseCanonicalBusinessNames() throws IOException {
+        List<String> entityRoots = List.of(
+                "ledger/impl/src/main/java/com/wind/funds/ledger/dal/entities",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/dal/entities",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/dal/entities",
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/dal/entities",
+                "governance/impl/src/main/java/com/wind/funds/governance/dal/entities");
+        Pattern explicitColumn = Pattern.compile(
+                "@Column\\(\"([^\"]+)\"\\)\\s+private\\s+[^;=]+\\s+(\\w+)\\s*;");
+        Pattern bridgeSetter = Pattern.compile(
+                "\\bvoid\\s+(setStatus|setReconciliationDecisionStatus)\\s*\\(");
+        Map<String, String> mismatches = new LinkedHashMap<>();
+        List<String> bridgeSetters = new ArrayList<>();
+        for (Path entity : javaSourceFiles(entityRoots)) {
+            String source = Files.readString(entity);
+            Matcher matcher = explicitColumn.matcher(source);
+            while (matcher.find()) {
+                String column = matcher.group(1);
+                String field = matcher.group(2);
+                if (!column.equals(toSnakeCase(field))) {
+                    mismatches.put(workspaceRoot().relativize(entity) + "#" + field, column);
+                }
+            }
+            if (bridgeSetter.matcher(source).find()) {
+                bridgeSetters.add(workspaceRoot().relativize(entity).toString());
+            }
+        }
+
+        assertThat(mismatches).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "ledger/impl/src/main/java/com/wind/funds/ledger/dal/entities/Ledger.java#allowNegative",
+                "is_allow_negative",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/dal/entities/FundingAccount.java#platform",
+                "is_platform",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/dal/entities/PaymentInstrumentBinding.java#defaultBinding",
+                "is_default"));
+        assertThat(bridgeSetters).isEmpty();
+
+        assertThat(Stream.of(ProjectionReplayTask.class.getDeclaredMethods()).map(Method::getName))
+                .contains("getState", "setState")
+                .doesNotContain("getStatus", "setStatus");
+        assertThat(Stream.of(FundsProjectionReplayTaskDTO.class.getRecordComponents())
+                .map(component -> component.getName()))
+                .contains("state")
+                .doesNotContain("status");
+        String mapperSource = Files.readString(workspaceRoot().resolve(
+                "governance/impl/src/main/java/com/wind/funds/governance/dal/mapper/ProjectionReplayTaskMapper.java"));
+        assertThat(mapperSource)
+                .contains("checkpoint_value, state, success_count")
+                .contains("AND state IN ('CREATED', 'RUNNING')")
+                .doesNotContain("status AS state", "checkpoint_value, status, success_count", "AND status IN");
+    }
+
+    /**
      * 场景：wallet 对外提供支付工具授权、收款和账户能力 application facade。
      * 预期：非 wallet 生产模块不直接拼装 wallet 资源服务完成授权准入、支付工具能力或资金责任解析。
      * 红线：跨模块调用方必须通过 wallet application/use-case facade 或交易层 canonical 入口表达业务意图。
@@ -1266,6 +1328,12 @@ class FundsModuleDependencyBoundaryTests {
             }
         }
         return javaFiles;
+    }
+
+    private String toSnakeCase(String value) {
+        return value.replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2")
+                .replaceAll("([a-z\\d])([A-Z])", "$1_$2")
+                .toLowerCase(Locale.ROOT);
     }
 
     private boolean containsJavaSource(Path path) throws IOException {

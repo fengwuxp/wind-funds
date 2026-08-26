@@ -168,7 +168,7 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
         jdbcTemplate.update("""
                         INSERT INTO t_funding_account
                             (sn, tenant_id, owner_id, owner_type, account_type, is_platform, currency,
-                             ledger_profile_code, ledger_profile_version, status, version)
+                             ledger_profile_code, ledger_profile_version, state, version)
                         VALUES (?, ?, ?, 'USER', 'USER_WALLET', 0, ?, 'FUNDING_BASIC', 1, ?, 0)
                         """,
                 sn, TENANT_ID, "hierarchy_owner", currency.name(), state.name());

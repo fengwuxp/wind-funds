@@ -188,7 +188,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         replaceDetailDigest("platform_prepayment", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
         assertThat(core1bJdbcTemplate.update("""
                         UPDATE t_funds_transaction_detail
-                        SET status = 'PROCESSING'
+                        SET state = 'PROCESSING'
                         WHERE tenant_id = ? AND business_sn = ? AND subject_id = ?
                         """, TENANT_ID, CORE1B_BUSINESS_SN, "funding_user")).isEqualTo(1);
         BalanceSnapshot balancesBeforeReplay = snapshot(balances(

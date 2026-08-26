@@ -106,7 +106,6 @@ public class SpendControlScope implements Serializable, TenantIsolationObject<Lo
      * 支出控制范围状态。
      */
     @NotNull
-    @Column("status")
     private FundsAccountState state;
 
     /**

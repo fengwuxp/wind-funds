@@ -167,7 +167,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
         assertThat(failed.getFundsTransactionSn()).isNotBlank();
         assertThat(candidateStatuses(candidateSn)).containsExactly(ClearingCandidateState.BLOCKED.name());
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT status FROM t_funds_transaction WHERE sn = ?", String.class,
+                "SELECT state FROM t_funds_transaction WHERE sn = ?", String.class,
                 failed.getFundsTransactionSn())).isEqualTo(FundsTransactionState.FAILED.name());
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_ledger_transaction WHERE funds_transaction_sn = ?", Integer.class,
@@ -294,7 +294,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            status, amount, currency, completed_amount, refunded_amount, declined_amount,
+                            state, amount, currency, completed_amount, refunded_amount, declined_amount,
                             route_snapshot, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0)
                         """,
@@ -325,7 +325,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
                             posting_plan_sn, ledger_entry_sn, route_snapshot_digest, clearing_available_time,
                             clearing_rule_code, clearing_rule_version, gate_evidence_ref,
                             reconciliation_evidence_refs, source_digest,
-                            candidate_digest, active_splittable_detail_sn, status, created_by
+                            candidate_digest, active_splittable_detail_sn, state, created_by
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'READY', 'system')
                         """,
                 candidateSn, TENANT_ID, "split_result_" + suffix, "split_batch_" + suffix,
@@ -341,7 +341,7 @@ class ClearingBatchApplicationServiceTests extends FundsTransactionFlowTestSuppo
 
     private List<String> candidateStatuses(String... candidateSns) {
         return jdbcTemplate.queryForList("""
-                        SELECT status FROM t_clearing_candidate
+                        SELECT state FROM t_clearing_candidate
                         WHERE sn IN (%s)
                         ORDER BY sn
                         """.formatted(String.join(",", java.util.Collections.nCopies(candidateSns.length, "?"))),

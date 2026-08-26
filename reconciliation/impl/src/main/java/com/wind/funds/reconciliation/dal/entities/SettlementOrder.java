@@ -88,12 +88,7 @@ public class SettlementOrder implements Serializable, TenantIsolationObject<Long
     private Long netAmount;
 
     @NotNull
-    @Column("status")
     private SettlementOrderState state;
-
-    void setStatus(SettlementOrderState state) {
-        this.state = state;
-    }
 
     private String settlementApprovalRef;
 

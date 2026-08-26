@@ -17,27 +17,51 @@ import java.util.List;
 public interface ClearingCandidateMapper extends BaseMapper<ClearingCandidate> {
 
     @Select("""
-            SELECT * FROM t_clearing_candidate
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_result_sn, split_batch_sn,
+                   splittable_detail_sn, subject_type, subject_id, currency, business_line, clearing_period, amount,
+                   funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn,
+                   ledger_entry_sn, route_snapshot_digest, clearing_available_time, clearing_rule_code,
+                   clearing_rule_version, gate_evidence_ref, reconciliation_evidence_refs, source_digest,
+                   candidate_digest, active_splittable_detail_sn, state, block_reason, exclusion_reason,
+                   locked_clearing_batch_sn, created_by, updated_by, state_changed_time FROM t_clearing_candidate
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             """)
     ClearingCandidate selectBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_clearing_candidate
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_result_sn, split_batch_sn,
+                   splittable_detail_sn, subject_type, subject_id, currency, business_line, clearing_period, amount,
+                   funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn,
+                   ledger_entry_sn, route_snapshot_digest, clearing_available_time, clearing_rule_code,
+                   clearing_rule_version, gate_evidence_ref, reconciliation_evidence_refs, source_digest,
+                   candidate_digest, active_splittable_detail_sn, state, block_reason, exclusion_reason,
+                   locked_clearing_batch_sn, created_by, updated_by, state_changed_time FROM t_clearing_candidate
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             FOR UPDATE
             """)
     ClearingCandidate selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT * FROM t_clearing_candidate
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_result_sn, split_batch_sn,
+                   splittable_detail_sn, subject_type, subject_id, currency, business_line, clearing_period, amount,
+                   funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn,
+                   ledger_entry_sn, route_snapshot_digest, clearing_available_time, clearing_rule_code,
+                   clearing_rule_version, gate_evidence_ref, reconciliation_evidence_refs, source_digest,
+                   candidate_digest, active_splittable_detail_sn, state, block_reason, exclusion_reason,
+                   locked_clearing_batch_sn, created_by, updated_by, state_changed_time FROM t_clearing_candidate
             WHERE tenant_id = #{tenantId} AND candidate_digest = #{candidateDigest}
             """)
     ClearingCandidate selectByDigest(@Param("tenantId") Long tenantId,
                                      @Param("candidateDigest") String candidateDigest);
 
     @Select("""
-            SELECT * FROM t_clearing_candidate
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_result_sn, split_batch_sn,
+                   splittable_detail_sn, subject_type, subject_id, currency, business_line, clearing_period, amount,
+                   funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn,
+                   ledger_entry_sn, route_snapshot_digest, clearing_available_time, clearing_rule_code,
+                   clearing_rule_version, gate_evidence_ref, reconciliation_evidence_refs, source_digest,
+                   candidate_digest, active_splittable_detail_sn, state, block_reason, exclusion_reason,
+                   locked_clearing_batch_sn, created_by, updated_by, state_changed_time FROM t_clearing_candidate
             WHERE tenant_id = #{tenantId}
               AND active_splittable_detail_sn = #{splittableDetailSn}
             FOR UPDATE
@@ -47,7 +71,13 @@ public interface ClearingCandidateMapper extends BaseMapper<ClearingCandidate> {
 
     @Select("""
             <script>
-            SELECT * FROM t_clearing_candidate
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_result_sn, split_batch_sn,
+                   splittable_detail_sn, subject_type, subject_id, currency, business_line, clearing_period, amount,
+                   funds_transaction_sn, funds_transaction_detail_sn, ledger_transaction_sn, posting_plan_sn,
+                   ledger_entry_sn, route_snapshot_digest, clearing_available_time, clearing_rule_code,
+                   clearing_rule_version, gate_evidence_ref, reconciliation_evidence_refs, source_digest,
+                   candidate_digest, active_splittable_detail_sn, state, block_reason, exclusion_reason,
+                   locked_clearing_batch_sn, created_by, updated_by, state_changed_time FROM t_clearing_candidate
             WHERE tenant_id = #{tenantId}
               AND sn IN
               <foreach collection="sns" item="sn" open="(" separator="," close=")">
@@ -61,53 +91,53 @@ public interface ClearingCandidateMapper extends BaseMapper<ClearingCandidate> {
 
     @Update("""
             UPDATE t_clearing_candidate
-            SET status = 'LOCKED', locked_clearing_batch_sn = #{clearingBatchSn},
-                updated_by = #{updatedBy}, status_changed_time = #{statusChangedTime}
-            WHERE tenant_id = #{tenantId} AND sn = #{candidateSn} AND status = 'READY'
+            SET state = 'LOCKED', locked_clearing_batch_sn = #{clearingBatchSn},
+                updated_by = #{updatedBy}, state_changed_time = #{stateChangedTime}
+            WHERE tenant_id = #{tenantId} AND sn = #{candidateSn} AND state = 'READY'
             """)
     int lockReadyCandidate(@Param("tenantId") Long tenantId,
                            @Param("candidateSn") String candidateSn,
                            @Param("clearingBatchSn") String clearingBatchSn,
                            @Param("updatedBy") String updatedBy,
-                           @Param("statusChangedTime") LocalDateTime statusChangedTime);
+                           @Param("stateChangedTime") LocalDateTime stateChangedTime);
 
     @Update("""
             UPDATE t_clearing_candidate
-            SET status = 'READY', locked_clearing_batch_sn = NULL, block_reason = NULL,
-                updated_by = #{updatedBy}, status_changed_time = #{statusChangedTime}
+            SET state = 'READY', locked_clearing_batch_sn = NULL, block_reason = NULL,
+                updated_by = #{updatedBy}, state_changed_time = #{stateChangedTime}
             WHERE tenant_id = #{tenantId} AND sn = #{candidateSn}
-              AND status = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
+              AND state = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
             """)
     int releaseLockedCandidate(@Param("tenantId") Long tenantId,
                                @Param("candidateSn") String candidateSn,
                                @Param("clearingBatchSn") String clearingBatchSn,
                                @Param("updatedBy") String updatedBy,
-                               @Param("statusChangedTime") LocalDateTime statusChangedTime);
+                               @Param("stateChangedTime") LocalDateTime stateChangedTime);
 
     @Update("""
             UPDATE t_clearing_candidate
-            SET status = 'CLEARED', locked_clearing_batch_sn = NULL,
-                updated_by = #{updatedBy}, status_changed_time = #{statusChangedTime}
+            SET state = 'CLEARED', locked_clearing_batch_sn = NULL,
+                updated_by = #{updatedBy}, state_changed_time = #{stateChangedTime}
             WHERE tenant_id = #{tenantId} AND sn = #{candidateSn}
-              AND status = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
+              AND state = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
             """)
     int markLockedCandidateCleared(@Param("tenantId") Long tenantId,
                                    @Param("candidateSn") String candidateSn,
                                    @Param("clearingBatchSn") String clearingBatchSn,
                                    @Param("updatedBy") String updatedBy,
-                                   @Param("statusChangedTime") LocalDateTime statusChangedTime);
+                                   @Param("stateChangedTime") LocalDateTime stateChangedTime);
 
     @Update("""
             UPDATE t_clearing_candidate
-            SET status = 'BLOCKED', locked_clearing_batch_sn = NULL, block_reason = #{blockReason},
-                updated_by = #{updatedBy}, status_changed_time = #{statusChangedTime}
+            SET state = 'BLOCKED', locked_clearing_batch_sn = NULL, block_reason = #{blockReason},
+                updated_by = #{updatedBy}, state_changed_time = #{stateChangedTime}
             WHERE tenant_id = #{tenantId} AND sn = #{candidateSn}
-              AND status = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
+              AND state = 'LOCKED' AND locked_clearing_batch_sn = #{clearingBatchSn}
             """)
     int blockLockedCandidate(@Param("tenantId") Long tenantId,
                              @Param("candidateSn") String candidateSn,
                              @Param("clearingBatchSn") String clearingBatchSn,
                              @Param("blockReason") String blockReason,
                              @Param("updatedBy") String updatedBy,
-                             @Param("statusChangedTime") LocalDateTime statusChangedTime);
+                             @Param("stateChangedTime") LocalDateTime stateChangedTime);
 }

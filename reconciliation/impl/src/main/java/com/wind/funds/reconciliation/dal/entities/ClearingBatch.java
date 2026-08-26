@@ -79,12 +79,7 @@ public class ClearingBatch implements Serializable, TenantIsolationObject<Long> 
     private String fundsTransactionSn;
 
     @NotNull
-    @Column("status")
     private ClearingBatchState state;
-
-    void setStatus(ClearingBatchState state) {
-        this.state = state;
-    }
 
     @NotNull
     private String createdBy;

@@ -14,7 +14,11 @@ import org.apache.ibatis.annotations.Update;
 public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatch> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, currency, rule_namespace, rule_identity, rule_version,
+                   window_start, window_end, time_semantics, timezone_id, previous_batch_sn, state, run_result_sn,
+                   aborted_by, aborted_time, abort_reason, replacement_reason, replacement_evidence_ref,
+                   batch_digest, created_by
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
@@ -22,7 +26,11 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
     ReconciliationBatch selectBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, currency, rule_namespace, rule_identity, rule_version,
+                   window_start, window_end, time_semantics, timezone_id, previous_batch_sn, state, run_result_sn,
+                   aborted_by, aborted_time, abort_reason, replacement_reason, replacement_evidence_ref,
+                   batch_digest, created_by
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
@@ -31,7 +39,11 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
     ReconciliationBatch selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, currency, rule_namespace, rule_identity, rule_version,
+                   window_start, window_end, time_semantics, timezone_id, previous_batch_sn, state, run_result_sn,
+                   aborted_by, aborted_time, abort_reason, replacement_reason, replacement_evidence_ref,
+                   batch_digest, created_by
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND batch_digest = #{batchDigest}
@@ -40,7 +52,11 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
                                        @Param("batchDigest") String batchDigest);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, currency, rule_namespace, rule_identity, rule_version,
+                   window_start, window_end, time_semantics, timezone_id, previous_batch_sn, state, run_result_sn,
+                   aborted_by, aborted_time, abort_reason, replacement_reason, replacement_evidence_ref,
+                   batch_digest, created_by
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND batch_digest = #{batchDigest}
@@ -50,7 +66,11 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
                                                 @Param("batchDigest") String batchDigest);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, currency, rule_namespace, rule_identity, rule_version,
+                   window_start, window_end, time_semantics, timezone_id, previous_batch_sn, state, run_result_sn,
+                   aborted_by, aborted_time, abort_reason, replacement_reason, replacement_evidence_ref,
+                   batch_digest, created_by
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND previous_batch_sn = #{previousBatchSn}
@@ -61,22 +81,22 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
 
     @Update("""
             UPDATE t_reconciliation_batch
-            SET status = #{targetStatus}
+            SET state = #{targetState}
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
-              AND status = #{currentStatus}
+              AND state = #{currentState}
             """)
     int updateState(@Param("tenantId") Long tenantId,
                      @Param("sn") String sn,
-                     @Param("currentStatus") String currentStatus,
-                     @Param("targetStatus") String targetStatus);
+                     @Param("currentState") String currentState,
+                     @Param("targetState") String targetState);
 
     @Update("""
             UPDATE t_reconciliation_batch
-            SET status = 'COMPLETED', run_result_sn = #{runResultSn}
+            SET state = 'COMPLETED', run_result_sn = #{runResultSn}
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
-              AND status = 'DATA_READY'
+              AND state = 'DATA_READY'
               AND run_result_sn IS NULL
             """)
     int complete(@Param("tenantId") Long tenantId,
@@ -85,15 +105,15 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
 
     @Update("""
             UPDATE t_reconciliation_batch
-            SET status = 'ABORTED', aborted_by = #{abortedBy},
+            SET state = 'ABORTED', aborted_by = #{abortedBy},
                 aborted_time = #{abortedTime}, abort_reason = #{abortReason}
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
-              AND status = #{currentStatus}
+              AND state = #{currentState}
             """)
     int abort(@Param("tenantId") Long tenantId,
               @Param("sn") String sn,
-              @Param("currentStatus") String currentStatus,
+              @Param("currentState") String currentState,
               @Param("abortedBy") String abortedBy,
               @Param("abortedTime") java.time.LocalDateTime abortedTime,
               @Param("abortReason") String abortReason);

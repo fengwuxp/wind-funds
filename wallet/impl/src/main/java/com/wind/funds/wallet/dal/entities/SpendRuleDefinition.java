@@ -80,7 +80,6 @@ public class SpendRuleDefinition implements Serializable, TenantIsolationObject<
      * 规则定义状态。
      */
     @NotNull
-    @Column("status")
     private SpendRuleDefinitionState state;
 
     /**

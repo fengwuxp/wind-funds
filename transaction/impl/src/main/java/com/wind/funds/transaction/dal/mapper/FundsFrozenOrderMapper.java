@@ -43,7 +43,10 @@ public interface FundsFrozenOrderMapper extends BaseMapper<FundsFrozenOrder> {
 
     @Select("""
             <script>
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, subject_id, subject_type, freeze_type,
+                   business_scene, business_sn, transaction_sn, freeze_detail_sn, freeze_ledger_transaction_sn,
+                   amount, released_amount, currency, state, expire_time, release_time, description,
+                   context_variables, version
             FROM t_funds_frozen_order
             WHERE tenant_id = #{tenantId}
               AND id &gt; #{lastId} AND id &lt;= #{upperBoundId}

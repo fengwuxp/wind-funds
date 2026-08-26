@@ -15,21 +15,33 @@ import java.util.List;
 public interface ProjectionReplayTaskMapper extends BaseMapper<ProjectionReplayTask> {
 
     @Select("""
-            SELECT *, status AS state FROM t_projection_replay_task
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, request_sn, request_digest, view_domain,
+                   replay_mode, source_sn, owner_type, owner_id, range_start_time, range_end_time, batch_type,
+                   batch_sn, checkpoint_type, checkpoint_value, state, success_count, failed_count,
+                   skipped_count, difference_count, replay_reason, audit_ref, approval_ref,
+                   validated_shadow_task_sn, operator_id, version FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND request_sn = #{requestSn}
             """)
     ProjectionReplayTask selectByRequest(@Param("tenantId") Long tenantId,
                                          @Param("requestSn") String requestSn);
 
     @Select("""
-            SELECT *, status AS state FROM t_projection_replay_task
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, request_sn, request_digest, view_domain,
+                   replay_mode, source_sn, owner_type, owner_id, range_start_time, range_end_time, batch_type,
+                   batch_sn, checkpoint_type, checkpoint_value, state, success_count, failed_count,
+                   skipped_count, difference_count, replay_reason, audit_ref, approval_ref,
+                   validated_shadow_task_sn, operator_id, version FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND sn = #{taskSn}
             """)
     ProjectionReplayTask selectBySn(@Param("tenantId") Long tenantId,
                                     @Param("taskSn") String taskSn);
 
     @Select("""
-            SELECT *, status AS state FROM t_projection_replay_task
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, request_sn, request_digest, view_domain,
+                   replay_mode, source_sn, owner_type, owner_id, range_start_time, range_end_time, batch_type,
+                   batch_sn, checkpoint_type, checkpoint_value, state, success_count, failed_count,
+                   skipped_count, difference_count, replay_reason, audit_ref, approval_ref,
+                   validated_shadow_task_sn, operator_id, version FROM t_projection_replay_task
             WHERE tenant_id = #{tenantId} AND sn = #{taskSn}
             FOR UPDATE
             """)
@@ -37,8 +49,12 @@ public interface ProjectionReplayTaskMapper extends BaseMapper<ProjectionReplayT
                                              @Param("taskSn") String taskSn);
 
     @Select("""
-            SELECT *, status AS state FROM t_projection_replay_task
-            WHERE tenant_id = #{tenantId} AND status IN ('CREATED', 'RUNNING')
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, request_sn, request_digest, view_domain,
+                   replay_mode, source_sn, owner_type, owner_id, range_start_time, range_end_time, batch_type,
+                   batch_sn, checkpoint_type, checkpoint_value, state, success_count, failed_count,
+                   skipped_count, difference_count, replay_reason, audit_ref, approval_ref,
+                   validated_shadow_task_sn, operator_id, version FROM t_projection_replay_task
+            WHERE tenant_id = #{tenantId} AND state IN ('CREATED', 'RUNNING')
             ORDER BY id ASC
             LIMIT #{maxSize}
             """)

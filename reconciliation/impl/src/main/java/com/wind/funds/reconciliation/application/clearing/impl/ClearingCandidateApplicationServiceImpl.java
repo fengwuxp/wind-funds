@@ -120,7 +120,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         candidate.setBlockReason(null);
         candidate.setLockedClearingBatchSn(null);
         candidate.setUpdatedBy(operator.getOperatorAsText());
-        candidate.setStatusChangedTime(LocalDateTime.now());
+        candidate.setStateChangedTime(LocalDateTime.now());
         AssertUtils.isTrue(clearingCandidateMapper.update(candidate) == 1, "排除清算候选失败");
         return toDTO(candidate);
     }
@@ -160,7 +160,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         candidate.setState(ClearingCandidateState.LOCKED);
         candidate.setLockedClearingBatchSn(request.getClearingBatchSn());
         candidate.setUpdatedBy(operator.getOperatorAsText());
-        candidate.setStatusChangedTime(LocalDateTime.now());
+        candidate.setStateChangedTime(LocalDateTime.now());
         AssertUtils.isTrue(clearingCandidateMapper.update(candidate) == 1, "锁定清算候选失败");
         return toDTO(candidate);
     }
@@ -186,7 +186,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         candidate.setBlockReason(null);
         candidate.setExclusionReason(null);
         candidate.setUpdatedBy(operator.getOperatorAsText());
-        candidate.setStatusChangedTime(LocalDateTime.now());
+        candidate.setStateChangedTime(LocalDateTime.now());
         AssertUtils.isTrue(clearingCandidateMapper.update(candidate) == 1, "释放清算候选锁定失败");
         return toDTO(candidate);
     }
@@ -214,7 +214,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
                 .where(candidate.tenantId.eq(tenantId))
                 .and(candidate.state.eq(query.getState()))
                 .and(candidate.clearingAvailableTime.le(query.getClearingAvailableTimeMax()))
-                .and(candidate.statusChangedTime.le(query.getStatusChangedTimeMax()))
+                .and(candidate.stateChangedTime.le(query.getStateChangedTimeMax()))
                 .and(candidate.lockedClearingBatchSn.eq(query.getLockedClearingBatchSn()))
                 .orderBy(candidate.clearingAvailableTime.asc(), candidate.id.asc());
         return MybatisQueryHelper.<ClearingCandidate, ClearingCandidateDTO>query(wrapper)
@@ -252,7 +252,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
         candidate.setExclusionReason(null);
         candidate.setLockedClearingBatchSn(null);
         candidate.setUpdatedBy(operator.getOperatorAsText());
-        candidate.setStatusChangedTime(LocalDateTime.now());
+        candidate.setStateChangedTime(LocalDateTime.now());
     }
 
     private ClearingCandidate toCandidate(ClearingSplitResultSnapshot snapshot,
@@ -371,7 +371,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
                 .setBlockReason(source.getBlockReason())
                 .setExclusionReason(source.getExclusionReason())
                 .setLockedClearingBatchSn(source.getLockedClearingBatchSn())
-                .setStatusChangedTime(source.getStatusChangedTime())
+                .setStateChangedTime(source.getStateChangedTime())
                 .setCreatedTime(source.getGmtCreate())
                 .setModifiedTime(source.getGmtModified());
     }

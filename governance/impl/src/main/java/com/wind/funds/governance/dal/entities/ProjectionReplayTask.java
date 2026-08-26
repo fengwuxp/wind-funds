@@ -59,8 +59,6 @@ public class ProjectionReplayTask implements TenantIsolationObject<Long> {
 
     private String checkpointValue;
 
-    @Column("status")
-
     private ProjectionReplayTaskState state;
 
     private Long successCount;

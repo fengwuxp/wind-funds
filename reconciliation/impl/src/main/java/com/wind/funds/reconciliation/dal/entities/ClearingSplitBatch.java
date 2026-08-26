@@ -80,12 +80,7 @@ public class ClearingSplitBatch implements Serializable, TenantIsolationObject<L
     private String activeBatchDigest;
 
     @NotNull
-    @Column("status")
     private ClearingSplitBatchState state;
-
-    void setStatus(ClearingSplitBatchState state) {
-        this.state = state;
-    }
 
     @NotNull
     private String createdBy;

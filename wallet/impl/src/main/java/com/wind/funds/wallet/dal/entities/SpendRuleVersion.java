@@ -78,7 +78,6 @@ public class SpendRuleVersion implements Serializable, TenantIsolationObject<Lon
      * 规则版本状态。
      */
     @NotNull
-    @Column("status")
     private SpendRuleVersionState state;
 
     /**

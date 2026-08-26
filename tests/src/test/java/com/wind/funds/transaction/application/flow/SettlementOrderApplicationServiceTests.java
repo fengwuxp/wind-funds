@@ -186,7 +186,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 WindOperatorFactory.system()))
                 .hasMessageContaining("只有 DRAFT 或 REVIEWING 结算单可以取消");
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT status FROM t_settlement_order WHERE sn = ?", String.class, order.getSn()))
+                "SELECT state FROM t_settlement_order WHERE sn = ?", String.class, order.getSn()))
                 .isEqualTo("RELEASED");
     }
 
@@ -231,7 +231,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                 releaseRequest(createdOrder, createdGate, "cancel draft payout"), WindOperatorFactory.system());
 
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT status FROM t_payout_order WHERE sn = ?", String.class, "PYO_RELEASE_CREATED"))
+                "SELECT state FROM t_payout_order WHERE sn = ?", String.class, "PYO_RELEASE_CREATED"))
                 .isEqualTo(PayoutOrderState.CANCELLED.name());
         assertThat(settlementReleaseAuthority.lastContext().getPayoutOrder().getState())
                 .isEqualTo(PayoutOrderState.CREATED);
@@ -613,7 +613,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
                         INSERT INTO t_clearing_batch (
                             sn, tenant_id, subject_type, subject_id, currency, business_line, clearing_period,
                             clearing_rule_code, clearing_rule_version, candidate_count, total_amount, amount_digest,
-                            funds_transaction_sn, status, created_by, confirmed_by, confirmed_time
+                            funds_transaction_sn, state, created_by, confirmed_by, confirmed_time
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 sn, TENANT_ID, accountId.type(), accountId.id(), CURRENCY.name(), "ACQUIRING", "2026-07",
@@ -689,7 +689,7 @@ class SettlementOrderApplicationServiceTests extends FundsTransactionFlowTestSup
         jdbcTemplate.update("""
                         INSERT INTO t_payout_order (
                             sn, tenant_id, settlement_order_sn, settlement_subject_type, settlement_subject_id,
-                            amount, currency, status, created_by, version
+                            amount, currency, state, created_by, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                 payoutOrderSn, TENANT_ID, order.getSn(), order.getSettlementSubjectType(),

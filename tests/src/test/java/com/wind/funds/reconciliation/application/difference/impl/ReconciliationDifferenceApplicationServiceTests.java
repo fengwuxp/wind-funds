@@ -403,7 +403,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .hasMessageContaining("处理原因长度不能超过");
 
         assertThat(countDifferenceActionRows()).isZero();
-        assertThat(differenceStatus(requiredDifferenceSn())).isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
+        assertThat(differenceState(requiredDifferenceSn())).isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
     }
 
     @Test
@@ -481,7 +481,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
                 .hasMessageContaining("差错身份");
 
-        assertThat(differenceStatus(difference.getDifferenceSn()))
+        assertThat(differenceState(difference.getDifferenceSn()))
                 .isEqualTo(ReconciliationDifferenceState.ADJUSTING.name());
     }
 
@@ -500,7 +500,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumAdjustmentRequest(), WindOperatorFactory.system()))
                 .hasMessageContaining("处理动作必须在重跑批次创建前回链");
 
-        assertThat(differenceStatus(difference.getDifferenceSn()))
+        assertThat(differenceState(difference.getDifferenceSn()))
                 .isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
         assertThat(countDifferenceActionRows()).isZero();
     }
@@ -550,7 +550,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumAdjustmentRequest(), null))
                 .hasMessageContaining("对账差错处理回链操作人不能为空");
 
-        assertThat(differenceStatus(difference.getDifferenceSn()))
+        assertThat(differenceState(difference.getDifferenceSn()))
                 .isEqualTo(ReconciliationDifferenceState.BLOCKED.name());
     }
 
@@ -612,7 +612,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumRerunRequest(runResultSn), null))
                 .hasMessageContaining("对账差错重跑操作人不能为空");
 
-        assertThat(differenceStatus(difference.getDifferenceSn()))
+        assertThat(differenceState(difference.getDifferenceSn()))
                 .isEqualTo(ReconciliationDifferenceState.ADJUSTING.name());
     }
 
@@ -915,9 +915,9 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 """, Integer.class, TENANT_ID, requiredDifferenceSn());
     }
 
-    private String differenceStatus(String differenceSn) {
+    private String differenceState(String differenceSn) {
         return jdbcTemplate.queryForObject("""
-                SELECT status
+                SELECT state
                 FROM t_reconciliation_difference
                 WHERE tenant_id = ?
                   AND difference_sn = ?
@@ -927,7 +927,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     private void invalidateDifference(String differenceSn) {
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
-                SET status = 'INVALIDATED'
+                SET state = 'INVALIDATED'
                 WHERE tenant_id = ? AND difference_sn = ?
                 """, TENANT_ID, differenceSn);
     }

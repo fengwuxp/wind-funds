@@ -1283,7 +1283,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private void markLedgerState(Long ledgerId, LedgerState state) {
-        jdbcTemplate.update("UPDATE t_ledger SET status = ? WHERE id = ?", state.name(), ledgerId);
+        jdbcTemplate.update("UPDATE t_ledger SET state = ? WHERE id = ?", state.name(), ledgerId);
     }
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {

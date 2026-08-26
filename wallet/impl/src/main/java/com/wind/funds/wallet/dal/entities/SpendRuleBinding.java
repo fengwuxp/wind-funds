@@ -110,7 +110,6 @@ public class SpendRuleBinding implements Serializable, TenantIsolationObject<Lon
      * 挂载状态。
      */
     @NotNull
-    @Column("status")
     private SpendRuleBindingState state;
 
     /**

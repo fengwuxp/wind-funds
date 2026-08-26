@@ -152,7 +152,6 @@ public class FundsTransactionDetail implements Serializable, TenantIsolationObje
      * 交易明细状态。
      */
     @NotNull
-    @Column("status")
     private FundsTransactionDetailState state;
 
     /**

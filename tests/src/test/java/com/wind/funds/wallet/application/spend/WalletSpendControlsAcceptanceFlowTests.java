@@ -495,7 +495,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            reference_transaction_sn, status, amount, currency, authorized_amount, reversed_amount, completed_amount,
+                            reference_transaction_sn, state, amount, currency, authorized_amount, reversed_amount, completed_amount,
                             refunded_amount, declined_amount, fee_amount, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, 0, 0, 0)
                         """,

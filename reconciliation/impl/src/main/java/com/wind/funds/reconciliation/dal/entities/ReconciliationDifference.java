@@ -99,12 +99,7 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
      * 对账差错状态。
      */
     @NotNull
-    @Column("status")
     private ReconciliationDifferenceState state;
-
-    void setStatus(ReconciliationDifferenceState state) {
-        this.state = state;
-    }
 
     /**
      * 金额差异的币种；非金额差异为空。
