@@ -43,8 +43,6 @@ import java.util.TreeMap;
 /**
  * 默认冻结单生命周期保存服务。
  *
- * @author Codex
- * @date 2026-05-14
  */
 @Service
 @AllArgsConstructor
@@ -87,13 +85,14 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     public void markSucceeded(@NonNull FundsInstructionSpec instruction,
                               @NonNull FundsInstructionLifecycleResult result,
                               @Nullable String ledgerTransactionSn) {
-        FundsFrozenOrder order = findFrozenOrderBySn(result.getTransactionSn());
+        FundsFrozenOrder order = findFrozenOrderBySn(
+                instruction.getTenantId(), result.getTransactionSn());
         FundsTransactionEventType eventType = resolveEventType(order);
         if (isCompleted(order, eventType)) {
             return;
         }
         if (eventType == FundsTransactionEventType.UNFREEZE) {
-            markUnfreezeSucceeded(order, ledgerTransactionSn);
+            markUnfreezeSucceeded(instruction.getTenantId(), order, ledgerTransactionSn);
         } else {
             order.setFreezeLedgerTransactionSn(ledgerTransactionSn);
             order.setState(FundsFrozenOrderState.FROZEN);
@@ -106,7 +105,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     public void markFailed(@NonNull FundsInstructionSpec instruction,
                            @NonNull FundsInstructionLifecycleResult result,
                            @NonNull Throwable cause) {
-        findFrozenOrderBySn(result.getTransactionSn());
+        findFrozenOrderBySn(instruction.getTenantId(), result.getTransactionSn());
     }
 
     private FundsFrozenOrder findOrCreateFrozenOrder(FundsInstructionSpec instruction,
@@ -154,7 +153,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private FundsFrozenOrder createUnfreezeRecord(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
-        FundsFrozenOrder originalOrder = findReferencedFrozenOrder(instruction.getReference());
+        FundsFrozenOrder originalOrder = findReferencedFrozenOrder(
+                instruction.getTenantId(), instruction.getReference());
         assertEnoughReleasableAmount(originalOrder, instruction.getAmount().getAmount());
         FundsFrozenOrder entity = new FundsFrozenOrder();
         entity.setSn(TemporalSequenceFactory.hourNext(FUNDS_FROZEN_ORDER_SEQUENCE_TYPE));
@@ -190,18 +190,21 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         return fundsFrozenOrderMapper.selectOneByQuery(wrapper);
     }
 
-    private FundsFrozenOrder findFrozenOrderBySn(String sn) {
+    private FundsFrozenOrder findFrozenOrderBySn(Long tenantId, String sn) {
         FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(sn));
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn));
         FundsFrozenOrder result = fundsFrozenOrderMapper.selectOneByQuery(wrapper);
         AssertUtils.notNull(result, "资金冻结单生命周期记录不存在，sn = {}", sn);
         return result;
     }
 
-    private FundsFrozenOrder findReferencedFrozenOrder(@Nullable FundsInstructionReferenceSpec reference) {
+    private FundsFrozenOrder findReferencedFrozenOrder(Long tenantId,
+                                                       @Nullable FundsInstructionReferenceSpec reference) {
         AssertUtils.notNull(reference, "解冻事件必须引用冻结单");
         AssertUtils.hasText(reference.getReferenceSn(), "解冻事件必须引用冻结单");
-        return findFrozenOrderBySn(reference.getReferenceSn());
+        return findFrozenOrderBySn(tenantId, reference.getReferenceSn());
     }
 
     private RouteParticipantSpec resolveParticipant(RouteSnapshotSpec routeSnapshot) {
@@ -237,7 +240,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                 "资金冻结单请求参数不一致，sn = {}", order.getSn());
     }
 
-    private void markUnfreezeSucceeded(FundsFrozenOrder releaseRecord,
+    private void markUnfreezeSucceeded(Long tenantId,
+                                       FundsFrozenOrder releaseRecord,
                                        @Nullable String ledgerTransactionSn) {
         releaseRecord.setFreezeLedgerTransactionSn(ledgerTransactionSn);
         releaseRecord.setReleaseTime(LocalDateTime.now());
@@ -245,7 +249,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         AssertUtils.isTrue(fundsFrozenOrderMapper.update(releaseRecord) == 1,
                 "更新资金解冻生命周期状态失败，sn = {}", releaseRecord.getSn());
 
-        FundsFrozenOrder originalOrder = findReferencedFrozenOrder(releaseRecord.getContextVariables());
+        FundsFrozenOrder originalOrder = findReferencedFrozenOrder(
+                tenantId, releaseRecord.getContextVariables());
         assertEnoughReleasableAmount(originalOrder, releaseRecord.getAmount());
         Long releasedAmount = originalOrder.getReleasedAmount() + releaseRecord.getAmount();
         originalOrder.setReleasedAmount(releasedAmount);
@@ -257,12 +262,12 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                 "更新原冻结单释放金额失败，sn = {}", originalOrder.getSn());
     }
 
-    private FundsFrozenOrder findReferencedFrozenOrder(String contextVariables) {
+    private FundsFrozenOrder findReferencedFrozenOrder(Long tenantId, String contextVariables) {
         AssertUtils.hasText(contextVariables, "解冻生命周期记录缺少原冻结单引用上下文");
         Map<String, Object> values = parseContextVariables(contextVariables);
         String referenceFreezeSn = stringValue(values, FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
         AssertUtils.hasText(referenceFreezeSn, "解冻生命周期记录缺少原冻结单引用");
-        return findFrozenOrderBySn(referenceFreezeSn);
+        return findFrozenOrderBySn(tenantId, referenceFreezeSn);
     }
 
     private void assertEnoughReleasableAmount(FundsFrozenOrder originalOrder, Long releaseAmount) {
@@ -295,7 +300,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private String resolveFreezeType(FundsInstructionSpec instruction) {
         if (instruction.getEventType() == FundsTransactionEventType.UNFREEZE) {
-            return findReferencedFrozenOrder(instruction.getReference()).getFreezeType();
+            return findReferencedFrozenOrder(
+                    instruction.getTenantId(), instruction.getReference()).getFreezeType();
         }
         Object freezeType = instruction.getContextVariables().get(FundsInstructionContextKeys.FREEZE_TYPE);
         return freezeType == null ? instruction.getBusinessScene() : freezeType.toString();
@@ -446,7 +452,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         return FundsStableHashSupport.stableHashMap(values);
     }
 
-    // Preserve request hashes written before freeze/unfreeze moved from ADJUSTMENT to BALANCE_CONTROL.
+    // 保留冻结/解冻从 ADJUSTMENT 迁移到 BALANCE_CONTROL 之前写入的请求摘要。
     static String legacyCompatibleHashTransactionType(FundsTransactionEventType eventType,
                                                        DefaultFundsTransactionType transactionType) {
         return switch (eventType) {

@@ -58,7 +58,7 @@ class PaymentInstrumentRouteDslContractTests {
         assertThat(leg.getTargetNode().getNodeType()).isEqualTo(RouteNodeType.SUBJECT);
         assertThat(leg.getSourceNode().getSubjectRef().getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
         assertThat(leg.getTargetNode().getSubjectRef().getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
-        assertThat(instrumentRef.getInstrumentId()).isEqualTo("PI-001");
+        assertThat(instrumentRef.getInstrumentSn()).isEqualTo("PI-001");
         assertThat(externalAccountRef.getExternalAccountId()).isEqualTo("EA-001");
     }
 
@@ -428,24 +428,24 @@ class PaymentInstrumentRouteDslContractTests {
                 .build();
     }
 
-    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId, String instrumentNo) {
-        return paymentInstrumentRef(instrumentId,
+    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentSn, String instrumentNo) {
+        return paymentInstrumentRef(instrumentSn,
                 instrumentNo,
                 Map.of("bindingId", "BINDING-001", "bindingVersion", 3));
     }
 
-    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId,
+    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentSn,
                                                           String instrumentNo,
                                                           Map<String, Object> bindingSnapshot) {
         return ImmutablePaymentInstrumentRefSpec.builder()
                 .tenantId(1L)
-                .instrumentId(instrumentId)
+                .instrumentSn(instrumentSn)
                 .instrumentType("CARD")
                 .instrumentNo(instrumentNo)
                 .ownerId("USER-001")
                 .ownerType("USER")
                 .currency(CurrencyIsoCode.USD)
-                .status("ACTIVE")
+                .state("ACTIVE")
                 .bindingSnapshot(bindingSnapshot)
                 .build();
     }

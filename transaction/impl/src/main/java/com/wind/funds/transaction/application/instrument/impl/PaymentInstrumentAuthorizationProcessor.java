@@ -55,8 +55,6 @@ import java.util.TreeMap;
  * <p>作为支付工具交易应用服务的内部协作者，完成授权重放校验、支付工具与资金责任准入、
  * Spend Rule 准入和账户主体型授权交易组装，不作为独立的 wallet-face 契约暴露。</p>
  *
- * @author Codex
- * @date 2026-06-18
  */
 @Service
 @AllArgsConstructor
@@ -226,7 +224,7 @@ public class PaymentInstrumentAuthorizationProcessor {
     }
 
     private boolean hasSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
-        // controlScopeId selects binding candidates; it is not decision evidence by itself.
+        // controlScopeId 只用于选择绑定候选，本身不构成决策证据。
         return StringUtils.hasText(request.getSpendRuleId())
                 || StringUtils.hasText(request.getSpendRuleVersion())
                 || StringUtils.hasText(request.getSpendRuleBindingSn())
@@ -475,13 +473,13 @@ public class PaymentInstrumentAuthorizationProcessor {
         assertPaymentInstrumentSnapshotReady(instrumentDecision);
         return ImmutablePaymentInstrumentRefSpec.builder()
                 .tenantId(instrumentDecision.getTenantId())
-                .instrumentId(instrumentDecision.getInstrumentSn())
+                .instrumentSn(instrumentDecision.getInstrumentSn())
                 .instrumentType(instrumentDecision.getInstrumentType())
                 .instrumentNo(instrumentDecision.getInstrumentNo())
                 .ownerId(instrumentDecision.getOwnerId())
                 .ownerType(instrumentDecision.getOwnerType().name())
                 .currency(instrumentDecision.getCurrency())
-                .status(instrumentDecision.getState().name())
+                .state(instrumentDecision.getState().name())
                 .bindingSnapshot(bindingSnapshot(request, instrumentDecision))
                 .description(instrumentDecision.getDescription())
                 .build();

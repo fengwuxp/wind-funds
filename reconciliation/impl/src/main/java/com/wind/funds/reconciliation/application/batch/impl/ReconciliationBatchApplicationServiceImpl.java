@@ -257,7 +257,7 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         }
         AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.CREATED
                         || batch.getState() == ReconciliationBatchState.DATA_COLLECTING,
-                "当前对账批次状态不允许新增来源快照，reconciliationBatchSn = {}, status = {}",
+                "当前对账批次状态不允许新增来源快照，reconciliationBatchSn = {}, state = {}",
                 batch.getSn(), batch.getState());
         ReconciliationSourceSnapshot snapshot = toSnapshot(
                 request, operator, sourceDigest, semanticDigest, evidenceBundleDigest, evidenceRefs);

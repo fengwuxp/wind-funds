@@ -38,8 +38,8 @@
 | 支出控制 | `SpendControlAdmissionApplicationService`、`BudgetControlLimitAdjustmentApplicationService`、`SpendControlMovementService` | Spend Rule 准入、预算控制调整和控制事实查询；交易结果到控制事实的转换由 Provider 内部编排。 | `SpendControlAdmissionApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendRuleDefinitionServiceFlowTests` |
 | 直接交易 | `FundsDirectTransactionService` | 充值、转账、付款、退款、提现、手续费、退费。 | `FundsDirectTransactionFlowTests`、`FundsTransactionFeeFlowTests`、`FundsTransferPayWithdrawChainFlowTests` |
 | 授权交易 | `FundsAuthorizationTransactionService` | 授权、撤销、完成、完成后退款。 | `FundsAuthorizationTransactionFlowTests` |
-| 余额控制 | `FundsBalanceControlService` | 冻结、解冻、受控调整；冻结不表达扣款。 | `FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests` |
-| 让利出资记账 | `FundsBenefitContributionTransactionService` | 平台/商户/合作方已决策让利出资入账和按原交易冲回。 | `FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests` |
+| 余额控制 | `FundsBalanceControlService` | 冻结、解冻、受控调整；冻结不表达扣款。 | `FundsBalanceControlFailureFlowTests`、`DefaultFundsFrozenOrderLifecycleSaverTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests` |
+| 让利出资记账 | Consumer Benefit adapter -> `FundsDirectTransactionService.pay/refund` + `FundsActionFact` | 平台/商户/合作方已决策让利出资按出资方入账和按原 ActionFact/交易冲回。 | Capte Consumer application/boundary/integration、`FundsDirectTransactionFlowTests` |
 | 外部确认入金 | `ExternalFundsEventApplicationService` | 已确认外部入金消费为标准充值，目标必须是资金账户。 | `ExternalFundsEventApplicationServiceTests` |
 | 清结算、出款与追偿引用事实 | `ClearingBatchApplicationService`、`SettlementOrderApplicationService`、`PayoutOrderApplicationService`、`RecoveryOrderApplicationService` | 内部清算 `CLEARING -> AVAILABLE`；外部端点结算锁定 `AVAILABLE -> SETTLEMENT`；出款提交意图与归一回单；宿主已确认追偿责任和已完成 `RECOVERY` 资金交易引用。 | `ClearingBatchApplicationServiceTests`、`SettlementOrderApplicationServiceTests`、`PayoutOrderApplicationServiceTests`、`RecoveryOrderApplicationServiceTests`、对应公共契约与 DDL 测试 |
 | 交易投影恢复 | `FundsProjectionReplayApplicationService` | 按单笔、主体或时间窗口创建持久任务；稳定高水位续跑；`VERIFY_ONLY`、`REBUILD_SHADOW` 和经审批的 `REBUILD_APPLY`；差异只保存摘要。 | `FundsProjectionReplayServiceTests`、`FundsHostCompositionContractTests`、`ReconciliationMysqlDdlContractTests` |
@@ -159,7 +159,7 @@ VCC 或其他业务接入方负责外部事件验真、金额拆分、责任方�
 | 解冻 | `FundsBalanceControlService.unfreeze` | 不能超过原冻结事实。 |
 | 调整 | `FundsBalanceControlService.adjust` | 不能替代付款、退款或提现；同主体余额修正只能在差错单、审批、凭证、审计和重新对账闭环内承接，跨主体补偿不得通过本入口直接处理。 |
 
-验证锚点：`FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`。
+验证锚点：`FundsBalanceControlFailureFlowTests`、`DefaultFundsFrozenOrderLifecycleSaverTests`。
 
 ### 6.5 支付工具和资金责任准入
 
@@ -277,14 +277,14 @@ flowchart LR
 
 | 场景 | 入口 |
 | --- | --- |
-| 记录出资 | `FundsBenefitContributionTransactionService.settle` |
-| 冲回出资 | `FundsBenefitContributionTransactionService.refund` |
+| 记录出资 | Consumer adapter 校验业务责任后调用 `FundsDirectTransactionService.pay` |
+| 冲回出资 | Consumer adapter 引用原成功 ActionFact/交易调用 `FundsDirectTransactionService.refund` |
 
-`settle` 必须显式传入 `benefitReceiverLedgerSubjectCode`：平台补足商户使用 `CLEARING`，用户或订单归集使用 `SETTLEMENT`；字段无默认值，也不接受其他账目。`refund` 只引用原让利出资交易，不重新传目标账目，由资金底座沿原 route snapshot 回放。
+Consumer adapter 必须显式选择可记账账户、账目和 Money；当前已证明的 Capte 商户补足只使用 `CLEARING`，不得把没有真实 Consumer 的用户/订单 `SETTLEMENT` 场景泛化进公共层。退款只引用原成功 ActionFact/交易，不重新传目标账目，由资金底座沿原 route snapshot 回放。
 
-多方出资就多次调用 `settle`，不要批量 API，也不要把多个出资方合并到一个营销账户。
+多方出资就按出资方多次调用 generic pay，不要批量 API，也不要把多个出资方合并到一个营销账户。
 
-验证锚点：`FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests`。
+验证锚点：Capte `CouponImplContractBoundaryTests`、`CouponRedemptionApplicationServiceImplTests`、`OrderCouponRedemptionIntegrationTests`，以及 wind-funds `FundsDirectTransactionFlowTests` 与 ActionFact 契约。
 
 ### 6.8 全球账户和跨境接入准入卡
 
@@ -345,8 +345,8 @@ flowchart LR
 | VCC | PaymentInstrument/资金责任初始化 -> authorization hold -> completion 或 reversal -> 原路 refund；强制完成或无关联贷记只在上游确认资金责任后提交标准动作。 | Card、issuer 事件、PCI 数据、乱序归一、未关联贷记和关卡后的负余额处置留在 Fincone/issuer；找不到原 RouteSnapshot 时不得伪造原路。 |
 | 全球账户 / ACH | confirmed credit -> `ExternalFundsEventApplicationService.consume`；出金在上游预检后锁定/提交，外部终态再关闭；return/NOC/reversal 先进入差错归因。 | `Submitted/Accepted/Processing` 不是到账；通道状态 Unknown、错币种、NOC 或无法证明原交易时 fail-closed/manual。 |
 | 收单 / 订单交易 | 每笔成立的 pay 调用标准直接交易；部分/原路退款使用唯一原 `fundsTransactionSn`；订单只保存资金结果引用。 | 订单/账单/收单状态、迟到成功、退款范围、费用和履约属于 Fincone/收单 owner；VCC 开卡费和首次入金是两笔独立事实，不得净额合并。 |
-| 分佣 / 返利 / KPI | Fincone 冻结规则与 allocation 后，为每个 `FUNDS_ACCOUNT` 受益人提交标准 pay 到 `CLEARING`；wind-funds 清算到 `AVAILABLE`，按需锁定 `SETTLEMENT` 并出款。 | `sum(ClearingItem.amount)=commissionPoolAmount`、RETAINED/RESIDUAL、Payroll/AP 分流由 Fincone；`FundsBenefitContributionTransactionService` 不承接 commission/rebate/revenue share。 |
-| 优惠让利结算 | 业务 owner 已完成优惠资格、分摊和出资责任决策后，使用 `FundsBenefitContributionTransactionService` 记录单笔让利出资及原路冲回。 | 不在 funds 计算券、折扣、营销归因或多出资方分摊；commission/rebate/revenue share 不得映射为 Benefit。 |
+| 分佣 / 返利 / KPI | Fincone 冻结规则与 allocation 后，为每个 `FUNDS_ACCOUNT` 受益人提交标准 pay 到 `CLEARING`；wind-funds 清算到 `AVAILABLE`，按需锁定 `SETTLEMENT` 并出款。 | `sum(ClearingItem.amount)=commissionPoolAmount`、RETAINED/RESIDUAL、Payroll/AP 分流由 Fincone；不得借 Benefit adapter 绕过 commission/rebate/revenue-share 准入。 |
+| 优惠让利结算 | 业务 owner 已完成优惠资格、分摊和出资责任决策后，由 Consumer adapter 按出资方提交 generic pay；逆向引用各自原 ActionFact/交易。 | 不在 funds 计算券、折扣、营销归因、funding nature 或多出资方分摊；Benefit adapter 不进入 Provider Public API。 |
 | 跨域治理 | canonical 交易检查 account/action/Money/idempotency/original reference；随后按 `FundsTransaction -> RouteSnapshot -> Ledger -> Balance -> clearing/settlement/payout` 回链，并由宿主把标准化 rail 证据送入通用对账链。 | `Unknown`、部分成功、映射漂移和无法证明守恒时停止自动推进；投影重放不补写资金事实。 |
 
 Fincone `ClearingBatch.CONFIRMED` 与 wind-funds 清算批次不是同一状态。前者只冻结经营应得，不动资金；标准 handoff 是：
@@ -440,7 +440,7 @@ Fincone 的 `Calculated/Confirmed`、wind-funds 的 `CLEARING/AVAILABLE/SETTLEME
 | transaction 接入说明 | `just verify-slice FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,FundsBalanceControlFailureFlowTests tests` |
 | 账户动作与出款能力准入 | `just verify-slice FundsAccountCapabilityAdmissionFlowTests,PayoutOrderApplicationServiceTests tests` |
 | FX 来源价格和金额换算 | `just test-fx` |
-| 让利或外部入金说明 | `just verify-slice FundsBenefitContributionTransactionServiceContractTests,FundsBenefitContributionTransactionServiceFlowTests,ExternalFundsEventApplicationServiceTests tests` |
+| 让利或外部入金说明 | Benefit 使用 Capte Consumer/E4 + `FundsDirectTransactionFlowTests`；外部入金继续按 `ExternalFundsEventApplicationServiceTests` 的迁移证据与独立 normalized-fact 门禁验证 |
 | 交易投影恢复 | `just test-governance` |
 | 模块边界 | `just test-boundary` |
 | 收口 | `just verify-cad` |

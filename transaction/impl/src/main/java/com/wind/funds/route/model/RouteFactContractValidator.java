@@ -8,7 +8,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import java.time.LocalDateTime;
 
 /**
- * Route fact contract checks shared by runtime routes and persisted snapshots.
+ * 运行时 Route 与持久化快照共用的事实契约校验器。
  */
 final class RouteFactContractValidator {
 

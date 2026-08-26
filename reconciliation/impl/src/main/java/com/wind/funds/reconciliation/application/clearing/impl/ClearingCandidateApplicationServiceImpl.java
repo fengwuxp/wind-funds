@@ -95,7 +95,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
             return toDTO(winner);
         }
         AssertUtils.notNull(candidate.getId(), "创建清算候选失败");
-        log.info("清算候选生成完成，tenantId = {}, candidateSn = {}, splitResultSn = {}, status = {}",
+        log.info("清算候选生成完成，tenantId = {}, candidateSn = {}, splitResultSn = {}, state = {}",
                 request.getTenantId(), candidate.getSn(), request.getSplitResultSn(), candidate.getState());
         return toDTO(candidate);
     }
@@ -156,7 +156,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
             return toDTO(candidate);
         }
         AssertUtils.equals(ClearingCandidateState.READY, candidate.getState(),
-                "只有 READY 清算候选可以锁定，status = {}", candidate.getState());
+                "只有 READY 清算候选可以锁定，state = {}", candidate.getState());
         candidate.setState(ClearingCandidateState.LOCKED);
         candidate.setLockedClearingBatchSn(request.getClearingBatchSn());
         candidate.setUpdatedBy(operator.getOperatorAsText());
@@ -178,7 +178,7 @@ public class ClearingCandidateApplicationServiceImpl implements ClearingCandidat
             return toDTO(candidate);
         }
         AssertUtils.equals(ClearingCandidateState.LOCKED, candidate.getState(),
-                "只有 LOCKED 清算候选可以释放批次锁定，status = {}", candidate.getState());
+                "只有 LOCKED 清算候选可以释放批次锁定，state = {}", candidate.getState());
         AssertUtils.equals(request.getClearingBatchSn(), candidate.getLockedClearingBatchSn(),
                 "清算候选锁定批次不一致，candidateSn = {}", candidate.getSn());
         candidate.setState(ClearingCandidateState.READY);

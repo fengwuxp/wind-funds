@@ -72,6 +72,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(transactionSn)
                         .build());
 
@@ -120,6 +121,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(authorizationSn)
                         .build());
 
@@ -173,6 +175,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(refundSn)
                         .build());
 
@@ -226,6 +229,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(refundSn)
                         .build());
 
@@ -268,6 +272,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(refundSn)
                         .build());
 
@@ -315,6 +320,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
 
         assertThatThrownBy(() -> projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(transactionSn)
                         .build()))
                 .isInstanceOf(IllegalArgumentException.class)

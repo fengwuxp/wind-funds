@@ -80,7 +80,7 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
                     assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT.name());
                     assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME.name());
                 });
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(first))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, first))
                 .hasValueSatisfying(route -> assertThat(route.getLegs())
                         .singleElement()
                         .satisfies(leg -> {
@@ -146,7 +146,7 @@ class FundsSettlementTransactionFlowTests extends FundsTransactionFlowTestSuppor
                     assertThat(transaction.getReferenceTransactionSn()).isEqualTo(lockTransactionSn);
                     assertThat(transaction.getBusinessSn()).isEqualTo(settlementOrderSn + ":RELEASE");
                 });
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID,
                 first.getReleaseFundsTransactionSn()))
                 .hasValueSatisfying(route -> {
                     assertThat(route.getEventType()).isEqualTo(FundsTransactionEventType.SETTLEMENT_RELEASE);

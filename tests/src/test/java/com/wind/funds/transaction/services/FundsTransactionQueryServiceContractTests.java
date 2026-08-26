@@ -12,15 +12,42 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * {@link FundsTransactionQueryService} 公共契约测试。
  */
 class FundsTransactionQueryServiceContractTests {
+
+    /**
+     * 场景：公共资金事实查询按稳定流水读取持久化数据。
+     * 预期：所有相关查询显式携带 tenantId，旧无租户签名不存在。
+     */
+    @Test
+    void testPersistentFactQueriesShouldRequireTenantScope() {
+        Set<String> tenantScopedMethods = Set.of(
+                "findFundsTransactionBySn",
+                "queryFundsTransactionDetails",
+                "hasConsumedReplayLeg",
+                "sumConsumedReplayLegAmount",
+                "findRouteSnapshotByTransactionSn",
+                "findRouteSnapshotByFreezeOrderSn");
+
+        assertThat(FundsTransactionQueryService.class.getDeclaredMethods())
+                .filteredOn(method -> tenantScopedMethods.contains(method.getName()))
+                .allSatisfy(method -> assertThat(method.getParameterTypes())
+                        .as(method.getName())
+                        .startsWith(Long.class));
+        assertThat(FundsTransactionQueryService.class.getDeclaredMethods())
+                .extracting(Method::getName)
+                .doesNotContain("queryFundsTransaction");
+    }
 
     /**
      * 默认实现不能静默忽略排除参数，避免未显式支持排除能力的实现误算 replay
@@ -30,7 +57,7 @@ class FundsTransactionQueryServiceContractTests {
     void testDefaultReplayConsumptionQueryRejectsExcludedBusinessEvent() {
         FundsTransactionQueryService queryService = new MinimalFundsTransactionQueryService();
 
-        assertThatThrownBy(() -> queryService.sumConsumedReplayLegAmount("FT1",
+        assertThatThrownBy(() -> queryService.sumConsumedReplayLegAmount(1L, "FT1",
                 FundsTransactionEventType.REFUND,
                 "LEG1",
                 CurrencyIsoCode.USD,
@@ -52,7 +79,7 @@ class FundsTransactionQueryServiceContractTests {
         }
 
         @Override
-        public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {
+        public Optional<FundsTransactionDTO> findFundsTransactionBySn(Long tenantId, String transactionSn) {
             return Optional.empty();
         }
 
@@ -72,19 +99,21 @@ class FundsTransactionQueryServiceContractTests {
         }
 
         @Override
-        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(String transactionSn) {
+        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(Long tenantId, String transactionSn) {
             return List.of();
         }
 
         @Override
-        public boolean hasConsumedReplayLeg(String referenceTransactionSn,
+        public boolean hasConsumedReplayLeg(Long tenantId,
+                                            String referenceTransactionSn,
                                             FundsTransactionEventType eventType,
                                             String replayRefLegId) {
             return false;
         }
 
         @Override
-        public Money sumConsumedReplayLegAmount(String referenceTransactionSn,
+        public Money sumConsumedReplayLegAmount(Long tenantId,
+                                                String referenceTransactionSn,
                                                 FundsTransactionEventType eventType,
                                                 String replayRefLegId,
                                                 CurrencyIsoCode currency) {
@@ -92,12 +121,12 @@ class FundsTransactionQueryServiceContractTests {
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(Long tenantId, String transactionSn) {
             return Optional.empty();
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(String freezeOrderSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(Long tenantId, String freezeOrderSn) {
             return Optional.empty();
         }
     }

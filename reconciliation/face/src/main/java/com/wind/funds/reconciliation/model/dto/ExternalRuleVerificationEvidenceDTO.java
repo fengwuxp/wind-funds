@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -63,7 +63,7 @@ public class ExternalRuleVerificationEvidenceDTO implements Serializable {
     @NotBlank
     private String confirmedBy;
 
-    @Schema(description = "确认状态")
+    @Schema(description = "核验结果")
     @NotNull
-    private ExternalRuleVerificationStatus status;
+    private ExternalRuleVerificationResult verificationResult;
 }

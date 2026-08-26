@@ -737,13 +737,15 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         JsonNode routeSnapshot = jsonObject(routeSnapshotJson(businessSn));
         JsonNode paymentInstrumentRef = routeSnapshot.path("paymentInstrumentRef");
         assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
-        assertThat(paymentInstrumentRef.path("instrumentId").asString()).isEqualTo(RECEIVE_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.path("instrumentSn").asString()).isEqualTo(RECEIVE_INSTRUMENT_SN);
         assertThat(paymentInstrumentRef.path("instrumentType").asString()).isEqualTo("VA");
         assertThat(paymentInstrumentRef.path("instrumentNo").asString()).isEqualTo(RECEIVE_INSTRUMENT_NO);
         assertThat(paymentInstrumentRef.path("ownerId").asString()).isEqualTo(OWNER_ID);
         assertThat(paymentInstrumentRef.path("ownerType").asString()).isEqualTo(FundsAccountOwnerType.USER.name());
         assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("state").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
+        assertThat(paymentInstrumentRef.has("instrumentId")).isFalse();
+        assertThat(paymentInstrumentRef.has("status")).isFalse();
         assertThat(paymentInstrumentRef.toString()).doesNotContain("va_lifecycle_2468");
         JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();

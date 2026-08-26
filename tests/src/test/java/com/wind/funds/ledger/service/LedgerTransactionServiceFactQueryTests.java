@@ -72,6 +72,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -141,8 +142,8 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
     /**
      * 场景：跨模块调用方按稳定流水读取必然存在的账务事实。
      * 输入：LedgerTransactionService 公开 get-by-sn 方法。
-     * 输出：get 方法返回确定 DTO，不返回 Optional，不暴露 DAL 类型。
-     * 红线：按 sn 或 id 的 get 查询是必然存在语义，查不到应抛异常。
+     * 输出：get 方法返回确定 DTO，不返回 Optional、不暴露 DAL 类型和裸数据库 ID / 宽分页查询。
+     * 红线：跨模块账务事实只按 tenant-scoped stable SN 定位，不保留存储型公共查询面。
      */
     @Test
     void testLedgerTransactionServiceShouldExposeStableSnGetQueriesWithoutOptional() throws NoSuchMethodException {
@@ -155,6 +156,30 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         assertThat(getEntryBySn.getReturnType()).isEqualTo(LedgerEntryDTO.class);
         assertThat(getTransactionBySn.getReturnType().getName()).doesNotContain(".dal.");
         assertThat(getEntryBySn.getReturnType().getName()).doesNotContain(".dal.");
+
+        List<String> declaredMethodNames = Arrays.stream(LedgerTransactionService.class.getDeclaredMethods())
+                .map(Method::getName)
+                .toList();
+        List<String> legacySurfaces = new ArrayList<>();
+        List.of("getLedgerTransactionById", "queryAccountLedgerTransactions", "getLedgerEntryById").stream()
+                .filter(declaredMethodNames::contains)
+                .forEach(legacySurfaces::add);
+        String legacyQueryType = "com.wind.funds.ledger.query.LedgerTransactionQuery";
+        if (isTypePresent(legacyQueryType)) {
+            legacySurfaces.add(legacyQueryType);
+        }
+        assertThat(legacySurfaces)
+                .as("Ledger 公共查询不得暴露裸数据库 ID 或无 Consumer 的交易宽分页")
+                .isEmpty();
+    }
+
+    private static boolean isTypePresent(String typeName) {
+        try {
+            Class.forName(typeName, false, LedgerTransactionServiceFactQueryTests.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException ignored) {
+            return false;
+        }
     }
 
     /**
@@ -364,15 +389,11 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 WHERE ledger_transaction_sn = ?
                 ORDER BY sn LIMIT 1
                 """, String.class, ledgerTransactionSn);
-        Long transactionId = jdbcTemplate.queryForObject(
-                "SELECT id FROM t_ledger_transaction WHERE sn = ?", Long.class, ledgerTransactionSn);
-        Long entryId = jdbcTemplate.queryForObject(
-                "SELECT id FROM t_ledger_entry WHERE sn = ?", Long.class, entrySn);
         String targetSn = tamperPersistedDigest(layer, ledgerTransactionSn, postingPlanSn, entrySn);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         List<String> guardGaps = exactReadGuardGaps(
-                layer, transactionId, entryId, ledgerTransactionSn, postingPlanSn, entrySn, targetSn);
+                layer, ledgerTransactionSn, postingPlanSn, entrySn, targetSn);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
         assertThat(guardGaps)
                 .as("stable-sn ledger read must reject tampered " + stableLayerLabel(layer) + " digest")
@@ -404,21 +425,15 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
     }
 
     private List<String> exactReadGuardGaps(String layer,
-                                            Long transactionId,
-                                            Long entryId,
                                             String ledgerTransactionSn,
                                             String postingPlanSn,
                                             String entrySn,
                                             String targetSn) {
         List<String> result = new ArrayList<>();
         switch (layer) {
-            case "TRANSACTION" -> {
-                collectGuardGap(result, "getLedgerTransactionById",
-                        () -> ledgerTransactionService.getLedgerTransactionById(transactionId), layer, targetSn);
-                collectGuardGap(result, "getLedgerTransactionBySn",
-                        () -> ledgerTransactionService.getLedgerTransactionBySn(TENANT_ID, ledgerTransactionSn),
-                        layer, targetSn);
-            }
+            case "TRANSACTION" -> collectGuardGap(result, "getLedgerTransactionBySn",
+                    () -> ledgerTransactionService.getLedgerTransactionBySn(TENANT_ID, ledgerTransactionSn),
+                    layer, targetSn);
             case "POSTING_PLAN" -> {
                 collectGuardGap(result, "getLedgerTransactionBySn",
                         () -> ledgerTransactionService.getLedgerTransactionBySn(TENANT_ID, ledgerTransactionSn),
@@ -428,8 +443,6 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                                 TENANT_ID, postingPlanSn, ledgerTransactionSn), layer, targetSn);
             }
             case "LEDGER_ENTRY" -> {
-                collectGuardGap(result, "getLedgerEntryById",
-                        () -> ledgerTransactionService.getLedgerEntryById(entryId), layer, targetSn);
                 collectGuardGap(result, "getLedgerEntryBySn",
                         () -> ledgerTransactionService.getLedgerEntryBySn(TENANT_ID, entrySn), layer, targetSn);
                 collectGuardGap(result, "queryLedgerEntries",

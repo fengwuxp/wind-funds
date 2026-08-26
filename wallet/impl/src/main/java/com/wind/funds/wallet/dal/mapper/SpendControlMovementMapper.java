@@ -11,20 +11,22 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 /**
- * SpendControlMovement mapper.
+ * SpendControlMovement 持久化 Mapper。
  *
- * @author Codex
- * @date 2026-06-20
  */
 @Mapper
 public interface SpendControlMovementMapper extends BaseMapper<SpendControlMovement> {
 
     /**
-     * Reads the idempotency winner with a shared current-read lock on MySQL.
-     * H2 ignores the MySQL executable comment and uses its READ_COMMITTED test semantics.
+     * 在 MySQL 上通过共享当前读锁读取幂等竞争胜出记录。
+     * H2 会忽略 MySQL 可执行注释，并使用自身的 READ_COMMITTED 测试语义。
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, movement_sn, tenant_id, movement_type, business_scene, business_sn,
+                   original_movement_sn, transaction_sn, instrument_sn, action, target_subject_id,
+                   target_subject_type, amount, currency, spend_rule_id, spend_rule_version, spend_decision_sn,
+                   spend_decision_result, spend_decision_digest, control_scope_id, period_id, reject_reason,
+                   reason_code, operator_id, audit_reference_sn, movement_digest, description, context_variables
             FROM t_spend_control_movement
             WHERE tenant_id = #{tenantId}
               AND movement_sn = #{movementSn}
@@ -34,10 +36,14 @@ public interface SpendControlMovementMapper extends BaseMapper<SpendControlMovem
                                                           @Param("movementSn") String movementSn);
 
     /**
-     * Reads the current budget projection facts while the target account row is locked.
+     * 在目标账户行已加锁时读取当前预算投影事实。
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, movement_sn, tenant_id, movement_type, business_scene, business_sn,
+                   original_movement_sn, transaction_sn, instrument_sn, action, target_subject_id,
+                   target_subject_type, amount, currency, spend_rule_id, spend_rule_version, spend_decision_sn,
+                   spend_decision_result, spend_decision_digest, control_scope_id, period_id, reject_reason,
+                   reason_code, operator_id, audit_reference_sn, movement_digest, description, context_variables
             FROM t_spend_control_movement
             WHERE tenant_id = #{tenantId}
               AND currency = #{currency}

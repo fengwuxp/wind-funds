@@ -137,7 +137,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String TRANSACTION_SUMMARY_CONTEXT_KEY = "transactionSummary";
 
-    private static final String INSTRUMENT_ID_FIELD = "instrumentId";
+    private static final String INSTRUMENT_SN_FIELD = "instrumentSn";
 
     private static final String INSTRUMENT_TYPE_FIELD = "instrumentType";
 
@@ -151,7 +151,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String CURRENCY_FIELD = "currency";
 
-    private static final String STATUS_FIELD = "status";
+    private static final String STATE_FIELD = "state";
 
     private static final String BINDING_SNAPSHOT_FIELD = "bindingSnapshot";
 
@@ -488,8 +488,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (paymentInstrumentRef == null) {
             return;
         }
-        if (StringUtils.hasText(paymentInstrumentRef.getInstrumentId())) {
-            refs.add("paymentInstrument:" + paymentInstrumentRef.getInstrumentId());
+        if (StringUtils.hasText(paymentInstrumentRef.getInstrumentSn())) {
+            refs.add("paymentInstrument:" + paymentInstrumentRef.getInstrumentSn());
         }
         Map<String, Object> bindingSnapshot = paymentInstrumentRef.getBindingSnapshot();
         Object bindingSn = bindingSnapshot.get(BINDING_SN_FIELD);
@@ -585,7 +585,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         Map<String, Object> summary = new LinkedHashMap<>();
         if (transaction.getState() != null) {
-            summary.put(STATUS_FIELD, transaction.getState().name());
+            summary.put(STATE_FIELD, transaction.getState().name());
         }
         putIfNotNull(summary, AMOUNT_FIELD, transaction.getAmount());
         if (transaction.getCurrency() != null) {
@@ -640,7 +640,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             return;
         }
         Map<String, Object> refValues = new LinkedHashMap<>();
-        putIfText(refValues, INSTRUMENT_ID_FIELD, paymentInstrumentRef.getInstrumentId());
+        putIfText(refValues, INSTRUMENT_SN_FIELD, paymentInstrumentRef.getInstrumentSn());
         putIfText(refValues, INSTRUMENT_TYPE_FIELD, paymentInstrumentRef.getInstrumentType());
         putIfText(refValues, INSTRUMENT_NO_FIELD, paymentInstrumentRef.getInstrumentNo());
         putIfText(refValues, OWNER_ID_FIELD, paymentInstrumentRef.getOwnerId());
@@ -648,7 +648,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         putIfNotNull(refValues, TENANT_ID_FIELD, paymentInstrumentRef.getTenantId());
         putIfText(refValues, CURRENCY_FIELD,
                 paymentInstrumentRef.getCurrency() == null ? null : paymentInstrumentRef.getCurrency().name());
-        putIfText(refValues, STATUS_FIELD, paymentInstrumentRef.getStatus());
+        putIfText(refValues, STATE_FIELD, paymentInstrumentRef.getState());
         refValues.put(BINDING_SNAPSHOT_FIELD, paymentInstrumentRef.getBindingSnapshot());
         putIfText(refValues, DESCRIPTION_FIELD, paymentInstrumentRef.getDescription());
         values.put(PAYMENT_INSTRUMENT_REF_CONTEXT_KEY, Map.copyOf(refValues));

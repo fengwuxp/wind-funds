@@ -53,7 +53,7 @@ class FundsAccountCapabilityAdmissionFlowTests extends FundsTransactionFlowTestS
 
         assertFailedFundsTransactionWithoutLedgerFacts("CAPABILITY_TOPUP_REJECTED");
         String transactionSn = fundsTransactionsByBusinessSn("CAPABILITY_TOPUP_REJECTED").getFirst().getSn();
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs())
                         .as("routeful capability rejection keeps the resolved, unexecuted route")
                         .isNotEmpty());

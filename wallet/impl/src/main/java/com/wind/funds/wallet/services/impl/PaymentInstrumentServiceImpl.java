@@ -37,6 +37,7 @@ import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -51,11 +52,10 @@ import java.util.Objects;
 /**
  * 支付工具服务实现。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
 
     private static final String DEFAULT_CREATE_OPERATOR_ID = "SYSTEM";
@@ -77,6 +77,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrument entity = PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrument(request);
         paymentInstrumentMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建支付工具失败");
+        log.info("支付工具创建完成，等待事务提交，tenantId = {}, instrumentSn = {}, instrumentType = {}, "
+                        + "flowDirection = {}, state = {}, currency = {}",
+                entity.getTenantId(), entity.getSn(), entity.getInstrumentType(), entity.getFlowDirection(),
+                entity.getState(), entity.getCurrency());
         return entity.getId();
     }
 
@@ -93,6 +97,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBindingDTO existing = findBindingByBusinessKey(request);
         if (existing != null) {
             assertSameBinding(request, existing);
+            log.info("支付工具绑定幂等复用，tenantId = {}, instrumentSn = {}, bindingSn = {}, bindingRole = {}, "
+                            + "state = {}, version = {}",
+                    existing.getTenantId(), existing.getInstrumentSn(), existing.getSn(), existing.getBindingRole(),
+                    existing.getState(), existing.getVersion());
             return existing.getId();
         }
         PaymentInstrument instrument = getInstrumentBySn(request.getTenantId(), request.getInstrumentSn());
@@ -108,6 +116,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 createChangeReason(request),
                 request.getValidFrom(),
                 request.getContextVariables());
+        log.info("支付工具绑定创建完成，等待事务提交，tenantId = {}, instrumentSn = {}, bindingSn = {}, "
+                        + "bindingRole = {}, state = {}, version = {}",
+                created.getTenantId(), created.getInstrumentSn(), created.getSn(), created.getBindingRole(),
+                created.getState(), created.getVersion());
         return bindingId;
     }
 
@@ -124,6 +136,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBindingDTO after = copyBinding(before);
         applyBindingChanges(after, request);
         if (sameBindingState(before, after)) {
+            log.info("支付工具绑定无变化，幂等复用，tenantId = {}, instrumentSn = {}, bindingSn = {}, "
+                            + "bindingRole = {}, state = {}, version = {}",
+                    before.getTenantId(), before.getInstrumentSn(), before.getSn(), before.getBindingRole(),
+                    before.getState(), before.getVersion());
             return before.getId();
         }
         after.setVersion(before.getVersion() + 1);
@@ -138,6 +154,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 request.getChangeReason(),
                 request.getEffectiveAt(),
                 request.getContextVariables());
+        log.info("支付工具绑定变更完成，等待事务提交，tenantId = {}, instrumentSn = {}, bindingSn = {}, "
+                        + "bindingRole = {}, previousState = {}, state = {}, version = {}",
+                after.getTenantId(), after.getInstrumentSn(), after.getSn(), after.getBindingRole(), before.getState(),
+                after.getState(), after.getVersion());
         return after.getId();
     }
 
@@ -151,6 +171,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBindingDTO binding = findBindingBySn(request.getTenantId(), request.getBindingSn());
         if (binding == null) {
             assertBindingAlreadyUnbound(request.getTenantId(), request.getBindingSn());
+            log.info("支付工具绑定已解绑，幂等复用，tenantId = {}, bindingSn = {}",
+                    request.getTenantId(), request.getBindingSn());
             return;
         }
         paymentInstrumentBindingService.deletePaymentInstrumentBinding(
@@ -164,6 +186,10 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 request.getChangeReason(),
                 request.getEffectiveAt(),
                 request.getContextVariables());
+        log.info("支付工具解绑完成，等待事务提交，tenantId = {}, instrumentSn = {}, bindingSn = {}, "
+                        + "bindingRole = {}, previousState = {}, version = {}",
+                binding.getTenantId(), binding.getInstrumentSn(), binding.getSn(), binding.getBindingRole(),
+                binding.getState(), binding.getVersion());
     }
 
     private void assertBindingChangeAuditContextPresent(ChangePaymentInstrumentBindingRequest request) {

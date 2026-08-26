@@ -12,17 +12,16 @@ import java.time.LocalDateTime;
 /**
  * 账本余额桶
  *
- * @param accountCode 账户类型
+ * @param ledgerSubjectCode 账目编码
  * @param balance     账本余额
  * @param periodType  余额周期类型
  * @param periodId    周期标识
  * @param activeTime  余额生效时间
  * @param expireTime  余额失效时间，可空 = 永久有效
  * @author wuxp
- * @date 2026-04-24 13:01
  **/
 @Builder
-public record LedgerBalanceBucket(@NonNull LedgerSubjectCode accountCode,
+public record LedgerBalanceBucket(@NonNull LedgerSubjectCode ledgerSubjectCode,
                                   @NonNull Money balance,
                                   @NonNull AccountBalancePeriodType periodType,
                                   @NonNull String periodId,

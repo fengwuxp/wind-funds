@@ -12,6 +12,8 @@ import org.jspecify.annotations.NonNull;
  */
 @Builder
 public record FundsTransactionProjectionExplainQuery(
+        @Schema(description = "租户 ID")
+        @NonNull Long tenantId,
         @Schema(description = "资金交易流水号")
         @NonNull String fundsTransactionSn) {
 }

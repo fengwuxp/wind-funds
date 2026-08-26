@@ -24,7 +24,6 @@ import java.time.LocalTime;
  * 账户账本
  *
  * @author wuxp
- * @date 2026-04-14 09:47
  **/
 @Table(Ledger.TABLE_NAME)
 @Data
@@ -172,7 +171,7 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
     /**
      * 虚拟字段：按正常余额方向计算出的净额余额。
      *
-     * @return normal balance
+     * @return 按正常余额方向计算的净额余额
      */
     public Long getNormalBalance() {
         if (debitAmount == null || creditAmount == null || normalBalanceSide == null) {

@@ -49,8 +49,6 @@ import java.util.stream.Collectors;
 /**
  * 基于 v2 资金主体表和 ledger 投影的账户查询服务。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Service
 @AllArgsConstructor
@@ -338,7 +336,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         Map<LedgerSubjectCode, LedgerBalanceBucket> result = new EnumMap<>(LedgerSubjectCode.class);
         for (LedgerDTO ledger : ledgers) {
             result.put(ledger.getLedgerSubjectCode(), LedgerBalanceBucket.builder()
-                    .accountCode(ledger.getLedgerSubjectCode())
+                    .ledgerSubjectCode(ledger.getLedgerSubjectCode())
                     .balance(Money.immutable(balanceValue(ledger), currency))
                     .periodType(ledger.getPeriodType())
                     .periodId(ledger.getPeriodId())

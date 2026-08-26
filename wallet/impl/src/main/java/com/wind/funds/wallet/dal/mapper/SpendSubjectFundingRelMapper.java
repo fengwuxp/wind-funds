@@ -5,10 +5,8 @@ import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * SpendSubjectFundingRel mapper.
+ * SpendSubjectFundingRel 持久化 Mapper。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Mapper
 public interface SpendSubjectFundingRelMapper extends BaseMapper<SpendSubjectFundingRel> {

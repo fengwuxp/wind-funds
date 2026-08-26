@@ -59,7 +59,7 @@ class FundsBalanceAssertionSupportTests {
                 .setCurrency(CURRENCY)
                 .setInitialized(Boolean.TRUE)
                 .setBalanceBuckets(Map.of(LedgerSubjectCode.AVAILABLE, LedgerBalanceBucket.builder()
-                        .accountCode(LedgerSubjectCode.AVAILABLE)
+                        .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                         .balance(Money.immutable(amount, CURRENCY))
                         .periodType(periodType)
                         .periodId(periodId)

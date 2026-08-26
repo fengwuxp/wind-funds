@@ -97,7 +97,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         completeAuthorization(user, 20L, authorizationSn, "MIG05_AUTH_FIRST_COMPLETE");
         assertSingleFundsAndLedgerFactsForBusinessSn("MIG05_AUTH_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("MIG05_AUTH_FIRST_COMPLETE", 0, 2, 1, 2);
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, authorizationSn))
                 .hasValueSatisfying(snapshot -> assertThat(snapshot.getLegs()).singleElement());
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
@@ -282,7 +282,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getCompletedAmount()).isZero();
         assertThat(transaction.getDeclinedAmount()).isZero();
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, authorizationSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs()).isEmpty());
 
         assertThat(fundsTransactionDetails(authorizationSn))
@@ -1429,7 +1429,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(transaction.getCompletedAmount()).isZero();
         assertThat(transaction.getRefundedAmount()).isZero();
         assertThat(transaction.getDeclinedAmount()).isZero();
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(declinedSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, declinedSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs()).isEmpty());
 
         assertThat(fundsTransactionDetails(declinedSn))
@@ -1750,7 +1750,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         String authorizationSn = authorize(user, 80L, true, "AUTH_PARTIAL_REVERSAL_COMPLETE_AUTHORIZE");
         String authorizationLegId = "AUTHORIZATION_1";
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, authorizationSn))
                 .hasValueSatisfying(snapshot -> assertThat(snapshot.getLegs())
                         .singleElement()
                         .satisfies(leg -> assertThat(leg.getLegId()).isEqualTo(authorizationLegId)));
@@ -1826,7 +1826,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
-        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, authorizationSn,
                 FundsTransactionEventType.REVERSAL, authorizationLegId, CURRENCY).getAmount()).isEqualTo(30L);
 
         LedgerTransaction completeTransaction = ledgerTransactionByBusinessSn(
@@ -1854,7 +1854,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
-        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, authorizationSn,
                 FundsTransactionEventType.COMPLETE, authorizationLegId, CURRENCY).getAmount()).isEqualTo(50L);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_COMPLETE_AUTHORIZE", 1, 2);
@@ -2167,7 +2167,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(parentAccount), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(parentAccount), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, authorizationSn))
                 .as("authorization route snapshot should carry account hierarchy")
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getParticipants())
@@ -2702,7 +2702,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
                 .toList())
                 .containsOnly(authorizationTransaction.getSn());
-        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(authorizationSn,
+        assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, authorizationSn,
                 FundsTransactionEventType.AUTH_REFUND, authorizationLegId, CURRENCY).getAmount()).isEqualTo(60L);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
@@ -4058,7 +4058,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     private void assertNoAuthRefundRouteCode(String transactionSn) {
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getRouteCode())
                         .isEqualTo(FundsRouteCodes.AUTHORIZATION_NO_AUTH_REFUND_STANDARD)
                         .isNotEqualTo(FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY));
@@ -4273,7 +4273,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(releaseLedger.getAmount()).isEqualTo(releaseAmount);
         assertThat(releaseLedger.getCurrency()).isEqualTo(CURRENCY);
         assertThat(releaseLedger.getReferenceLedgerTransactionSn()).isEqualTo(authorizationLedger.getSn());
-        var authorizationRoute = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn)
+        var authorizationRoute = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                        TENANT_ID, authorizationSn)
                 .orElseThrow();
         List<FundsTransactionDetail> releaseDetails = fundsTransactionDetailsByBusinessSn(releaseBusinessSn).stream()
                 .filter(detail -> authorizationSn.equals(detail.getTransactionSn()))

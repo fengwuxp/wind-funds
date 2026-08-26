@@ -41,7 +41,6 @@ import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.application.impl.FundsBenefitContributionTransactionServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsClearingTransactionServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsSettlementTransactionServiceImpl;
@@ -1053,7 +1052,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         List<LedgerPostingPlan> postingPlans = postingPlansOf(ledgerTransaction);
         List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot must explain ledger facts for businessSn %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
@@ -1084,7 +1083,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     private void assertReadableRouteSnapshot(String transactionSn, String businessSn) {
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn))
                 .as("funds transaction route snapshot must be readable for businessSn %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> assertRouteSnapshotIdentity(routeSnapshot, businessSn));
     }
@@ -1120,12 +1119,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected FundsTransactionDTO fundsTransaction(String transactionSn) {
-        return fundsTransactionQueryService.queryFundsTransaction(transactionSn)
+        return fundsTransactionQueryService.findFundsTransactionBySn(TENANT_ID, transactionSn)
                 .orElseThrow(() -> new AssertionError("funds transaction not found: " + transactionSn));
     }
 
     protected List<FundsTransactionDetailDTO> fundsTransactionDetails(String transactionSn) {
-        return fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
+        return fundsTransactionQueryService.queryFundsTransactionDetails(TENANT_ID, transactionSn);
     }
 
     protected void assertPrimaryActionFacts(String businessScene,
@@ -1461,7 +1460,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         Map<LedgerSubjectCode, LedgerBalanceBucket> result = new EnumMap<>(LedgerSubjectCode.class);
         findLedgers(accountId).forEach(ledger -> result.put(ledger.getLedgerSubjectCode(),
                 LedgerBalanceBucket.builder()
-                        .accountCode(ledger.getLedgerSubjectCode())
+                        .ledgerSubjectCode(ledger.getLedgerSubjectCode())
                         .balance(Money.immutable(ledger.getNormalBalance(), CURRENCY))
                         .periodType(ledger.getPeriodType())
                         .periodId(ledger.getPeriodId())
@@ -1615,7 +1614,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
-            FundsBenefitContributionTransactionServiceImpl.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             FundsClearingTransactionServiceImpl.class,

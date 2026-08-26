@@ -64,8 +64,6 @@ import java.util.TreeMap;
 /**
  * 默认资金指令业务生命周期保存服务。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Service
 @AllArgsConstructor
@@ -154,9 +152,10 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                         transaction.getExternalFundsFactDigest(), instruction),
                 "外部资金事实请求参数不一致，transactionSn = {}", transaction.getSn());
         AssertUtils.isTrue(transaction.getState() == FundsTransactionState.CLOSED,
-                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                "外部资金事实尚未成功完成，transactionSn = {}，state = {}",
                 transaction.getSn(), transaction.getState());
-        List<FundsTransactionDetail> details = findTransactionDetails(transaction.getSn());
+        List<FundsTransactionDetail> details = findTransactionDetails(
+                instruction.getTenantId(), transaction.getSn());
         AssertUtils.notEmpty(details, "外部资金事实缺少交易明细，transactionSn = {}", transaction.getSn());
         AssertUtils.isTrue(details.stream().allMatch(this::isCompletedDetail),
                 "外部资金事实交易明细尚未完成，transactionSn = {}", transaction.getSn());
@@ -187,11 +186,13 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     public void markSucceeded(@NonNull FundsInstructionSpec instruction,
                               @NonNull FundsInstructionLifecycleResult result,
                               @Nullable String ledgerTransactionSn) {
-        List<FundsTransactionDetail> details = findDetailsBySn(result.getTransactionDetailSns());
+        List<FundsTransactionDetail> details = findDetailsBySn(
+                instruction.getTenantId(), result.getTransactionDetailSns());
         if (details.stream().allMatch(this::isCompletedDetail)) {
             return;
         }
-        FundsTransaction transaction = findTransactionBySn(result.getTransactionSn());
+        FundsTransaction transaction = findTransactionBySn(
+                instruction.getTenantId(), result.getTransactionSn());
         assertSucceededSummaryAllowed(transaction, details);
         for (FundsTransactionDetail detail : details) {
             detail.setState(resolveCompletedDetailState(detail));
@@ -212,7 +213,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     public void markFailed(@NonNull FundsInstructionSpec instruction,
                            @NonNull FundsInstructionLifecycleResult result,
                            @NonNull Throwable cause) {
-        List<FundsTransactionDetail> details = findDetailsBySn(result.getTransactionDetailSns());
+        List<FundsTransactionDetail> details = findDetailsBySn(
+                instruction.getTenantId(), result.getTransactionDetailSns());
         if (details.stream().allMatch(this::isCompletedDetail)) {
             return;
         }
@@ -224,7 +226,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                     "更新资金交易明细失败状态失败，sn = {}", detail.getSn());
         }
 
-        FundsTransaction transaction = findTransactionBySn(result.getTransactionSn());
+        FundsTransaction transaction = findTransactionBySn(
+                instruction.getTenantId(), result.getTransactionSn());
         if (!isStableTransactionState(transaction.getState())) {
             transaction.setState(FundsTransactionState.FAILED);
         }
@@ -290,7 +293,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 || !isFundsTransactionReference(reference.getReferenceType())) {
             return null;
         }
-        return findTransactionBySnNullable(reference.getReferenceSn());
+        return findTransactionBySnNullable(instruction.getTenantId(), reference.getReferenceSn());
     }
 
     private boolean requiresStandaloneTransaction(FundsInstructionSpec instruction) {
@@ -440,10 +443,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 instruction.getExternalFundsEffectType());
     }
 
-    private List<FundsTransactionDetail> findTransactionDetails(String transactionSn) {
+    private List<FundsTransactionDetail> findTransactionDetails(Long tenantId, String transactionSn) {
         FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
-                .where(ref.transactionSn.eq(transactionSn));
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.transactionSn.eq(transactionSn));
         return fundsTransactionDetailMapper.selectListByQuery(wrapper);
     }
 
@@ -479,31 +483,35 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return fundsTransactionDetailMapper.selectListByQuery(wrapper);
     }
 
-    private FundsTransaction findTransactionBySn(String sn) {
-        FundsTransaction result = findTransactionBySnNullable(sn);
+    private FundsTransaction findTransactionBySn(Long tenantId, String sn) {
+        FundsTransaction result = findTransactionBySnNullable(tenantId, sn);
         AssertUtils.notNull(result, "资金交易聚合记录不存在，sn = {}", sn);
         return result;
     }
 
-    private FundsTransaction findTransactionBySnNullable(String sn) {
+    private FundsTransaction findTransactionBySnNullable(Long tenantId, String sn) {
         FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(sn));
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn));
         return fundsTransactionMapper.selectOneByQuery(wrapper);
     }
 
-    private FundsTransactionDetail findDetailBySn(String sn) {
+    private FundsTransactionDetail findDetailBySn(Long tenantId, String sn) {
         FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(sn));
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn));
         FundsTransactionDetail result = fundsTransactionDetailMapper.selectOneByQuery(wrapper);
         AssertUtils.notNull(result, "资金交易生命周期明细不存在，sn = {}", sn);
         return result;
     }
 
-    private List<FundsTransactionDetail> findDetailsBySn(List<String> sns) {
+    private List<FundsTransactionDetail> findDetailsBySn(Long tenantId, List<String> sns) {
         AssertUtils.notEmpty(sns, "资金交易明细流水不能为空");
         List<FundsTransactionDetail> result = new ArrayList<>(sns.size());
         for (String sn : sns) {
-            result.add(findDetailBySn(sn));
+            result.add(findDetailBySn(tenantId, sn));
         }
         return result;
     }
@@ -542,7 +550,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (Objects.equals(reference.getReferenceSn(), transaction.getSn())) {
             return;
         }
-        FundsTransaction referencedTransaction = findTransactionBySn(reference.getReferenceSn());
+        FundsTransaction referencedTransaction = findTransactionBySn(
+                instruction.getTenantId(), reference.getReferenceSn());
         applyRefundedSummary(referencedTransaction, resolvePrimaryAmount(details), 0L);
         AssertUtils.isTrue(fundsTransactionMapper.update(referencedTransaction) == 1,
                 "更新引用资金交易聚合状态失败，sn = {}", referencedTransaction.getSn());

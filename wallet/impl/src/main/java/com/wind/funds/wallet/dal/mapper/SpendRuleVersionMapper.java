@@ -5,10 +5,8 @@ import com.wind.funds.wallet.dal.entities.SpendRuleVersion;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * SpendRuleVersion mapper.
+ * SpendRuleVersion 持久化 Mapper。
  *
- * @author Codex
- * @date 2026-06-22
  */
 @Mapper
 public interface SpendRuleVersionMapper extends BaseMapper<SpendRuleVersion> {

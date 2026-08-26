@@ -116,7 +116,7 @@ class FundsAccountBalanceContractTests {
 
     private static LedgerBalanceBucket bucket(LedgerSubjectCode subjectCode, long amount) {
         return LedgerBalanceBucket.builder()
-                .accountCode(subjectCode)
+                .ledgerSubjectCode(subjectCode)
                 .balance(Money.immutable(amount, CURRENCY))
                 .periodType(AccountBalancePeriodType.LIFETIME)
                 .periodId(AccountBalancePeriodType.LIFETIME.name())

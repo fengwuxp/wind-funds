@@ -13,7 +13,8 @@ import org.apache.ibatis.annotations.Select;
 public interface ProjectionReplayDifferenceMapper extends BaseMapper<ProjectionReplayDifference> {
 
     @Select("""
-            SELECT * FROM t_projection_replay_difference
+            SELECT id, gmt_create, gmt_modified, tenant_id, task_sn, source_sn, field_name, expected_value,
+                   actual_value FROM t_projection_replay_difference
             WHERE tenant_id = #{tenantId} AND task_sn = #{taskSn}
               AND source_sn = #{sourceSn} AND field_name = #{fieldName}
             """)

@@ -1742,10 +1742,12 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         JsonNode paymentInstrumentRef = jsonObject(routeSnapshotJson(businessSn))
                 .path("paymentInstrumentRef");
         assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
-        assertThat(paymentInstrumentRef.path("instrumentId").asString()).isEqualTo(PAYMENT_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.path("instrumentSn").asString()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(paymentInstrumentRef.path("instrumentType").asString()).isEqualTo("CARD");
         assertThat(paymentInstrumentRef.path("currency").asString()).isEqualTo(CurrencyIsoCode.USD.name());
-        assertThat(paymentInstrumentRef.path("status").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
+        assertThat(paymentInstrumentRef.path("state").asString()).isEqualTo(FundsAccountState.ACTIVE.name());
+        assertThat(paymentInstrumentRef.has("instrumentId")).isFalse();
+        assertThat(paymentInstrumentRef.has("status")).isFalse();
 
         JsonNode bindingSnapshot = paymentInstrumentRef.path("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
@@ -1806,6 +1808,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     private void assertAuthorizationProjectionInstrumentExplanation(String authorizationSn) {
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(authorizationSn)
                         .build());
 
@@ -1823,11 +1826,12 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
         Map<String, Object> paymentInstrumentRef = (Map<String, Object>) explanation.payload()
                 .get("paymentInstrumentRef");
         assertThat(paymentInstrumentRef)
-                .containsEntry("instrumentId", PAYMENT_INSTRUMENT_SN)
+                .containsEntry("instrumentSn", PAYMENT_INSTRUMENT_SN)
                 .containsEntry("instrumentType", "CARD")
                 .containsEntry("instrumentNo", "****2468")
                 .containsEntry("currency", CurrencyIsoCode.USD.name())
-                .containsEntry("status", FundsAccountState.ACTIVE.name());
+                .containsEntry("state", FundsAccountState.ACTIVE.name())
+                .doesNotContainKeys("instrumentId", "status");
         assertThat(paymentInstrumentRef)
                 .doesNotContainKey("externalInstrumentId");
         assertThat(paymentInstrumentRef.toString()).doesNotContain("tok_auth_admission_2468");
@@ -1846,6 +1850,7 @@ class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServic
     private void assertAuthorizationProjectionSpendRuleExplanation(String authorizationSn) {
         FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
                 FundsTransactionProjectionExplainQuery.builder()
+                        .tenantId(TENANT_ID)
                         .fundsTransactionSn(authorizationSn)
                         .build());
 

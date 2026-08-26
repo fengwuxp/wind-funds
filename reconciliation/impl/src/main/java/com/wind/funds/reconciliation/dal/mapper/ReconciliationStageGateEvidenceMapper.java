@@ -17,7 +17,10 @@ import org.apache.ibatis.annotations.Select;
 public interface ReconciliationStageGateEvidenceMapper extends BaseMapper<ReconciliationStageGateEvidence> {
 
     @Select("""
-            SELECT * FROM t_reconciliation_stage_gate_evidence
+            SELECT id, gmt_create, sn, tenant_id, stage_kind, stage_identity_owner_namespace, stage_identity_value,
+                   requirement_identity_owner_namespace, requirement_identity_value, requirement_version,
+                   requirement_semantic_digest, requirement_evidence_bundle_digest, consumed_pair_evidence,
+                   decision_digest, evidence_refs, created_by FROM t_reconciliation_stage_gate_evidence
             WHERE tenant_id = #{tenantId}
               AND stage_kind = #{stageKind}
               AND stage_identity_owner_namespace = #{stageIdentityOwnerNamespace}
@@ -30,7 +33,10 @@ public interface ReconciliationStageGateEvidenceMapper extends BaseMapper<Reconc
             @Param("stageIdentityValue") String stageIdentityValue);
 
     @Select("""
-            SELECT * FROM t_reconciliation_stage_gate_evidence
+            SELECT id, gmt_create, sn, tenant_id, stage_kind, stage_identity_owner_namespace, stage_identity_value,
+                   requirement_identity_owner_namespace, requirement_identity_value, requirement_version,
+                   requirement_semantic_digest, requirement_evidence_bundle_digest, consumed_pair_evidence,
+                   decision_digest, evidence_refs, created_by FROM t_reconciliation_stage_gate_evidence
             WHERE tenant_id = #{tenantId} AND sn = #{sn}
             """)
     ReconciliationStageGateEvidence selectBySn(@Param("tenantId") Long tenantId,

@@ -49,13 +49,15 @@ public interface FundsTransactionQueryService {
     Optional<FundsActionFactDTO> findFundsActionFact(@NonNull FundsActionFactRef ref);
 
     /**
-     * 查询主交易事实。
+     * 按租户和交易流水号查询主交易事实。
      *
+     * @param tenantId 租户 ID
      * @param transactionSn 资金交易流水号
      * @return 已保存主交易；不存在时返回 empty
      */
     @NonNull
-    Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn);
+    Optional<FundsTransactionDTO> findFundsTransactionBySn(@NonNull Long tenantId,
+                                                           @NonNull String transactionSn);
 
     /**
      * 按业务场景和业务流水查询主交易事实。
@@ -97,11 +99,13 @@ public interface FundsTransactionQueryService {
      *
      * <p>按主键升序返回该交易下已有主体明细；不存在明细时返回空列表。</p>
      *
+     * @param tenantId 租户 ID
      * @param transactionSn 资金交易流水号
      * @return 交易明细事实列表
      */
     @NonNull
-    List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull String transactionSn);
+    List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull Long tenantId,
+                                                                 @NonNull String transactionSn);
 
     /**
      * 判断指定 replay leg 是否已被成功消费。
@@ -109,12 +113,14 @@ public interface FundsTransactionQueryService {
      * <p>能力范围：用于 `REPLAY_ONCE` 幂等边界。实现侧应基于成功的交易明细或账本交易事实判断，
      * 不依赖当前 RouteResolver 重新推导。</p>
      *
+     * @param tenantId 租户 ID
      * @param referenceTransactionSn 原资金交易流水号
      * @param eventType 本次 replay 事件语义
      * @param replayRefLegId 原 RouteLeg ID
      * @return true 表示同一原 RouteLeg 已在该 replay 事件下成功消费
      */
-    boolean hasConsumedReplayLeg(@NonNull String referenceTransactionSn,
+    boolean hasConsumedReplayLeg(@NonNull Long tenantId,
+                                 @NonNull String referenceTransactionSn,
                                  @NonNull FundsTransactionEventType eventType,
                                  @NonNull String replayRefLegId);
 
@@ -124,6 +130,7 @@ public interface FundsTransactionQueryService {
      * <p>能力范围：用于后续退款、手续费退回、拒付等 replay 累计上限校验。实现侧应基于成功的交易明细或
      * 账本交易事实判断，并按原 RouteLeg 去重，避免同一 replay 生成的多主体明细重复累计。</p>
      *
+     * @param tenantId 租户 ID
      * @param referenceTransactionSn 原资金交易流水号
      * @param eventType 本次 replay 事件语义
      * @param replayRefLegId 原 RouteLeg ID
@@ -131,7 +138,8 @@ public interface FundsTransactionQueryService {
      * @return 已成功消费金额；不存在时返回 0
      */
     @NonNull
-    Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+    Money sumConsumedReplayLegAmount(@NonNull Long tenantId,
+                                     @NonNull String referenceTransactionSn,
                                      @NonNull FundsTransactionEventType eventType,
                                      @NonNull String replayRefLegId,
                                      @NonNull CurrencyIsoCode currency);
@@ -142,6 +150,7 @@ public interface FundsTransactionQueryService {
      * <p>用于路由解析阶段做来源级剩余额度校验，同时允许同一 `businessScene + businessSn`
      * 的幂等重试继续进入生命周期记录器做请求摘要一致性校验。</p>
      *
+     * @param tenantId 租户 ID
      * @param referenceTransactionSn 原资金交易或冻结单流水号
      * @param eventType 本次 replay 或引用消费事件语义
      * @param replayRefLegId 原 RouteLeg ID
@@ -151,7 +160,8 @@ public interface FundsTransactionQueryService {
      * @return 已成功消费金额；不存在时返回 0
      */
     @NonNull
-    default Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+    default Money sumConsumedReplayLegAmount(@NonNull Long tenantId,
+                                             @NonNull String referenceTransactionSn,
                                              @NonNull FundsTransactionEventType eventType,
                                              @NonNull String replayRefLegId,
                                              @NonNull CurrencyIsoCode currency,
@@ -159,7 +169,7 @@ public interface FundsTransactionQueryService {
                                              @Nullable String excludedBusinessSn) {
         AssertUtils.isFalse(StringUtils.hasText(excludedBusinessScene) || StringUtils.hasText(excludedBusinessSn),
                 "带排除参数的 replay 消费金额查询必须由实现类显式支持");
-        return sumConsumedReplayLegAmount(referenceTransactionSn, eventType, replayRefLegId, currency);
+        return sumConsumedReplayLegAmount(tenantId, referenceTransactionSn, eventType, replayRefLegId, currency);
     }
 
     /**
@@ -168,11 +178,13 @@ public interface FundsTransactionQueryService {
      * <p>能力范围：按资金交易流水号读取该交易首次解析得到的路径快照，用于后续撤销、结算、
      * 退款或拒付沿原路径回放。不负责生成新路径，也不负责校验可撤销或可退款金额。</p>
      *
+     * @param tenantId 租户 ID
      * @param transactionSn 资金交易流水号
      * @return 已保存路径快照；不存在或未保存时返回 empty
      */
     @NonNull
-    Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn);
+    Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull Long tenantId,
+                                                                 @NonNull String transactionSn);
 
     /**
      * 通过冻结单号查询原冻结动作对应的 RouteSnapshot。
@@ -181,9 +193,11 @@ public interface FundsTransactionQueryService {
      * 再返回该资金交易保存的路径快照，用于沿原冻结路径释放。若冻结单不存在、未绑定交易号、
      * 或交易未保存 RouteSnapshot，则返回 empty。</p>
      *
+     * @param tenantId 租户 ID
      * @param freezeOrderSn 冻结单号
      * @return 原冻结路径快照；不存在时返回 empty
      */
     @NonNull
-    Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn);
+    Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull Long tenantId,
+                                                                 @NonNull String freezeOrderSn);
 }

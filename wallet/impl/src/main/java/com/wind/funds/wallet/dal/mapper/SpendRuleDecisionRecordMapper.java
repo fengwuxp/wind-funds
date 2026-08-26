@@ -5,10 +5,8 @@ import com.wind.funds.wallet.dal.entities.SpendRuleDecisionRecord;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * SpendRuleDecisionRecord mapper.
+ * SpendRuleDecisionRecord 持久化 Mapper。
  *
- * @author Codex
- * @date 2026-06-22
  */
 @Mapper
 public interface SpendRuleDecisionRecordMapper extends BaseMapper<SpendRuleDecisionRecord> {

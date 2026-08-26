@@ -38,7 +38,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Verifier for DSL JSON contract samples.
+ * DSL JSON 契约样例校验器。
  */
 final class FundsDslJsonContractVerifier {
 

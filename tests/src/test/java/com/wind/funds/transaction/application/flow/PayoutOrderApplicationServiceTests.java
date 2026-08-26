@@ -11,7 +11,7 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutNextAction;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
@@ -155,6 +155,41 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_payout_receipt WHERE payout_order_sn = ?", Integer.class, payout.getSn()))
                 .isEqualTo(3);
+    }
+
+    @Test
+    void testReceiptDigestShouldUseStateKey() {
+        FundsAccountId accountId = fundingAccount("payout_digest_merchant");
+        PayoutOrderDTO payout = newSubmittedPayout(accountId, 180L, "digest-state");
+        HandlePayoutReceiptRequest request = receipt(
+                payout, PayoutOrderState.ACCEPTED, 180L, "digest-state", "external-digest-state");
+
+        payoutOrderApplicationService.handleReceipt(request, WindOperatorFactory.system());
+
+        String actualDigest = jdbcTemplate.queryForObject(
+                "SELECT normalized_receipt_digest FROM t_payout_receipt WHERE payout_order_sn = ?",
+                String.class, payout.getSn());
+        String expectedDigest = FundsStableHashSupport.sha256Json(Map.of(
+                "tenantId", request.getTenantId(),
+                "payoutOrderSn", request.getPayoutOrderSn(),
+                "channelRef", request.getChannelRef(),
+                "externalReceiptRef", request.getExternalReceiptRef(),
+                "externalReference", request.getExternalReference(),
+                "state", request.getState().name(),
+                "amount", request.getAmount(),
+                "currency", request.getCurrency().name(),
+                "sourceReceiptDigest", request.getSourceReceiptDigest()));
+        String legacyDigest = FundsStableHashSupport.sha256Json(Map.of(
+                "tenantId", request.getTenantId(),
+                "payoutOrderSn", request.getPayoutOrderSn(),
+                "channelRef", request.getChannelRef(),
+                "externalReceiptRef", request.getExternalReceiptRef(),
+                "externalReference", request.getExternalReference(),
+                "status", request.getState().name(),
+                "amount", request.getAmount(),
+                "currency", request.getCurrency().name(),
+                "sourceReceiptDigest", request.getSourceReceiptDigest()));
+        assertThat(actualDigest).isEqualTo(expectedDigest).isNotEqualTo(legacyDigest);
     }
 
     @Test
@@ -469,7 +504,7 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                         .setJurisdiction("TEST")
                         .setVerifiedAt(LocalDate.now())
                         .setConfirmedBy("test-owner")
-                        .setStatus(ExternalRuleVerificationStatus.VERIFIED));
+                        .setVerificationResult(ExternalRuleVerificationResult.VERIFIED));
     }
 
     private ReleaseSettlementOrderRequest releaseRequest(SettlementOrderDTO settlement, String suffix) {

@@ -967,7 +967,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_PAY", 2, 2);
 
         clearFundsTransactionRouteSnapshot(payTransactionSn);
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(payTransactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, payTransactionSn))
                 .as("original direct pay route snapshot must be absent before replay refund")
                 .isEmpty();
         LedgerFactSnapshot afterCorruptedReferenceFacts = ledgerFactSnapshot();
@@ -1774,10 +1774,10 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         enrichFundsTransactionRouteSnapshot(payTransactionSn, Map.of(
                 "paymentInstrumentRef", paymentInstrumentSnapshot("CARD-OLD", "BINDING-OLD", "v1"),
                 "routingDecision", routingDecisionSnapshot()));
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(payTransactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, payTransactionSn))
                 .as("original direct pay route snapshot must carry historical attribution")
                 .hasValueSatisfying(routeSnapshot -> {
-                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentSn()).isEqualTo("CARD-OLD");
                     assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
                             .containsEntry("bindingId", "BINDING-OLD")
                             .containsEntry("bindingVersion", "v1");
@@ -4905,7 +4905,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     private void assertDirectRouteSnapshotCarriesMetadata(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("direct route snapshot metadata for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getTenantId()).isEqualTo(TENANT_ID);
@@ -4930,7 +4930,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     private void assertDirectRouteSnapshotKeepsContextMinimal(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("direct route snapshot context for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getContextVariables())
                         .as("direct route snapshot must not carry request context variables for %s", businessSn)
@@ -4939,7 +4939,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private RouteSnapshotSpec routeSnapshot(String businessSn) {
         String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
-        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn)
+        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn)
                 .orElseThrow(() -> new AssertionError("missing route snapshot for businessSn " + businessSn));
     }
 
@@ -4986,7 +4986,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .as("original direct pay refunded amount")
                 .isEqualTo(refundAmount);
         RouteSnapshotSpec payRouteSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(payTransactionSn)
+                .findRouteSnapshotByTransactionSn(TENANT_ID, payTransactionSn)
                 .orElseThrow();
         List<RouteLegSpec> replayablePrincipalLegs = payRouteSnapshot.getLegs().stream()
                 .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
@@ -4998,7 +4998,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(refundRouteSnapshot.getLegs()).singleElement().satisfies(refundLeg -> {
             String sourceLegId = replayablePrincipalLegs.getFirst().getLegId();
             assertThat(refundLeg.getReplayRefLegId()).isEqualTo(sourceLegId);
-            assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(payTransactionSn,
+            assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, payTransactionSn,
                     FundsTransactionEventType.REFUND, sourceLegId, refundLeg.getAmount().getCurrency()).getAmount())
                     .isEqualTo(refundAmount);
         });
@@ -5206,22 +5206,21 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         }
     }
 
-    private Map<String, Object> paymentInstrumentSnapshot(String instrumentId,
+    private Map<String, Object> paymentInstrumentSnapshot(String instrumentSn,
                                                           String bindingId,
                                                           String bindingVersion) {
         Map<String, Object> bindingSnapshot = new LinkedHashMap<>();
         bindingSnapshot.put("bindingId", bindingId);
         bindingSnapshot.put("bindingVersion", bindingVersion);
-        bindingSnapshot.put("bindingStatus", "ACTIVE");
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("instrumentId", instrumentId);
+        result.put("instrumentSn", instrumentSn);
         result.put("instrumentType", "CARD");
         result.put("instrumentNo", "**** 4242");
         result.put("ownerId", "funding_user");
         result.put("ownerType", "USER");
         result.put("tenantId", TENANT_ID);
         result.put("currency", CURRENCY.name());
-        result.put("status", "ACTIVE");
+        result.put("state", "ACTIVE");
         result.put("bindingSnapshot", bindingSnapshot);
         result.put("description", "historical payment instrument snapshot");
         return result;
@@ -5243,7 +5242,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(routeSnapshot(businessSn))
                 .as("referenced refund route snapshot must keep historical instrument and funding attribution")
                 .satisfies(routeSnapshot -> {
-                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentSn()).isEqualTo("CARD-OLD");
                     assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
                             .containsEntry("bindingId", "BINDING-OLD")
                             .containsEntry("bindingVersion", "v1");
@@ -5279,7 +5278,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(detail.getGmtModified()).isAfterOrEqualTo(detail.getGmtCreate());
                     assertThat(detail.getRequestHash()).isNotBlank();
                 });
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("failed direct route snapshot identity must follow transaction for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getTenantId()).isEqualTo(TENANT_ID);
@@ -5301,7 +5300,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerPostingPlan::getRouteLegId)
                 .toList();
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot for direct transaction %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
@@ -5337,7 +5336,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
         List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(businessSn);
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot participants must explain funds transaction details for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> assertThat(details.stream()
                         .map(DirectRouteParticipantKey::from)
@@ -5361,7 +5360,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
         List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot for direct transaction %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> postingPlansOf(ledgerTransaction).forEach(plan -> {
                     RouteLegSpec routeLeg = directRouteLegById(routeSnapshot.getLegs(), plan.getRouteLegId());
@@ -5529,7 +5528,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .as("ledger entry businessScene must follow funds transaction for %s", businessSn)
                 .extracting(LedgerEntry::getBusinessScene)
                 .containsOnly(transaction.getBusinessScene());
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot businessScene must follow funds transaction for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getBusinessScene())
                         .isEqualTo(transaction.getBusinessScene()));
@@ -5570,7 +5569,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     }
                     assertThat(detail.getCurrency()).isEqualTo(transaction.getCurrency());
                 });
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getSn()))
                 .as("route snapshot identity must follow funds transaction for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());

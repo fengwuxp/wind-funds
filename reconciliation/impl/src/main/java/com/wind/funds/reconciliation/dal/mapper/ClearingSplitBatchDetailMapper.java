@@ -16,7 +16,8 @@ import java.util.List;
 public interface ClearingSplitBatchDetailMapper extends BaseMapper<ClearingSplitBatchDetail> {
 
     @Select("""
-            SELECT * FROM t_clearing_split_batch_detail
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, split_batch_sn, splittable_detail_sn,
+                   active_splittable_detail_sn, created_by FROM t_clearing_split_batch_detail
             WHERE tenant_id = #{tenantId} AND split_batch_sn = #{splitBatchSn}
             ORDER BY splittable_detail_sn
             """)

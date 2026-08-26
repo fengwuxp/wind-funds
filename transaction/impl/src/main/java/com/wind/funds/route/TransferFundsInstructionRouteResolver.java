@@ -227,7 +227,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 "提现必须引用冻结单");
         AssertUtils.hasText(reference.getReferenceSn(), "提现必须引用冻结单");
         Optional<RouteSnapshotSpec> routeSnapshot =
-                fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
+                fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(
+                        instruction.getTenantId(), reference.getReferenceSn());
         AssertUtils.isTrue(routeSnapshot.isPresent(),
                 "提现引用冻结单不存在或缺少原冻结路径，referenceSn = {}", reference.getReferenceSn());
         RouteSnapshotSpec snapshot = routeSnapshot.get();
@@ -248,7 +249,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         Money freezeAmount = freezeLeg.getAmount();
         AssertUtils.isTrue(instruction.getAmount().getCurrency() == freezeAmount.getCurrency(),
                 "提现引用冻结单币种与请求金额不一致，referenceSn = {}", reference.getReferenceSn());
-        long totalUsedAmount = sumFreezeOrderUsedAmount(reference.getReferenceSn(), freezeAmount);
+        long totalUsedAmount = sumFreezeOrderUsedAmount(
+                instruction.getTenantId(), reference.getReferenceSn(), freezeAmount);
         long usedAmount = sumFreezeOrderUsedAmount(instruction, reference.getReferenceSn(), freezeAmount);
         if (totalUsedAmount > usedAmount) {
             return;
@@ -259,12 +261,12 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 reference.getReferenceSn(), remainingAmount, instruction.getAmount().getAmount());
     }
 
-    private long sumFreezeOrderUsedAmount(String freezeOrderSn, Money freezeAmount) {
-        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+    private long sumFreezeOrderUsedAmount(Long tenantId, String freezeOrderSn, Money freezeAmount) {
+        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(tenantId, freezeOrderSn,
                 FundsTransactionEventType.WITHDRAW,
                 FundsRouteLegIds.FREEZE,
                 freezeAmount.getCurrency());
-        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(tenantId, freezeOrderSn,
                 FundsTransactionEventType.UNFREEZE,
                 FundsRouteLegIds.FREEZE,
                 freezeAmount.getCurrency());
@@ -272,13 +274,15 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     }
 
     private long sumFreezeOrderUsedAmount(FundsInstructionSpec instruction, String freezeOrderSn, Money freezeAmount) {
-        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
+                instruction.getTenantId(), freezeOrderSn,
                 FundsTransactionEventType.WITHDRAW,
                 FundsRouteLegIds.FREEZE,
                 freezeAmount.getCurrency(),
                 instruction.getBusinessScene(),
                 instruction.getBusinessSn());
-        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
+                instruction.getTenantId(), freezeOrderSn,
                 FundsTransactionEventType.UNFREEZE,
                 FundsRouteLegIds.FREEZE,
                 freezeAmount.getCurrency(),

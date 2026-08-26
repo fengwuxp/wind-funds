@@ -123,12 +123,12 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
         });
 
         RouteSnapshotSpec freezeSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByFreezeOrderSn(freezeSn)
+                .findRouteSnapshotByFreezeOrderSn(TENANT_ID, freezeSn)
                 .orElseThrow();
         assertThat(freezeSnapshot.getLegs()).singleElement();
         String releaseSn = frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getSn();
         RouteSnapshotSpec releaseSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByFreezeOrderSn(releaseSn)
+                .findRouteSnapshotByFreezeOrderSn(TENANT_ID, releaseSn)
                 .orElseThrow();
         assertThat(releaseSnapshot.getLegs()).singleElement().satisfies(releaseLeg ->
                 assertThat(releaseLeg.getReplayRefLegId()).isEqualTo(freezeSnapshot.getLegs().getFirst().getLegId()));

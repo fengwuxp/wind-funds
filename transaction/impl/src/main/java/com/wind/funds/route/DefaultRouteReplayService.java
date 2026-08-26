@@ -116,7 +116,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .operator(instruction.getOperator())
                 .contextVariables(replayContext)
                 .build();
-        assertReplayLegAmountNotOverConsumed(instruction.getReference(), snapshot, replayRequest);
+        assertReplayLegAmountNotOverConsumed(
+                instruction.getTenantId(), instruction.getReference(), snapshot, replayRequest);
         return replay(snapshot, replayRequest);
     }
 
@@ -178,8 +179,10 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         AssertUtils.notNull(fundsTransactionQueryService, "Route replay resolver requires FundsTransactionQueryService");
         FundsInstructionReferenceSpec reference = requireReplayReference(instruction);
         Optional<RouteSnapshotSpec> routeSnapshot = switch (reference.getReferenceType()) {
-            case FREEZE_ORDER -> fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
-            default -> fundsTransactionQueryService.findRouteSnapshotByTransactionSn(reference.getReferenceSn());
+            case FREEZE_ORDER -> fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(
+                    instruction.getTenantId(), reference.getReferenceSn());
+            default -> fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                    instruction.getTenantId(), reference.getReferenceSn());
         };
         AssertUtils.isTrue(routeSnapshot.isPresent(), "RouteSnapshot 回放事件未找到原路径快照，referenceSn = {}",
                 reference.getReferenceSn());
@@ -270,13 +273,15 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 continue;
             }
             AssertUtils.isFalse(fundsTransactionQueryService.hasConsumedReplayLeg(
-                            reference.getReferenceSn(), instruction.getEventType(), leg.getLegId()),
+                            instruction.getTenantId(), reference.getReferenceSn(),
+                            instruction.getEventType(), leg.getLegId()),
                     "RouteSnapshot leg 仅允许成功回放一次，referenceSn = {}，eventType = {}，legId = {}",
                     reference.getReferenceSn(), instruction.getEventType(), leg.getLegId());
         }
     }
 
-    private void assertReplayLegAmountNotOverConsumed(@NonNull FundsInstructionReferenceSpec reference,
+    private void assertReplayLegAmountNotOverConsumed(@NonNull Long tenantId,
+                                                      @NonNull FundsInstructionReferenceSpec reference,
                                                       @NonNull RouteSnapshotSpec routeSnapshot,
                                                       @NonNull ReplayRequestSpec replayRequest) {
         FundsTransactionEventType eventType = resolveEventType(replayRequest);
@@ -284,12 +289,12 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         for (RouteLegSpec sourceLeg : sourceLegs) {
             Money replayAmount = resolveReplayAmount(sourceLeg, replayRequest);
             Money consumedAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
-                    reference.getReferenceSn(), eventType, sourceLeg.getLegId(),
+                    tenantId, reference.getReferenceSn(), eventType, sourceLeg.getLegId(),
                     sourceLeg.getAmount().getCurrency(),
                     replayRequest.getBusinessScene(),
                     replayRequest.getBusinessSn());
-            long withdrawConsumedAmount = freezeOrderWithdrawConsumedAmount(reference, eventType, sourceLeg,
-                    replayRequest);
+            long withdrawConsumedAmount = freezeOrderWithdrawConsumedAmount(
+                    tenantId, reference, eventType, sourceLeg, replayRequest);
             long consumedTotal = consumedAmount.getAmount() + withdrawConsumedAmount + replayAmount.getAmount();
             assertReplayLegAmountWithinSource(reference, eventType, sourceLeg, replayAmount, consumedTotal,
                     withdrawConsumedAmount);
@@ -323,7 +328,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 && withdrawConsumedAmount == 0L;
     }
 
-    private long freezeOrderWithdrawConsumedAmount(@NonNull FundsInstructionReferenceSpec reference,
+    private long freezeOrderWithdrawConsumedAmount(@NonNull Long tenantId,
+                                                   @NonNull FundsInstructionReferenceSpec reference,
                                                    @NonNull FundsTransactionEventType eventType,
                                                    @NonNull RouteLegSpec sourceLeg,
                                                    @NonNull ReplayRequestSpec replayRequest) {
@@ -331,7 +337,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 || eventType != FundsTransactionEventType.UNFREEZE) {
             return 0L;
         }
-        return fundsTransactionQueryService.sumConsumedReplayLegAmount(reference.getReferenceSn(),
+        return fundsTransactionQueryService.sumConsumedReplayLegAmount(tenantId, reference.getReferenceSn(),
                 FundsTransactionEventType.WITHDRAW, sourceLeg.getLegId(),
                 sourceLeg.getAmount().getCurrency(),
                 replayRequest.getBusinessScene(),

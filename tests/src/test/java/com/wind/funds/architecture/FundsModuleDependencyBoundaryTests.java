@@ -976,6 +976,66 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
+     * 场景：生产模块通过 MapStruct Converter 转换持久化模型和契约模型。
+     * 预期：所有 Converter 都使用严格目标字段策略，并以 convertToXxx 命名转换方法。
+     * 红线：新增目标字段不得只产生告警，Converter 不得继续使用语义过弱的 toDTO 方法名。
+     */
+    @Test
+    void testMapStructConvertersShouldUseStrictPolicyAndExplicitMethodNames() throws IOException {
+        List<String> violations = new ArrayList<>();
+        for (Path converter : javaSourceFiles(List.of(
+                "ledger/impl/src/main/java/com/wind/funds/ledger/mapstruct",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/mapstruct",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/mapstruct",
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/mapstruct"))) {
+            if (!converter.getFileName().toString().endsWith("Converter.java")) {
+                continue;
+            }
+            String source = Files.readString(converter);
+            Path relativePath = workspaceRoot().relativize(converter);
+            if (!source.contains("unmappedTargetPolicy = ReportingPolicy.ERROR")) {
+                violations.add(relativePath + " does not fail on unmapped target properties");
+            }
+            if (Pattern.compile("\\btoDTO\\s*\\(").matcher(source).find()) {
+                violations.add(relativePath + " still uses toDTO");
+            }
+        }
+
+        assertThat(violations)
+                .as("MapStruct converters must fail fast and name their target model explicitly")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：生产 Mapper 使用自定义 SQL 承载锁定查询或复杂查询。
+     * 预期：保留自定义方法和 SQL 语义，同时显式声明查询列。
+     * 红线：生产查询不得使用 SELECT * 隐式扩大持久化投影。
+     */
+    @Test
+    void testProductionMapperQueriesShouldUseExplicitColumnProjection() throws IOException {
+        Pattern selectAllPattern = Pattern.compile(
+                "(?i)\\bselect\\s+(?:distinct\\s+)?(?:[a-z_][a-z0-9_]*\\s*\\.\\s*)?\\*(?:\\s*,|\\s+from)");
+        assertThat(selectAllPattern.matcher("SELECT t.* FROM t_funds_transaction t").find()).isTrue();
+        List<String> violations = new ArrayList<>();
+        for (Path mapper : javaSourceFiles(List.of(
+                "ledger/impl/src/main/java/com/wind/funds/ledger/dal/mapper",
+                "wallet/impl/src/main/java/com/wind/funds/wallet/dal/mapper",
+                "transaction/impl/src/main/java/com/wind/funds/transaction/dal/mapper",
+                "reconciliation/impl/src/main/java/com/wind/funds/reconciliation/dal/mapper",
+                "governance/impl/src/main/java/com/wind/funds/governance/dal/mapper"))) {
+            String source = Files.readString(mapper);
+            Matcher matcher = selectAllPattern.matcher(source);
+            if (matcher.find()) {
+                violations.add(workspaceRoot().relativize(mapper).toString());
+            }
+        }
+
+        assertThat(violations)
+                .as("Custom mapper SQL must keep explicit column projections")
+                .isEmpty();
+    }
+
+    /**
      * 场景：持久化模型、数据库列和公共契约表达生命周期、结果或布尔属性。
      * 预期：业务属性和物理列使用同一业务名，只保留数据库 is_* 与 Java 布尔属性的约规差异。
      * 红线：不得用 status/state 双命名、SQL 别名或桥接 setter 掩盖映射不一致。

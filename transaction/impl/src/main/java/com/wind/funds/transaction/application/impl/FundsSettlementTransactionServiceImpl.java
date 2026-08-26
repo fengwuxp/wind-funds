@@ -157,7 +157,8 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
                         && releaseTransaction.getAmount() == amount.getAmount()
                         && releaseTransaction.getCurrency() == amount.getCurrency(),
                 "结算释放资金交易与原锁定交易不一致，transactionSn = {}", releaseTransactionSn);
-        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(releaseTransactionSn)
+        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                        TenantContextHolder.requireTenantId(), releaseTransactionSn)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "结算释放资金交易缺少 RouteSnapshot，transactionSn = " + releaseTransactionSn));
         AssertUtils.isTrue(route.getEventType() == FundsTransactionEventType.SETTLEMENT_RELEASE
@@ -214,7 +215,8 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
                         && settlementOrderSn.equals(transaction.getBusinessSn()),
                 "原资金交易不是当前结算单已完成的 SETTLEMENT_LOCK，transactionSn = {}",
                 transaction.getSn());
-        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn())
+        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                        transaction.getTenantId(), transaction.getSn())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "原结算锁定资金交易缺少 RouteSnapshot，transactionSn = " + transaction.getSn()));
         AssertUtils.isTrue(route.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK

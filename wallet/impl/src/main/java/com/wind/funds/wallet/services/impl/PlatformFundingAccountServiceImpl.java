@@ -21,8 +21,6 @@ import java.util.List;
 /**
  * 平台资金账户查询服务实现。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Service
 @AllArgsConstructor
@@ -53,7 +51,7 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
                 tenantId, currency, role, results.size());
         FundingAccountDTO result = results.getFirst();
         AssertUtils.isTrue(Boolean.TRUE.equals(result.getPlatform()) && result.getState() == FundsAccountState.ACTIVE,
-                "平台资金账户状态不可用，tenantId = {}, currency = {}, role = {}, accountId = {}, platform = {}, status = {}",
+                "平台资金账户状态不可用，tenantId = {}, currency = {}, role = {}, accountId = {}, platform = {}, state = {}",
                 tenantId, currency, role, result.getSn(), result.getPlatform(), result.getState());
         AssertUtils.isTrue(result.getCurrency() == currency,
                 "平台资金账户币种不匹配，tenantId = {}, expectedCurrency = {}, actualCurrency = {}, role = {}, accountId = {}",

@@ -12,7 +12,7 @@ import java.util.Map;
 public interface PaymentInstrumentRefSpec {
 
     @NonNull
-    String getInstrumentId();
+    String getInstrumentSn();
 
     @NonNull
     String getInstrumentType();
@@ -37,7 +37,7 @@ public interface PaymentInstrumentRefSpec {
     }
 
     @Nullable
-    default String getStatus() {
+    default String getState() {
         return null;
     }
 

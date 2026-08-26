@@ -82,7 +82,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         AssertUtils.notNull(batch, "对账批次不存在，reconciliationBatchSn = {}", request.getReconciliationBatchSn());
         AssertUtils.isTrue(batch.getState() == ReconciliationBatchState.DATA_READY
                         || batch.getState() == ReconciliationBatchState.COMPLETED,
-                "对账批次来源尚未冻结完整，reconciliationBatchSn = {}, status = {}",
+                "对账批次来源尚未冻结完整，reconciliationBatchSn = {}, state = {}",
                 batch.getSn(), batch.getState());
 
         SourceSet sources = loadSources(batch);
@@ -94,7 +94,7 @@ public class ReconciliationRunResultApplicationServiceImpl
                             && Objects.equals(batch.getRunResultSn(), existing.getSn())
                             && Objects.equals(existing.getResultDigest(), candidate.getResultDigest()),
                     "同一批次的对账运行结果事实冲突，reconciliationBatchSn = {}", batch.getSn());
-            return ReconciliationRunResultConverter.INSTANCE.toDTO(existing);
+            return ReconciliationRunResultConverter.INSTANCE.convertToReconciliationRunResultDTO(existing);
         }
 
         reconciliationRunResultMapper.insertSelective(candidate);
@@ -108,7 +108,7 @@ public class ReconciliationRunResultApplicationServiceImpl
                 "完成对账批次失败，reconciliationBatchSn = {}", batch.getSn());
         log.info("strict-exact 对账完成，tenantId = {}, batchSn = {}, outcome = {}, total = {}",
                 batch.getTenantId(), batch.getSn(), candidate.getOutcome(), candidate.getTotalCount());
-        return ReconciliationRunResultConverter.INSTANCE.toDTO(
+        return ReconciliationRunResultConverter.INSTANCE.convertToReconciliationRunResultDTO(
                 reconciliationRunResultMapper.selectBySn(batch.getTenantId(), candidate.getSn()));
     }
 
@@ -118,7 +118,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         validateQueryIdentity(tenantId, runResultSn);
         ReconciliationRunResult result = reconciliationRunResultMapper.selectBySn(tenantId, runResultSn);
         AssertUtils.notNull(result, "对账运行结果不存在，runResultSn = {}", runResultSn);
-        return ReconciliationRunResultConverter.INSTANCE.toDTO(result);
+        return ReconciliationRunResultConverter.INSTANCE.convertToReconciliationRunResultDTO(result);
     }
 
     @Override
@@ -142,7 +142,7 @@ public class ReconciliationRunResultApplicationServiceImpl
         return MybatisQueryHelper.<ReconciliationMatchResult, ReconciliationMatchResultDTO>query(queryWrapper)
                 .counter(reconciliationMatchResultMapper::selectCountByQuery)
                 .resultQueryFunc(reconciliationMatchResultMapper::selectListByQuery)
-                .converter(ReconciliationMatchResultConverter.INSTANCE::toDTO)
+                .converter(ReconciliationMatchResultConverter.INSTANCE::convertToReconciliationMatchResultDTO)
                 .query(options);
     }
 

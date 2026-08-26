@@ -50,6 +50,7 @@ class FundsInstructionDslContractTests {
      * 预期：旧方法仅作为待移除的兼容桥保留，精确事件仍由 eventType 显式表达。
      * 红线：不得破坏已发布 Core API，也不得把兼容字符串当成唯一事件事实。
      */
+    @SuppressWarnings("removal")
     @Test
     void testLegacyEventTypeProjectionShouldRemainDeprecatedDuringMigration() throws NoSuchMethodException {
         Deprecated annotation = DefaultFundsTransactionType.class.getDeclaredMethod("asEventType")

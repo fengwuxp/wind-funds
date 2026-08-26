@@ -47,7 +47,7 @@ public interface LedgerService {
      * 根据 id 查询账户账本
      *
      * @param id 账户账本 id
-     * @return Ledger
+     * @return 账户账本
      */
     @NonNull LedgerDTO getLedgerById(@NonNull Long id);
 

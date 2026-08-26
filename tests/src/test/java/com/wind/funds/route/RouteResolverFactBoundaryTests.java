@@ -14,7 +14,6 @@ import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
-import com.wind.funds.transaction.services.FundsFrozenOrderService;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import org.junit.jupiter.api.Test;
@@ -63,7 +62,6 @@ class RouteResolverFactBoundaryTests {
             FundsDirectTransactionService.class,
             FundsAuthorizationTransactionService.class,
             FundsTransactionCommandServiceImpl.class,
-            FundsFrozenOrderService.class,
             DefaultFundsInstructionLifecycleSaver.class,
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DefaultRoutedFundsInstructionOrchestrator.class);

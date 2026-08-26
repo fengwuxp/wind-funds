@@ -16,14 +16,14 @@ import java.util.Map;
  */
 @Builder
 @FieldNameConstants
-public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
+public record ImmutablePaymentInstrumentRefSpec(String instrumentSn,
                                                 String instrumentType,
                                                 String instrumentNo,
                                                 String ownerId,
                                                 String ownerType,
                                                 @Nullable Long tenantId,
                                                 @Nullable CurrencyIsoCode currency,
-                                                @Nullable String status,
+                                                @Nullable String state,
                                                 Map<String, Object> bindingSnapshot,
                                                 @Nullable String description)
         implements PaymentInstrumentRefSpec {
@@ -40,8 +40,8 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
     }
 
     @Override
-    public @NonNull String getInstrumentId() {
-        return instrumentId;
+    public @NonNull String getInstrumentSn() {
+        return instrumentSn;
     }
 
     @Override
@@ -75,8 +75,8 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
     }
 
     @Override
-    public @Nullable String getStatus() {
-        return status;
+    public @Nullable String getState() {
+        return state;
     }
 
     @Override

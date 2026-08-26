@@ -92,7 +92,7 @@ public class FundsClearingTransactionServiceImpl implements FundsClearingTransac
                     "清算来源交易不存在，fundsTransactionSn = {}", sourceTransactionSn);
             AssertUtils.isTrue(sourceTransaction.getState() == FundsTransactionState.OPEN
                             || sourceTransaction.getState() == FundsTransactionState.CLOSED,
-                    "清算来源交易状态不可清算，fundsTransactionSn = {}，status = {}",
+                    "清算来源交易状态不可清算，fundsTransactionSn = {}，state = {}",
                     sourceTransactionSn, sourceTransaction.getState());
             AssertUtils.equals(request.getAmount().getCurrency(), sourceTransaction.getCurrency(),
                     "清算来源交易币种不一致，fundsTransactionSn = {}", sourceTransactionSn);

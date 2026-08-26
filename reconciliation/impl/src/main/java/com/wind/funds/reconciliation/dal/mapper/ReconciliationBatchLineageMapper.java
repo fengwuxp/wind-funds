@@ -14,7 +14,8 @@ import org.apache.ibatis.annotations.Update;
 public interface ReconciliationBatchLineageMapper extends BaseMapper<ReconciliationBatchLineage> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, current_batch_sn
             FROM t_reconciliation_batch_lineage
             WHERE tenant_id = #{tenantId}
               AND scope_owner_namespace = #{scopeOwnerNamespace}
@@ -29,7 +30,8 @@ public interface ReconciliationBatchLineageMapper extends BaseMapper<Reconciliat
                                                      @Param("pairIdentityValue") String pairIdentityValue);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, gmt_modified, tenant_id, scope_owner_namespace, scope_identity_value,
+                   pair_owner_namespace, pair_identity_value, current_batch_sn
             FROM t_reconciliation_batch_lineage
             WHERE tenant_id = #{tenantId}
               AND scope_owner_namespace = #{scopeOwnerNamespace}

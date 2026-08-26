@@ -11,7 +11,7 @@ import com.wind.funds.reconciliation.dal.entities.SettlementOrder;
 import com.wind.funds.reconciliation.dal.mapper.PayoutOrderMapper;
 import com.wind.funds.reconciliation.dal.mapper.PayoutReceiptMapper;
 import com.wind.funds.reconciliation.dal.mapper.SettlementOrderMapper;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutNextAction;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
@@ -376,7 +376,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 "channelRef", request.getChannelRef(),
                 "externalReceiptRef", request.getExternalReceiptRef(),
                 "externalReference", request.getExternalReference(),
-                "status", request.getState().name(),
+                "state", request.getState().name(),
                 "amount", request.getAmount(),
                 "currency", request.getCurrency().name(),
                 "sourceReceiptDigest", request.getSourceReceiptDigest()));
@@ -403,7 +403,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
                 "jurisdiction", evidence.getJurisdiction(),
                 "verifiedAt", evidence.getVerifiedAt(),
                 "confirmedBy", evidence.getConfirmedBy(),
-                "status", evidence.getStatus().name());
+                "verificationResult", evidence.getVerificationResult().name());
     }
 
     private void validateCreateRequest(CreatePayoutOrderRequest request, WindOperator operator) {
@@ -433,7 +433,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
         AssertUtils.hasText(evidence.getJurisdiction(), "外部规则适用法域不能为空");
         AssertUtils.notNull(evidence.getVerifiedAt(), "外部规则核验日期不能为空");
         AssertUtils.hasText(evidence.getConfirmedBy(), "外部规则确认方不能为空");
-        AssertUtils.equals(ExternalRuleVerificationStatus.VERIFIED, evidence.getStatus(),
+        AssertUtils.equals(ExternalRuleVerificationResult.VERIFIED, evidence.getVerificationResult(),
                 "外部规则必须完成核验");
     }
 
@@ -479,7 +479,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
 
     private void assertSettlementReady(SettlementOrder settlement) {
         AssertUtils.isTrue(settlement.getState() == SettlementOrderState.LOCKED,
-                "只有 LOCKED 结算单可以创建或提交出款，status = {}", settlement.getState());
+                "只有 LOCKED 结算单可以创建或提交出款，state = {}", settlement.getState());
         AssertUtils.isTrue(settlement.getSettlementDestination() == SettlementDestination.EXTERNAL_ENDPOINT,
                 "只有外部收款端点结算单可以创建出款");
         AssertUtils.hasText(settlement.getLockFundsTransactionSn(), "结算单缺少资金锁定事实");

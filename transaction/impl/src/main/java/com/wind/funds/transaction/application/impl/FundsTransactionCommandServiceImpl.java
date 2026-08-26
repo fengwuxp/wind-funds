@@ -126,7 +126,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                         existingTransaction.getExternalFundsFactDigest(), instruction),
                 "外部资金事实请求参数不一致，transactionSn = {}", existingTransaction.getSn());
         AssertUtils.isTrue(existingTransaction.getState() == FundsTransactionState.CLOSED,
-                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                "外部资金事实尚未成功完成，transactionSn = {}，state = {}",
                 existingTransaction.getSn(), existingTransaction.getState());
         log.info("外部资金事实已完成，复用原资金交易，externalSourceCode={}, externalFundsFactSn={}, "
                         + "transactionSn={}", instruction.getExternalSourceCode(), instruction.getExternalFundsFactSn(),
@@ -187,7 +187,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.isTrue(referenceTransaction.getTransactionType() == DefaultFundsTransactionType.PAY,
                 "关联退款原交易必须是直接支付，transactionSn = {}", referenceTransaction.getSn());
         AssertUtils.isTrue(fundsTransactionQueryService
-                        .findRouteSnapshotByTransactionSn(referenceTransaction.getSn()).isPresent(),
+                        .findRouteSnapshotByTransactionSn(
+                                referenceTransaction.getTenantId(), referenceTransaction.getSn()).isPresent(),
                 "RouteSnapshot 回放事件未找到原路径快照，referenceSn = {}", referenceTransaction.getSn());
     }
 
@@ -418,7 +419,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                 .filter(leg -> feeRefund == FundsRouteLegIds.FEE.equals(leg.getLegId()))
                 .toList();
         List<FundsTransactionDetailDTO> details = fundsTransactionQueryService
-                .queryFundsTransactionDetails(transaction.getSn());
+                .queryFundsTransactionDetails(transaction.getTenantId(), transaction.getSn());
         FundsEffectType effectType = FundsEffectType.DIRECT;
         AssertUtils.isTrue(replayLegs.size() == 1
                         && matchesTransactionFactGroup(transaction, routeSnapshot, details, effectType)
@@ -439,7 +440,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                         && routeSnapshot.getTransactionType() == DefaultFundsTransactionType.PAY,
                 message, transaction.getSn());
         List<FundsTransactionDetailDTO> details = fundsTransactionQueryService
-                .queryFundsTransactionDetails(transaction.getSn()).stream()
+                .queryFundsTransactionDetails(transaction.getTenantId(), transaction.getSn()).stream()
                 .filter(detail -> detail.getEventType() == FundsTransactionEventType.AUTHORIZE)
                 .toList();
         AssertUtils.isTrue(matchesTransactionFactGroup(
@@ -452,7 +453,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     private @Nullable RouteSnapshotSpec findRouteSnapshot(FundsTransaction transaction) {
         try {
-            return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()).orElse(null);
+            return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                    transaction.getTenantId(), transaction.getSn()).orElse(null);
         } catch (RuntimeException exception) {
             return null;
         }

@@ -8,31 +8,35 @@ import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * CreditAccount model converter.
+ * CreditAccount 模型转换器。
  *
- * @author Codex
- * @date 2026-05-08
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface CreditAccountConverter {
 
     CreditAccountConverter INSTANCE = Mappers.getMapper(CreditAccountConverter.class);
 
     /**
-     * CreateCreditAccountRequest convert to CreditAccount.
+     * 将 CreateCreditAccountRequest 转换为 CreditAccount。
      *
      * @param request 创建请求
      * @return CreditAccount 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "ledgerProfileVersion", ignore = true)
+    @Mapping(target = "version", ignore = true)
     CreditAccount convertToCreditAccount(CreateCreditAccountRequest request);
 
     /**
-     * CreditAccount convert to CreditAccountDTO.
+     * 将 CreditAccount 转换为 CreditAccountDTO。
      *
      * @param data CreditAccount 实例
      * @return CreditAccountDTO 实例
@@ -40,7 +44,7 @@ public interface CreditAccountConverter {
     CreditAccountDTO convertToCreditAccountDTO(CreditAccount data);
 
     /**
-     * Fill create defaults after same-name field mapping.
+     * 在同名字段映射后补齐创建默认值。
      *
      * @param request 创建请求
      * @param entity 信用账户实体

@@ -478,7 +478,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
 
         var releaseOrder = frozenOrderByBusinessSn("PROJECTION_UNFREEZE_RELEASE");
         var beforeReadFacts = ledgerFactSnapshot();
-        var recovered = fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(releaseOrder.getSn());
+        var recovered = fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(TENANT_ID, releaseOrder.getSn());
 
         assertThat(recovered).isPresent();
         assertLedgerTransactionFactsUnchanged(beforeReadFacts);

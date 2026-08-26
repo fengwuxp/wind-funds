@@ -286,9 +286,11 @@ public class DefaultFundsTransactionQueryService
     }
 
     @Override
-    public @NonNull Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn) {
+    public @NonNull Optional<FundsTransactionDTO> findFundsTransactionBySn(@NonNull Long tenantId,
+                                                                          @NonNull String transactionSn) {
+        AssertUtils.notNull(tenantId, "资金交易租户 ID 不能为空");
         AssertUtils.hasText(transactionSn, "资金交易流水号不能为空");
-        return Optional.ofNullable(findTransactionBySnNullable(transactionSn))
+        return Optional.ofNullable(findTransactionBySnNullable(tenantId, transactionSn))
                 .map(FundsTransactionConverter.INSTANCE::convertToFundsTransactionDTO);
     }
 
@@ -331,12 +333,15 @@ public class DefaultFundsTransactionQueryService
     }
 
     @Override
-    public @NonNull List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull String transactionSn) {
+    public @NonNull List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull Long tenantId,
+                                                                                 @NonNull String transactionSn) {
+        AssertUtils.notNull(tenantId, "资金交易明细租户 ID 不能为空");
         AssertUtils.hasText(transactionSn, "资金交易流水号不能为空");
         FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
         QueryWrapper wrapper = QueryWrapper.create()
                 .from(ref)
-                .where(ref.transactionSn.eq(transactionSn))
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.transactionSn.eq(transactionSn))
                 .orderBy(ref.id.asc());
         return fundsTransactionDetailMapper.selectListByQuery(wrapper)
                 .stream()
@@ -345,42 +350,49 @@ public class DefaultFundsTransactionQueryService
     }
 
     @Override
-    public boolean hasConsumedReplayLeg(@NonNull String referenceTransactionSn,
+    public boolean hasConsumedReplayLeg(@NonNull Long tenantId,
+                                        @NonNull String referenceTransactionSn,
                                         @NonNull FundsTransactionEventType eventType,
                                         @NonNull String replayRefLegId) {
+        AssertUtils.notNull(tenantId, "RouteReplay 租户 ID 不能为空");
         AssertUtils.hasText(referenceTransactionSn, "原资金交易流水号不能为空");
         AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
         AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
-        return queryConsumedReplayDetails(referenceTransactionSn, eventType)
+        return queryConsumedReplayDetails(tenantId, referenceTransactionSn, eventType)
                 .stream()
                 .anyMatch(detail -> isReplayLegConsumed(detail, replayRefLegId));
     }
 
     @Override
-    public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+    public @NonNull Money sumConsumedReplayLegAmount(@NonNull Long tenantId,
+                                                     @NonNull String referenceTransactionSn,
                                                      @NonNull FundsTransactionEventType eventType,
                                                      @NonNull String replayRefLegId,
                                                      @NonNull CurrencyIsoCode currency) {
-        return sumConsumedReplayLegAmount(referenceTransactionSn, eventType, replayRefLegId, currency, null, null);
+        return sumConsumedReplayLegAmount(
+                tenantId, referenceTransactionSn, eventType, replayRefLegId, currency, null, null);
     }
 
     @Override
-    public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+    public @NonNull Money sumConsumedReplayLegAmount(@NonNull Long tenantId,
+                                                     @NonNull String referenceTransactionSn,
                                                      @NonNull FundsTransactionEventType eventType,
                                                      @NonNull String replayRefLegId,
                                                      @NonNull CurrencyIsoCode currency,
                                                      @Nullable String excludedBusinessScene,
                                                      @Nullable String excludedBusinessSn) {
+        AssertUtils.notNull(tenantId, "RouteReplay 租户 ID 不能为空");
         AssertUtils.hasText(referenceTransactionSn, "原资金交易流水号不能为空");
         AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
         AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
         AssertUtils.notNull(currency, "RouteReplay 币种不能为空");
         if (isFreezeOrderUnfreezeConsumption(eventType, replayRefLegId)) {
-            return sumFrozenOrderReleasedAmount(referenceTransactionSn, currency,
+            return sumFrozenOrderReleasedAmount(tenantId, referenceTransactionSn, currency,
                     excludedBusinessScene, excludedBusinessSn);
         }
         Map<String, Long> consumedAmounts = new LinkedHashMap<>();
-        for (FundsTransactionDetail detail : queryConsumedReplayDetails(referenceTransactionSn, eventType)) {
+        for (FundsTransactionDetail detail : queryConsumedReplayDetails(
+                tenantId, referenceTransactionSn, eventType)) {
             if (sameBusinessEvent(detail, excludedBusinessScene, excludedBusinessSn)) {
                 continue;
             }
@@ -408,9 +420,11 @@ public class DefaultFundsTransactionQueryService
     }
 
     @Override
-    public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn) {
+    public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull Long tenantId,
+                                                                                 @NonNull String transactionSn) {
+        AssertUtils.notNull(tenantId, "RouteSnapshot 租户 ID 不能为空");
         AssertUtils.hasText(transactionSn, "资金交易流水号不能为空");
-        FundsTransaction transaction = findTransactionBySnNullable(transactionSn);
+        FundsTransaction transaction = findTransactionBySnNullable(tenantId, transactionSn);
         if (transaction == null || !StringUtils.hasText(transaction.getRouteSnapshot())) {
             return Optional.empty();
         }
@@ -419,9 +433,11 @@ public class DefaultFundsTransactionQueryService
     }
 
     @Override
-    public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
+    public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull Long tenantId,
+                                                                                 @NonNull String freezeOrderSn) {
+        AssertUtils.notNull(tenantId, "冻结单 RouteSnapshot 租户 ID 不能为空");
         AssertUtils.hasText(freezeOrderSn, "冻结单号不能为空");
-        FundsFrozenOrder order = findFreezeOrderBySnNullable(freezeOrderSn);
+        FundsFrozenOrder order = findFreezeOrderBySnNullable(tenantId, freezeOrderSn);
         if (order == null) {
             return Optional.empty();
         }
@@ -430,14 +446,8 @@ public class DefaultFundsTransactionQueryService
             return frozenOrderSnapshot;
         }
         return StringUtils.hasText(order.getTransactionSn())
-                ? findRouteSnapshotByTransactionSn(order.getTransactionSn())
+                ? findRouteSnapshotByTransactionSn(tenantId, order.getTransactionSn())
                 : Optional.empty();
-    }
-
-    private FundsTransaction findTransactionBySnNullable(String sn) {
-        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(sn));
-        return fundsTransactionMapper.selectOneByQuery(wrapper);
     }
 
     private FundsTransaction findTransactionBySnNullable(Long tenantId, String sn) {
@@ -2221,9 +2231,11 @@ public class DefaultFundsTransactionQueryService
     private record RecoveryFactProjection(FundsTransactionDetail principal, boolean succeeded) {
     }
 
-    private FundsFrozenOrder findFreezeOrderBySnNullable(String sn) {
+    private FundsFrozenOrder findFreezeOrderBySnNullable(Long tenantId, String sn) {
         FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
-        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(sn));
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn));
         return fundsFrozenOrderMapper.selectOneByQuery(wrapper);
     }
 
@@ -2267,11 +2279,12 @@ public class DefaultFundsTransactionQueryService
                 && FundsRouteLegIds.FREEZE.equals(replayRefLegId);
     }
 
-    private Money sumFrozenOrderReleasedAmount(String freezeOrderSn,
+    private Money sumFrozenOrderReleasedAmount(Long tenantId,
+                                               String freezeOrderSn,
                                                CurrencyIsoCode currency,
                                                @Nullable String excludedBusinessScene,
                                                @Nullable String excludedBusinessSn) {
-        FundsFrozenOrder order = findFreezeOrderBySnNullable(freezeOrderSn);
+        FundsFrozenOrder order = findFreezeOrderBySnNullable(tenantId, freezeOrderSn);
         if (order == null) {
             return Money.immutable(0L, currency);
         }
@@ -2321,12 +2334,14 @@ public class DefaultFundsTransactionQueryService
         return amount == null ? 0L : amount;
     }
 
-    private List<FundsTransactionDetail> queryConsumedReplayDetails(String referenceTransactionSn,
+    private List<FundsTransactionDetail> queryConsumedReplayDetails(Long tenantId,
+                                                                    String referenceTransactionSn,
                                                                     FundsTransactionEventType eventType) {
         FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
         QueryWrapper wrapper = QueryWrapper.create()
                 .from(ref)
-                .where(ref.referenceDetailSn.eq(referenceTransactionSn))
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.referenceDetailSn.eq(referenceTransactionSn))
                 .and(ref.eventType.eq(eventType))
                 .and(ref.state.eq(FundsTransactionDetailState.SUCCEEDED))
                 .and(ref.ledgerTransactionSn.isNotNull())

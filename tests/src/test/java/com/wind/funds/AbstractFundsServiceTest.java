@@ -65,8 +65,9 @@ import java.util.Set;
  * 资金域服务层流程测试公共基座。
  *
  * <p>公共基座只承载测试运行基础设施：H2 schema、MyBatis Flex、事务、JdbcTemplate、
- * 缓存、锁、国际化、SQL 审计、租户上下文和 Spring 静态上下文。业务 Bean、外部端口替身、
- * 测试数据和业务断言应由具体测试基座声明。</p>
+ * 缓存、锁、国际化、按需 SQL 审计、租户上下文和 Spring 静态上下文。业务 Bean、外部端口替身、
+ * 测试数据和业务断言应由具体测试基座声明。SQL 审计默认关闭，可通过
+ * {@code wind.funds.test.sql-audit-enabled=true} 显式开启。</p>
  */
 @TestPropertySource(locations = {
         "classpath:application-h2.properties",
@@ -118,8 +119,13 @@ public abstract class AbstractFundsServiceTest {
 
         private final ApplicationContext applicationContext;
 
-        public TestCoreInfrastructureConfig(ApplicationContext applicationContext) {
+        private final boolean sqlAuditEnabled;
+
+        public TestCoreInfrastructureConfig(
+                ApplicationContext applicationContext,
+                @Value("${wind.funds.test.sql-audit-enabled:false}") boolean sqlAuditEnabled) {
             this.applicationContext = applicationContext;
+            this.sqlAuditEnabled = sqlAuditEnabled;
         }
 
         @PostConstruct
@@ -129,9 +135,11 @@ public abstract class AbstractFundsServiceTest {
             SpringApplicationContextUtils.markStarted();
             setTestApplicationEventPublisher(event -> {
             });
-            AuditManager.setAuditEnable(true);
-            AuditManager.setMessageCollector(auditMessage -> SQL_LOG.info("{}, {}ms",
-                    auditMessage.getFullSql(), auditMessage.getElapsedTime()));
+            AuditManager.setAuditEnable(sqlAuditEnabled);
+            if (sqlAuditEnabled) {
+                AuditManager.setMessageCollector(auditMessage -> SQL_LOG.info("{}, {}ms",
+                        auditMessage.getFullSql(), auditMessage.getElapsedTime()));
+            }
         }
 
         @PreDestroy

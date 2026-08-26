@@ -73,7 +73,8 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_CAPTURE_OR_RELEASE");
         assertThat(explanation.payload()).containsKey("transactionSummary");
         assertThat(asMap(explanation.payload().get("transactionSummary")))
-                .containsEntry("status", "OPEN")
+                .containsEntry("state", "OPEN")
+                .doesNotContainKey("status")
                 .containsEntry("authorizedAmount", 80L)
                 .containsEntry("completedAmount", 30L)
                 .containsEntry("reversedAmount", 0L)
@@ -130,7 +131,8 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertThat(partialRefund.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
         assertThat(partialRefund.statusMeaning()).isEqualTo("FUNDS_POSTED");
         assertThat(asMap(partialRefund.payload().get("transactionSummary")))
-                .containsEntry("status", "OPEN")
+                .containsEntry("state", "OPEN")
+                .doesNotContainKey("status")
                 .containsEntry("authorizedAmount", 80L)
                 .containsEntry("completedAmount", 80L)
                 .containsEntry("refundedAmount", 30L)
@@ -150,7 +152,8 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         assertThat(fullRefund.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
         assertThat(fullRefund.statusMeaning()).isEqualTo("FUNDS_REFUNDED");
         assertThat(asMap(fullRefund.payload().get("transactionSummary")))
-                .containsEntry("status", "CLOSED")
+                .containsEntry("state", "CLOSED")
+                .doesNotContainKey("status")
                 .containsEntry("authorizedAmount", 80L)
                 .containsEntry("completedAmount", 80L)
                 .containsEntry("refundedAmount", 80L)
@@ -298,6 +301,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
 
     private FundsTransactionProjectionExplanation explain(String transactionSn) {
         return projectionExplainApplicationService.explain(FundsTransactionProjectionExplainQuery.builder()
+                .tenantId(TENANT_ID)
                 .fundsTransactionSn(transactionSn)
                 .build());
     }

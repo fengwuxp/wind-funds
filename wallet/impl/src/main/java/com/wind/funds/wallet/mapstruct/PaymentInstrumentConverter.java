@@ -12,39 +12,46 @@ import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * PaymentInstrument model converter.
+ * PaymentInstrument 模型转换器。
  *
- * @author Codex
- * @date 2026-05-08
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface PaymentInstrumentConverter {
 
     PaymentInstrumentConverter INSTANCE = Mappers.getMapper(PaymentInstrumentConverter.class);
 
     /**
-     * CreatePaymentInstrumentRequest convert to PaymentInstrument.
+     * 将 CreatePaymentInstrumentRequest 转换为 PaymentInstrument。
      *
      * @param request 创建请求
      * @return PaymentInstrument 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
     PaymentInstrument convertToPaymentInstrument(CreatePaymentInstrumentRequest request);
 
     /**
-     * CreatePaymentInstrumentBindingRequest convert to PaymentInstrumentBinding.
+     * 将 CreatePaymentInstrumentBindingRequest 转换为 PaymentInstrumentBinding。
      *
      * @param request 创建请求
      * @return PaymentInstrumentBinding 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "sn", ignore = true)
+    @Mapping(target = "version", ignore = true)
     PaymentInstrumentBinding convertToPaymentInstrumentBinding(CreatePaymentInstrumentBindingRequest request);
 
     /**
-     * PaymentInstrument convert to PaymentInstrumentDTO.
+     * 将 PaymentInstrument 转换为 PaymentInstrumentDTO。
      *
      * @param data PaymentInstrument 实例
      * @return PaymentInstrumentDTO 实例
@@ -52,7 +59,7 @@ public interface PaymentInstrumentConverter {
     PaymentInstrumentDTO convertToPaymentInstrumentDTO(PaymentInstrument data);
 
     /**
-     * PaymentInstrumentBinding convert to PaymentInstrumentBindingDTO.
+     * 将 PaymentInstrumentBinding 转换为 PaymentInstrumentBindingDTO。
      *
      * @param data PaymentInstrumentBinding 实例
      * @return PaymentInstrumentBindingDTO 实例
@@ -60,7 +67,7 @@ public interface PaymentInstrumentConverter {
     PaymentInstrumentBindingDTO convertToPaymentInstrumentBindingDTO(PaymentInstrumentBinding data);
 
     /**
-     * PaymentInstrumentBindingHistory convert to PaymentInstrumentBindingHistoryDTO.
+     * 将 PaymentInstrumentBindingHistory 转换为 PaymentInstrumentBindingHistoryDTO。
      *
      * @param data PaymentInstrumentBindingHistory 实例
      * @return PaymentInstrumentBindingHistoryDTO 实例
@@ -68,7 +75,7 @@ public interface PaymentInstrumentConverter {
     PaymentInstrumentBindingHistoryDTO convertToPaymentInstrumentBindingHistoryDTO(PaymentInstrumentBindingHistory data);
 
     /**
-     * Fill create defaults after same-name field mapping.
+     * 在同名字段映射后补齐创建默认值。
      *
      * @param request 创建请求
      * @param entity 支付工具实体
@@ -79,7 +86,7 @@ public interface PaymentInstrumentConverter {
     }
 
     /**
-     * Fill binding create defaults after same-name field mapping.
+     * 在同名字段映射后补齐绑定创建默认值。
      *
      * @param request 创建请求
      * @param entity 支付工具绑定实体

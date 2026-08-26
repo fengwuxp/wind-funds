@@ -279,14 +279,14 @@ final class RouteSnapshotJsonSupport {
         if (instrumentRef == null) {
             return values;
         }
-        values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentId, instrumentRef.getInstrumentId());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentSn, instrumentRef.getInstrumentSn());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentType, instrumentRef.getInstrumentType());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo, instrumentRef.getInstrumentNo());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.ownerId, instrumentRef.getOwnerId());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.ownerType, instrumentRef.getOwnerType());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.tenantId, instrumentRef.getTenantId());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.currency, instrumentRef.getCurrency());
-        values.put(ImmutablePaymentInstrumentRefSpec.Fields.status, instrumentRef.getStatus());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.state, instrumentRef.getState());
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot,
                 sortedMap(instrumentRef.getBindingSnapshot()));
         values.put(ImmutablePaymentInstrumentRefSpec.Fields.description, instrumentRef.getDescription());
@@ -467,15 +467,19 @@ final class RouteSnapshotJsonSupport {
         if (value == null || value.isEmpty()) {
             return null;
         }
+        String instrumentSn = textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentSn);
+        if (!StringUtils.hasText(instrumentSn)) {
+            throw new IllegalArgumentException("paymentInstrumentRef.instrumentSn 不能为空");
+        }
         return ImmutablePaymentInstrumentRefSpec.builder()
-                .instrumentId(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentId))
+                .instrumentSn(instrumentSn)
                 .instrumentType(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentType))
                 .instrumentNo(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo))
                 .ownerId(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerId))
                 .ownerType(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.ownerType))
                 .tenantId(longValue(value, ImmutablePaymentInstrumentRefSpec.Fields.tenantId))
                 .currency(currencyValue(value, ImmutablePaymentInstrumentRefSpec.Fields.currency))
-                .status(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.status))
+                .state(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.state))
                 .bindingSnapshot(parseObjectMap(objectValue(value,
                         ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot)))
                 .description(textValue(value, ImmutablePaymentInstrumentRefSpec.Fields.description))

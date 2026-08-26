@@ -16,7 +16,6 @@ import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.LedgerTransactionCommandService;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
-import com.wind.funds.ledger.query.LedgerTransactionQuery;
 import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
@@ -593,15 +592,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         FundsInstructionContextValidator.immutableInstructionContext(contextVariables, owner);
     }
 
-
-    @Override
-    @NonNull
-    public LedgerTransactionDTO getLedgerTransactionById(@NonNull Long id) {
-        LedgerTransaction transaction = findAccountLedgerTransaction(id);
-        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(
-                verifiedLedgerAggregate(transaction).transaction());
-    }
-
     @Override
     @NonNull
     public LedgerTransactionDTO getLedgerTransactionBySn(@NonNull Long tenantId, @NonNull String sn) {
@@ -609,42 +599,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         AssertUtils.hasText(sn, "账本交易流水号不能为空");
         return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(
                 verifiedLedgerAggregateBySn(tenantId, sn).transaction());
-    }
-
-    @Override
-    public @NonNull WindPagination<LedgerTransactionDTO> queryAccountLedgerTransactions(
-            @NonNull LedgerTransactionQuery query,
-            @NonNull WindQuery<? extends QueryOrderField> options) {
-        LedgerTransactionNameRefs ledgerTransaction = LedgerTransactionNameRefs.ledgerTransaction;
-        QueryWrapper queryWrapper = MybatisQueryHelper.from(options).select()
-                .from(ledgerTransaction)
-                .where(ledgerTransaction.sn.eq(query.getSn()))
-                .and(ledgerTransaction.tenantId.eq(query.getTenantId()))
-                .and(ledgerTransaction.fundsTransactionSn.eq(query.getFundsTransactionSn()))
-                .and(ledgerTransaction.eventType.eq(enumName(query.getEventType())))
-                .and(ledgerTransaction.currency.eq(query.getCurrency()))
-                .and(ledgerTransaction.businessSn.eq(query.getBusinessSn()))
-                .and(ledgerTransaction.businessScene.eq(query.getBusinessScene()))
-                .and(ledgerTransaction.referenceLedgerTransactionSn.eq(query.getReferenceLedgerTransactionSn()))
-                .and(ledgerTransaction.transactionTime.ge(query.getTransactionTimeMin()))
-                .and(ledgerTransaction.transactionTime.le(query.getTransactionTimeMax()))
-                .and(ledgerTransaction.gmtCreate.ge(query.getGmtCreateMin()))
-                .and(ledgerTransaction.gmtCreate.le(query.getGmtCreateMax()))
-                .and(ledgerTransaction.gmtModified.ge(query.getGmtModifiedMin()))
-                .and(ledgerTransaction.gmtModified.le(query.getGmtModifiedMax()));
-
-        return MybatisQueryHelper.<LedgerTransaction, LedgerTransactionDTO>query(queryWrapper)
-                .counter(ledgerTransactionMapper::selectCountByQuery)
-                .resultQueryFunc(ledgerTransactionMapper::selectListByQuery)
-                .converter(LedgerConverter.INSTANCE::convertToAccountLedgerTransactionDTO)
-                .query(options);
-    }
-
-
-    private LedgerTransaction findAccountLedgerTransaction(Long id) {
-        LedgerTransaction result = ledgerTransactionMapper.selectOneById(id);
-        AssertUtils.notNull(result, "账户账本交易不存在");
-        return result;
     }
 
     private LedgerPostingScope resolvePostingScope(LedgerPostingPlanSpec plan, String phaseCode) {
@@ -704,17 +658,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
         return value == null ? defaultValue : value;
     }
 
-    private String enumName(Enum<?> value) {
-        return value == null ? null : value.name();
-    }
-
     private String defaultIfBlank(String value, String defaultValue) {
         return StringUtils.hasText(value) ? value : defaultValue;
-    }
-
-    @Override
-    public @NonNull LedgerEntryDTO getLedgerEntryById(@NonNull Long id) {
-        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(verifiedLedgerEntry(findAccountLedgerEntry(id)));
     }
 
     @Override
@@ -793,13 +738,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService, L
                     return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(entry);
                 })
                 .query(options);
-    }
-
-
-    private LedgerEntry findAccountLedgerEntry(Long id) {
-        LedgerEntry result = ledgerEntryMapper.selectOneById(id);
-        AssertUtils.notNull(result, "账户账本条目不存在");
-        return result;
     }
 
     /**

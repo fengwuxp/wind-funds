@@ -67,30 +67,30 @@ public interface LedgerBalanceView {
     /**
      * 获取指定账本科目的余额
      *
-     * @param accountCode 账本科目
-     * @return LedgerBalanceBucket
+     * @param ledgerSubjectCode 账目编码
+     * @return 账本余额桶
      */
     @Nullable
-    default LedgerBalanceBucket getBalanceBucketNullable(@NonNull LedgerSubjectCode accountCode) {
-        return getBalanceBuckets().get(accountCode);
+    default LedgerBalanceBucket getBalanceBucketNullable(@NonNull LedgerSubjectCode ledgerSubjectCode) {
+        return getBalanceBuckets().get(ledgerSubjectCode);
     }
 
     @NonNull
-    default LedgerBalanceBucket getBalanceBucket(@NonNull LedgerSubjectCode accountCode) {
-        LedgerBalanceBucket result = getBalanceBucketNullable(accountCode);
-        AssertUtils.notNull(result, "LedgerBalanceBucket not found for {} ", accountCode);
+    default LedgerBalanceBucket getBalanceBucket(@NonNull LedgerSubjectCode ledgerSubjectCode) {
+        LedgerBalanceBucket result = getBalanceBucketNullable(ledgerSubjectCode);
+        AssertUtils.notNull(result, "账目余额桶不存在，ledgerSubjectCode = {}", ledgerSubjectCode);
         return result;
     }
 
     /**
      * 获取指定账本科目的余额
      *
-     * @param accountCode 账本科目
-     * @return LedgerBalanceBucket
+     * @param ledgerSubjectCode 账目编码
+     * @return 账本余额金额
      */
     @NonNull
-    default Money getBalance(@NonNull LedgerSubjectCode accountCode) {
-        return Optional.ofNullable(getBalanceBucketNullable(accountCode))
+    default Money getBalance(@NonNull LedgerSubjectCode ledgerSubjectCode) {
+        return Optional.ofNullable(getBalanceBucketNullable(ledgerSubjectCode))
                 .map(LedgerBalanceBucket::balance)
                 .orElseGet(() -> Money.immutable(0, getCurrency()));
     }

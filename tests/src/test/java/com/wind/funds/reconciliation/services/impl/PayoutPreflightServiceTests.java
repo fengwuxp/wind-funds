@@ -7,7 +7,7 @@ import com.wind.funds.reconciliation.application.difference.impl.ReconciliationD
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
@@ -137,8 +137,8 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getDecisionResult()).isEqualTo(PayoutPreflightDecisionResult.PREFLIGHT_BLOCKED);
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.WAITING_EVIDENCE);
         assertThat(result.getAction()).isEqualTo(PayoutPreflightAction.BLOCKED);
-        assertThat(result.getExternalRuleVerificationStatus())
-                .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
+        assertThat(result.getExternalRuleVerificationResult())
+                .isEqualTo(ExternalRuleVerificationResult.UNVERIFIED);
         assertThat(result.isManualReviewRequired()).isTrue();
         assertThat(result.getBlockingReasons())
                 .extracting(PayoutPreflightBlockingReasonDTO::getCode)
@@ -189,7 +189,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.PREFLIGHT_PASSED);
         assertThat(result.getAction())
                 .isEqualTo(PayoutPreflightAction.SUBMISSION_REVALIDATION_REQUIRED);
-        assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
+        assertThat(result.getExternalRuleVerificationResult()).isEqualTo(ExternalRuleVerificationResult.VERIFIED);
         assertThat(result.getStageRef()).isNotNull();
         assertThat(result.getEvidenceRefs())
                 .contains("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
@@ -236,12 +236,12 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 readyPayoutPreflightRequest()
                         .setExternalRuleVerificationEvidence(new ExternalRuleVerificationEvidenceDTO()
                                 .setEvidenceRef("rule-evidence-incomplete")
-                                .setStatus(ExternalRuleVerificationStatus.VERIFIED)),
+                                .setVerificationResult(ExternalRuleVerificationResult.VERIFIED)),
                 WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
-        assertThat(result.getExternalRuleVerificationStatus())
-                .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
+        assertThat(result.getExternalRuleVerificationResult())
+                .isEqualTo(ExternalRuleVerificationResult.UNVERIFIED);
         assertThat(result.getBlockingReasons())
                 .extracting(PayoutPreflightBlockingReasonDTO::getCode)
                 .containsExactly(PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED);
@@ -358,7 +358,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setJurisdiction("US")
                 .setVerifiedAt(LocalDate.of(2026, 5, 23))
                 .setConfirmedBy("compliance-ops")
-                .setStatus(ExternalRuleVerificationStatus.VERIFIED);
+                .setVerificationResult(ExternalRuleVerificationResult.VERIFIED);
     }
 
     private CreateReconciliationDifferenceRequest payoutDifferenceRequest() {

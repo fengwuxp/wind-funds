@@ -58,7 +58,7 @@ public interface LedgerConverter {
     Ledger convertToLedger(CreateLedgerRequest request);
 
     /**
-     * Ledger convert to LedgerDTO
+     * 将 Ledger 实体转换为 LedgerDTO。
      *
      * @param data Ledger 实例
      * @return LedgerDTO 实例
@@ -96,7 +96,7 @@ public interface LedgerConverter {
     LedgerEntry convertToLedgerEntry(LedgerEntrySpec data);
 
     /**
-     * LedgerEntry convert to LedgerEntryDTO
+     * 将 LedgerEntry 实体转换为 LedgerEntryDTO。
      *
      * @param data LedgerEntry 实例
      * @return LedgerEntryDTO 实例
@@ -151,7 +151,7 @@ public interface LedgerConverter {
     LedgerTransaction convertToLedgerTransaction(LedgerTransactionSpec data);
 
     /**
-     * LedgerTransaction convert to LedgerTransactionDTO
+     * 将 LedgerTransaction 实体转换为 LedgerTransactionDTO。
      *
      * @param data LedgerTransaction 实例
      * @return LedgerTransactionDTO 实例
@@ -182,60 +182,60 @@ public interface LedgerConverter {
     }
 
     /**
-     * Enum convert to database value.
+     * 将枚举转换为数据库字段值。
      *
-     * @param value enum value
-     * @return enum name
+     * @param value 枚举值
+     * @return 枚举名称
      */
     default String enumName(Enum<?> value) {
         return value == null ? null : value.name();
     }
 
     /**
-     * Database value convert to balance constraint type.
+     * 将数据库字段值转换为余额约束类型。
      *
-     * @param value database value
-     * @return balance constraint type
+     * @param value 数据库字段值
+     * @return 余额约束类型
      */
     default LedgerBalanceConstraintType toLedgerBalanceConstraintType(String value) {
         return StringUtils.hasText(value) ? LedgerBalanceConstraintType.valueOf(value) : null;
     }
 
     /**
-     * Database value convert to posting intent type.
+     * 将数据库字段值转换为入账意图类型。
      *
-     * @param value database value
-     * @return posting intent type
+     * @param value 数据库字段值
+     * @return 入账意图类型
      */
     default LedgerPostingIntentType toLedgerPostingIntentType(String value) {
         return StringUtils.hasText(value) ? LedgerPostingIntentType.valueOf(value) : null;
     }
 
     /**
-     * Database value convert to posting scope.
+     * 将数据库字段值转换为入账范围。
      *
-     * @param value database value
-     * @return posting scope
+     * @param value 数据库字段值
+     * @return 入账范围
      */
     default LedgerPostingScope toLedgerPostingScope(String value) {
         return StringUtils.hasText(value) ? LedgerPostingScope.valueOf(value) : null;
     }
 
     /**
-     * Database value convert to balance effect type.
+     * 将数据库字段值转换为余额影响类型。
      *
-     * @param value database value
-     * @return balance effect type
+     * @param value 数据库字段值
+     * @return 余额影响类型
      */
     default LedgerBalanceEffectType toLedgerBalanceEffectType(String value) {
         return StringUtils.hasText(value) ? LedgerBalanceEffectType.valueOf(value) : null;
     }
 
     /**
-     * Database value convert to ledger phase code.
+     * 将数据库字段值转换为账本阶段编码。
      *
-     * @param value database value
-     * @return ledger phase code
+     * @param value 数据库字段值
+     * @return 账本阶段编码
      */
     default LedgerPhaseCode toLedgerPhaseCode(String value) {
         return StringUtils.hasText(value) ? LedgerPhaseCode.valueOf(value) : null;

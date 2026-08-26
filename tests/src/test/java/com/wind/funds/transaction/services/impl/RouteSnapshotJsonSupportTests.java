@@ -169,8 +169,31 @@ class RouteSnapshotJsonSupportTests {
         RouteSnapshotSpec parsed = RouteSnapshotJsonSupport.parseRouteSnapshot(json,
                 LocalDateTime.of(2026, 5, 24, 10, 0));
 
+        JsonNode paymentInstrumentRef = WindJson.parseObject(json, JsonNode.class)
+                .path("paymentInstrumentRef");
+        assertThat(paymentInstrumentRef.path("instrumentSn").asString()).isEqualTo("PI-CUSTOM-001");
+        assertThat(paymentInstrumentRef.path("state").asString()).isEqualTo("ACTIVE");
+        assertThat(paymentInstrumentRef.has("instrumentId")).isFalse();
+        assertThat(paymentInstrumentRef.has("status")).isFalse();
+        assertThat(parsed.getPaymentInstrumentRef().getInstrumentSn()).isEqualTo("PI-CUSTOM-001");
+        assertThat(parsed.getPaymentInstrumentRef().getState()).isEqualTo("ACTIVE");
         assertThat(parsed.getPaymentInstrumentRef().getInstrumentNo()).isEqualTo("****1111");
         assertThat(parsed.getExternalAccountRef().getExternalAccountNo()).isEqualTo("****3456");
+    }
+
+    @Test
+    void testRouteSnapshotJsonShouldRejectLegacyPaymentInstrumentKeys() {
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                paymentInstrument("****1111", Map.of("instrumentToken", "tok-card-001")),
+                null);
+        String legacyJson = RouteSnapshotJsonSupport.toRouteSnapshotJson(snapshot)
+                .replace("\"instrumentSn\"", "\"instrumentId\"")
+                .replace("\"state\"", "\"status\"");
+
+        assertThatThrownBy(() -> RouteSnapshotJsonSupport.parseRouteSnapshot(
+                legacyJson, LocalDateTime.of(2026, 5, 24, 10, 0)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instrumentSn");
     }
 
     /**
@@ -239,7 +262,7 @@ class RouteSnapshotJsonSupportTests {
         return new PaymentInstrumentRefSpec() {
 
             @Override
-            public String getInstrumentId() {
+            public String getInstrumentSn() {
                 return "PI-CUSTOM-001";
             }
 
@@ -261,6 +284,11 @@ class RouteSnapshotJsonSupportTests {
             @Override
             public String getOwnerType() {
                 return "USER";
+            }
+
+            @Override
+            public String getState() {
+                return "ACTIVE";
             }
 
             @Override

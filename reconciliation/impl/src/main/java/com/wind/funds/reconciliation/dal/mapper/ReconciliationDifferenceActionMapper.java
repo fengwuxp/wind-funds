@@ -15,7 +15,8 @@ import java.util.List;
 public interface ReconciliationDifferenceActionMapper extends BaseMapper<ReconciliationDifferenceAction> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, difference_sn, action_type, adjustment_sn, idempotency_key,
+                   original_fact_ref, adjustment_transaction_sn, approval_ref, evidence_ref, reason, created_by
             FROM t_reconciliation_difference_action
             WHERE tenant_id = #{tenantId}
               AND adjustment_sn = #{adjustmentSn}
@@ -25,7 +26,8 @@ public interface ReconciliationDifferenceActionMapper extends BaseMapper<Reconci
                                                                  @Param("adjustmentSn") String adjustmentSn);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, difference_sn, action_type, adjustment_sn, idempotency_key,
+                   original_fact_ref, adjustment_transaction_sn, approval_ref, evidence_ref, reason, created_by
             FROM t_reconciliation_difference_action
             WHERE tenant_id = #{tenantId}
               AND idempotency_key = #{idempotencyKey}
@@ -38,7 +40,8 @@ public interface ReconciliationDifferenceActionMapper extends BaseMapper<Reconci
      * 按发生顺序查询单笔差错的全部处理动作事实。
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, difference_sn, action_type, adjustment_sn, idempotency_key,
+                   original_fact_ref, adjustment_transaction_sn, approval_ref, evidence_ref, reason, created_by
             FROM t_reconciliation_difference_action
             WHERE tenant_id = #{tenantId}
               AND difference_sn = #{differenceSn}

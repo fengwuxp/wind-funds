@@ -87,7 +87,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         validateRequest(request, operator);
         FundsActionRecordedEvidenceDTO evidence = requiredRecordedEvidence(request);
         FundsTransactionDTO transaction = fundsTransactionQueryService
-                .queryFundsTransaction(evidence.getActionFact().getIntentRef())
+                .findFundsTransactionBySn(request.getTenantId(), evidence.getActionFact().getIntentRef())
                 .orElse(null);
         AssertUtils.notNull(transaction, "可清分来源资金交易不存在，fundsTransactionSn = {}",
                 evidence.getActionFact().getIntentRef());
@@ -104,7 +104,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
         if (candidate.getExclusionReason() == ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED) {
             log.info("可清分明细被对账 Gate 临时阻断，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}",
                     request.getTenantId(), transaction.getSn(), source.entry().getSn());
-            return ClearingSplittableDetailConverter.INSTANCE.toDTO(candidate);
+            return ClearingSplittableDetailConverter.INSTANCE.convertToClearingSplittableDetailDTO(candidate);
         }
 
         ClearingSplittableDetail existing = clearingSplittableDetailMapper.selectByLedgerEntrySn(
@@ -123,10 +123,10 @@ public class ClearingSplittableDetailApplicationServiceImpl
         AssertUtils.notNull(candidate.getId(), "创建可清分明细准入结果失败");
         ClearingSplittableDetail saved = clearingSplittableDetailMapper.selectByLedgerEntrySn(
                 request.getTenantId(), source.entry().getSn());
-        log.info("可清分明细准入完成，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}, status = {}, exclusionReason = {}",
+        log.info("可清分明细准入完成，tenantId = {}, fundsTransactionSn = {}, ledgerEntrySn = {}, admissionResult = {}, exclusionReason = {}",
                 request.getTenantId(), transaction.getSn(), source.entry().getSn(),
                 candidate.getAdmissionResult(), candidate.getExclusionReason());
-        return ClearingSplittableDetailConverter.INSTANCE.toDTO(saved);
+        return ClearingSplittableDetailConverter.INSTANCE.convertToClearingSplittableDetailDTO(saved);
     }
 
     private FundsActionRecordedEvidenceDTO requiredRecordedEvidence(IdentifyClearingSplittableDetailRequest request) {
@@ -238,7 +238,8 @@ public class ClearingSplittableDetailApplicationServiceImpl
             }
         }
         AssertUtils.notNull(clearingSibling, "可清分来源缺少唯一 PAYEE/CLEARING credit");
-        FundsTransactionDetailDTO detail = requiredDetail(transaction.getSn(), clearingSibling.getDetailSn());
+        FundsTransactionDetailDTO detail = requiredDetail(
+                transaction.getTenantId(), transaction.getSn(), clearingSibling.getDetailSn());
         return new ResolvedClearingSource(detail, clearingEntry);
     }
 
@@ -266,9 +267,9 @@ public class ClearingSplittableDetailApplicationServiceImpl
                 || entry.getBalanceEffectType() == LedgerBalanceEffectType.CONSUME);
     }
 
-    private FundsTransactionDetailDTO requiredDetail(String transactionSn, String detailSn) {
+    private FundsTransactionDetailDTO requiredDetail(Long tenantId, String transactionSn, String detailSn) {
         FundsTransactionDetailDTO result = fundsTransactionQueryService
-                .queryFundsTransactionDetails(transactionSn)
+                .queryFundsTransactionDetails(tenantId, transactionSn)
                 .stream()
                 .filter(detail -> detailSn.equals(detail.getSn()))
                 .findFirst()
@@ -509,7 +510,7 @@ public class ClearingSplittableDetailApplicationServiceImpl
                                                        ClearingSplittableDetail candidate) {
         AssertUtils.isTrue(existing.getSourceDigest().equals(candidate.getSourceDigest()),
                 "同一账本分录的可清分来源事实或规则已变化，ledgerEntrySn = {}", existing.getLedgerEntrySn());
-        return ClearingSplittableDetailConverter.INSTANCE.toDTO(existing);
+        return ClearingSplittableDetailConverter.INSTANCE.convertToClearingSplittableDetailDTO(existing);
     }
 
     private void validateRequest(IdentifyClearingSplittableDetailRequest request, WindOperator operator) {

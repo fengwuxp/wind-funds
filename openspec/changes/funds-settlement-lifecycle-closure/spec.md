@@ -34,7 +34,7 @@
 | `SC-SLC-002A` | 原分配逆向能从 Fincone handoff 唯一回链到资金交易；业务 allocation 字段不进入 core。 | Fincone 映射契约与现有 direct refund `referenceTransactionSn` H2；不由本仓伪造 Fincone 实现。 |
 | `SC-SLC-003` | `SETTLEMENT` 锁定后、出款成功前的逆向有明确 fail-closed 行为；若缺公共动作，以现状证据进入 Owner Gate。 | H2 失败路径、无新增资金/账务事实断言。 |
 | `SC-SLC-004` | `gateRef` 不作为授权令牌，最终清算、结算、出款在本地事务内重查权威 Gate。 | Gate 契约、实现锚点和既有 H2 Gate 测试。 |
-| `SC-SLC-005` | 分佣、返利、分润不复用 `FundsBenefitContributionTransactionService`。 | 公共契约、实现拒绝和边界测试。 |
+| `SC-SLC-005` | 分佣、返利、分润不得借 Benefit adapter 或 generic direct action 绕过各自 allocation、责任和准入。 | Consumer contract、资金动作与边界测试。 |
 | `SC-SLC-006` | 结算收款 Profile 完成 Owner 裁决；未裁决前不修改 public enum 或账户映射。 | Profile 决策记录、API baseline 与迁移矩阵。 |
 | `SC-SLC-007` | Wave 收口时编译、相关 H2、PMD 和独立 Checker 无未归属 P0/P1。 | 新鲜命令报告与 Checker 结论。 |
 
@@ -72,7 +72,7 @@
 | `D-SLC-003` | wind-funds 只承接 `FUNDS_ACCOUNT` 和 `EXTERNAL_PAYOUT`；Payroll/AP 由上游持有并先完成目标解析。 | `CONFIRMED` | Fincone/HR/财务 Owner 负责映射、审批和合规。 |
 | `D-SLC-004` | `allocationGroupRef`、`allocationRole`、`basisAmount`、`commissionPoolAmount`、`creditShare` 全部属于 Fincone 的计算、守恒和多受益人编排事实；`basisAmount` 是经济基数，`commissionPoolAmount` 是待分总额，`sum(ClearingItem.amount)=commissionPoolAmount`。 | `CONFIRMED` | `RETAINED/RESIDUAL` 必须是带单一 `beneficiaryRef` 的显式 ClearingItem role；精度、舍入和尾差接收方由规则版本固定。funds 只消费最终 Money 与资金执行引用。 |
 | `D-SLC-005` | `gateRef` 只是证据引用；清算确认、结算锁定、结算释放和出款提交在各自事务内调用 `checkGate`。普通 direct pay、adjust、Recovery 登记自身不消费 Gate。 | `CONFIRMED_EXISTING_FOUR_CONSUMERS` | Fincone 先查 Gate、再跨仓调用普通 pay 不是原子准入；初始 `pay -> CLEARING` 是否必须消费 fresh Gate 仍待业务前提裁决，不得由包装器预设。 |
-| `D-SLC-006` | commission、rebate、revenue share 不映射为 Benefit。 | `CONFIRMED` | 保持 `FundsBenefitContributionTransactionService` 的拒绝边界。 |
+| `D-SLC-006` | commission、rebate、revenue share 不映射为 Benefit。 | `CONFIRMED` | Provider Benefit facade 退役后，拒绝边界由上游 allocation/责任 Owner、Consumer adapter 和 generic direct 资金准入共同保持。 |
 | `D-SLC-007` | 主付款与分佣不做组原子；多受益人状态由 Fincone `SettlementBatch + FundsHandoffRecord` 聚合。 | `CONFIRMED` | 部分退款范围未闭合时 fail-closed/manual；不新增 core Group。 |
 | `D-SLC-008` | 保留 `FUNDING_MERCHANT` 的收单商户语义，以 additive 方式新增显式 `FUNDING_SETTLEMENT_PAYEE`：`CLEARING(false) / AVAILABLE(true) / FROZEN(false) / SETTLEMENT(false)` 四 bucket，能力仅声明 `RECEIVE + WITHDRAW`。`AVAILABLE=true` 只开放受控负余额的静态闸门，不表示默认透支。 | `RECOMMENDED_AWAITING_APPROVAL` | `CORE-2B-A` 待用户批准；不自动映射 `ACCOUNT_PAYABLE`，不改 converter、历史行或 Fincone。外部消费者与历史值清单未知只阻止未来 rename/remove/migration。 |
 | `D-SLC-009` | 逆向按资金阶段处理；原 route snapshot、detail、posting、entry 和批次历史不覆盖，原资金交易的累计逆向摘要可按既有契约前滚。 | `CONFIRMED_WITH_P1` | `SETTLEMENT` 锁定后、出款前缺稳定公开撤销/调整动作。 |
@@ -104,7 +104,7 @@
 | 全球账户 / ACH | `ExternalFundsEventApplicationService` 消费已确认入金；withdraw、PayoutOrder、Gate、原交易逆向和资金侧对账。 | `ExternalFundsEventApplicationService.java`；`GlobalAccountAchBusinessFlowTests`、`PayoutOrderApplicationServiceTests`。 | `Submitted/Accepted/Processing`、return、NOC、rail reversal 与外部 `Unknown` 由 Fincone/通道归一；实际到账终态由通道主责。 | 归一资金链 `L3-H2`；真实 ACH rail `PENDING`。 |
 | 收单 / 订单交易 | 标准 pay、部分/原路 refund、幂等和交易/路由/账本回链。 | `FundsDirectTransactionService` 与请求契约；`AcquiringSettlementBusinessFlowTests`、`FundsDirectTransactionFlowTests`。 | 订单、账单、收单状态、迟到成功、退款范围、费用和履约由 Fincone/收单 Owner 持有；VCC 开卡费与首次入金必须是两笔业务/资金事实。 | 公共资金链 `L3-H2`；收单/订单/履约 `PENDING`。 |
 | 分佣 / 邀请返利 / KPI | 每受益人标准 pay 到 `CLEARING`、内部清算、结算锁定、出款、adjust、Recovery 和原交易引用。 | `AgentCommissionSettlementBusinessFlowTests`、`ClearingBatchApplicationServiceTests`、`SettlementOrderApplicationServiceTests`、`RecoveryOrderApplicationServiceTests`。 | Fact/Attribution/Eligibility/Rule/Pool/allocation/ClearingItem/SettlementItem/handoff 与经营对账由 Fincone；Payroll/AP 终态由其主责。多受益人范围不明时人工。 | funds 分段原语 `L3-H2`；Fincone 实施 `PENDING`。 |
-| 优惠让利结算 | 上游已确认出资责任后使用 `FundsBenefitContributionTransactionService` 记录单笔 Benefit contribution 与原路冲回。 | Benefit 公共契约；`FundsBenefitContributionTransactionServiceFlowTests` 与 `TDD-BEN-RED-035`。 | 券、折扣、营销归因、多出资方分摊和规则版本由 Fincone/营销 Owner 持有；commission/rebate/revenue share 不映射为 Benefit。 | 单笔让利资金链 `L3-H2`；完整优惠产品 `PENDING`。 |
+| 优惠让利结算 | 上游已确认出资责任后，由 Consumer adapter 按出资方提交 generic direct pay；逆向引用原 ActionFact/交易执行 referenced refund。 | Capte Consumer/E4、ActionFact 与 generic direct flow。 | 券、折扣、营销归因、funding nature、多出资方分摊和规则版本由 Fincone/营销 Owner 持有；commission/rebate/revenue share 不映射为 Benefit。 | Capte 商户 CLEARING library-host E4；其他 Consumer/L4 独立。 |
 | 跨域治理 | tenant/account/profile/capability/action/Money/idempotency/original reference；FundsTransaction -> RouteSnapshot -> Ledger -> Balance -> clearing/settlement/payout -> external reconciliation；投影重放。 | `DefaultRoutedFundsInstructionOrchestrator`、`ReconciliationGateApplicationService`、`FundsProjectionReplayApplicationService`；`FundsAccountCapabilityAdmissionFlowTests`、`FundsHostCompositionContractTests`。 | 初始 pay 的 fresh Gate 业务前提、Fincone adapter、跨仓 L3、目标数据库与外部 `Unknown`、payout 异常政策和部分成功仍由对应 Owner 关闭。 | capability、既有四个事务内 Gate 消费者与 release Provider 能力 `L3-H2`；`CLR-GATE-003` 保持 `PENDING_BUSINESS_PREMISE`。 |
 
 拒绝新增 Commission、Benefit、ACH 或 VCC 场景专用公共 DSL：上述场景均能由已有账户、动作、金额币种、来源交易、RouteSnapshot、清结算和对账原语表达。`allocationGroupRef` 等经营标识保存在 Fincone `FundsHandoffRecord` 并映射到返回的 `fundsTransactionSn`，不进入 core，也不塞入 `contextVariables`。
@@ -422,6 +422,6 @@ Fincone 必须先关闭 `CLR-GATE-001~006`。当前 Goal 只提供 handoff 契�
 - Fincone 一手材料：业务架构、资金内核、VCC 发卡履约/卡交易、全球账户与通道、订单交易，以及清结算基础 v1.1、分佣与邀请返利 v1.2 产品/系分设计；当前仍为 `REVIEW_READY / OwnerDecision=PENDING / ImplementationStatus=NOT_STARTED`，本轮未修改 Fincone。
 - wind-funds 产品与测试规格：`docs/产品设计/03-清结算与对账.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`。
 - Gate：`reconciliation/face/.../ReconciliationGateApplicationService.java` 与 settlement/payout ApplicationService 实现。
-- Benefit 排除：`transaction/face/.../FundsBenefitContributionTransactionService.java` 与对应实现。
+- Benefit 排除：Consumer adapter、generic direct action 与 ActionFact 的责任边界；旧 Provider Benefit service/impl 只作 R8B 退役 provenance。
 - 调整/追偿：`FundsBalanceControlService`、`FundsBalanceAdjustRequest`、`RecoveryOrderApplicationService` 与对应 H2 测试。
 - 分佣组合：`tests/src/test/java/com/wind/funds/transaction/application/flow/AgentCommissionSettlementBusinessFlowTests.java`。

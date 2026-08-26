@@ -24,7 +24,7 @@ import java.util.Map;
  *
  * <p>边界：只做模型转换和确定性默认值填充，不承载交易状态机、路由解析、账本入账或余额计算。</p>
  */
-@Mapper(imports = WindJson.class, unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(imports = WindJson.class, unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface FundsTransactionConverter {
 
     FundsTransactionConverter INSTANCE = Mappers.getMapper(FundsTransactionConverter.class);
@@ -38,6 +38,19 @@ public interface FundsTransactionConverter {
      * @return 资金交易实体
      */
     @Mapping(target = "sn", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "transactionMode", ignore = true)
+    @Mapping(target = "referenceTransactionSn", ignore = true)
+    @Mapping(target = "state", ignore = true)
+    @Mapping(target = "authorizedAmount", ignore = true)
+    @Mapping(target = "reversedAmount", ignore = true)
+    @Mapping(target = "completedAmount", ignore = true)
+    @Mapping(target = "refundedAmount", ignore = true)
+    @Mapping(target = "declinedAmount", ignore = true)
+    @Mapping(target = "feeAmount", ignore = true)
+    @Mapping(target = "version", ignore = true)
     @Mapping(target = "amount", expression = "java(instruction.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(instruction.getAmount().getCurrency())")
     @Mapping(target = "externalSourceCode", expression = "java(instruction.getExternalSourceCode())")
@@ -57,6 +70,21 @@ public interface FundsTransactionConverter {
      * @return 资金交易明细实体
      */
     @Mapping(target = "sn", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "transactionSn", ignore = true)
+    @Mapping(target = "subjectId", ignore = true)
+    @Mapping(target = "subjectType", ignore = true)
+    @Mapping(target = "participantRole", ignore = true)
+    @Mapping(target = "requestHash", ignore = true)
+    @Mapping(target = "fundsEffectType", ignore = true)
+    @Mapping(target = "ledgerTransactionSn", ignore = true)
+    @Mapping(target = "referenceDetailSn", ignore = true)
+    @Mapping(target = "referenceLedgerTransactionSn", ignore = true)
+    @Mapping(target = "state", ignore = true)
+    @Mapping(target = "errorCode", ignore = true)
+    @Mapping(target = "errorMessage", ignore = true)
     @Mapping(target = "amount", expression = "java(instruction.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(instruction.getAmount().getCurrency())")
     @Mapping(target = "contextVariables", expression = "java(WindJson.toJsonString(instruction.getContextVariables()))")

@@ -658,12 +658,12 @@ class FundsProjectionReplayServiceTests {
 
         @Override
         public void upsertShadow(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
-            // No-op: this test only verifies compare contract hardening.
+            // 无操作：本测试只验证比较契约加固。
         }
 
         @Override
         public void upsertOfficial(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
-            // No-op: this test only verifies compare contract hardening.
+            // 无操作：本测试只验证比较契约加固。
         }
     }
 

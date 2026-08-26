@@ -15,7 +15,10 @@ import java.util.List;
 public interface ReconciliationSourceSnapshotMapper extends BaseMapper<ReconciliationSourceSnapshot> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_batch_sn, source_role, source_namespace,
+                   snapshot_owner_namespace, snapshot_identity_value, snapshot_version, coverage_complete,
+                   coverage_watermark, coverage_member_count, source_digest, semantic_digest,
+                   evidence_bundle_digest, evidence_refs, created_by
             FROM t_reconciliation_source_snapshot
             WHERE tenant_id = #{tenantId}
               AND reconciliation_batch_sn = #{reconciliationBatchSn}
@@ -26,7 +29,10 @@ public interface ReconciliationSourceSnapshotMapper extends BaseMapper<Reconcili
                                                       @Param("sourceRole") String sourceRole);
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_batch_sn, source_role, source_namespace,
+                   snapshot_owner_namespace, snapshot_identity_value, snapshot_version, coverage_complete,
+                   coverage_watermark, coverage_member_count, source_digest, semantic_digest,
+                   evidence_bundle_digest, evidence_refs, created_by
             FROM t_reconciliation_source_snapshot
             WHERE tenant_id = #{tenantId}
               AND reconciliation_batch_sn = #{reconciliationBatchSn}

@@ -1,7 +1,6 @@
 package com.wind.funds.dsl;
 
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -42,7 +41,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FundsTransactionRequestContextVariablesContractTests {
 
     private static final List<Class<?>> TRANSACTION_REQUEST_PACKAGE_TYPES = List.of(
-            CreateFundsFrozenOrderRequest.class,
             FundsAuthorizationTransactionAuthorizeRequest.class,
             FundsAuthorizationTransactionRefundRequest.class,
             FundsAuthorizationTransactionReversalRequest.class,

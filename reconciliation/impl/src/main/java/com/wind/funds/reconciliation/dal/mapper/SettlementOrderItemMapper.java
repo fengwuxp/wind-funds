@@ -16,7 +16,9 @@ import java.util.List;
 public interface SettlementOrderItemMapper extends BaseMapper<SettlementOrderItem> {
 
     @Select("""
-            SELECT * FROM t_settlement_order_item
+            SELECT id, gmt_create, gmt_modified, sn, tenant_id, settlement_order_sn, item_type, direction,
+                   source_type, source_sn, amount, currency, source_amount_digest, active_source_claim, created_by
+            FROM t_settlement_order_item
             WHERE tenant_id = #{tenantId} AND settlement_order_sn = #{settlementOrderSn}
             ORDER BY source_sn
             """)

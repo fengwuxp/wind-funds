@@ -153,7 +153,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             return logOrderResult("submit", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT,
-                "只有 DRAFT 结算单可以提交复核，status = {}", order.getState());
+                "只有 DRAFT 结算单可以提交复核，state = {}", order.getState());
         order.setState(SettlementOrderState.REVIEWING);
         order.setSubmittedBy(operator.getOperatorAsText());
         order.setSubmittedTime(LocalDateTime.now());
@@ -172,7 +172,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             return logOrderResult("return-to-draft", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
-                "只有 REVIEWING 结算单可以退回草稿，status = {}", order.getState());
+                "只有 REVIEWING 结算单可以退回草稿，state = {}", order.getState());
         order.setState(SettlementOrderState.DRAFT);
         order.setReturnedBy(operator.getOperatorAsText());
         order.setReturnedTime(LocalDateTime.now());
@@ -194,7 +194,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             return logOrderResult("approve", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.REVIEWING,
-                "只有 REVIEWING 结算单可以审批，status = {}", order.getState());
+                "只有 REVIEWING 结算单可以审批，state = {}", order.getState());
         order.setState(SettlementOrderState.APPROVED);
         order.setSettlementApprovalRef(request.getSettlementApprovalRef());
         order.setApprovedBy(operator.getOperatorAsText());
@@ -215,7 +215,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.DRAFT
                         || order.getState() == SettlementOrderState.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 结算单可以取消，status = {}", order.getState());
+                "只有 DRAFT 或 REVIEWING 结算单可以取消，state = {}", order.getState());
         List<SettlementOrderItem> items = requiredItems(order);
         AssertUtils.isTrue(settlementOrderItemMapper.releaseActiveSourceClaims(
                 order.getTenantId(), order.getSn()) == items.size(), "释放结算来源占用失败");
@@ -238,7 +238,7 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
             return logOrderResult("lock", order, true);
         }
         AssertUtils.isTrue(order.getState() == SettlementOrderState.APPROVED,
-                "只有 APPROVED 结算单可以锁定资金，status = {}", order.getState());
+                "只有 APPROVED 结算单可以锁定资金，state = {}", order.getState());
         List<SettlementOrderItem> items = requiredItems(order);
         validateCurrentSources(order, items);
         validateDigests(order, items);
@@ -284,11 +284,11 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
         }
 
         AssertUtils.isTrue(order.getState() == SettlementOrderState.LOCKED,
-                "只有 LOCKED 结算单可以释放资金，status = {}", order.getState());
+                "只有 LOCKED 结算单可以释放资金，state = {}", order.getState());
         AssertUtils.hasText(order.getLockFundsTransactionSn(), "结算单缺少原锁定资金交易流水号");
         if (payoutOrder != null) {
             AssertUtils.isTrue(payoutOrder.getState() == PayoutOrderState.CREATED,
-                    "出款单状态不允许释放结算资金，payoutOrderSn = {}, status = {}",
+                    "出款单状态不允许释放结算资金，payoutOrderSn = {}, state = {}",
                     payoutOrder.getSn(), payoutOrder.getState());
         }
 
@@ -399,8 +399,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
     }
 
     private String validateOriginalLock(SettlementOrder order) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
-                order.getLockFundsTransactionSn()).orElse(null);
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                order.getTenantId(), order.getLockFundsTransactionSn()).orElse(null);
         AssertUtils.notNull(transaction, "结算单原锁定资金交易不存在，transactionSn = {}",
                 order.getLockFundsTransactionSn());
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), order.getTenantId())
@@ -412,7 +412,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                         && transaction.getCurrency() == order.getCurrency(),
                 "结算单与原 SETTLEMENT_LOCK 资金事实不一致，transactionSn = {}", transaction.getSn());
         AssertUtils.hasText(transaction.getRouteSnapshot(), "原 SETTLEMENT_LOCK 缺少 RouteSnapshot");
-        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn())
+        RouteSnapshotSpec route = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
+                        order.getTenantId(), transaction.getSn())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "原 SETTLEMENT_LOCK RouteSnapshot 不可读取，transactionSn = " + transaction.getSn()));
         AssertUtils.isTrue(route.getEventType() == FundsTransactionEventType.SETTLEMENT_LOCK
@@ -713,8 +714,8 @@ public class SettlementOrderApplicationServiceImpl implements SettlementOrderApp
                                             List<SettlementOrderItem> items,
                                             LedgerPostingRejectedException exception,
                                             WindOperator operator) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
-                exception.getFundsTransactionSn()).orElse(null);
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                order.getTenantId(), exception.getFundsTransactionSn()).orElse(null);
         if (transaction == null || transaction.getState() != FundsTransactionState.FAILED) {
             throw new IllegalStateException("结算资金结果未知，不能释放结算来源", exception);
         }

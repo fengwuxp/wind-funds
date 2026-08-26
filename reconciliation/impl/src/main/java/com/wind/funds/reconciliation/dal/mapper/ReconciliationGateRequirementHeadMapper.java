@@ -17,7 +17,10 @@ import org.apache.ibatis.annotations.Update;
 public interface ReconciliationGateRequirementHeadMapper extends BaseMapper<ReconciliationGateRequirementHead> {
 
     @Select("""
-            SELECT * FROM t_reconciliation_gate_requirement_head
+            SELECT id, gmt_create, gmt_modified, tenant_id, stage_kind, stage_identity_owner_namespace,
+                   stage_identity_value, current_requirement_identity_owner_namespace,
+                   current_requirement_identity_value, current_requirement_version, current_semantic_digest,
+                   current_evidence_bundle_digest, version FROM t_reconciliation_gate_requirement_head
             WHERE tenant_id = #{tenantId}
               AND stage_kind = #{stageKind}
               AND stage_identity_owner_namespace = #{stageIdentityOwnerNamespace}
@@ -30,7 +33,10 @@ public interface ReconciliationGateRequirementHeadMapper extends BaseMapper<Reco
             @Param("stageIdentityValue") String stageIdentityValue);
 
     @Select("""
-            SELECT * FROM t_reconciliation_gate_requirement_head
+            SELECT id, gmt_create, gmt_modified, tenant_id, stage_kind, stage_identity_owner_namespace,
+                   stage_identity_value, current_requirement_identity_owner_namespace,
+                   current_requirement_identity_value, current_requirement_version, current_semantic_digest,
+                   current_evidence_bundle_digest, version FROM t_reconciliation_gate_requirement_head
             WHERE tenant_id = #{tenantId}
               AND stage_kind = #{stageKind}
               AND stage_identity_owner_namespace = #{stageIdentityOwnerNamespace}

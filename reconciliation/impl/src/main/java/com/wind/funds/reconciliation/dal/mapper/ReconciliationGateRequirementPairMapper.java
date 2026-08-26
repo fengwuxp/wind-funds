@@ -18,7 +18,9 @@ import java.util.List;
 public interface ReconciliationGateRequirementPairMapper extends BaseMapper<ReconciliationGateRequirementPair> {
 
     @Select("""
-            SELECT * FROM t_reconciliation_gate_requirement_pair
+            SELECT id, gmt_create, tenant_id, requirement_identity_owner_namespace, requirement_identity_value,
+                   scope_owner_namespace, scope_identity_value, pair_owner_namespace, pair_identity_value,
+                   rule_namespace, rule_identity, rule_version FROM t_reconciliation_gate_requirement_pair
             WHERE tenant_id = #{tenantId}
               AND requirement_identity_owner_namespace = #{requirementIdentityOwnerNamespace}
               AND requirement_identity_value = #{requirementIdentityValue}

@@ -2,7 +2,7 @@ package com.wind.funds.reconciliation.services.impl;
 
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
@@ -86,7 +86,7 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                 .setDecisionResult(resolveDecisionResult(passed))
                 .setDisplayStatus(resolveDisplayStatus(passed, blockingReasons))
                 .setAction(resolveAction(passed))
-                .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
+                .setExternalRuleVerificationResult(resolveExternalRuleVerificationResult(request))
                 .setStageRef(reconciliationGateDecision.getStageRef())
                 .setCheckedAt(checkedAt)
                 .setCheckedBy(operator.getOperatorAsText())
@@ -136,11 +136,11 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
                 .setConfirmationOwner(OPERATIONS_CONFIRMATION_OWNER));
     }
 
-    private ExternalRuleVerificationStatus resolveExternalRuleVerificationStatus(CheckPayoutPreflightRequest request) {
+    private ExternalRuleVerificationResult resolveExternalRuleVerificationResult(CheckPayoutPreflightRequest request) {
         if (isExternalRuleVerified(request.getExternalRuleVerificationEvidence())) {
-            return ExternalRuleVerificationStatus.VERIFIED;
+            return ExternalRuleVerificationResult.VERIFIED;
         }
-        return ExternalRuleVerificationStatus.UNVERIFIED;
+        return ExternalRuleVerificationResult.UNVERIFIED;
     }
 
     private ReconciliationGateDecisionDTO checkReconciliationGate(CheckPayoutPreflightRequest request,
@@ -243,7 +243,7 @@ public class PayoutPreflightServiceImpl implements PayoutPreflightService {
     }
 
     private boolean isExternalRuleVerified(@Nullable ExternalRuleVerificationEvidenceDTO evidence) {
-        if (evidence == null || evidence.getStatus() != ExternalRuleVerificationStatus.VERIFIED) {
+        if (evidence == null || evidence.getVerificationResult() != ExternalRuleVerificationResult.VERIFIED) {
             return false;
         }
         return StringUtils.hasText(evidence.getEvidenceRef())

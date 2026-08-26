@@ -112,7 +112,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         validateCandidateSns(request.getCandidateSns());
         ClearingBatch batch = requiredBatchForUpdate(request.getTenantId(), request.getClearingBatchSn());
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT,
-                "只有 DRAFT 清算批次可以替换候选，status = {}", batch.getState());
+                "只有 DRAFT 清算批次可以替换候选，state = {}", batch.getState());
         List<ClearingCandidate> candidates = requiredCandidates(request.getTenantId(), request.getCandidateSns());
         validateBatchBoundary(candidates, ClearingCandidateState.READY);
         applySummary(batch, candidates);
@@ -132,7 +132,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
             return toDTO(batch);
         }
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT,
-                "只有 DRAFT 清算批次可以提交复核，status = {}", batch.getState());
+                "只有 DRAFT 清算批次可以提交复核，state = {}", batch.getState());
         List<ClearingCandidate> candidates = batchCandidates(batch);
         validateBatchBoundary(candidates, ClearingCandidateState.READY);
         applySummary(batch, candidates);
@@ -163,7 +163,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
             return toDTO(batch);
         }
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.REVIEWING,
-                "只有 REVIEWING 清算批次可以退回草稿，status = {}", batch.getState());
+                "只有 REVIEWING 清算批次可以退回草稿，state = {}", batch.getState());
         assertNoFundsFact(batch);
         releaseCandidates(batch, operator);
         batch.setState(ClearingBatchState.DRAFT);
@@ -186,7 +186,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
             return toDTO(batch);
         }
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.REVIEWING,
-                "只有 REVIEWING 清算批次可以确认，status = {}", batch.getState());
+                "只有 REVIEWING 清算批次可以确认，state = {}", batch.getState());
         List<ClearingCandidate> candidates = validateReviewingBatch(batch);
         List<ReconciliationGateDecisionDTO> gateDecisions = candidates.stream()
                 .map(candidate -> validateCurrentCandidate(batch, candidate, operator))
@@ -231,7 +231,7 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
         }
         AssertUtils.isTrue(batch.getState() == ClearingBatchState.DRAFT
                         || batch.getState() == ClearingBatchState.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 清算批次可以取消，status = {}", batch.getState());
+                "只有 DRAFT 或 REVIEWING 清算批次可以取消，state = {}", batch.getState());
         if (batch.getState() == ClearingBatchState.REVIEWING) {
             assertNoFundsFact(batch);
             releaseCandidates(batch, operator);
@@ -356,8 +356,8 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                                                                    WindOperator operator) {
         AssertUtils.isTrue(!candidate.getClearingAvailableTime().isAfter(LocalDateTime.now().plusSeconds(1)),
                 "清算候选尚未到可清算时间，candidateSn = {}", candidate.getSn());
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
-                candidate.getFundsTransactionSn()).orElse(null);
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                batch.getTenantId(), candidate.getFundsTransactionSn()).orElse(null);
         AssertUtils.notNull(transaction, "清算来源交易不存在，fundsTransactionSn = {}",
                 candidate.getFundsTransactionSn());
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), batch.getTenantId())
@@ -390,8 +390,8 @@ public class ClearingBatchApplicationServiceImpl implements ClearingBatchApplica
                                             List<ClearingCandidate> candidates,
                                             LedgerPostingRejectedException exception,
                                             WindOperator operator) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
-                exception.getFundsTransactionSn()).orElse(null);
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                batch.getTenantId(), exception.getFundsTransactionSn()).orElse(null);
         if (transaction == null || transaction.getState() != FundsTransactionState.FAILED) {
             throw new IllegalStateException("清算资金结果未知，不能释放候选", exception);
         }

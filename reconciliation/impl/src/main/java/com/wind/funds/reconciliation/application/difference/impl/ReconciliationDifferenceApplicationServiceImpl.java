@@ -562,7 +562,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     }
 
     private void logDifferenceCreated(ReconciliationDifference difference, boolean reused) {
-        log.info("对账差错物化完成，tenantId = {}, differenceSn = {}, batchSn = {}, scope = {}:{}, pair = {}:{}, status = {}, reused = {}",
+        log.info("对账差错物化完成，tenantId = {}, differenceSn = {}, batchSn = {}, scope = {}:{}, pair = {}:{}, state = {}, reused = {}",
                 difference.getTenantId(), difference.getDifferenceSn(), difference.getReconciliationBatchSn(),
                 difference.getScopeOwnerNamespace(), difference.getScopeIdentityValue(),
                 difference.getPairOwnerNamespace(), difference.getPairIdentityValue(), difference.getState(), reused);
@@ -571,7 +571,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     private void logActionLinked(ReconciliationDifference difference,
                                  ReconciliationDifferenceAction action,
                                  boolean reused) {
-        log.info("对账差错处理动作回链完成，tenantId = {}, differenceSn = {}, actionSn = {}, actionType = {}, adjustmentSn = {}, status = {}, reused = {}",
+        log.info("对账差错处理动作回链完成，tenantId = {}, differenceSn = {}, actionSn = {}, actionType = {}, adjustmentSn = {}, state = {}, reused = {}",
                 difference.getTenantId(), difference.getDifferenceSn(), action.getSn(), action.getActionType(),
                 action.getAdjustmentSn(), difference.getState(), reused);
     }
@@ -579,7 +579,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     private void logRerunLinked(ReconciliationDifference difference,
                                 ReconciliationRunResult runResult,
                                 boolean reused) {
-        log.info("对账差错重跑结果回链完成，tenantId = {}, differenceSn = {}, runResultSn = {}, status = {}, balanced = {}, reused = {}",
+        log.info("对账差错重跑结果回链完成，tenantId = {}, differenceSn = {}, runResultSn = {}, state = {}, balanced = {}, reused = {}",
                 difference.getTenantId(), difference.getDifferenceSn(), runResult.getSn(), difference.getState(),
                 runResult.getOutcome() == ReconciliationRunOutcome.BALANCED, reused);
     }

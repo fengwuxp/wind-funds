@@ -8,31 +8,35 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountState;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * FundingAccount model converter.
+ * FundingAccount 模型转换器。
  *
- * @author Codex
- * @date 2026-05-08
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface FundingAccountConverter {
 
     FundingAccountConverter INSTANCE = Mappers.getMapper(FundingAccountConverter.class);
 
     /**
-     * CreateFundingAccountRequest convert to FundingAccount.
+     * 将 CreateFundingAccountRequest 转换为 FundingAccount。
      *
      * @param request 创建请求
      * @return FundingAccount 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "ledgerProfileVersion", ignore = true)
+    @Mapping(target = "version", ignore = true)
     FundingAccount convertToFundingAccount(CreateFundingAccountRequest request);
 
     /**
-     * FundingAccount convert to FundingAccountDTO.
+     * 将 FundingAccount 转换为 FundingAccountDTO。
      *
      * @param data FundingAccount 实例
      * @return FundingAccountDTO 实例
@@ -40,7 +44,7 @@ public interface FundingAccountConverter {
     FundingAccountDTO convertToFundingAccountDTO(FundingAccount data);
 
     /**
-     * Fill create defaults after same-name field mapping.
+     * 在同名字段映射后补齐创建默认值。
      *
      * @param request 创建请求
      * @param entity 资金账户实体
@@ -54,10 +58,10 @@ public interface FundingAccountConverter {
     }
 
     /**
-     * Resolve ledger profile code by explicit request or platform account role.
+     * 根据显式请求或平台账户角色解析账本 Profile 编码。
      *
      * @param request 创建请求
-     * @return ledger profile code
+     * @return 账本 Profile 编码
      */
     default LedgerProfileCode resolveProfileCode(CreateFundingAccountRequest request) {
         if (request.getLedgerProfileCode() != null) {

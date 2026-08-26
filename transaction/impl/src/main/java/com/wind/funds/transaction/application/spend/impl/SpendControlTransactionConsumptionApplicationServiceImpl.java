@@ -214,7 +214,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
     }
 
     private FundsTransactionDTO getExistingFundsTransaction(SpendControlTransactionConsumptionRequest request) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(request.getTransactionSn())
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                        request.getTenantId(), request.getTransactionSn())
                 .orElse(null);
         AssertUtils.notNull(transaction, "资金交易不存在，transactionSn = {}", request.getTransactionSn());
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), request.getTenantId()),
@@ -381,8 +382,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
 
     private void assertRefundReferenceTransactionValid(SpendControlTransactionConsumptionRequest request,
                                                        FundsTransactionDTO refundTransaction) {
-        FundsTransactionDTO referencedTransaction = fundsTransactionQueryService.queryFundsTransaction(
-                        refundTransaction.getReferenceTransactionSn())
+        FundsTransactionDTO referencedTransaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                        request.getTenantId(), refundTransaction.getReferenceTransactionSn())
                 .orElse(null);
         AssertUtils.notNull(referencedTransaction,
                 "退款交易引用的原消费交易不存在，transactionSn = {}, referenceTransactionSn = {}",
@@ -482,8 +483,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl {
                                                                String referenceTransactionSn) {
         AssertUtils.hasText(activity.getTransactionSn(),
                 "退款控制补偿活动缺少资金交易流水，movementSn = {}", activity.getMovementSn());
-        FundsTransactionDTO refundTransaction = fundsTransactionQueryService.queryFundsTransaction(
-                        activity.getTransactionSn())
+        FundsTransactionDTO refundTransaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                        request.getTenantId(), activity.getTransactionSn())
                 .orElse(null);
         AssertUtils.notNull(refundTransaction,
                 "退款控制补偿活动缺少资金交易事实，movementSn = {}, transactionSn = {}",

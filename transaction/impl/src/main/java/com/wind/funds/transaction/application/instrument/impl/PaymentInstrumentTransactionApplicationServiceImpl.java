@@ -62,8 +62,6 @@ import java.util.TreeMap;
 /**
  * Transaction Provider 内部支付工具交易编排服务。
  *
- * @author Codex
- * @date 2026-06-21
  */
 @Slf4j
 @Service
@@ -177,10 +175,10 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
         }
         FundsTransactionDTO transaction = existing.get();
         AssertUtils.isTrue(transaction.getState() == FundsTransactionState.CLOSED,
-                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                "外部资金事实尚未成功完成，transactionSn = {}，state = {}",
                 transaction.getSn(), transaction.getState());
         RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(transaction.getSn())
+                .findRouteSnapshotByTransactionSn(transaction.getTenantId(), transaction.getSn())
                 .orElse(null);
         AssertUtils.notNull(routeSnapshot, "已成立支付工具收款缺少 RouteSnapshot，transactionSn = {}",
                 transaction.getSn());
@@ -192,7 +190,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
                         && transaction.getTransactionType() == DefaultFundsTransactionType.TOPUP
                         && Objects.equals(transaction.getAmount(), request.getAmount())
                         && transaction.getCurrency() == request.getCurrency()
-                        && Objects.equals(instrumentRef.getInstrumentId(), request.getInstrumentSn())
+                        && Objects.equals(instrumentRef.getInstrumentSn(), request.getInstrumentSn())
                         && Objects.equals(bindingVersion, request.getExpectedBindingVersion()),
                 "已成立支付工具收款请求参数不一致，transactionSn = {}，externalFundsFactSn = {}",
                 transaction.getSn(), request.getExternalFundsFactSn());
@@ -231,7 +229,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
     private FundsTransactionDTO getPaymentInstrumentAuthorization(
             Long tenantId, String authorizationTransactionSn, CurrencyIsoCode currency, String actionName) {
         FundsTransactionDTO authorization = fundsTransactionQueryService
-                .queryFundsTransaction(authorizationTransactionSn)
+                .findFundsTransactionBySn(tenantId, authorizationTransactionSn)
                 .orElse(null);
         AssertUtils.notNull(authorization, "原授权资金交易不存在，authorizationTransactionSn = {}",
                 authorizationTransactionSn);
@@ -247,7 +245,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
 
     private PaymentInstrumentRefSpec getPaymentInstrumentRef(FundsTransactionDTO authorization) {
         RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(authorization.getSn())
+                .findRouteSnapshotByTransactionSn(authorization.getTenantId(), authorization.getSn())
                 .orElse(null);
         AssertUtils.notNull(routeSnapshot, "支付工具授权缺少 RouteSnapshot，transactionSn = {}",
                 authorization.getSn());
@@ -509,13 +507,13 @@ public class PaymentInstrumentTransactionApplicationServiceImpl {
         assertPaymentInstrumentSnapshotReady(instrument);
         return ImmutablePaymentInstrumentRefSpec.builder()
                 .tenantId(instrument.getTenantId())
-                .instrumentId(instrument.getInstrumentSn())
+                .instrumentSn(instrument.getInstrumentSn())
                 .instrumentType(instrument.getInstrumentType())
                 .instrumentNo(instrument.getInstrumentNo())
                 .ownerId(instrument.getOwnerId())
                 .ownerType(instrument.getOwnerType().name())
                 .currency(instrument.getCurrency())
-                .status(instrument.getState().name())
+                .state(instrument.getState().name())
                 .bindingSnapshot(bindingSnapshot(snapshot, instrument))
                 .description(instrument.getDescription())
                 .build();

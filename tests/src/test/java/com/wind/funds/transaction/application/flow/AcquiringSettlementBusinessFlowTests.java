@@ -24,7 +24,7 @@ import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrder
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.RecoveryOrderState;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
@@ -226,16 +226,16 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         assertLedgerFactsFollowRouteSnapshot("ACQUIRING_REFUND_BEFORE_SPLIT");
         assertPostedTransactions(3);
         var sourceRouteSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(capture.transactionSn())
+                .findRouteSnapshotByTransactionSn(TENANT_ID, capture.transactionSn())
                 .orElseThrow();
         var refundRouteSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(refundTransactionSn)
+                .findRouteSnapshotByTransactionSn(TENANT_ID, refundTransactionSn)
                 .orElseThrow();
         assertThat(sourceRouteSnapshot.getLegs()).singleElement();
         assertThat(refundRouteSnapshot.getLegs()).singleElement().satisfies(refundLeg -> {
             String sourceLegId = sourceRouteSnapshot.getLegs().getFirst().getLegId();
             assertThat(refundLeg.getReplayRefLegId()).isEqualTo(sourceLegId);
-            assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(capture.transactionSn(),
+            assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, capture.transactionSn(),
                     FundsTransactionEventType.REFUND, sourceLegId, CURRENCY).getAmount()).isEqualTo(100L);
         });
 
@@ -359,7 +359,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
         String transactionSn = directTransactionService.pay(request, WindOperatorFactory.system());
         String replay = directTransactionService.pay(request, WindOperatorFactory.system());
         assertThat(replay).isEqualTo(transactionSn);
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn))
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getParticipants())
                         .filteredOn(participant -> participant.getParticipantRole() == RouteParticipantRole.PAYEE)
                         .extracting(participant -> participant.getLedgerProfileCode())
@@ -559,7 +559,7 @@ class AcquiringSettlementBusinessFlowTests extends FundsTransactionFlowTestSuppo
                 .setJurisdiction("TEST")
                 .setVerifiedAt(LocalDate.now())
                 .setConfirmedBy("test-owner")
-                .setStatus(ExternalRuleVerificationStatus.VERIFIED);
+                .setVerificationResult(ExternalRuleVerificationResult.VERIFIED);
     }
 
     private void prepareAccount(FundsAccountId accountId) {

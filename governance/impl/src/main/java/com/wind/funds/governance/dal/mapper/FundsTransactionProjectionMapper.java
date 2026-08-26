@@ -13,7 +13,9 @@ import org.apache.ibatis.annotations.Select;
 public interface FundsTransactionProjectionMapper extends BaseMapper<FundsTransactionProjection> {
 
     @Select("""
-            SELECT * FROM t_funds_transaction_projection
+            SELECT id, gmt_create, gmt_modified, tenant_id, view_domain, projection_scope, scope_ref, projection_sn,
+                   owner_type, owner_id, source_sn, display_type, display_status, amount, currency, occurred_time,
+                   payload_json, replay_task_sn, version FROM t_funds_transaction_projection
             WHERE tenant_id = #{tenantId} AND view_domain = #{viewDomain}
               AND projection_scope = #{projectionScope} AND scope_ref = #{scopeRef}
               AND projection_sn = #{projectionSn}

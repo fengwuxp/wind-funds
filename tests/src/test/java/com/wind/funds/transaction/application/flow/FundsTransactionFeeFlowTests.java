@@ -1323,7 +1323,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
     private RouteSnapshotSpec routeSnapshot(String businessSn) {
         String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
-        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn)
+        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, transactionSn)
                 .orElseThrow(() -> new AssertionError("missing route snapshot for businessSn " + businessSn));
     }
 
@@ -1418,7 +1418,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     var postingPlans = postingPlansOf(transaction);
                     var entries = entriesByBusinessSn(businessSn);
                     var routeSnapshot = fundsTransactionQueryService
-                            .findRouteSnapshotByTransactionSn(transaction.getFundsTransactionSn())
+                            .findRouteSnapshotByTransactionSn(TENANT_ID, transaction.getFundsTransactionSn())
                             .orElseThrow(() -> new AssertionError("fee refund route snapshot not found: "
                                     + businessSn));
                     var replayLegs = routeSnapshot.getLegs();
@@ -1503,7 +1503,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                 assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.FEE.name());
                             });
                     RouteLegSpec replayLeg = replayLegs.getFirst();
-                    assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(sourceTransactionSn,
+                    assertThat(fundsTransactionQueryService.sumConsumedReplayLegAmount(TENANT_ID, sourceTransactionSn,
                             FundsTransactionEventType.FEE_REFUND, replayLeg.getReplayRefLegId(),
                             replayLeg.getAmount().getCurrency()).getAmount())
                             .isEqualTo(replayLeg.getAmount().getAmount());

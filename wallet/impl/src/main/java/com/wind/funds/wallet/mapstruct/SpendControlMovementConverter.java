@@ -16,28 +16,29 @@ import org.mapstruct.factory.Mappers;
 import java.util.Arrays;
 
 /**
- * SpendControlMovement model converter.
+ * SpendControlMovement 模型转换器。
  *
- * @author Codex
- * @date 2026-06-23
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface SpendControlMovementConverter {
 
     SpendControlMovementConverter INSTANCE = Mappers.getMapper(SpendControlMovementConverter.class);
 
     /**
-     * RecordSpendControlMovementRequest convert to SpendControlMovement.
+     * 将 RecordSpendControlMovementRequest 转换为 SpendControlMovement。
      *
      * @param request 记录请求
      * @return SpendControlMovement 实例
      */
     @Mapping(target = "targetSubjectId", ignore = true)
     @Mapping(target = "targetSubjectType", ignore = true)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
     SpendControlMovement convertToSpendControlMovement(RecordSpendControlMovementRequest request);
 
     /**
-     * SpendControlMovement convert to SpendControlMovementDTO.
+     * 将 SpendControlMovement 转换为 SpendControlMovementDTO。
      *
      * @param data SpendControlMovement 实例
      * @return SpendControlMovementDTO 实例
@@ -46,7 +47,7 @@ public interface SpendControlMovementConverter {
     SpendControlMovementDTO convertToSpendControlMovementDTO(SpendControlMovement data);
 
     /**
-     * Fill target subject fields after same-name field mapping.
+     * 在同名字段映射后补齐目标主体字段。
      *
      * @param request 记录请求
      * @param entity 控制额度变动流水实体
@@ -63,7 +64,7 @@ public interface SpendControlMovementConverter {
     }
 
     /**
-     * Fill account id after same-name field mapping.
+     * 在同名字段映射后补齐账户标识。
      *
      * @param data 控制额度变动流水实体
      * @param dto 控制额度变动流水 DTO
@@ -78,7 +79,7 @@ public interface SpendControlMovementConverter {
     }
 
     /**
-     * Resolve FundsSubjectType with explicit validation.
+     * 通过显式校验解析 FundsSubjectType。
      *
      * @param accountId 账户标识
      * @return 资金主体类型

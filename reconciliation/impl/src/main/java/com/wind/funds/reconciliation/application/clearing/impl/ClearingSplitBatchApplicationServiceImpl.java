@@ -129,7 +129,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
             return toDTO(batch);
         }
         AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.DRAFT,
-                "只有 DRAFT 清分批次可以提交复核，status = {}", batch.getState());
+                "只有 DRAFT 清分批次可以提交复核，state = {}", batch.getState());
         batch.setState(ClearingSplitBatchState.REVIEWING);
         batch.setSubmittedBy(operator.getOperatorAsText());
         batch.setSubmittedTime(LocalDateTime.now());
@@ -147,7 +147,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
             return toDTO(batch);
         }
         AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.REVIEWING,
-                "只有 REVIEWING 清分批次可以确认，status = {}", batch.getState());
+                "只有 REVIEWING 清分批次可以确认，state = {}", batch.getState());
         List<ClearingSplittableDetail> details = batchDetails(batch);
         List<ReconciliationGateDecisionDTO> gateDecisions = details.stream()
                 .map(detail -> validateCurrentSource(batch, detail, operator))
@@ -177,7 +177,7 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
         }
         AssertUtils.isTrue(batch.getState() == ClearingSplitBatchState.DRAFT
                         || batch.getState() == ClearingSplitBatchState.REVIEWING,
-                "只有 DRAFT 或 REVIEWING 清分批次可以取消，status = {}", batch.getState());
+                "只有 DRAFT 或 REVIEWING 清分批次可以取消，state = {}", batch.getState());
         AssertUtils.isTrue(clearingSplitBatchDetailMapper.releaseActiveMembership(batch.getTenantId(), batch.getSn())
                         == batch.getDetailCount(),
                 "释放清分批次成员占用失败");
@@ -379,8 +379,8 @@ public class ClearingSplitBatchApplicationServiceImpl implements ClearingSplitBa
     private ReconciliationGateDecisionDTO validateCurrentSource(ClearingSplitBatch batch,
                                                                 ClearingSplittableDetail detail,
                                                                 WindOperator operator) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(
-                detail.getFundsTransactionSn()).orElse(null);
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                batch.getTenantId(), detail.getFundsTransactionSn()).orElse(null);
         AssertUtils.notNull(transaction, "清分来源交易不存在，fundsTransactionSn = {}", detail.getFundsTransactionSn());
         AssertUtils.isTrue(Objects.equals(transaction.getTenantId(), batch.getTenantId())
                         && defaultAmount(transaction.getRefundedAmount()) == detail.getRefundAmount()

@@ -101,7 +101,7 @@ class FundsClearingTransactionFlowTests extends FundsTransactionFlowTestSupport 
                     assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.WITHIN_SUBJECT.name());
                     assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RELEASE.name());
                 });
-        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(first))
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(TENANT_ID, first))
                 .hasValueSatisfying(snapshot -> assertThat(snapshot.getLegs())
                         .singleElement()
                         .satisfies(leg -> {

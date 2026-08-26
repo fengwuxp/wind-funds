@@ -164,7 +164,7 @@ class DefaultRouteReplayServiceTests {
         ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference, currentInstrument));
 
         assertThat(resolvedRoute.getPaymentInstrumentRef()).isSameAs(originalInstrument);
-        assertThat(resolvedRoute.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+        assertThat(resolvedRoute.getPaymentInstrumentRef().getInstrumentSn()).isEqualTo("CARD-OLD");
         assertThat(resolvedRoute.getPaymentInstrumentRef().getBindingSnapshot())
                 .containsEntry("bindingId", "old-binding");
         assertThat(resolvedRoute.getPaymentInstrumentRef()).isNotSameAs(currentInstrument);
@@ -722,16 +722,16 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
-    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId, String bindingId) {
+    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentSn, String bindingId) {
         return ImmutablePaymentInstrumentRefSpec.builder()
-                .instrumentId(instrumentId)
+                .instrumentSn(instrumentSn)
                 .instrumentType("CARD")
                 .instrumentNo("**** 4242")
                 .ownerId("PAYER-001")
                 .ownerType("USER")
                 .tenantId(1L)
                 .currency(CurrencyIsoCode.USD)
-                .status("ACTIVE")
+                .state("ACTIVE")
                 .bindingSnapshot(Map.of("bindingId", bindingId))
                 .build();
     }
@@ -794,7 +794,7 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
-        public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {
+        public Optional<FundsTransactionDTO> findFundsTransactionBySn(Long tenantId, String transactionSn) {
             return Optional.empty();
         }
 
@@ -814,19 +814,21 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
-        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(String transactionSn) {
+        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(Long tenantId, String transactionSn) {
             return List.of();
         }
 
         @Override
-        public boolean hasConsumedReplayLeg(String referenceTransactionSn,
+        public boolean hasConsumedReplayLeg(Long tenantId,
+                                            String referenceTransactionSn,
                                             FundsTransactionEventType eventType,
                                             String replayRefLegId) {
             return false;
         }
 
         @Override
-        public Money sumConsumedReplayLegAmount(String referenceTransactionSn,
+        public Money sumConsumedReplayLegAmount(Long tenantId,
+                                                String referenceTransactionSn,
                                                 FundsTransactionEventType eventType,
                                                 String replayRefLegId,
                                                 CurrencyIsoCode currency) {
@@ -834,7 +836,8 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
-        public Money sumConsumedReplayLegAmount(String referenceTransactionSn,
+        public Money sumConsumedReplayLegAmount(Long tenantId,
+                                                String referenceTransactionSn,
                                                 FundsTransactionEventType eventType,
                                                 String replayRefLegId,
                                                 CurrencyIsoCode currency,
@@ -844,12 +847,12 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(Long tenantId, String transactionSn) {
             return Optional.empty();
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(String freezeOrderSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(Long tenantId, String freezeOrderSn) {
             return Optional.empty();
         }
     }
@@ -863,7 +866,7 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(Long tenantId, String transactionSn) {
             return Optional.of(routeSnapshot);
         }
     }

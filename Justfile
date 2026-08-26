@@ -118,7 +118,7 @@ test-balance-control tests='FundsBalanceControlFailureFlowTests,FundsWithdrawalS
     @just _run-test-classes "{{tests}}" tests
 
 # Business flow and balance assertion tests.
-test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests,FundsBalanceAssertionSupportTests,FundsTransactionProjectionBusinessScenarioTests,GlobalAccountAchBusinessFlowTests,AgentCommissionSettlementBusinessFlowTests,AcquiringSettlementBusinessFlowTests,FundsBenefitContributionTransactionServiceFlowTests':
+test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests,FundsBalanceAssertionSupportTests,FundsTransactionProjectionBusinessScenarioTests,GlobalAccountAchBusinessFlowTests,AgentCommissionSettlementBusinessFlowTests,AcquiringSettlementBusinessFlowTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, wallet, and module dependency boundary tests.

@@ -28,6 +28,7 @@ import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -43,11 +44,10 @@ import java.util.TreeMap;
 /**
  * 控制额度变动流水服务实现。
  *
- * @author Codex
- * @date 2026-06-23
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class SpendControlMovementServiceImpl implements SpendControlMovementService {
 
     private static final String SHA256_PREFIX = "sha256:";
@@ -84,6 +84,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         SpendControlMovementDTO existing = findSpendControlMovement(request.getTenantId(), request.getMovementSn());
         if (existing != null) {
             assertSameMovement(request, existing);
+            logIdempotentMovementReuse(existing);
             return existing;
         }
         validateRecordRequest(request);
@@ -98,6 +99,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         if (concurrentExisting != null) {
             SpendControlMovementDTO result = toDTO(concurrentExisting);
             assertSameMovement(request, result);
+            logIdempotentMovementReuse(result);
             return result;
         }
         Long id;
@@ -110,7 +112,12 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         AssertUtils.isTrue(incrementTargetAccountVersion(request, targetSubjectType, version) == 1,
                 "控制额度变动目标账户并发冲突，请重试，accountId = {}",
                 request.getTargetAccountId());
-        return getSpendControlMovementById(id);
+        SpendControlMovementDTO result = getSpendControlMovementById(id);
+        log.info("控制额度变动记录完成，等待事务提交，tenantId = {}, movementSn = {}, movementType = {}, "
+                        + "businessScene = {}, businessSn = {}, transactionSn = {}, amount = {}, currency = {}",
+                result.getTenantId(), result.getMovementSn(), result.getMovementType(), result.getBusinessScene(),
+                result.getBusinessSn(), result.getTransactionSn(), result.getAmount(), result.getCurrency());
+        return result;
     }
 
     @Override
@@ -232,7 +239,16 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         }
         SpendControlMovementDTO result = toDTO(existing);
         assertSameMovement(request, result);
+        logIdempotentMovementReuse(result);
         return result;
+    }
+
+    private void logIdempotentMovementReuse(SpendControlMovementDTO movement) {
+        log.info("控制额度变动幂等复用，tenantId = {}, movementSn = {}, movementType = {}, businessScene = {}, "
+                        + "businessSn = {}, transactionSn = {}, amount = {}, currency = {}",
+                movement.getTenantId(), movement.getMovementSn(), movement.getMovementType(),
+                movement.getBusinessScene(), movement.getBusinessSn(), movement.getTransactionSn(),
+                movement.getAmount(), movement.getCurrency());
     }
 
     private void assertSameMovement(RecordSpendControlMovementRequest request, SpendControlMovementDTO existing) {
@@ -407,7 +423,8 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private Integer lockTargetAccountVersion(RecordSpendControlMovementRequest request,
                                              FundsSubjectType targetSubjectType) {
-        // ponytail: account-row serialization is intentionally coarse; split by control scope only after contention is measured.
+        // ponytail: 账户行级串行化是有意的粗粒度控制；
+        // 仅在确认存在锁竞争后再按控制范围拆分。
         return switch (targetSubjectType) {
             case FUNDING_ACCOUNT -> fundingAccountMapper.selectVersionBySnForUpdate(
                     request.getTenantId(), request.getTargetAccountId().id());

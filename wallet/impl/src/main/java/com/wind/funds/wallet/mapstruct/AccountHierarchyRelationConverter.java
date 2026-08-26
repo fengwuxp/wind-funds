@@ -9,7 +9,7 @@ import org.mapstruct.factory.Mappers;
 /**
  * 账户层级关系模型转换器。
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface AccountHierarchyRelationConverter {
 
     AccountHierarchyRelationConverter INSTANCE = Mappers.getMapper(AccountHierarchyRelationConverter.class);

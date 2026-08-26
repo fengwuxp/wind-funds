@@ -226,8 +226,8 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
                 FundsTransactionState.CLOSED, CURRENCY));
         assertThatThrownBy(() -> guardService.recordResult(
                 recordRequest(order.getSn(), "cross-tenant-transaction", "tenant"), WindOperatorFactory.system()))
-                .isInstanceOf(BaseException.class)
-                .hasMessageContaining("租户不一致");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("追偿资金交易不存在");
 
         queryService.put(transaction("wrong-currency-transaction", TENANT_ID,
                 FundsTransactionState.CLOSED, CurrencyIsoCode.EUR));
@@ -446,8 +446,9 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
         }
 
         @Override
-        public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {
-            return Optional.ofNullable(transactions.get(transactionSn));
+        public Optional<FundsTransactionDTO> findFundsTransactionBySn(Long tenantId, String transactionSn) {
+            return Optional.ofNullable(transactions.get(transactionSn))
+                    .filter(transaction -> tenantId.equals(transaction.getTenantId()));
         }
 
         @Override
@@ -464,19 +465,21 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
         }
 
         @Override
-        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(String transactionSn) {
+        public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(Long tenantId, String transactionSn) {
             return List.of();
         }
 
         @Override
-        public boolean hasConsumedReplayLeg(String referenceTransactionSn,
+        public boolean hasConsumedReplayLeg(Long tenantId,
+                                            String referenceTransactionSn,
                                             FundsTransactionEventType eventType,
                                             String replayRefLegId) {
             return false;
         }
 
         @Override
-        public Money sumConsumedReplayLegAmount(String referenceTransactionSn,
+        public Money sumConsumedReplayLegAmount(Long tenantId,
+                                                String referenceTransactionSn,
                                                 FundsTransactionEventType eventType,
                                                 String replayRefLegId,
                                                 CurrencyIsoCode currency) {
@@ -484,12 +487,12 @@ class RecoveryOrderApplicationServiceTests extends FundsTransactionFlowTestSuppo
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(Long tenantId, String transactionSn) {
             return Optional.empty();
         }
 
         @Override
-        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(String freezeOrderSn) {
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(Long tenantId, String freezeOrderSn) {
             return Optional.empty();
         }
     }

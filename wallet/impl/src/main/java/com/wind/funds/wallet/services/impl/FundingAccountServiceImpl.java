@@ -19,6 +19,7 @@ import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +27,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 真实资金账户服务实现。
  *
- * @author Codex
- * @date 2026-05-07
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class FundingAccountServiceImpl implements FundingAccountService {
 
     private final FundingAccountMapper fundingAccountMapper;
@@ -52,6 +52,10 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                 .setCurrency(entity.getCurrency())
                 .setLedgerProfileCode(entity.getLedgerProfileCode())
                 .setLedgerProfileVersion(entity.getLedgerProfileVersion()));
+        log.info("资金账户创建完成，等待事务提交，tenantId = {}, accountSn = {}, accountType = {}, state = {}, "
+                        + "currency = {}, ledgerProfileCode = {}, ledgerProfileVersion = {}",
+                entity.getTenantId(), entity.getSn(), entity.getAccountType(), entity.getState(), entity.getCurrency(),
+                entity.getLedgerProfileCode(), entity.getLedgerProfileVersion());
         return entity.getId();
     }
 

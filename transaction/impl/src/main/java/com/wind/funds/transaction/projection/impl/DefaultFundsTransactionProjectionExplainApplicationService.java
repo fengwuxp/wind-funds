@@ -58,16 +58,17 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
             @NonNull FundsTransactionProjectionExplainQuery query) {
         AssertUtils.notNull(query, "交易投影解释查询条件不能为空");
         AssertUtils.hasText(query.fundsTransactionSn(), "交易投影解释资金交易流水不能为空");
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(query.fundsTransactionSn())
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                        query.tenantId(), query.fundsTransactionSn())
                 .orElseThrow(() -> new IllegalArgumentException("资金交易不存在，transactionSn = "
                         + query.fundsTransactionSn()));
         RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
-                .findRouteSnapshotByTransactionSn(query.fundsTransactionSn())
+                .findRouteSnapshotByTransactionSn(query.tenantId(), query.fundsTransactionSn())
                 .orElseThrow(() -> new IllegalArgumentException("资金交易缺少 RouteSnapshot，transactionSn = "
                         + query.fundsTransactionSn()));
         assertRouteSnapshotMatchesTransaction(transaction, routeSnapshot);
         List<FundsTransactionDetailDTO> details = fundsTransactionQueryService
-                .queryFundsTransactionDetails(query.fundsTransactionSn());
+                .queryFundsTransactionDetails(query.tenantId(), query.fundsTransactionSn());
         AssertUtils.notEmpty(details, "交易投影解释缺少资金交易明细，transactionSn = {}",
                 query.fundsTransactionSn());
         FundsTransactionDetailDTO primaryDetail = resolvePrimaryDetail(details);
@@ -117,6 +118,7 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
                     ? cursor.transactionUpperBoundId() : transactions.getLast().getId();
             facts.addAll(transactions.stream()
                     .map(transaction -> explain(FundsTransactionProjectionExplainQuery.builder()
+                            .tenantId(transaction.getTenantId())
                             .fundsTransactionSn(transaction.getSn())
                             .build()))
                     .filter(explanation -> matchesEvent(query, explanation.eventType()))
@@ -153,7 +155,8 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
     private FundsTransactionProjectionExplanation explainFrozenOrder(FundsFrozenOrder order) {
         Map<String, Object> context = parseContextVariables(order.getContextVariables());
         FundsTransactionEventType eventType = resolveFrozenOrderEventType(context);
-        RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(order.getSn())
+        RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(
+                        order.getTenantId(), order.getSn())
                 .orElseThrow(() -> new IllegalArgumentException("资金冻结事实缺少 RouteSnapshot，freezeOrderSn = "
                         + order.getSn()));
         return FundsTransactionProjectionExplanationSource.builder()

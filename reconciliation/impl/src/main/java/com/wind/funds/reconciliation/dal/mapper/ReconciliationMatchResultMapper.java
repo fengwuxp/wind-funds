@@ -13,7 +13,11 @@ import org.apache.ibatis.annotations.Select;
 public interface ReconciliationMatchResultMapper extends BaseMapper<ReconciliationMatchResult> {
 
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_run_result_sn, reconciliation_batch_sn,
+                   reference_fact_owner_namespace, reference_fact_identity_value, comparison_fact_owner_namespace,
+                   comparison_fact_identity_value, comparison_owner_namespace, comparison_identity_value,
+                   result_kind, absolute_difference_currency, absolute_difference_amount, larger_side,
+                   evidence_refs, match_identity_digest, result_digest, created_by
             FROM t_reconciliation_match_result
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
@@ -24,7 +28,11 @@ public interface ReconciliationMatchResultMapper extends BaseMapper<Reconciliati
      * 按运行结果和来源对身份查询匹配结果。
      */
     @Select("""
-            SELECT *
+            SELECT id, gmt_create, sn, tenant_id, reconciliation_run_result_sn, reconciliation_batch_sn,
+                   reference_fact_owner_namespace, reference_fact_identity_value, comparison_fact_owner_namespace,
+                   comparison_fact_identity_value, comparison_owner_namespace, comparison_identity_value,
+                   result_kind, absolute_difference_currency, absolute_difference_amount, larger_side,
+                   evidence_refs, match_identity_digest, result_digest, created_by
             FROM t_reconciliation_match_result
             WHERE tenant_id = #{tenantId}
               AND reconciliation_run_result_sn = #{reconciliationRunResultSn}

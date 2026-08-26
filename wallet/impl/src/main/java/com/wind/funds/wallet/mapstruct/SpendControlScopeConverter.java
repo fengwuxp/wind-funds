@@ -7,31 +7,34 @@ import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * SpendControlScope model converter.
+ * SpendControlScope 模型转换器。
  *
- * @author Codex
- * @date 2026-05-08
  */
-@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface SpendControlScopeConverter {
 
     SpendControlScopeConverter INSTANCE = Mappers.getMapper(SpendControlScopeConverter.class);
 
     /**
-     * CreateSpendControlScopeRequest convert to SpendControlScope.
+     * 将 CreateSpendControlScopeRequest 转换为 SpendControlScope。
      *
      * @param request 创建请求
      * @return SpendControlScope 实例
      */
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "gmtCreate", ignore = true)
+    @Mapping(target = "gmtModified", ignore = true)
+    @Mapping(target = "version", ignore = true)
     SpendControlScope convertToSpendControlScope(CreateSpendControlScopeRequest request);
 
     /**
-     * SpendControlScope convert to SpendControlScopeDTO.
+     * 将 SpendControlScope 转换为 SpendControlScopeDTO。
      *
      * @param data SpendControlScope 实例
      * @return SpendControlScopeDTO 实例
@@ -39,7 +42,7 @@ public interface SpendControlScopeConverter {
     SpendControlScopeDTO convertToSpendControlScopeDTO(SpendControlScope data);
 
     /**
-     * Fill create defaults after same-name field mapping.
+     * 在同名字段映射后补齐创建默认值。
      *
      * @param request 创建请求
      * @param entity 支出控制范围实体

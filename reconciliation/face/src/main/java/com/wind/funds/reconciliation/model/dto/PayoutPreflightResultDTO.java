@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDecisionResult;
@@ -60,8 +60,8 @@ public class PayoutPreflightResultDTO implements Serializable {
     @Schema(description = "建议操作")
     private PayoutPreflightAction action;
 
-    @Schema(description = "外部规则核验状态")
-    private ExternalRuleVerificationStatus externalRuleVerificationStatus;
+    @Schema(description = "外部规则核验结果")
+    private ExternalRuleVerificationResult externalRuleVerificationResult;
 
     @Schema(description = "本次只读预检解释的精确阶段引用")
     private GateStageRef stageRef;

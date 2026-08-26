@@ -7,6 +7,7 @@ import com.wind.funds.reconciliation.model.value.ComparisonRuleRef;
 import com.wind.funds.reconciliation.model.value.StableIdentity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 import org.springframework.util.StringUtils;
 
@@ -15,7 +16,7 @@ import java.util.List;
 /**
  * 对账运行结果模型转换器。
  */
-@Mapper
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface ReconciliationRunResultConverter {
 
     ReconciliationRunResultConverter INSTANCE = Mappers.getMapper(ReconciliationRunResultConverter.class);
@@ -25,7 +26,7 @@ public interface ReconciliationRunResultConverter {
     @Mapping(target = "scopeIdentity", expression = "java(identity(source.getScopeOwnerNamespace(), source.getScopeIdentityValue()))")
     @Mapping(target = "pairIdentity", expression = "java(identity(source.getPairOwnerNamespace(), source.getPairIdentityValue()))")
     @Mapping(target = "comparisonRuleRef", expression = "java(rule(source.getRuleNamespace(), source.getRuleIdentity(), source.getRuleVersion()))")
-    ReconciliationRunResultDTO toDTO(ReconciliationRunResult source);
+    ReconciliationRunResultDTO convertToReconciliationRunResultDTO(ReconciliationRunResult source);
 
     default List<String> parseEvidenceRefs(String value) {
         return StringUtils.hasText(value) ? List.copyOf(WindJson.parseArray(value, String.class)) : List.of();

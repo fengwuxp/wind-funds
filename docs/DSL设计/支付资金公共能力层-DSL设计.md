@@ -664,7 +664,7 @@ MIG-04 不新增 action kind、Intent/Attempt、责任 snapshot、route provenan
 3. Ledger 持有 Ledger profile、posting、LedgerTransaction/Entry、Balance projection 和窄只读事实；Wallet 的 Ledger wrapper/DTO 不是新的稳定 DSL，也不能成为长期公共契约。
 4. Host/Consumer 持有 Benefit 等场景事实。场景 facade 退出 Provider 时只能归一到已有资金 DSL，不得为迁移增加万能 action、registry、factory 或 context 扩展槽。
 
-模块搬迁不得改变任何公共事实的 identity、Money、outcome/effect、original refs、route provenance 或 SemanticDigest。不存在兼容 alias、双 DTO、双读/双写或按 Consumer 选择旧/新 Owner；若真实调用清册、MIG-05 原 LedgerTransaction 引用解析合同或 MIG-08 可部署 Consumer E4 未闭合，对应对象保持未迁移并阻断整个原子切换。MIG-05 文档方向 PASS 不代替该物理契约准入。
+模块搬迁不得改变任何公共事实的 identity、Money、outcome/effect、original refs、route provenance 或 SemanticDigest。不存在兼容 alias、双 DTO、双读/双写或按 Consumer 选择旧/新 Owner；若真实调用清册、MIG-05 原 LedgerTransaction 引用解析合同或目标 Consumer E4 未闭合，对应对象保持未迁移并阻断整个原子切换。`D-R8B-001` 已确认 `capte-domain` 作为无独立数据库/部署进程的通用模块，其唯一制品、真实 Bean、联合 schema/事务和跨进程恢复组成的 library test host E4 已关闭本 Benefit Consumer 门槛；未来真实部署宿主 L4 仍独立等待。MIG-05 文档方向 PASS 不代替其物理契约准入。
 
 MIG-04 独立 Checker 最终判定 `PASS / 0 P0 / 0 P1 / 0 P2`。本 Profile 只证明迁移不需要扩展 DSL；该 PASS 当时只准进入 MIG-05 文档卡，当前活动状态见 10.12，不授权实现。
 

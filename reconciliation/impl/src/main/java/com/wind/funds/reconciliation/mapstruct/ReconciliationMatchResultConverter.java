@@ -6,6 +6,7 @@ import com.wind.funds.reconciliation.model.dto.ReconciliationMatchResultDTO;
 import com.wind.funds.reconciliation.model.value.StableIdentity;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 import org.springframework.util.StringUtils;
 
@@ -14,7 +15,7 @@ import java.util.List;
 /**
  * 对账逐笔匹配结果模型转换器。
  */
-@Mapper
+@Mapper(unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface ReconciliationMatchResultConverter {
 
     ReconciliationMatchResultConverter INSTANCE = Mappers.getMapper(ReconciliationMatchResultConverter.class);
@@ -24,7 +25,7 @@ public interface ReconciliationMatchResultConverter {
     @Mapping(target = "comparisonFactRef", expression = "java(nullableIdentity(source.getComparisonFactOwnerNamespace(), source.getComparisonFactIdentityValue()))")
     @Mapping(target = "comparisonIdentity", expression = "java(identity(source.getComparisonOwnerNamespace(), source.getComparisonIdentityValue()))")
     @Mapping(target = "evidenceRefs", expression = "java(parseEvidenceRefs(source.getEvidenceRefs()))")
-    ReconciliationMatchResultDTO toDTO(ReconciliationMatchResult source);
+    ReconciliationMatchResultDTO convertToReconciliationMatchResultDTO(ReconciliationMatchResult source);
 
     default StableIdentity identity(String ownerNamespace, String value) {
         return new StableIdentity().setOwnerNamespace(ownerNamespace).setValue(value);

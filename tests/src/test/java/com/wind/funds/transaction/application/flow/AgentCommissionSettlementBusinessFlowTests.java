@@ -23,7 +23,7 @@ import com.wind.funds.reconciliation.application.settlement.SettlementOrderAppli
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ClearingBatchState;
 import com.wind.funds.reconciliation.enums.ClearingSplittableAdmissionResult;
-import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
+import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutOrderState;
 import com.wind.funds.reconciliation.enums.SettlementDestination;
 import com.wind.funds.reconciliation.enums.SettlementMode;
@@ -625,7 +625,7 @@ class AgentCommissionSettlementBusinessFlowTests extends FundsTransactionFlowTes
                 .setJurisdiction("TEST")
                 .setVerifiedAt(LocalDate.now())
                 .setConfirmedBy("test-owner")
-                .setStatus(ExternalRuleVerificationStatus.VERIFIED);
+                .setVerificationResult(ExternalRuleVerificationResult.VERIFIED);
     }
 
     private String prepareGate(String stageKind,

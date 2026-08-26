@@ -201,7 +201,8 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
     }
 
     private FundsTransactionDTO requiredRecoveryTransaction(RecoveryOrder order, String transactionSn) {
-        FundsTransactionDTO transaction = fundsTransactionQueryService.queryFundsTransaction(transactionSn)
+        FundsTransactionDTO transaction = fundsTransactionQueryService.findFundsTransactionBySn(
+                        order.getTenantId(), transactionSn)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "追偿资金交易不存在，fundsTransactionSn = " + transactionSn));
         AssertUtils.equals(order.getTenantId(), transaction.getTenantId(), "追偿资金交易租户不一致");
@@ -212,7 +213,8 @@ public class RecoveryOrderApplicationServiceImpl implements RecoveryOrderApplica
         AssertUtils.isTrue(transaction.getAmount() > 0, "追偿资金交易金额必须大于 0");
         AssertUtils.equals(order.getCurrency(), transaction.getCurrency(), "追偿资金交易币种不一致");
 
-        List<FundsTransactionDetailDTO> details = fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
+        List<FundsTransactionDetailDTO> details = fundsTransactionQueryService.queryFundsTransactionDetails(
+                order.getTenantId(), transactionSn);
         boolean responsibleSubjectIncluded = details.stream().anyMatch(detail ->
                 detail.getState() == FundsTransactionDetailState.SUCCEEDED
                         && Objects.equals(order.getTenantId(), detail.getTenantId())
