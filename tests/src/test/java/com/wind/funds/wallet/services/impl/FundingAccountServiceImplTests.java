@@ -320,9 +320,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
-        FundsAccount accountView = fundsAccountQueryService.getAccount(
+        FundsAccount accountView = fundsAccountQueryService.getAccount(TENANT_ID,
                 FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
-        FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(
+        FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(TENANT_ID,
                 FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
 
         assertThat(account.getSn()).isEqualTo(ACCOUNT_SN);

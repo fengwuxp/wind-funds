@@ -121,7 +121,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 PlatformFundingAccountRole.CASH_MAPPING, instruction.getAmount(), instruction.getDescription()));
         participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, prepaymentAccount,
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
                 instruction.getAmount(), instruction.getDescription()));
         return route(instruction, FundsRouteCodes.TOPUP_STANDARD, participants, legs,
                 instruction.getExternalAccountRef(),
@@ -141,9 +142,11 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeAccountId)))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payerAccountId, true),
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(payerAccountId, true),
                 payerAccountId, instruction.getAmount(), instruction.getDescription()));
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payeeAccountId, false),
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(payeeAccountId, false),
                 payeeAccountId, instruction.getAmount(), instruction.getDescription()));
         return route(instruction, FundsRouteCodes.INTERNAL_TRANSFER_STANDARD, participants, legs, null);
     }
@@ -161,9 +164,11 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
                 instruction.getAmount(), instruction.getDescription()));
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payeeId, false), payeeId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(payeeId, false), payeeId,
                 instruction.getAmount(), instruction.getDescription()));
         return route(instruction, FundsRouteCodes.DIRECT_PAY_STANDARD, participants, legs, null);
     }
@@ -180,9 +185,11 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId)))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payerId, true), payerId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(payerId, true), payerId,
                 instruction.getAmount(), instruction.getDescription()));
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
                 instruction.getAmount(), instruction.getDescription()));
         return route(instruction, FundsRouteCodes.DIRECT_REFUND_STANDARD, participants, legs, null);
     }
@@ -208,7 +215,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .targetNode(targetNode(cashMappingSubject))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
-        participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
+        participants.add(subjectParticipant(instruction.getTenantId(),
+                routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
                 instruction.getAmount(), instruction.getDescription()));
         participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, prepaymentAccount,
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
@@ -321,7 +329,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount)))
                 .build());
         List<RouteParticipantSpec> participants = routeParticipantFactory.distinct(List.of(
-                subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
+                subjectParticipant(instruction.getTenantId(),
+                        routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
                         instruction.getAmount(), instruction.getDescription()),
                 platformParticipant(RouteParticipantRole.FEE_RECEIVER, feeAccount,
                         PlatformFundingAccountRole.FEE, instruction.getAmount(), instruction.getDescription())
@@ -368,13 +377,15 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         return result;
     }
 
-    private RouteParticipantSpec subjectParticipant(RouteParticipantRole role,
+    private RouteParticipantSpec subjectParticipant(Long tenantId,
+                                                    RouteParticipantRole role,
                                                     FundsAccountId accountId,
                                                     Money amount,
                                                     String description) {
         return routeParticipantFactory.createParticipant(role,
                 routeSubjectSupport.createSubjectRef(accountId),
-                routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), amount, description, Map.of());
+                routeSubjectSupport.resolveLedgerProfileCode(tenantId, accountId).name(),
+                amount, description, Map.of());
     }
 
     private RouteParticipantSpec platformParticipant(RouteParticipantRole role,

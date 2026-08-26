@@ -250,7 +250,8 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
     }
 
     private void validateReleaseAccount(FundsAccountId accountId, Money amount) {
-        FundsAccount account = fundsAccountQueryService.getAccount(accountId);
+        FundsAccount account = fundsAccountQueryService.getAccount(
+                TenantContextHolder.requireTenantId(), accountId);
         AssertUtils.isTrue(account.isAvailable(), "结算释放资金账户不可用，accountId = {}", accountId);
         AssertUtils.equals(account.getCurrency(), amount.getCurrency(),
                 "结算释放金额币种必须与账户币种一致，accountId = {}", accountId);
@@ -267,7 +268,8 @@ public class FundsSettlementTransactionServiceImpl implements FundsSettlementTra
         AssertUtils.notNull(request.getAmount(), "结算锁定金额不能为空");
         AssertUtils.isTrue(request.getAmount().getAmount() > 0, "结算锁定金额必须大于 0");
         AssertUtils.hasText(request.getSettlementOrderSn(), "结算单流水号不能为空");
-        FundsAccount account = fundsAccountQueryService.getAccount(request.getAccountId());
+        FundsAccount account = fundsAccountQueryService.getAccount(
+                TenantContextHolder.requireTenantId(), request.getAccountId());
         AssertUtils.isTrue(account.isAvailable(), "结算资金账户不可用，accountId = {}", request.getAccountId());
         AssertUtils.equals(account.getCurrency(), request.getAmount().getCurrency(),
                 "结算锁定金额币种必须与账户币种一致，accountId = {}", request.getAccountId());

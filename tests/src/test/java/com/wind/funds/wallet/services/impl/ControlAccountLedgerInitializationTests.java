@@ -137,7 +137,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         Long accountId = creditAccountService.createCreditAccount(createCreditAccountRequest());
 
         CreditAccountDTO account = creditAccountService.getCreditAccountById(accountId);
-        FundsAccount accountView = fundsAccountQueryService.getAccount(
+        FundsAccount accountView = fundsAccountQueryService.getAccount(TENANT_ID,
                 FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN);
 

@@ -76,7 +76,8 @@ public class FundsDirectTransactionInstructionConverter {
         boolean hasExternalFact = StringUtils.hasText(request.getExternalFundsFactSn());
         AssertUtils.isTrue(hasExternalSource == hasExternalFact,
                 "外部资金事实来源编码和流水号必须同时提供");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
@@ -126,7 +127,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "系统内转账收款账户不能是外部账户");
         assertNotSpendControlScope(request.getPayerAccountId(), "系统内转账付款账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayeeAccountId(), "系统内转账收款账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
@@ -160,7 +162,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "直接付款收款主体不能是外部账户");
         assertNotSpendControlScope(request.getAccountId(), "直接付款账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayeeId(), "直接付款收款主体不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
@@ -237,7 +240,8 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getPayerLedgerSubjectCode(), "业务确认型直接退款出资账目不能为空");
         assertNotSpendControlScope(request.getAccountId(), "业务确认型直接退款到账账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayerId(), "业务确认型直接退款出资主体不能是支出控制范围");
-        return amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        return amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(), request.getAccountId());
     }
 
     private @Nullable FundsInstructionReferenceSpec refundReference(
@@ -262,7 +266,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "提现账户不能是外部账户");
         AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
         assertNotSpendControlScope(request.getAccountId(), "提现账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
@@ -298,7 +303,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "手续费支出账户不能是外部账户");
         AssertUtils.notNull(request.getFeeType(), "手续费类型不能为空");
         assertNotSpendControlScope(request.getAccountId(), "手续费支出账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(
+                TenantContextHolder.requireTenantId(), request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -326,7 +332,8 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "手续费退回到账账户不能是外部账户");
         assertNotSpendControlScope(request.getAccountId(), "手续费退回到账账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())

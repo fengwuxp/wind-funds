@@ -54,7 +54,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionAuthorizeRequest request,
             @NonNull WindOperator operator) {
         assertNotSpendControlScope(request.getAccountId(), "授权交易账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put(FundsInstructionContextKeys.APPROVED, request.getApproved());
@@ -93,7 +94,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionReversalRequest request,
             @NonNull WindOperator operator,
             @NonNull String referenceLedgerTransactionSn) {
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
@@ -121,7 +123,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionCompleteRequest request,
             @NonNull WindOperator operator,
             @Nullable String referenceLedgerTransactionSn) {
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         FundsInstructionReferenceSpec reference = null;
@@ -170,7 +173,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionRefundRequest request,
             @NonNull WindOperator operator,
             @Nullable String referenceLedgerTransactionSn) {
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(TenantContextHolder.requireTenantId(),
+                request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         FundsInstructionReferenceSpec reference;

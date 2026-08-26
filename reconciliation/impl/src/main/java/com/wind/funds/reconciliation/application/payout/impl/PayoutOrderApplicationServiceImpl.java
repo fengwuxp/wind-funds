@@ -173,7 +173,7 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
     private void assertWithdrawAllowed(PayoutOrder order) {
         FundsAccountId accountId = FundsAccountId.immutable(
                 order.getSettlementSubjectId(), order.getSettlementSubjectType());
-        FundsAccount account = fundsAccountQueryService.getAccount(accountId);
+        FundsAccount account = fundsAccountQueryService.getAccount(order.getTenantId(), accountId);
         AssertUtils.isTrue(account.canWithdraw(),
                 "结算资金账户不具备 WITHDRAW 能力，accountId = {}, accountType = {}, capabilitySource = {}",
                 accountId.id(), accountId.type(), account.getCapabilitySource());

@@ -81,7 +81,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private ResolvedRouteSpec resolveFreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
-        assertEnoughAvailableBalance(accountId, instruction.getAmount());
+        assertEnoughAvailableBalance(instruction.getTenantId(), accountId, instruction.getAmount());
         List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(
                 FundsRouteLegIds.FREEZE, 1, RouteLegType.HOLD, instruction)
                 .sourceNode(RouteSpecSupport.sourceNode(routeSubjectSupport.createSubjectRef(accountId)))
@@ -92,8 +92,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         return route(instruction, FundsRouteCodes.BALANCE_FREEZE_STANDARD, participants, legs);
     }
 
-    private void assertEnoughAvailableBalance(FundsAccountId accountId, Money amount) {
-        Money beforeBalance = fundsAccountQueryService.getBalance(accountId).getAvailableBalance();
+    private void assertEnoughAvailableBalance(Long tenantId, FundsAccountId accountId, Money amount) {
+        Money beforeBalance = fundsAccountQueryService.getBalance(tenantId, accountId).getAvailableBalance();
         long beforeAmount = beforeBalance.getAmount();
         long balanceDelta = -amount.getAmount();
         long afterAmount = beforeAmount + balanceDelta;
@@ -256,7 +256,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private RouteParticipantSpec subjectParticipant(FundsAccountId accountId, FundsInstructionSpec instruction) {
         return routeParticipantFactory.createParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true),
                 routeSubjectSupport.createSubjectRef(accountId),
-                routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),
+                routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
+                instruction.getAmount(),
                 instruction.getDescription(), Map.of());
     }
 

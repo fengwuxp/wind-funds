@@ -65,7 +65,8 @@ public class RouteSubjectSupport {
         return sourceSide ? RouteParticipantRole.PAYER : RouteParticipantRole.PAYEE;
     }
 
-    public @NonNull LedgerProfileCode resolveLedgerProfileCode(@NonNull FundsAccountId accountId) {
+    public @NonNull LedgerProfileCode resolveLedgerProfileCode(@NonNull Long tenantId,
+                                                                @NonNull FundsAccountId accountId) {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return LedgerProfileCode.CREDIT_BASIC;
         }
@@ -73,7 +74,7 @@ public class RouteSubjectSupport {
             throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能解析账本 Profile，accountId = "
                     + accountId);
         }
-        return fundsAccountQueryService.getLedgerProfileCode(accountId);
+        return fundsAccountQueryService.getLedgerProfileCode(tenantId, accountId);
     }
 
     public boolean isFundingAccount(@NonNull FundsAccountId accountId) {

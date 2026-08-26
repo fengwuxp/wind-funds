@@ -33,7 +33,7 @@ public class FundsAccountCapabilityApplicationServiceImpl implements FundsAccoun
     public @NonNull FundsAccountCapabilityDecisionDTO resolveFundsAccountCapability(
             @NonNull ResolveFundsAccountCapabilityRequest request) {
         validateRequest(request);
-        FundsAccount account = fundsAccountQueryService.getAccount(request.getAccountId());
+        FundsAccount account = fundsAccountQueryService.getAccount(request.getTenantId(), request.getAccountId());
         AssertUtils.isTrue(Objects.equals(account.getTenantId(), request.getTenantId()),
                 "资金账户租户不匹配，accountId = {}，tenantId = {}",
                 request.getAccountId(),

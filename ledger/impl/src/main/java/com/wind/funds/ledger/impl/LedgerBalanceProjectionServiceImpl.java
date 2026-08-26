@@ -20,7 +20,6 @@ import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.transaction.support.FundsInstructionContextValidator;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,8 +47,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class LedgerBalanceProjectionServiceImpl {
 
-    private final FundsAccountQueryService fundsAccountQueryService;
-
     private final LedgerService ledgerService;
 
     private final LedgerMapper ledgerMapper;
@@ -65,8 +62,6 @@ public class LedgerBalanceProjectionServiceImpl {
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
         Map<Long, List<LedgerEntrySpec>> groups = entries.stream()
                 .collect(Collectors.groupingBy(this::requireLedgerId, LinkedHashMap::new, Collectors.toList()));
-        // 仅校验账务主体存在；余额约束由下方账本读取和原子更新保证。
-        fundsAccountQueryService.getAccount(accountId);
         List<ProjectionCommand> commands = groups.entrySet().stream()
                 .map(entry -> prepareProjectionCommand(entry.getKey(), entry.getValue()))
                 .toList();
@@ -376,10 +371,6 @@ public class LedgerBalanceProjectionServiceImpl {
         return value;
     }
 
-
-    public boolean supports(@NonNull FundsAccountId accountId) {
-        return fundsAccountQueryService.supports(accountId);
-    }
 
     private record ProjectionDelta(long balanceDelta, long debitAmountDelta, long creditAmountDelta) {
     }

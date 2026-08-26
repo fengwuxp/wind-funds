@@ -157,13 +157,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         String authorizationSn = authorize(user, 60L, true, "OWNED_FUNDS_BALANCE_AUTHORIZE");
 
-        FundsAccountBalanceView afterAuthorize = fundsAccountQueryService.getBalance(user);
+        FundsAccountBalanceView afterAuthorize = fundsAccountQueryService.getBalance(TENANT_ID, user);
         assertThat(afterAuthorize.getAuthorizationBalance()).isEqualTo(Money.immutable(60L, CURRENCY));
         assertThat(afterAuthorize.getTotalBalance()).isEqualTo(Money.immutable(100L, CURRENCY));
 
         completeAuthorization(user, 60L, authorizationSn, "OWNED_FUNDS_BALANCE_COMPLETE");
 
-        assertThat(fundsAccountQueryService.getBalance(user).getTotalBalance())
+        assertThat(fundsAccountQueryService.getBalance(TENANT_ID, user).getTotalBalance())
                 .isEqualTo(Money.immutable(40L, CURRENCY));
     }
 
@@ -175,7 +175,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
      */
     @Test
     void testTotalBalanceShouldRejectUndefinedProfile() {
-        assertThatThrownBy(() -> fundsAccountQueryService.getBalance(settlementAccount()).getTotalBalance())
+        assertThatThrownBy(() -> fundsAccountQueryService.getBalance(
+                TENANT_ID, settlementAccount()).getTotalBalance())
                 .hasMessageContaining("口径尚未定义");
     }
 

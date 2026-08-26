@@ -66,7 +66,7 @@ public class ClearingFundsInstructionRouteResolver implements RouteResolver, Ord
         RouteParticipantSpec participant = routeParticipantFactory.createParticipant(
                 RouteParticipantRole.PAYEE,
                 routeSubjectSupport.createSubjectRef(accountId),
-                routeSubjectSupport.resolveLedgerProfileCode(accountId).name(),
+                routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
                 instruction.getAmount(),
                 instruction.getDescription(),
                 Map.of());

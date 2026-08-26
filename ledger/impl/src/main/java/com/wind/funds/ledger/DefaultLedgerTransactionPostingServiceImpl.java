@@ -14,6 +14,7 @@ import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.ledger.spec.LedgerEntrySpec;
 import com.wind.funds.ledger.spec.LedgerPostingPlanSpec;
 import com.wind.funds.ledger.spec.LedgerTransactionSpec;
@@ -52,6 +53,8 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     private final LedgerTransactionCommandService ledgerTransactionCommandService;
 
     private final LedgerService ledgerService;
+
+    private final FundsAccountQueryService fundsAccountQueryService;
 
     private final LedgerBalanceProjectionServiceImpl ledgerBalanceProjectionService;
 
@@ -106,7 +109,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 .map(ProjectionGroupKey::accountId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         accountIds.forEach(accountId -> AssertUtils.isTrue(
-                ledgerBalanceProjectionService.supports(accountId),
+                fundsAccountQueryService.supports(transaction.getTenantId(), accountId),
                 "未找到支持的账本余额投影服务，accountId = {}",
                 accountId));
         LedgerTransactionPostResult postResult = ledgerTransactionCommandService.postLedgerTransaction(transaction);

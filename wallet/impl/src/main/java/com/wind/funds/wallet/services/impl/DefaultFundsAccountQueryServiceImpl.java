@@ -65,8 +65,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     private final LedgerService ledgerService;
 
     @Override
-    public @NonNull FundsAccount getAccount(@NonNull FundsAccountId accountId) {
-        ResolvedFundsSubject subject = findRequired(accountId);
+    public @NonNull FundsAccount getAccount(@NonNull Long tenantId, @NonNull FundsAccountId accountId) {
+        ResolvedFundsSubject subject = findRequired(tenantId, accountId);
         FundsAccountCapabilitySourceResolver.AccountCapabilityResolution capabilityResolution =
                 FundsAccountCapabilitySourceResolver.resolve(
                         subject.ledgerProfileCode(),
@@ -85,13 +85,14 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Override
-    public @NonNull LedgerProfileCode getLedgerProfileCode(@NonNull FundsAccountId accountId) {
-        return findRequired(accountId).ledgerProfileCode();
+    public @NonNull LedgerProfileCode getLedgerProfileCode(@NonNull Long tenantId,
+                                                            @NonNull FundsAccountId accountId) {
+        return findRequired(tenantId, accountId).ledgerProfileCode();
     }
 
     @Override
-    public @NonNull FundsAccountBalanceView getBalance(@NonNull FundsAccountId accountId) {
-        ResolvedFundsSubject subject = findRequired(accountId);
+    public @NonNull FundsAccountBalanceView getBalance(@NonNull Long tenantId, @NonNull FundsAccountId accountId) {
+        ResolvedFundsSubject subject = findRequired(tenantId, accountId);
         List<LedgerDTO> ledgers = loadLedgers(subject);
         return ImmutableFundsBalanceView.builder()
                 .id(subject.id())
@@ -104,8 +105,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Override
-    public boolean supports(@NonNull FundsAccountId accountId) {
-        return findNullable(accountId) != null;
+    public boolean supports(@NonNull Long tenantId, @NonNull FundsAccountId accountId) {
+        return findNullable(tenantId, accountId) != null;
     }
 
     @Override
@@ -124,23 +125,23 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         return queryCurrentBalance(query, query.getSubjectRefs().getFirst(), true);
     }
 
-    private ResolvedFundsSubject findRequired(FundsAccountId accountId) {
-        ResolvedFundsSubject result = findNullable(accountId);
+    private ResolvedFundsSubject findRequired(Long tenantId, FundsAccountId accountId) {
+        ResolvedFundsSubject result = findNullable(tenantId, accountId);
         AssertUtils.notNull(result, "资金主体不存在，accountId = {}", accountId);
         return result;
     }
 
     @Nullable
-    private ResolvedFundsSubject findNullable(FundsAccountId accountId) {
+    private ResolvedFundsSubject findNullable(Long tenantId, FundsAccountId accountId) {
         FundsSubjectType subjectType = parseSubjectType(accountId.type());
         if (subjectType != null) {
-            return findBySubjectType(subjectType, accountId.id());
+            return findBySubjectType(tenantId, subjectType, accountId.id());
         }
-        FundingAccountDTO fundingAccount = findFundingAccount(accountId);
+        FundingAccountDTO fundingAccount = findFundingAccount(tenantId, accountId);
         if (fundingAccount != null) {
             return ResolvedFundsSubject.from(fundingAccount);
         }
-        CreditAccountDTO creditAccount = findCreditAccount(accountId);
+        CreditAccountDTO creditAccount = findCreditAccount(tenantId, accountId);
         if (creditAccount != null) {
             return ResolvedFundsSubject.from(creditAccount);
         }
@@ -148,14 +149,16 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Nullable
-    private ResolvedFundsSubject findBySubjectType(FundsSubjectType subjectType, String subjectId) {
+    private ResolvedFundsSubject findBySubjectType(Long tenantId,
+                                                   FundsSubjectType subjectType,
+                                                   String subjectId) {
         return switch (subjectType) {
             case FUNDING_ACCOUNT -> {
-                FundingAccountDTO account = findFundingAccountBySn(subjectId);
+                FundingAccountDTO account = findFundingAccountBySn(tenantId, subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
             case CREDIT_ACCOUNT -> {
-                CreditAccountDTO account = findCreditAccountBySn(subjectId);
+                CreditAccountDTO account = findCreditAccountBySn(tenantId, subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
         };
@@ -172,28 +175,32 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Nullable
-    private FundingAccountDTO findFundingAccountBySn(String sn) {
+    private FundingAccountDTO findFundingAccountBySn(Long tenantId, String sn) {
         return querySingleFundingAccount(new FundingAccountQuery()
+                .setTenantId(tenantId)
                 .setSn(sn));
     }
 
     @Nullable
-    private FundingAccountDTO findFundingAccount(FundsAccountId accountId) {
+    private FundingAccountDTO findFundingAccount(Long tenantId, FundsAccountId accountId) {
         return querySingleFundingAccount(new FundingAccountQuery()
+                .setTenantId(tenantId)
                 .setSn(accountId.id())
                 .setAccountType(accountId.type()));
     }
 
     @Nullable
-    private CreditAccountDTO findCreditAccount(FundsAccountId accountId) {
+    private CreditAccountDTO findCreditAccount(Long tenantId, FundsAccountId accountId) {
         return querySingleCreditAccount(new CreditAccountQuery()
+                .setTenantId(tenantId)
                 .setSn(accountId.id())
                 .setAccountType(accountId.type()));
     }
 
     @Nullable
-    private CreditAccountDTO findCreditAccountBySn(String sn) {
+    private CreditAccountDTO findCreditAccountBySn(Long tenantId, String sn) {
         return querySingleCreditAccount(new CreditAccountQuery()
+                .setTenantId(tenantId)
                 .setSn(sn));
     }
 
@@ -216,7 +223,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     private FundsSubjectBalanceDTO queryCurrentBalance(FundsSubjectBalanceQuery query,
                                                        FundsAccountId subjectRef,
                                                        boolean requireCompleteLedger) {
-        ResolvedFundsSubject subject = findRequired(subjectRef);
+        ResolvedFundsSubject subject = findRequired(query.getTenantId(), subjectRef);
         AssertUtils.isTrue(Objects.equals(subject.tenantId(), query.getTenantId()),
                 "资金主体租户不匹配，accountId = {}，tenantId = {}", subjectRef, query.getTenantId());
         AssertUtils.isTrue(subject.currency() == query.getCurrency(),

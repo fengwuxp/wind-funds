@@ -76,7 +76,8 @@ public class FundsClearingTransactionServiceImpl implements FundsClearingTransac
         AssertUtils.isTrue(request.getSourceTransactionSns().stream().distinct().count()
                         == request.getSourceTransactionSns().size(),
                 "清算来源交易流水号不能重复");
-        FundsAccount account = fundsAccountQueryService.getAccount(request.getAccountId());
+        FundsAccount account = fundsAccountQueryService.getAccount(
+                TenantContextHolder.requireTenantId(), request.getAccountId());
         AssertUtils.isTrue(account.isAvailable(), "清算资金账户不可用，accountId = {}", request.getAccountId());
         AssertUtils.equals(account.getCurrency(), request.getAmount().getCurrency(),
                 "清算确认金额币种必须与账户币种一致，accountId = {}", request.getAccountId());

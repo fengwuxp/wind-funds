@@ -1513,22 +1513,22 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
             return new FundsAccountQueryService() {
 
                 @Override
-                public FundsAccount getAccount(FundsAccountId accountId) {
+                public FundsAccount getAccount(Long tenantId, FundsAccountId accountId) {
                     throw new UnsupportedOperationException("Spend Rule evaluation projection test does not write movement");
                 }
 
                 @Override
-                public LedgerProfileCode getLedgerProfileCode(FundsAccountId accountId) {
+                public LedgerProfileCode getLedgerProfileCode(Long tenantId, FundsAccountId accountId) {
                     throw new UnsupportedOperationException("Spend Rule evaluation projection test does not query ledger profiles");
                 }
 
                 @Override
-                public FundsAccountBalanceView getBalance(FundsAccountId accountId) {
+                public FundsAccountBalanceView getBalance(Long tenantId, FundsAccountId accountId) {
                     throw new UnsupportedOperationException("Spend Rule evaluation projection test does not query balance");
                 }
 
                 @Override
-                public boolean supports(FundsAccountId accountId) {
+                public boolean supports(Long tenantId, FundsAccountId accountId) {
                     throw new UnsupportedOperationException("Spend Rule evaluation projection test does not check support");
                 }
             };

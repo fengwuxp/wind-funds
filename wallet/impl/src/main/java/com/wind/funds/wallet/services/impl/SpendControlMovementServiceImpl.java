@@ -218,7 +218,8 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private void assertTargetAccountSupported(RecordSpendControlMovementRequest request) {
         targetSubjectType(request.getTargetAccountId());
-        FundsAccount account = fundsAccountQueryService.getAccount(request.getTargetAccountId());
+        FundsAccount account = fundsAccountQueryService.getAccount(
+                request.getTenantId(), request.getTargetAccountId());
         AssertUtils.isTrue(Objects.equals(account.getTenantId(), request.getTenantId()),
                 "控制额度变动目标账户租户不匹配，accountId = {}，tenantId = {}",
                 request.getTargetAccountId(),

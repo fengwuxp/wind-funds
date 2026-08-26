@@ -59,7 +59,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
         TenantContextHolder.setTenantId(TENANT_ID);
         PlatformFundingAccountService platformFundingAccountService = new FixedPlatformFundingAccountService();
         FundsAccountQueryService fundsAccountQueryService = mock(FundsAccountQueryService.class);
-        when(fundsAccountQueryService.getLedgerProfileCode(USER_ACCOUNT))
+        when(fundsAccountQueryService.getLedgerProfileCode(TENANT_ID, USER_ACCOUNT))
                 .thenReturn(LedgerProfileCode.FUNDING_BASIC);
         resolver = new AuthorizationFundsInstructionRouteResolver(
                 new RouteParticipantFactory(),

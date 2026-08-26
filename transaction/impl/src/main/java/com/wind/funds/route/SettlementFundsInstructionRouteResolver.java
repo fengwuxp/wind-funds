@@ -69,7 +69,7 @@ public class SettlementFundsInstructionRouteResolver implements RouteResolver, O
         RouteParticipantSpec participant = routeParticipantFactory.createParticipant(
                 RouteParticipantRole.PAYER,
                 routeSubjectSupport.createSubjectRef(accountId),
-                routeSubjectSupport.resolveLedgerProfileCode(accountId).name(),
+                routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
                 instruction.getAmount(),
                 instruction.getDescription(),
                 Map.of());

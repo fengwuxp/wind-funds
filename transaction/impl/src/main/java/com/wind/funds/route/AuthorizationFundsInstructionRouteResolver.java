@@ -324,7 +324,8 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                                     FundsInstructionSpec instruction) {
         return routeParticipantFactory.createParticipant(role,
                 routeSubjectSupport.createSubjectRef(accountId),
-                routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),
+                routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
+                instruction.getAmount(),
                 instruction.getDescription(), Map.of());
     }
 

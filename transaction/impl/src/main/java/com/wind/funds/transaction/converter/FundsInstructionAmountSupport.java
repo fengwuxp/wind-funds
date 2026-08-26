@@ -21,10 +21,11 @@ final class FundsInstructionAmountSupport {
         this.fundsAccountQueryService = fundsAccountQueryService;
     }
 
-    @NonNull ConvertedAmount fromTransactionAmount(@NonNull TransactionAmount transactionAmount,
+    @NonNull ConvertedAmount fromTransactionAmount(@NonNull Long tenantId,
+                                                   @NonNull TransactionAmount transactionAmount,
                                                    @NonNull FundsAccountId targetAccountId) {
         AssertUtils.notNull(transactionAmount, "transactionAmount must not be null");
-        validateCurrency(transactionAmount.getAmount(), targetAccountId, "transactionAmount.amount");
+        validateCurrency(tenantId, transactionAmount.getAmount(), targetAccountId, "transactionAmount.amount");
         return fromTransactionAmount(transactionAmount);
     }
 
@@ -34,17 +35,19 @@ final class FundsInstructionAmountSupport {
                 transactionAmount.getExchangeRate());
     }
 
-    @NonNull ConvertedAmount sameCurrency(@NonNull Money amount,
+    @NonNull ConvertedAmount sameCurrency(@NonNull Long tenantId,
+                                          @NonNull Money amount,
                                           @NonNull FundsAccountId targetAccountId) {
-        validateCurrency(amount, targetAccountId, "amount");
+        validateCurrency(tenantId, amount, targetAccountId, "amount");
         return new ConvertedAmount(amount, amount, BigDecimal.ONE);
     }
 
-    private void validateCurrency(@NonNull Money amount,
+    private void validateCurrency(@NonNull Long tenantId,
+                                  @NonNull Money amount,
                                   @NonNull FundsAccountId targetAccountId,
                                   @NonNull String amountName) {
         AssertUtils.notNull(amount, "{} must not be null", amountName);
-        CurrencyIsoCode targetCurrency = fundsAccountQueryService.getAccount(targetAccountId).getCurrency();
+        CurrencyIsoCode targetCurrency = fundsAccountQueryService.getAccount(tenantId, targetAccountId).getCurrency();
         AssertUtils.isTrue(amount.getCurrency() == targetCurrency,
                 "{} currency must equal account currency, accountId = {}", amountName, targetAccountId);
     }

@@ -797,10 +797,10 @@ com.wind.funds.wallet.FundsAccountOwner	public java.io.Serializable ownerId();
 com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner merchant(java.io.Serializable);
 com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner of(java.io.Serializable, com.wind.funds.wallet.enums.FundsAccountOwnerType);
 com.wind.funds.wallet.FundsAccountOwner	public static com.wind.funds.wallet.FundsAccountOwner user(java.io.Serializable);
-com.wind.funds.wallet.FundsAccountQueryService	public abstract boolean supports(com.wind.funds.wallet.FundsAccountId);
-com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getLedgerProfileCode(com.wind.funds.wallet.FundsAccountId);
-com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccount getAccount(com.wind.funds.wallet.FundsAccountId);
-com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccountBalanceView getBalance(com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract boolean supports(java.lang.Long, com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.ledger.enums.LedgerProfileCode getLedgerProfileCode(java.lang.Long, com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccount getAccount(java.lang.Long, com.wind.funds.wallet.FundsAccountId);
+com.wind.funds.wallet.FundsAccountQueryService	public abstract com.wind.funds.wallet.FundsAccountBalanceView getBalance(java.lang.Long, com.wind.funds.wallet.FundsAccountId);
 com.wind.funds.wallet.FundsAccountQueryService	public interface com.wind.funds.wallet.FundsAccountQueryService {
 com.wind.funds.wallet.enums.DefaultFundsAccountType	public com.wind.funds.ledger.enums.LedgerSubjectCategory getAccountCategory();
 com.wind.funds.wallet.enums.DefaultFundsAccountType	public final class com.wind.funds.wallet.enums.DefaultFundsAccountType extends java.lang.Enum<com.wind.funds.wallet.enums.DefaultFundsAccountType> implements com.wind.common.enums.DescriptiveEnum {

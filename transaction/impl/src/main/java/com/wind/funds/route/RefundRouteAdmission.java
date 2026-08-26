@@ -36,7 +36,7 @@ public class RefundRouteAdmission {
             SubjectRef subjectRef = leg.getTargetNode().getSubjectRef();
             targets.putIfAbsent(subjectRef.getSubjectType().name() + ":" + subjectRef.getSubjectId(), subjectRef);
         });
-        targets.values().forEach(this::assertRefundTargetAvailable);
+        targets.values().forEach(subjectRef -> assertRefundTargetAvailable(instruction.getTenantId(), subjectRef));
     }
 
     private boolean isRefundEvent(FundsTransactionEventType eventType) {
@@ -45,10 +45,10 @@ public class RefundRouteAdmission {
                 || eventType == FundsTransactionEventType.FEE_REFUND;
     }
 
-    private void assertRefundTargetAvailable(SubjectRef subjectRef) {
+    private void assertRefundTargetAvailable(Long tenantId, SubjectRef subjectRef) {
         FundsAccountId accountId = FundsAccountId.immutable(
                 subjectRef.getSubjectId(), subjectRef.getSubjectType().name());
-        FundsAccount account = fundsAccountQueryService.getAccount(accountId);
+        FundsAccount account = fundsAccountQueryService.getAccount(tenantId, accountId);
         AssertUtils.isTrue(account.getState().canAcceptRefund(),
                 "关闭账户不允许承接退款，accountId = {}，state = {}",
                 accountId,

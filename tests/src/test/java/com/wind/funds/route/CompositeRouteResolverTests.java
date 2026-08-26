@@ -217,22 +217,22 @@ class CompositeRouteResolverTests {
         return new FundsAccountQueryService() {
 
             @Override
-            public FundsAccount getAccount(FundsAccountId accountId) {
+            public FundsAccount getAccount(Long tenantId, FundsAccountId accountId) {
                 throw new AssertionError("route post-processing must not query accounts in resolver selection tests");
             }
 
             @Override
-            public LedgerProfileCode getLedgerProfileCode(FundsAccountId accountId) {
+            public LedgerProfileCode getLedgerProfileCode(Long tenantId, FundsAccountId accountId) {
                 throw new AssertionError("route post-processing must not query ledger profiles in resolver selection tests");
             }
 
             @Override
-            public FundsAccountBalanceView getBalance(FundsAccountId accountId) {
+            public FundsAccountBalanceView getBalance(Long tenantId, FundsAccountId accountId) {
                 throw new AssertionError("route post-processing must not query balances in resolver selection tests");
             }
 
             @Override
-            public boolean supports(FundsAccountId accountId) {
+            public boolean supports(Long tenantId, FundsAccountId accountId) {
                 throw new AssertionError("route post-processing must not query account support in resolver selection tests");
             }
         };

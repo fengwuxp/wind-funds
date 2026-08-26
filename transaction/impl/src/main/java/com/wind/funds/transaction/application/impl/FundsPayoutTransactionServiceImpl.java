@@ -12,6 +12,7 @@ import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,7 +70,8 @@ public class FundsPayoutTransactionServiceImpl implements FundsPayoutTransaction
         AssertUtils.notNull(request.getAmount(), "出款金额不能为空");
         AssertUtils.isTrue(request.getAmount().getAmount() > 0, "出款金额必须大于 0");
         AssertUtils.hasText(request.getPayoutOrderSn(), "出款单流水号不能为空");
-        FundsAccount account = fundsAccountQueryService.getAccount(request.getAccountId());
+        FundsAccount account = fundsAccountQueryService.getAccount(
+                TenantContextHolder.requireTenantId(), request.getAccountId());
         AssertUtils.isTrue(account.isAvailable(), "出款结算资金账户不可用，accountId = {}", request.getAccountId());
         AssertUtils.equals(account.getCurrency(), request.getAmount().getCurrency(),
                 "出款金额币种必须与账户币种一致，accountId = {}", request.getAccountId());

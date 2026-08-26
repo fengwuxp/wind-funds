@@ -8,6 +8,7 @@ import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.ledger.service.LedgerTransactionService;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -66,6 +67,11 @@ class LedgerPostingJdkProxyContextTests {
         @Bean
         LedgerService ledgerService() {
             return mock(LedgerService.class);
+        }
+
+        @Bean
+        FundsAccountQueryService fundsAccountQueryService() {
+            return mock(FundsAccountQueryService.class);
         }
 
         @Bean

@@ -91,7 +91,8 @@ public class FundsBalanceControlInstructionConverter {
             @NonNull FundsBalanceFreezeRequest request,
             @Nullable FundsInstructionReferenceSpec reference,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(
+                TenantContextHolder.requireTenantId(), request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
@@ -114,7 +115,8 @@ public class FundsBalanceControlInstructionConverter {
     public @NonNull FundsInstructionSpec convertToUnfreezeInstruction(@NonNull FundsBalanceUnfreezeRequest request,
                                                                       @NonNull WindOperator operator) {
         requireUnfreezeReference(request);
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(
+                TenantContextHolder.requireTenantId(), request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
@@ -146,7 +148,8 @@ public class FundsBalanceControlInstructionConverter {
         FundsTransactionEventType eventType = isLimitAdjust(request)
                 ? FundsTransactionEventType.LIMIT_ADJUST
                 : FundsTransactionEventType.BALANCE_ADJUST;
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(
+                TenantContextHolder.requireTenantId(), request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)

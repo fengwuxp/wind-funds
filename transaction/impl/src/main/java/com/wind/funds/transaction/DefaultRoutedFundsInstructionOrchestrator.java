@@ -138,29 +138,30 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     private void assertAccountCapabilities(FundsInstructionSpec instruction,
                                            ResolvedRouteSpec resolvedRoute,
                                            String transactionSn) {
+        Long tenantId = instruction.getTenantId();
         switch (resolvedRoute.getEventType()) {
-            case TOPUP -> assertCanReceive(instruction.getAccountId(), transactionSn);
+            case TOPUP -> assertCanReceive(tenantId, instruction.getAccountId(), transactionSn);
             case TRANSFER -> {
-                assertCanPay(instruction.getPayerAccountId(), transactionSn);
-                assertCanReceive(instruction.getPayeeAccountId(), transactionSn);
+                assertCanPay(tenantId, instruction.getPayerAccountId(), transactionSn);
+                assertCanReceive(tenantId, instruction.getPayeeAccountId(), transactionSn);
             }
             case PAY -> {
-                assertCanPay(instruction.getAccountId(), transactionSn);
-                assertCanReceive(instruction.getPayeeId(), transactionSn);
+                assertCanPay(tenantId, instruction.getAccountId(), transactionSn);
+                assertCanReceive(tenantId, instruction.getPayeeId(), transactionSn);
             }
             case REFUND -> {
                 if (!isOriginalTransactionReference(instruction.getReference())) {
-                    assertCanPay(instruction.getPayerId(), transactionSn);
-                    assertCanReceive(instruction.getAccountId(), transactionSn);
+                    assertCanPay(tenantId, instruction.getPayerId(), transactionSn);
+                    assertCanReceive(tenantId, instruction.getAccountId(), transactionSn);
                 }
             }
-            case WITHDRAW -> assertCanWithdraw(instruction.getAccountId(), transactionSn);
-            case FEE_CHARGE -> assertCanPay(instruction.getAccountId(), transactionSn);
+            case WITHDRAW -> assertCanWithdraw(tenantId, instruction.getAccountId(), transactionSn);
+            case FEE_CHARGE -> assertCanPay(tenantId, instruction.getAccountId(), transactionSn);
             case AUTHORIZE -> {
-                assertCanPay(instruction.getAccountId(), transactionSn);
+                assertCanPay(tenantId, instruction.getAccountId(), transactionSn);
                 FundsAccountId linkedFundingAccountId = instruction.getLinkedFundingAccountId();
                 if (linkedFundingAccountId != null && !linkedFundingAccountId.equals(instruction.getAccountId())) {
-                    assertCanPay(linkedFundingAccountId, transactionSn);
+                    assertCanPay(tenantId, linkedFundingAccountId, transactionSn);
                 }
             }
             case FEE_REFUND, CLEARING_CONFIRM, SETTLEMENT_LOCK, SETTLEMENT_RELEASE,
@@ -178,22 +179,22 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                 && reference.getReferenceType() == FundsInstructionReferenceType.ORIGINAL_TRANSACTION;
     }
 
-    private void assertCanPay(FundsAccountId accountId, String transactionSn) {
-        FundsAccount account = requiredAccount(accountId);
+    private void assertCanPay(Long tenantId, FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(tenantId, accountId);
         if (!account.canPay()) {
             throw capabilityRejected(transactionSn, accountId, account, "PAY");
         }
     }
 
-    private void assertCanReceive(FundsAccountId accountId, String transactionSn) {
-        FundsAccount account = requiredAccount(accountId);
+    private void assertCanReceive(Long tenantId, FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(tenantId, accountId);
         if (!account.canReceive()) {
             throw capabilityRejected(transactionSn, accountId, account, "RECEIVE");
         }
     }
 
-    private void assertCanWithdraw(FundsAccountId accountId, String transactionSn) {
-        FundsAccount account = requiredAccount(accountId);
+    private void assertCanWithdraw(Long tenantId, FundsAccountId accountId, String transactionSn) {
+        FundsAccount account = requiredAccount(tenantId, accountId);
         if (!account.canWithdraw()) {
             throw capabilityRejected(transactionSn, accountId, account, "WITHDRAW");
         }
@@ -208,9 +209,9 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                         capability, accountId.id(), accountId.type(), account.getCapabilitySource()));
     }
 
-    private FundsAccount requiredAccount(FundsAccountId accountId) {
+    private FundsAccount requiredAccount(Long tenantId, FundsAccountId accountId) {
         AssertUtils.notNull(accountId, "资金账户能力校验缺少账户标识");
-        return fundsAccountQueryService.getAccount(accountId);
+        return fundsAccountQueryService.getAccount(tenantId, accountId);
     }
 
     private FundsInstructionLifecycleResult completedLifecycleResult(FundsInstructionLifecycleResult source,

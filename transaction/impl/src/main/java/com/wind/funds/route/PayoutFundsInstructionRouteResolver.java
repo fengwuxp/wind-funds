@@ -81,7 +81,8 @@ public class PayoutFundsInstructionRouteResolver implements RouteResolver, Order
                         .build());
         List<RouteParticipantSpec> participants = List.of(
                 routeParticipantFactory.createParticipant(RouteParticipantRole.PAYER, accountSubject,
-                        routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),
+                        routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
+                        instruction.getAmount(),
                         instruction.getDescription(), Map.of()),
                 routeParticipantFactory.createParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT,
                         prepaymentSubject, PlatformFundingAccountRole.PREPAYMENT.getLedgerProfileCode().name(),
@@ -101,7 +102,8 @@ public class PayoutFundsInstructionRouteResolver implements RouteResolver, Order
                 .targetNode(targetNode(subject))
                 .build();
         RouteParticipantSpec participant = routeParticipantFactory.createParticipant(RouteParticipantRole.PAYER,
-                subject, routeSubjectSupport.resolveLedgerProfileCode(accountId).name(), instruction.getAmount(),
+                subject, routeSubjectSupport.resolveLedgerProfileCode(instruction.getTenantId(), accountId).name(),
+                instruction.getAmount(),
                 instruction.getDescription(), Map.of());
         return route(instruction, FundsRouteCodes.PAYOUT_FAILURE_RETURN, List.of(participant), List.of(leg), null);
     }
