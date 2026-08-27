@@ -5,6 +5,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -28,6 +29,7 @@ public class FundingAccountQuery {
     private String sn;
 
     @Schema(description = "租户 ID")
+    @NotNull
     private Long tenantId;
 
     @Schema(description = "账户归属主体 ID")

@@ -16,7 +16,6 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.funds.wallet.FundsAccountId;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,25 +59,6 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     }
 
     @Override
-    public @NonNull FundingAccountDTO getFundingAccountById(@NonNull Long id) {
-        FundingAccount result = fundingAccountMapper.selectOneById(id);
-        AssertUtils.notNull(result, "资金账户不存在，id = {}", id);
-        return FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(result);
-    }
-
-    @Override
-    public @NonNull FundingAccountDTO getFundingAccount(@NonNull FundsAccountId accountId) {
-        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(accountId.id()))
-                .and(ref.accountType.eq(accountId.type()));
-        FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "资金账户不存在，accountId = {}", accountId);
-        return FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(result);
-    }
-
-    @Override
     public @NonNull FundingAccountDTO getFundingAccount(@NonNull Long tenantId, @NonNull String accountSn) {
         FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
         QueryWrapper wrapper = QueryWrapper.create()
@@ -94,6 +74,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     public @NonNull WindPagination<FundingAccountDTO> queryFundingAccounts(
             @NonNull FundingAccountQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(ref)

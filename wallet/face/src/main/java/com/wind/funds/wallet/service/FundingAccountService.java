@@ -6,7 +6,6 @@ import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -30,26 +29,6 @@ public interface FundingAccountService {
      * @return 资金账户主键
      */
     @NonNull Long createFundingAccount(@NonNull CreateFundingAccountRequest request);
-
-    /**
-     * 根据主键查询资金账户。
-     *
-     * <p>能力范围：只读查询，不初始化 ledger，不修复账户状态。</p>
-     *
-     * @param id 主键
-     * @return 资金账户
-     */
-    @NonNull FundingAccountDTO getFundingAccountById(@NonNull Long id);
-
-    /**
-     * 根据账户号查询资金账户。
-     *
-     * <p>能力范围：按 FundsAccountId 查询真实资金账户，不支持信用账户和支出控制范围。</p>
-     *
-     * @param accountId 账户标识
-     * @return 资金账户
-     */
-    @NonNull FundingAccountDTO getFundingAccount(@NonNull FundsAccountId accountId);
 
     /**
      * 按租户和账户号查询资金账户。

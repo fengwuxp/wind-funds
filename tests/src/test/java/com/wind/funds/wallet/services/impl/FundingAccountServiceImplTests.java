@@ -115,9 +115,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     void testCreateFundingAccountShouldInitializeRequiredLedgers() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
 
-        FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
+        FundingAccountDTO account = fundingAccountService.getFundingAccount(TENANT_ID, ACCOUNT_SN);
         List<LedgerDTO> ledgers = loadLedgers();
 
         assertThat(account.getSn()).isEqualTo(ACCOUNT_SN);
@@ -315,11 +315,11 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testFundingAccountDefaultBalanceShouldKeepLifetimeLedgersWhenMonthlyBucketCoexists() {
-        Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
         createMonthlyAvailableLedger();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
+        FundingAccountDTO account = fundingAccountService.getFundingAccount(TENANT_ID, ACCOUNT_SN);
         FundsAccount accountView = fundsAccountQueryService.getAccount(TENANT_ID,
                 FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
         FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(TENANT_ID,
