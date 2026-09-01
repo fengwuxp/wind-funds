@@ -68,6 +68,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -676,21 +677,21 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     /**
      * 场景：高阶账本命令缺少租户身份。
-     * 输入：instruction.tenantId 为空，route 和账本事实完整。
+     * 输入：受控指令端口的 tenantId 为空，其他命令、route 和账本事实完整。
      * 输出：Ledger 在访问或写入账务事实前拒绝命令。
      * 红线：数据库非空约束不能替代公共资金写边界的租户校验。
      */
     @Test
     void testPostShouldRejectMissingTenantIdBeforeLedgerFacts() {
         prepareCommandTransferLedgers(200L);
-        FundsInstructionSpec instruction = commandInstruction(
-                null,
+        FundsInstructionSpec instruction = instructionWithoutTenant(commandInstruction(
+                TENANT_ID,
                 FundsInstructionType.DIRECT_TRANSACTION,
                 FundsTransactionEventType.TRANSFER,
                 DefaultFundsTransactionType.TRANSFER,
                 TRANSACTION_AMOUNT,
                 COMMAND_BUSINESS_SCENE,
-                COMMAND_BUSINESS_SN);
+                COMMAND_BUSINESS_SN));
         ResolvedRouteSpec route = commandTransferRoute(TRANSACTION_AMOUNT, COMMAND_BUSINESS_SCENE, COMMAND_BUSINESS_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -978,6 +979,14 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .operator(WindOperatorFactory.system())
                 .contextVariables(Map.of())
                 .build();
+    }
+
+    private FundsInstructionSpec instructionWithoutTenant(FundsInstructionSpec delegate) {
+        return (FundsInstructionSpec) Proxy.newProxyInstance(
+                FundsInstructionSpec.class.getClassLoader(),
+                new Class<?>[]{FundsInstructionSpec.class},
+                (proxy, method, args) -> "getTenantId".equals(method.getName())
+                        ? null : method.invoke(delegate, args));
     }
 
     private ResolvedRouteSpec commandTransferRoute(Money amount,

@@ -126,6 +126,28 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：调用方未为资金指令提供显式租户。
+     * 预期：指令在构造边界立即拒绝 null tenant。
+     * 红线：路由、交易和账务不得从上下文或返回事实反推授权租户。
+     */
+    @Test
+    void testFundsInstructionShouldRequireExplicitTenant() {
+        assertThatThrownBy(() -> ImmutableFundsInstructionSpec.builder()
+                .tenantId(null)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(Money.immutable(100L, CURRENCY))
+                .businessScene("FUNDS_INSTRUCTION_TENANT_CONTRACT")
+                .businessSn("BIZ-FI-TENANT-001")
+                .eventTime(LocalDateTime.of(2026, 8, 31, 17, 0))
+                .operator(WindOperatorTestFixture.system())
+                .contextVariables(Map.of())
+                .build())
+                .hasMessageContaining("fundsInstruction.tenantId must not be null");
+    }
+
+    /**
      * 场景：业务侧把外部交易流水带入资金指令，进入路由和账本前形成稳定 DSL 事实。
      * 预期：资金指令保留交易语义、业务幂等号、操作者和可追溯引用。
      * 红线：资金指令不能丢失业务身份或引用定位能力。

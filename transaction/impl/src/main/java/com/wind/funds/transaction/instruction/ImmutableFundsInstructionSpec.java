@@ -32,7 +32,7 @@ import java.util.Map;
  */
 @Builder
 @FieldNameConstants
-public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
+public record ImmutableFundsInstructionSpec(Long tenantId,
                                             FundsInstructionType instructionType,
                                             FundsTransactionEventType eventType,
                                             DefaultFundsTransactionType transactionType,
@@ -64,6 +64,7 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             Map<String, Object> contextVariables) implements FundsInstructionSpec {
 
     public ImmutableFundsInstructionSpec {
+        AssertUtils.notNull(tenantId, "fundsInstruction.tenantId must not be null");
         AssertUtils.notNull(instructionType, "fundsInstruction.instructionType must not be null");
         AssertUtils.notNull(eventType, "fundsInstruction.eventType must not be null");
         AssertUtils.notNull(transactionType, "fundsInstruction.transactionType must not be null");
@@ -185,7 +186,7 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
 
 
     @Override
-    public @Nullable Long getTenantId() {
+    public @NonNull Long getTenantId() {
         return tenantId;
     }
 

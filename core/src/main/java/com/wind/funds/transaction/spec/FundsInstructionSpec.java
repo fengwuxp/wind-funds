@@ -37,7 +37,7 @@ import java.util.Map;
  */
 public interface FundsInstructionSpec {
 
-    @Nullable
+    @NonNull
     Long getTenantId();
 
     @NonNull
