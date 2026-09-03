@@ -3,16 +3,21 @@ package com.wind.funds.wallet.services.impl;
 import com.wind.funds.wallet.dal.entities.AccountHierarchyRelation;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
+import com.wind.funds.wallet.service.AccountHierarchyRelationService;
 import com.wind.integration.operator.WindOperator;
 import org.junit.jupiter.api.Test;
 
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
 /**
  * 账户层级关系契约测试。
@@ -20,15 +25,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccountHierarchyRelationContractTests {
 
     @Test
-    void testCreateRelationContractShouldOnlyAcceptBusinessRelationFacts() throws NoSuchMethodException {
+    void testCreateRelationContractShouldOnlyAcceptBusinessRelationFacts()
+            throws IntrospectionException, NoSuchMethodException {
         assertThat(fieldNames(CreateAccountHierarchyRelationRequest.class))
                 .containsExactlyInAnyOrder("tenantId", "accountId", "parentAccountId")
                 .doesNotContain("sn", "currency", "operatorId", "contextVariables");
-        assertThat(AccountHierarchyRelationServiceImpl.class.getMethod(
-                        "createAccountHierarchyRelation",
-                        CreateAccountHierarchyRelationRequest.class,
-                        WindOperator.class)
-                .getReturnType()).isEqualTo(Long.class);
+        String[] relationProperties = Arrays.stream(Introspector.getBeanInfo(
+                        AccountHierarchyRelationDTO.class, Object.class).getPropertyDescriptors())
+                .map(property -> property.getName())
+                .toArray(String[]::new);
+        Method createMethod = AccountHierarchyRelationService.class.getMethod(
+                "createAccountHierarchyRelation",
+                CreateAccountHierarchyRelationRequest.class,
+                WindOperator.class);
+
+        assertSoftly(softly -> {
+            softly.assertThat(createMethod.getReturnType())
+                    .isEqualTo(AccountHierarchyRelationDTO.class);
+            softly.assertThat(relationProperties).doesNotContain("id");
+        });
     }
 
     @Test

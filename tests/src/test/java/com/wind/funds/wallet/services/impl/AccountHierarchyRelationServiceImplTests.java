@@ -1,15 +1,16 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.FundsAccountState;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
-import com.wind.funds.wallet.model.query.AccountHierarchyRelationQuery;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.funds.wallet.service.AccountHierarchyRelationService;
+import com.wind.integration.operator.OperationActorType;
+import com.wind.integration.operator.WindOperator;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +29,7 @@ import java.lang.reflect.Proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账户层级关系服务测试。
@@ -79,42 +81,68 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
     @Test
     void testCreateRelationShouldGenerateFactAndRemainIdempotentForSameParent() {
         CreateAccountHierarchyRelationRequest request = relation(CHILD, PARENT);
+        LedgerFactSnapshot ledgerFactsBefore = ledgerFactSnapshot(jdbcTemplate);
+        long transactionCountBefore = countRows("t_funds_transaction");
+        long detailCountBefore = countRows("t_funds_transaction_detail");
+        WindOperator winnerOperator = WindOperatorFactory.system();
+        WindOperator retryOperator = WindOperatorFactory.create(
+                "account-hierarchy-retry",
+                "Account hierarchy retry",
+                "wind-funds-tests",
+                OperationActorType.TENANT_API_CLIENT);
 
-        Long firstId = accountHierarchyRelationService.createAccountHierarchyRelation(
-                request, WindOperatorFactory.system());
-        Long retryId = accountHierarchyRelationService.createAccountHierarchyRelation(
-                request, WindOperatorFactory.system());
+        AccountHierarchyRelationDTO first = accountHierarchyRelationService.createAccountHierarchyRelation(
+                request, winnerOperator);
+        AccountHierarchyRelationDTO retry = accountHierarchyRelationService.createAccountHierarchyRelation(
+                request, retryOperator);
         AccountHierarchyRelationDTO relation = accountHierarchyRelationService
                 .findAccountHierarchyRelation(TENANT_ID, account(CHILD))
                 .orElseThrow();
 
-        assertThat(retryId).isEqualTo(firstId);
+        assertThat(first.getSn()).isNotBlank();
+        assertThat(first.getGmtCreate()).isNotNull();
+        assertThat(first.getGmtModified()).isNotNull();
+        assertThat(first.getOperatorId()).isEqualTo(winnerOperator.getOperatorAsText());
+        assertThat(retry.getSn()).isEqualTo(first.getSn());
+        assertThat(retry.getOperatorId()).isEqualTo(first.getOperatorId());
+        assertThat(retry.getGmtCreate()).isEqualTo(first.getGmtCreate());
+        assertThat(retry.getGmtModified()).isEqualTo(first.getGmtModified());
+        assertThat(relation).usingRecursiveComparison().isEqualTo(first);
         assertThat(relation.getSn()).isNotBlank();
         assertThat(relation.getAccountId()).isEqualTo(CHILD);
         assertThat(relation.getParentAccountId()).isEqualTo(PARENT);
         assertThat(relation.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
-        assertThat(relation.getOperatorId()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
+        assertThat(relation.getOperatorId()).isEqualTo(winnerOperator.getOperatorAsText());
         assertThat(countRows("t_account_hierarchy_relation", "account_id", CHILD)).isOne();
         assertThat(countRows("t_ledger", "subject_id", CHILD)).isZero();
         assertThat(countRows("t_funds_transaction", "business_sn", relation.getSn())).isZero();
+        assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(ledgerFactsBefore);
+        assertThat(countRows("t_funds_transaction")).isEqualTo(transactionCountBefore);
+        assertThat(countRows("t_funds_transaction_detail")).isEqualTo(detailCountBefore);
     }
 
     @Test
     void testCreateRelationShouldRejectDifferentParentForExistingChild() {
+        LedgerFactSnapshot ledgerFactsBefore = ledgerFactSnapshot(jdbcTemplate);
+        long transactionCountBefore = countRows("t_funds_transaction");
+        long detailCountBefore = countRows("t_funds_transaction_detail");
         accountHierarchyRelationService.createAccountHierarchyRelation(
                 relation(CHILD, PARENT), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> accountHierarchyRelationService.createAccountHierarchyRelation(
                 relation(CHILD, OTHER_PARENT), WindOperatorFactory.system()))
                 .hasMessageContaining("已存在其他父账户关系");
+        assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(ledgerFactsBefore);
+        assertThat(countRows("t_funds_transaction")).isEqualTo(transactionCountBefore);
+        assertThat(countRows("t_funds_transaction_detail")).isEqualTo(detailCountBefore);
     }
 
     @Test
     void testCreateRelationShouldAllowFrozenAndSuspendedButRejectClosedAccount() {
-        Long id = accountHierarchyRelationService.createAccountHierarchyRelation(
+        AccountHierarchyRelationDTO created = accountHierarchyRelationService.createAccountHierarchyRelation(
                 relation(FROZEN_CHILD, SUSPENDED_PARENT), WindOperatorFactory.system());
 
-        assertThat(id).isNotNull();
+        assertThat(created.getSn()).isNotBlank();
         assertThatThrownBy(() -> accountHierarchyRelationService.createAccountHierarchyRelation(
                 relation(CLOSED_CHILD, PARENT), WindOperatorFactory.system()))
                 .hasMessageContaining("CLOSED");
@@ -137,20 +165,16 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
     }
 
     @Test
-    void testQueryRelationsShouldSupportParentAccountFilter() {
+    void testFindRelationShouldReturnCurrentTenantAndHideForeignTenant() {
         accountHierarchyRelationService.createAccountHierarchyRelation(
                 relation(CHILD, PARENT), WindOperatorFactory.system());
-        accountHierarchyRelationService.createAccountHierarchyRelation(
-                relation(FROZEN_CHILD, PARENT), WindOperatorFactory.system());
 
-        assertThat(accountHierarchyRelationService.queryAccountHierarchyRelations(
-                        new AccountHierarchyRelationQuery()
-                                .setTenantId(TENANT_ID)
-                                .setParentAccountId(account(PARENT)),
-                        DefaultPageQueryOptions.defaults(10))
-                .getRecords())
-                .extracting(AccountHierarchyRelationDTO::getAccountId)
-                .containsExactly(CHILD, FROZEN_CHILD);
+        assertThat(accountHierarchyRelationService.findAccountHierarchyRelation(TENANT_ID, account(CHILD)))
+                .get()
+                .extracting(AccountHierarchyRelationDTO::getParentAccountId)
+                .isEqualTo(PARENT);
+        assertThat(accountHierarchyRelationService.findAccountHierarchyRelation(TENANT_ID + 1, account(CHILD)))
+                .isEmpty();
     }
 
     private CreateAccountHierarchyRelationRequest relation(String child, String parent) {
@@ -179,6 +203,10 @@ class AccountHierarchyRelationServiceImplTests extends AbstractFundsServiceTest 
                 "SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class,
                 value);
+    }
+
+    private long countRows(String tableName) {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
     }
 
     @Configuration

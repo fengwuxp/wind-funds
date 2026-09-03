@@ -2,9 +2,6 @@ package com.wind.funds.wallet.services.impl;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
-import com.wind.common.query.WindPagination;
-import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.dal.entities.AccountHierarchyRelation;
@@ -15,13 +12,11 @@ import com.wind.funds.wallet.mapstruct.AccountHierarchyRelationConverter;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
-import com.wind.funds.wallet.model.query.AccountHierarchyRelationQuery;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.funds.wallet.service.AccountHierarchyRelationService;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.integration.operator.WindOperator;
-import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -53,7 +48,7 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull Long createAccountHierarchyRelation(
+    public @NonNull AccountHierarchyRelationDTO createAccountHierarchyRelation(
             @NonNull CreateAccountHierarchyRelationRequest request,
             @NonNull WindOperator operator) {
         validateRequest(request);
@@ -74,8 +69,10 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
         } catch (DuplicateKeyException ex) {
             return resolveConcurrentCreate(request, ex);
         }
-        AssertUtils.notNull(entity.getId(), "创建账户层级关系失败");
-        return entity.getId();
+        Optional<AccountHierarchyRelationDTO> created = findAccountHierarchyRelation(
+                request.getTenantId(), request.getAccountId());
+        AssertUtils.isTrue(created.isPresent(), "创建账户层级关系失败");
+        return created.orElseThrow();
     }
 
     @Override
@@ -90,29 +87,6 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
                 .and(ref.accountId.eq(accountId.id()))
                 .and(ref.accountType.eq(accountType)));
         return Optional.ofNullable(result).map(this::toDTO);
-    }
-
-    @Override
-    public @NonNull WindPagination<AccountHierarchyRelationDTO> queryAccountHierarchyRelations(
-            @NonNull AccountHierarchyRelationQuery query,
-            @NonNull WindQuery<? extends QueryOrderField> options) {
-        FundsSubjectType accountType = optionalAccountSubjectType(query.getAccountId());
-        FundsSubjectType parentAccountType = optionalAccountSubjectType(query.getParentAccountId());
-        AccountHierarchyRelationNameRefs ref = AccountHierarchyRelationNameRefs.accountHierarchyRelation;
-        QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
-                .from(ref)
-                .where(ref.sn.eq(query.getSn()))
-                .and(ref.tenantId.eq(query.getTenantId()))
-                .and(ref.accountId.eq(accountId(query.getAccountId())))
-                .and(ref.accountType.eq(accountType))
-                .and(ref.parentAccountId.eq(accountId(query.getParentAccountId())))
-                .and(ref.parentAccountType.eq(parentAccountType));
-        wrapper.orderBy(ref.id.asc());
-        return MybatisQueryHelper.<AccountHierarchyRelation, AccountHierarchyRelationDTO>query(wrapper)
-                .counter(accountHierarchyRelationMapper::selectCountByQuery)
-                .resultQueryFunc(accountHierarchyRelationMapper::selectListByQuery)
-                .converter(this::toDTO)
-                .query(options);
     }
 
     private void validateRequest(CreateAccountHierarchyRelationRequest request) {
@@ -182,7 +156,8 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
         return result;
     }
 
-    private Long resolveConcurrentCreate(CreateAccountHierarchyRelationRequest request, DuplicateKeyException ex) {
+    private AccountHierarchyRelationDTO resolveConcurrentCreate(CreateAccountHierarchyRelationRequest request,
+                                                                DuplicateKeyException ex) {
         Optional<AccountHierarchyRelationDTO> existing = findAccountHierarchyRelation(
                 request.getTenantId(), request.getAccountId());
         if (existing.isEmpty()) {
@@ -191,12 +166,13 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
         return reuseExistingRelation(existing.orElseThrow(), request.getParentAccountId());
     }
 
-    private Long reuseExistingRelation(AccountHierarchyRelationDTO existing, FundsAccountId parentAccountId) {
+    private AccountHierarchyRelationDTO reuseExistingRelation(AccountHierarchyRelationDTO existing,
+                                                               FundsAccountId parentAccountId) {
         FundsSubjectType parentAccountType = requireAccountSubjectType(parentAccountId);
         AssertUtils.isTrue(existing.getParentAccountType() == parentAccountType
                         && existing.getParentAccountId().equals(parentAccountId.id()),
                 "子账户已存在其他父账户关系，accountId = {}", existing.getAccountId());
-        return existing.getId();
+        return existing;
     }
 
     private AccountHierarchyRelationDTO toDTO(AccountHierarchyRelation entity) {
@@ -209,10 +185,6 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
         return result;
     }
 
-    private FundsSubjectType optionalAccountSubjectType(FundsAccountId accountId) {
-        return accountId == null ? null : requireAccountSubjectType(accountId);
-    }
-
     private FundsSubjectType parseAccountSubjectType(String type) {
         if (FundsSubjectType.FUNDING_ACCOUNT.name().equals(type)) {
             return FundsSubjectType.FUNDING_ACCOUNT;
@@ -221,10 +193,6 @@ public class AccountHierarchyRelationServiceImpl implements AccountHierarchyRela
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
         return null;
-    }
-
-    private String accountId(FundsAccountId accountId) {
-        return accountId == null ? null : accountId.id();
     }
 
     private record ResolvedAccount(String accountId,

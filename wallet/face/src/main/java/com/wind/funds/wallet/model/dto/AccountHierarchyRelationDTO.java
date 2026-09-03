@@ -26,9 +26,6 @@ public class AccountHierarchyRelationDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = -1580740280393341089L;
 
-    @Schema(description = "主键")
-    private Long id;
-
     @Schema(description = "创建时间")
     private LocalDateTime gmtCreate;
 

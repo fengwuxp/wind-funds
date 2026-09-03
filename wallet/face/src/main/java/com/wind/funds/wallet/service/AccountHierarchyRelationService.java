@@ -1,11 +1,7 @@
 package com.wind.funds.wallet.service;
 
-import com.wind.common.query.WindPagination;
-import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.model.dto.AccountHierarchyRelationDTO;
-import com.wind.funds.wallet.model.query.AccountHierarchyRelationQuery;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.integration.operator.WindOperator;
 import org.jspecify.annotations.NonNull;
@@ -25,14 +21,15 @@ public interface AccountHierarchyRelationService {
     /**
      * 创建账户层级关系。
      *
-     * <p>同一子账户重复提交相同父账户时返回已有主键；已存在其他父账户时拒绝。</p>
+     * <p>同一子账户重复提交相同父账户时返回已持久化关系；已存在其他父账户时拒绝。</p>
      *
      * @param request 创建请求
      * @param operator 操作人
-     * @return 关系主键
+     * @return 已持久化关系
      */
-    @NonNull Long createAccountHierarchyRelation(@NonNull CreateAccountHierarchyRelationRequest request,
-                                                 @NonNull WindOperator operator);
+    @NonNull AccountHierarchyRelationDTO createAccountHierarchyRelation(
+            @NonNull CreateAccountHierarchyRelationRequest request,
+            @NonNull WindOperator operator);
 
     /**
      * 查询子账户的直接父账户关系。
@@ -45,14 +42,4 @@ public interface AccountHierarchyRelationService {
             @NonNull Long tenantId,
             @NonNull FundsAccountId accountId);
 
-    /**
-     * 分页查询账户层级关系。
-     *
-     * @param query 可选查询条件
-     * @param options 分页和排序选项
-     * @return 关系分页结果
-     */
-    @NonNull WindPagination<AccountHierarchyRelationDTO> queryAccountHierarchyRelations(
-            @NonNull AccountHierarchyRelationQuery query,
-            @NonNull WindQuery<? extends QueryOrderField> options);
 }
