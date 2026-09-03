@@ -26,14 +26,6 @@ public interface SpendRuleVersionService {
     @NonNull Long createVersion(@NonNull PublishSpendRuleVersionRequest request);
 
     /**
-     * 根据主键查询 Spend Rule 版本。
-     *
-     * @param id 主键
-     * @return 规则版本
-     */
-    @NonNull SpendRuleVersionDTO getVersionById(@NonNull Long id);
-
-    /**
      * 按租户、规则标识和版本号查找 Spend Rule 版本。
      *
      * @param tenantId 租户 ID

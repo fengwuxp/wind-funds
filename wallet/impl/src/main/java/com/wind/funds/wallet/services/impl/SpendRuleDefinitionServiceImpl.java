@@ -80,8 +80,12 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
             return existing;
         }
         try {
-            Long versionId = spendRuleVersionService.createVersion(request);
-            return spendRuleVersionService.getVersionById(versionId);
+            spendRuleVersionService.createVersion(request);
+            SpendRuleVersionDTO result = spendRuleVersionService.findVersion(
+                    request.getTenantId(), request.getRuleId(), request.getRuleVersion());
+            AssertUtils.notNull(result, "发布 Spend Rule 版本失败，ruleId = {}, ruleVersion = {}",
+                    request.getRuleId(), request.getRuleVersion());
+            return result;
         } catch (DataIntegrityViolationException exception) {
             return readIdempotentVersionAfterInsertConflict(request, exception);
         }
@@ -101,18 +105,10 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
             return existing;
         }
         try {
-            Long bindingId = spendRuleBindingService.createSpendRuleBinding(request);
-            return spendRuleBindingService.getSpendRuleBindingById(bindingId);
+            return spendRuleBindingService.createSpendRuleBinding(request);
         } catch (DataIntegrityViolationException exception) {
             return readIdempotentBindingAfterInsertConflict(request, exception);
         }
-    }
-
-    @Override
-    public @NonNull SpendRuleDefinitionDTO getDefinitionById(@NonNull Long id) {
-        SpendRuleDefinition entity = spendRuleDefinitionMapper.selectOneById(id);
-        AssertUtils.notNull(entity, "Spend Rule 定义不存在，id = {}", id);
-        return toDTO(entity);
     }
 
     @Override

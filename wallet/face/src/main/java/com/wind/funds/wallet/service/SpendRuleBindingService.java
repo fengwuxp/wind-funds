@@ -32,9 +32,9 @@ public interface SpendRuleBindingService {
      * 创建 Spend Rule 挂载。
      *
      * @param request 挂载请求
-     * @return 规则挂载主键
+     * @return 规则挂载
      */
-    @NonNull Long createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
+    @NonNull SpendRuleBindingDTO createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
 
     /**
      * 暂停 Spend Rule 挂载。
@@ -62,14 +62,6 @@ public interface SpendRuleBindingService {
      * @param request 退役请求
      */
     void retireSpendRuleBinding(@NonNull RetireSpendRuleBindingRequest request);
-
-    /**
-     * 根据主键查询 Spend Rule 挂载。
-     *
-     * @param id 主键
-     * @return 规则挂载
-     */
-    @NonNull SpendRuleBindingDTO getSpendRuleBindingById(@NonNull Long id);
 
     /**
      * 按租户和挂载流水查找 Spend Rule 挂载。

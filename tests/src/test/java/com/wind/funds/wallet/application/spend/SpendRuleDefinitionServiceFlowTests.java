@@ -121,8 +121,9 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
      */
     @Test
     void testPublishedSpendRuleVersionShouldRejectInPlaceOverwrite() {
-        SpendRuleDefinitionDTO definition = spendRuleDefinitionService.getDefinitionById(
-                spendRuleDefinitionService.createDefinition(createDefinitionRequest()));
+        spendRuleDefinitionService.createDefinition(createDefinitionRequest());
+        SpendRuleDefinitionDTO definition = spendRuleDefinitionService.findDefinition(TENANT_ID, RULE_ID);
+        assertThat(definition).isNotNull();
         SpendRuleVersionDTO published =
                 spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
 

@@ -47,14 +47,6 @@ public interface SpendRuleDefinitionService {
     @NonNull SpendRuleBindingDTO createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
 
     /**
-     * 根据主键查询 Spend Rule 定义。
-     *
-     * @param id 主键
-     * @return 规则定义
-     */
-    @NonNull SpendRuleDefinitionDTO getDefinitionById(@NonNull Long id);
-
-    /**
      * 按租户和规则标识查找 Spend Rule 定义。
      *
      * @param tenantId 租户 ID

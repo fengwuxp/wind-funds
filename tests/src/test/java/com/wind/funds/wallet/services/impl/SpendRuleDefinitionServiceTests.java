@@ -32,6 +32,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -100,6 +101,30 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     private JdbcTemplate jdbcTemplate;
 
     /**
+     * 场景：公共调用方按租户内稳定身份读取不可变规则版本。
+     * 预期：版本服务不暴露无租户 raw-id 查询。
+     * 红线：数据库代理主键不能替代规则版本的对象授权。
+     */
+    @Test
+    void testPublicContractShouldNotExposeVersionRawIdGetter() {
+        assertThat(com.wind.funds.wallet.service.SpendRuleVersionService.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain("getVersionById");
+    }
+
+    /**
+     * 场景：公共调用方按租户内稳定身份读取规则定义。
+     * 预期：定义服务不暴露无租户 raw-id 查询。
+     * 红线：数据库代理主键不能替代规则定义的对象授权。
+     */
+    @Test
+    void testPublicContractShouldNotExposeDefinitionRawIdGetter() {
+        assertThat(SpendRuleDefinitionService.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain("getDefinitionById");
+    }
+
+    /**
      * 场景：标准基础服务发布不可变 Spend Rule 版本。
      * 输入：同一版本重复发布同摘要和异摘要。
      * 输出：同摘要幂等返回，异摘要拒绝。
@@ -109,8 +134,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     void testPublishVersionShouldBeIdempotentAndRejectDigestDriftWithoutFundsSideEffect() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleDefinitionDTO definition = spendRuleDefinitionService.getDefinitionById(
-                spendRuleDefinitionService.createDefinition(createDefinitionRequest()));
+        spendRuleDefinitionService.createDefinition(createDefinitionRequest());
+        SpendRuleDefinitionDTO definition = spendRuleDefinitionService.findDefinition(TENANT_ID, RULE_ID);
+        assertThat(definition).isNotNull();
         SpendRuleVersionDTO published =
                 spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
         SpendRuleVersionDTO replayed =

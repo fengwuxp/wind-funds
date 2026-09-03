@@ -28,6 +28,7 @@ import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,7 +53,8 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     private final SpendRuleBindingMapper spendRuleBindingMapper;
 
     @Override
-    public @NonNull Long createSpendRuleBinding(
+    @Transactional(rollbackFor = Exception.class, noRollbackFor = DataIntegrityViolationException.class)
+    public @NonNull SpendRuleBindingDTO createSpendRuleBinding(
             @NonNull CreateSpendRuleBindingRequest request) {
         SpendRuleBinding entity = toEntity(request);
         spendRuleBindingMapper.insertSelective(entity);
@@ -60,7 +62,9 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 request.getRuleId(),
                 request.getRuleVersion(),
                 request.getAuditReferenceSn());
-        return entity.getId();
+        SpendRuleBindingDTO result = findSpendRuleBinding(request.getTenantId(), entity.getSn());
+        AssertUtils.notNull(result, "挂载 Spend Rule 版本后回读失败，sn = {}", entity.getSn());
+        return result;
     }
 
     @Override
@@ -95,13 +99,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 "只有有效或已暂停的 Spend Rule 挂载可以退役，sn = {}",
                 request.getSn());
         updateBindingState(entity, SpendRuleBindingState.RETIRED);
-    }
-
-    @Override
-    public @NonNull SpendRuleBindingDTO getSpendRuleBindingById(@NonNull Long id) {
-        SpendRuleBinding entity = spendRuleBindingMapper.selectOneById(id);
-        AssertUtils.notNull(entity, "Spend Rule 挂载不存在，id = {}", id);
-        return toDTO(entity);
     }
 
     @Override

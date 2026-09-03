@@ -38,13 +38,6 @@ public class SpendRuleVersionServiceImpl implements SpendRuleVersionService {
     }
 
     @Override
-    public @NonNull SpendRuleVersionDTO getVersionById(@NonNull Long id) {
-        SpendRuleVersion entity = spendRuleVersionMapper.selectOneById(id);
-        AssertUtils.notNull(entity, "Spend Rule 版本不存在，id = {}", id);
-        return toDTO(entity);
-    }
-
-    @Override
     public @Nullable SpendRuleVersionDTO findVersion(@NonNull Long tenantId,
                                                      @NonNull String ruleId,
                                                      @NonNull String ruleVersion) {

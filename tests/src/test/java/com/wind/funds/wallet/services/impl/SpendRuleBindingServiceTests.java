@@ -11,23 +11,29 @@ import com.wind.funds.wallet.model.request.ResumeSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.RetireSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
 import com.wind.funds.wallet.service.SpendRuleBindingService;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 /**
  * Spend Rule 挂载基础服务测试。
@@ -55,6 +61,55 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    /**
+     * 场景：公共调用方使用稳定创建结果管理 Spend Rule 挂载。
+     * 输入：反射读取 Binding 基础服务的创建和查询契约。
+     * 输出：创建返回包含稳定 sn 的 DTO，且不暴露无租户 raw-id 查询。
+     * 红线：数据库代理主键不能替代挂载的 tenant + sn 对象授权。
+     */
+    @Test
+    void testPublicContractShouldUseStableCreationResultWithoutRawIdGetter() throws NoSuchMethodException {
+        Method createMethod = SpendRuleBindingService.class.getMethod(
+                "createSpendRuleBinding", CreateSpendRuleBindingRequest.class);
+
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(createMethod.getReturnType()).isEqualTo(SpendRuleBindingDTO.class);
+            softly.assertThat(SpendRuleBindingService.class.getMethods())
+                    .extracting(Method::getName)
+                    .doesNotContain("getSpendRuleBindingById");
+        });
+    }
+
+    /**
+     * 场景：外层幂等恢复在挂载业务唯一键冲突后继续回读 winner。
+     * 输入：预置挂载后，在真实外层事务中再次创建相同业务唯一键。
+     * 输出：唯一键异常可被捕获，winner 可回读且外层事务正常提交。
+     * 红线：内层 REQUIRED 事务不能把可恢复冲突升级为最终 UnexpectedRollbackException。
+     */
+    @Test
+    void testInsertConflictShouldRemainReadableForOuterIdempotentRecovery() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CreateSpendRuleBindingRequest request = createBindingRequest("grant:srb-insert-conflict-recovery");
+        SpendRuleBindingDTO winner = spendRuleBindingService.createSpendRuleBinding(request);
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+
+        Throwable transactionFailure = catchThrowable(() -> transactionTemplate.executeWithoutResult(status -> {
+            assertThatThrownBy(() -> spendRuleBindingService.createSpendRuleBinding(request))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+            SpendRuleBindingDTO recovered = getBindingBySn(winner.getSn());
+            assertThat(recovered.getId()).isEqualTo(winner.getId());
+            assertThat(recovered.getSn()).isEqualTo(winner.getSn());
+        }));
+
+        assertThat(countBindings()).isOne();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+        assertThat(transactionFailure).isNull();
+    }
+
     /**
      * 场景：Spend Rule 挂载按允许状态机执行暂停、恢复、退役。
      * 输入：ACTIVE 挂载依次执行 suspend、resume、retire。
@@ -64,18 +119,22 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
     @Test
     void testLifecycleCommandsShouldPersistAllowedTransitionsWithoutFundsSideEffect() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        Long bindingId = spendRuleBindingService.createSpendRuleBinding(
+        SpendRuleBindingDTO binding = spendRuleBindingService.createSpendRuleBinding(
                 createBindingRequest("grant:srb-lifecycle-allowed"));
-        SpendRuleBindingDTO binding = spendRuleBindingService.getSpendRuleBindingById(bindingId);
+
+        assertThat(binding.getId()).isNotNull();
+        assertThat(binding.getSn()).isNotBlank();
+        assertThat(binding.getState()).isEqualTo(SpendRuleBindingState.ACTIVE);
+        assertThat(binding.getGmtCreate()).isNotNull();
+        assertThat(binding.getGmtModified()).isNotNull();
 
         spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn()));
-        SpendRuleBindingDTO suspended = spendRuleBindingService.getSpendRuleBindingById(bindingId);
+        SpendRuleBindingDTO suspended = getBindingBySn(binding.getSn());
         spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn()));
-        SpendRuleBindingDTO resumed = spendRuleBindingService.getSpendRuleBindingById(bindingId);
+        SpendRuleBindingDTO resumed = getBindingBySn(binding.getSn());
         spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
-        SpendRuleBindingDTO retired = spendRuleBindingService.getSpendRuleBindingById(bindingId);
+        SpendRuleBindingDTO retired = getBindingBySn(binding.getSn());
 
-        assertThat(binding.getState()).isEqualTo(SpendRuleBindingState.ACTIVE);
         assertThat(suspended.getState()).isEqualTo(SpendRuleBindingState.SUSPENDED);
         assertThat(suspended.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(suspended.getDescription()).isEqualTo("挂载 Spend Rule 版本");
@@ -97,19 +156,18 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
      */
     @Test
     void testLifecycleCommandsShouldRejectWrongTransitions() {
-        Long bindingId = spendRuleBindingService.createSpendRuleBinding(
+        SpendRuleBindingDTO binding = spendRuleBindingService.createSpendRuleBinding(
                 createBindingRequest("grant:srb-lifecycle-reject"));
-        SpendRuleBindingDTO binding = spendRuleBindingService.getSpendRuleBindingById(bindingId);
 
         assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn())))
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+        assertThat(getBindingBySn(binding.getSn()).getState())
                 .isEqualTo(SpendRuleBindingState.ACTIVE);
 
         spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn()));
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn())))
                 .hasMessageContaining("只有有效的 Spend Rule 挂载可以暂停");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+        assertThat(getBindingBySn(binding.getSn()).getState())
                 .isEqualTo(SpendRuleBindingState.SUSPENDED);
 
         spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
@@ -117,7 +175,7 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
         assertThatThrownBy(() -> spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn())))
                 .hasMessageContaining("只有有效或已暂停的 Spend Rule 挂载可以退役");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+        assertThat(getBindingBySn(binding.getSn()).getState())
                 .isEqualTo(SpendRuleBindingState.RETIRED);
     }
 
@@ -129,13 +187,13 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
      */
     @Test
     void testLifecycleCommandsShouldValidateBindingIdentity() {
-        Long bindingId = spendRuleBindingService.createSpendRuleBinding(
+        SpendRuleBindingDTO binding = spendRuleBindingService.createSpendRuleBinding(
                 createBindingRequest("grant:srb-lifecycle-validation"));
 
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
                 suspendRequest(null)))
                 .hasMessageContaining("Spend Rule 挂载流水号不能为空");
-        assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getState())
+        assertThat(getBindingBySn(binding.getSn()).getState())
                 .isEqualTo(SpendRuleBindingState.ACTIVE);
     }
 
@@ -180,6 +238,18 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         return new RetireSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn);
+    }
+
+    private SpendRuleBindingDTO getBindingBySn(String sn) {
+        SpendRuleBindingDTO binding = spendRuleBindingService.findSpendRuleBinding(TENANT_ID, sn);
+        assertThat(binding).isNotNull();
+        return binding;
+    }
+
+    private int countBindings() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
+                Integer.class, TENANT_ID, RULE_ID);
     }
 
     private void cleanupSpendRuleBindingServiceTestData() {
