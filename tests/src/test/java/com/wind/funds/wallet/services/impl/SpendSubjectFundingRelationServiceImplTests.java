@@ -25,6 +25,8 @@ import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.NotNull;
+import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -86,6 +90,27 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /**
+     * 场景：调用方检查资金责任关系的公共读取契约。
+     * 预期：Public Service 不暴露数据库 raw-id getter，query tenant 继续声明为必填。
+     * 红线：数据库代理主键只能定位关系，不能替代租户对象授权。
+     */
+    @Test
+    void testPublicContractShouldNotExposeRawIdGetter() throws NoSuchFieldException {
+        boolean tenantRequired = SpendSubjectFundingRelationQuery.class.getDeclaredField("tenantId")
+                .isAnnotationPresent(NotNull.class);
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(Arrays.stream(SpendSubjectFundingRelationService.class.getMethods())
+                            .map(Method::getName)
+                            .toList())
+                    .as("spend subject funding relation raw-id getter")
+                    .doesNotContain("getSpendSubjectFundingRelationById");
+            softly.assertThat(tenantRequired)
+                    .as("SpendSubjectFundingRelationQuery tenant @NotNull")
+                    .isTrue();
+        });
+    }
+
     @Test
     void testCreateSpendSubjectFundingRelationShouldNotPostLedgerOrChangeFundingAccountBalance() {
         fundingAccountService.createFundingAccount(createFundingAccountRequest(FUNDING_ACCOUNT_SN));
@@ -114,6 +139,28 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertThat(loadFundingAccountLedgers(FUNDING_ACCOUNT_SN))
                 .usingRecursiveFieldByFieldElementComparator()
                 .containsExactlyInAnyOrderElementsOf(fundingLedgersBefore);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：支出主体资金关系查询缺少租户授权。
+     * 输入：已存在的同租户关系，但 Query 未提供 tenantId。
+     * 输出：查询在首次读取前被拒绝，且资金事实不变。
+     * 红线：不能把可空 tenantId 传入持久化查询形成宽扫描。
+     */
+    @Test
+    void testQuerySpendSubjectFundingRelationsShouldRejectMissingTenantId() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest(FUNDING_ACCOUNT_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest(
+                SPEND_SUBJECT_ID, FundsSubjectType.FUNDING_ACCOUNT, FUNDING_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery().setSpendSubjectId(SPEND_SUBJECT_ID),
+                DefaultPageQueryOptions.defaults(10)))
+                .hasMessageContaining("租户 ID 不能为空");
+
+        assertThat(countRelations(SPEND_SUBJECT_ID)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

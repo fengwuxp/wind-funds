@@ -4,6 +4,7 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -27,6 +28,7 @@ public class SpendSubjectFundingRelationQuery {
     private String sn;
 
     @Schema(description = "租户 ID")
+    @NotNull
     private Long tenantId;
 
     @Schema(description = "支出控制主体 ID")

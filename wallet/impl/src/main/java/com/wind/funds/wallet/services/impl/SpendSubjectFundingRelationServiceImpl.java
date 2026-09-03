@@ -59,16 +59,10 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
     }
 
     @Override
-    public @NonNull SpendSubjectFundingRelationDTO getSpendSubjectFundingRelationById(@NonNull Long id) {
-        SpendSubjectFundingRel result = spendSubjectFundingRelMapper.selectOneById(id);
-        AssertUtils.notNull(result, "支出主体资金关系不存在，id = {}", id);
-        return toDTO(result);
-    }
-
-    @Override
     public @NonNull WindPagination<SpendSubjectFundingRelationDTO> querySpendSubjectFundingRelations(
             @NonNull SpendSubjectFundingRelationQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         SpendSubjectFundingRelNameRefs ref = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(ref)

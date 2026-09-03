@@ -31,16 +31,6 @@ public interface SpendSubjectFundingRelationService {
     @NonNull Long createSpendSubjectFundingRelation(@NonNull CreateSpendSubjectFundingRelationRequest request);
 
     /**
-     * 根据主键查询支出主体资金关系。
-     *
-     * <p>能力范围：只读查询单条关系，不校验余额和额度。</p>
-     *
-     * @param id 主键
-     * @return 支出主体资金关系
-     */
-    @NonNull SpendSubjectFundingRelationDTO getSpendSubjectFundingRelationById(@NonNull Long id);
-
-    /**
      * 分页查询支出主体资金关系。
      *
      * <p>能力范围：只读分页查询关系配置，供管理后台和路由排查使用。</p>
