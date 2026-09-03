@@ -7,12 +7,16 @@ import com.wind.funds.governance.dal.entities.ProjectionReplayDifference;
 import com.wind.funds.governance.dal.entities.ProjectionReplayTask;
 import com.wind.funds.governance.dal.mapper.ProjectionReplayDifferenceMapper;
 import com.wind.funds.governance.dal.mapper.ProjectionReplayTaskMapper;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFact;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFactBatch;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionReplaySource;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionRow;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionWriter;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -32,8 +36,7 @@ import java.util.UUID;
  *
  * <p>职责：校验重放请求必须有界且使用交易投影 checkpoint，加载来源事实，重建投影行并比较现有投影差异。</p>
  *
- * <p>能力：支持持久任务的 {@code VERIFY_ONLY}、影子重建和经审批的正式投影重建；旧的直接调用入口仍只开放
- * {@code VERIFY_ONLY}。</p>
+ * <p>能力：支持持久任务的 {@code VERIFY_ONLY}、影子重建和经审批的正式投影重建。</p>
  *
  * <p>边界：该服务只处理交易只读投影，不重新入账、不补写交易事实、不修改账本分录、不修改余额投影、
  * 不推进清结算或对账差错处理。</p>
@@ -57,19 +60,10 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
 
     private final FundsTransactionProjectionWriter projectionWriter;
 
-    private final @Nullable ProjectionReplayTaskMapper replayTaskMapper;
+    private final ProjectionReplayTaskMapper replayTaskMapper;
 
-    private final @Nullable ProjectionReplayDifferenceMapper replayDifferenceMapper;
+    private final ProjectionReplayDifferenceMapper replayDifferenceMapper;
 
-    public FundsProjectionReplayService(@NonNull FundsTransactionProjectionReplaySource replaySource,
-                                        @NonNull FundsTransactionProjectionWriter projectionWriter) {
-        this.replaySource = replaySource;
-        this.projectionWriter = projectionWriter;
-        this.replayTaskMapper = null;
-        this.replayDifferenceMapper = null;
-    }
-
-    @Autowired
     public FundsProjectionReplayService(@NonNull FundsTransactionProjectionReplaySource replaySource,
                                         @NonNull FundsTransactionProjectionWriter projectionWriter,
                                         @NonNull ProjectionReplayTaskMapper replayTaskMapper,
@@ -80,43 +74,12 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         this.replayDifferenceMapper = replayDifferenceMapper;
     }
 
-    public @NonNull FundsTransactionProjectionReplayResult replay(
-            @NonNull FundsTransactionProjectionReplayRequest request) {
-        assertRequestValid(request);
-        AssertUtils.isTrue(request.mode() == ProjectionReplayMode.VERIFY_ONLY,
-                "交易投影重放控制面未开放，仅支持 VERIFY_ONLY");
-        List<FundsTransactionProjectionFact> facts = replaySource.loadFacts(request.replayRange());
-        AssertUtils.notNull(facts, "交易投影重放来源事实列表不能为空");
-        List<FundsTransactionProjectionRow> rebuiltRows = facts.stream()
-                .map(fact -> rebuildProjectionRow(request, fact))
-                .toList();
-        List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(),
-                rebuiltRows);
-        AssertUtils.notNull(differences, "交易投影重放差异列表不能为空");
-        assertDifferencesComplete(differences);
-        if (request.mode() == ProjectionReplayMode.REBUILD_SHADOW) {
-            projectionWriter.upsertShadow(request.taskSn(), rebuiltRows);
-        } else if (request.mode() == ProjectionReplayMode.REBUILD_APPLY) {
-            projectionWriter.upsertOfficial(request.taskSn(), rebuiltRows);
-        }
-        return FundsTransactionProjectionReplayResult.builder()
-                .taskSn(request.taskSn())
-                .mode(request.mode())
-                .viewDomain(request.viewDomain())
-                .range(request.replayRange())
-                .loadedFactCount(facts.size())
-                .rebuiltRowCount(rebuiltRows.size())
-                .differences(differences)
-                .checkpoint(request.checkpoint())
-                .build();
-    }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull FundsProjectionReplayTaskDTO createTask(
             @NonNull CreateFundsProjectionReplayTaskRequest request,
             @NonNull WindOperator operator) {
-        ProjectionReplayTaskMapper taskMapper = requiredTaskMapper();
+        ProjectionReplayTaskMapper taskMapper = replayTaskMapper;
         validateCreateRequest(request, operator);
         ProjectionReplayTask existing = taskMapper.selectByRequest(request.tenantId(), request.requestSn());
         if (existing != null) {
@@ -127,6 +90,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         validateApplyEvidence(request);
         FundsTransactionProjectionCheckpoint checkpoint = replaySource.initializeCheckpoint(request.tenantId(),
                 request.viewDomain(), request.replayRange());
+        validateCheckpoint(checkpoint);
         ProjectionReplayTask task = new ProjectionReplayTask();
         task.setSn("PRT-" + UUID.randomUUID().toString().replace("-", ""));
         task.setTenantId(request.tenantId());
@@ -158,7 +122,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
             @NonNull RunFundsProjectionReplayTaskRequest request,
             @NonNull WindOperator operator) {
         validateRunRequest(request, operator);
-        ProjectionReplayTaskMapper taskMapper = requiredTaskMapper();
+        ProjectionReplayTaskMapper taskMapper = replayTaskMapper;
         ProjectionReplayTask task = taskMapper.selectBySnForUpdate(request.tenantId(), request.taskSn());
         AssertUtils.notNull(task, "投影重放任务不存在，taskSn = {}", request.taskSn());
         AssertUtils.isTrue(task.getState() != ProjectionReplayTaskState.COMPLETED,
@@ -168,15 +132,8 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         FundsTransactionProjectionFactBatch batch = replaySource.loadFactBatch(task.getTenantId(),
                 task.getViewDomain(), range, checkpoint, request.maxBatchSize());
         AssertUtils.notNull(batch, "投影重放事实批次不能为空");
-        FundsTransactionProjectionReplayRequest replayRequest = FundsTransactionProjectionReplayRequest.builder()
-                .taskSn(task.getSn())
-                .mode(task.getReplayMode())
-                .viewDomain(task.getViewDomain())
-                .replayRange(range)
-                .checkpoint(checkpoint)
-                .build();
         List<FundsTransactionProjectionRow> rebuiltRows = batch.facts().stream()
-                .map(fact -> rebuildProjectionRow(replayRequest, fact))
+                .map(fact -> rebuildProjectionRow(task.getViewDomain(), range, fact))
                 .toList();
         List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(task.getTenantId(),
                 task.getViewDomain(), rebuiltRows);
@@ -214,7 +171,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
                                                          @NonNull String taskSn,
                                                          @NonNull WindOperator operator) {
         validateQuery(tenantId, taskSn, operator);
-        ProjectionReplayTask task = requiredTaskMapper().selectBySn(tenantId, taskSn);
+        ProjectionReplayTask task = replayTaskMapper.selectBySn(tenantId, taskSn);
         AssertUtils.notNull(task, "投影重放任务不存在，taskSn = {}", taskSn);
         return toDTO(task);
     }
@@ -227,7 +184,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         validateOperatorAndTenant(tenantId, operator);
         AssertUtils.isTrue(maxSize > 0 && maxSize <= MAX_BATCH_SIZE,
                 "投影重放 backlog 查询大小必须在 1 到 {} 之间", MAX_BATCH_SIZE);
-        return requiredTaskMapper().selectBacklog(tenantId, maxSize).stream().map(this::toDTO).toList();
+        return replayTaskMapper.selectBacklog(tenantId, maxSize).stream().map(this::toDTO).toList();
     }
 
     private void validateCreateRequest(CreateFundsProjectionReplayTaskRequest request, WindOperator operator) {
@@ -252,7 +209,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         }
         AssertUtils.hasText(request.approvalRef(), "正式投影重放必须提供审批引用");
         AssertUtils.hasText(request.validatedShadowTaskSn(), "正式投影重放必须引用已验证影子任务");
-        ProjectionReplayTask shadow = requiredTaskMapper().selectBySn(request.tenantId(),
+        ProjectionReplayTask shadow = replayTaskMapper.selectBySn(request.tenantId(),
                 request.validatedShadowTaskSn());
         AssertUtils.notNull(shadow, "正式投影重放引用的影子任务不存在");
         AssertUtils.isTrue(shadow.getReplayMode() == ProjectionReplayMode.REBUILD_SHADOW
@@ -285,7 +242,7 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
 
     private void persistDifferences(ProjectionReplayTask task,
                                     List<FundsTransactionProjectionDifference> differences) {
-        ProjectionReplayDifferenceMapper differenceMapper = requiredDifferenceMapper();
+        ProjectionReplayDifferenceMapper differenceMapper = replayDifferenceMapper;
         for (FundsTransactionProjectionDifference difference : differences) {
             ProjectionReplayDifference entity = differenceMapper.selectDifference(task.getTenantId(), task.getSn(),
                     difference.sourceSn(), difference.fieldName());
@@ -371,26 +328,11 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
                 .build();
     }
 
-    private ProjectionReplayTaskMapper requiredTaskMapper() {
-        AssertUtils.notNull(replayTaskMapper, "持久投影重放任务 Mapper 未装配");
-        return replayTaskMapper;
-    }
-
-    private ProjectionReplayDifferenceMapper requiredDifferenceMapper() {
-        AssertUtils.notNull(replayDifferenceMapper, "持久投影重放差异 Mapper 未装配");
-        return replayDifferenceMapper;
-    }
-
-    private void assertRequestValid(FundsTransactionProjectionReplayRequest request) {
-        AssertUtils.hasText(request.taskSn(), "交易投影重放任务号不能为空");
-        AssertUtils.notNull(request.mode(), "交易投影重放模式不能为空");
-        AssertUtils.hasText(request.viewDomain(), "交易投影视图域不能为空");
-        AssertUtils.notNull(request.replayRange(), "交易投影重放范围不能为空");
-        AssertUtils.isTrue(request.replayRange().isBounded(), "交易投影重放必须指定单笔、主体、时间窗口或批次范围");
-        AssertUtils.notNull(request.checkpoint(), "交易投影重放 checkpoint 不能为空");
-        AssertUtils.notNull(request.checkpoint().type(), "交易投影重放 checkpoint 类型不能为空");
-        AssertUtils.hasText(request.checkpoint().checkpointSn(), "交易投影重放 checkpoint 流水号不能为空");
-        AssertUtils.isTrue(request.checkpoint().type() == ProjectionCheckpointType.TRANSACTION_PROJECTION,
+    private void validateCheckpoint(FundsTransactionProjectionCheckpoint checkpoint) {
+        AssertUtils.notNull(checkpoint, "交易投影重放 checkpoint 不能为空");
+        AssertUtils.notNull(checkpoint.type(), "交易投影重放 checkpoint 类型不能为空");
+        AssertUtils.hasText(checkpoint.checkpointSn(), "交易投影重放 checkpoint 流水号不能为空");
+        AssertUtils.isTrue(checkpoint.type() == ProjectionCheckpointType.TRANSACTION_PROJECTION,
                 "交易投影重放 checkpoint 类型必须为交易投影");
     }
 
@@ -406,10 +348,11 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         AssertUtils.hasText(value, "交易投影重放差异项字段不能为空，field = {}", fieldName);
     }
 
-    private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionReplayRequest request,
+    private FundsTransactionProjectionRow rebuildProjectionRow(String viewDomain,
+                                                               FundsTransactionProjectionReplayRange range,
                                                                FundsTransactionProjectionFact fact) {
         assertFactComplete(fact);
-        assertFactInRequestScope(request, fact);
+        assertFactInRequestScope(viewDomain, range, fact);
         assertExplainabilityPayload(fact);
         return FundsTransactionProjectionRow.builder()
                 .projectionSn("TP-" + fact.sourceSn())
@@ -447,12 +390,12 @@ public class FundsProjectionReplayService implements FundsProjectionReplayApplic
         AssertUtils.notNull(value, "交易投影重放来源事实字段不能为空，field = {}", fieldName);
     }
 
-    private void assertFactInRequestScope(FundsTransactionProjectionReplayRequest request,
+    private void assertFactInRequestScope(String viewDomain,
+                                          FundsTransactionProjectionReplayRange range,
                                           FundsTransactionProjectionFact fact) {
-        AssertUtils.isTrue(request.viewDomain().equals(fact.viewDomain()),
+        AssertUtils.isTrue(viewDomain.equals(fact.viewDomain()),
                 "交易投影重放来源事实不属于请求视图域，sourceSn = {}，actual = {}，expected = {}",
-                fact.sourceSn(), fact.viewDomain(), request.viewDomain());
-        FundsTransactionProjectionReplayRange range = request.replayRange();
+                fact.sourceSn(), fact.viewDomain(), viewDomain);
         assertSourceInRange(range, fact);
         assertOwnerInRange(range, fact);
         assertOccurredTimeInRange(range, fact);

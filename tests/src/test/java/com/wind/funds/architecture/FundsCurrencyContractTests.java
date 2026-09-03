@@ -1,8 +1,8 @@
 package com.wind.funds.architecture;
 
 import com.wind.funds.governance.dal.entities.FundsTransactionProjection;
-import com.wind.funds.governance.projection.FundsTransactionProjectionFact;
-import com.wind.funds.governance.projection.FundsTransactionProjectionRow;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFact;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionRow;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.reconciliation.dal.mapper.RecoveryOrderMapper;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FundsCurrencyContractTests {
 
     @Test
-    void testPublicCurrencyContractsShouldUseCurrencyIsoCode() throws NoSuchMethodException {
+    void testCurrencyContractsShouldUseCurrencyIsoCode() throws NoSuchMethodException {
         assertThat(SubjectRef.class.getMethod("getCurrency").getReturnType()).isEqualTo(CurrencyIsoCode.class);
         assertThat(PaymentInstrumentRefSpec.class.getMethod("getCurrency").getReturnType())
                 .isEqualTo(CurrencyIsoCode.class);

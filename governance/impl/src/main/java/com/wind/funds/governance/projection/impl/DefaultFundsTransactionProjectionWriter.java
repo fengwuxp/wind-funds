@@ -3,8 +3,8 @@ package com.wind.funds.governance.projection.impl;
 import com.wind.funds.governance.dal.entities.FundsTransactionProjection;
 import com.wind.funds.governance.dal.mapper.FundsTransactionProjectionMapper;
 import com.wind.funds.governance.projection.FundsTransactionProjectionDifference;
-import com.wind.funds.governance.projection.FundsTransactionProjectionRow;
-import com.wind.funds.governance.projection.FundsTransactionProjectionWriter;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionRow;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionWriter;
 import com.wind.jackson.WindJson;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -29,13 +29,6 @@ public class DefaultFundsTransactionProjectionWriter implements FundsTransaction
     private static final String OFFICIAL_SCOPE_REF = "OFFICIAL";
 
     private final FundsTransactionProjectionMapper projectionMapper;
-
-    @Override
-    public @NonNull List<FundsTransactionProjectionDifference> compare(
-            @NonNull String viewDomain,
-            @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
-        throw new IllegalStateException("生产投影写入器必须使用 tenant 有界比较");
-    }
 
     @Override
     public @NonNull List<FundsTransactionProjectionDifference> compare(
@@ -64,22 +57,10 @@ public class DefaultFundsTransactionProjectionWriter implements FundsTransaction
     }
 
     @Override
-    public void upsertShadow(@NonNull String taskSn,
-                             @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
-        throw new IllegalStateException("生产投影写入器必须使用 tenant 有界影子写入");
-    }
-
-    @Override
     public void upsertShadow(@NonNull Long tenantId,
                              @NonNull String taskSn,
                              @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
         upsert(tenantId, SHADOW_SCOPE, taskSn, taskSn, rebuiltRows);
-    }
-
-    @Override
-    public void upsertOfficial(@NonNull String taskSn,
-                               @NonNull List<FundsTransactionProjectionRow> rebuiltRows) {
-        throw new IllegalStateException("生产投影写入器必须使用 tenant 有界正式写入");
     }
 
     @Override

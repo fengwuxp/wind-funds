@@ -1,22 +1,173 @@
 package com.wind.funds.governance.projection;
 
+import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.governance.enums.ProjectionCheckpointType;
 import com.wind.funds.governance.enums.ProjectionReplayMode;
+import com.wind.funds.governance.enums.ProjectionReplayTaskState;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFact;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFactBatch;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionReplaySource;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionRow;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionWriter;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
 /**
  * 交易投影重放边界测试。
  */
-class FundsProjectionReplayServiceTests {
+@SpringJUnitConfig({
+        AbstractFundsServiceTest.TestInfrastructureConfig.class,
+        FundsProjectionReplayServiceTests.Config.class
+})
+class FundsProjectionReplayServiceTests extends AbstractFundsServiceTest {
+
+    private static final String VIEW_DOMAIN = "USER_BILL";
+
+    @Autowired
+    private FundsProjectionReplayApplicationService projectionReplayApplicationService;
+
+    @Autowired
+    private SwitchableProjectionReplaySource switchableSource;
+
+    @Autowired
+    private SwitchableProjectionWriter switchableWriter;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private int requestSequence;
+
+    @BeforeEach
+    void setUpProjectionReplayService() {
+        requestSequence = 0;
+        TransactionTemplate cleanup = new TransactionTemplate(transactionManager);
+        cleanup.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        cleanup.executeWithoutResult(status -> {
+            jdbcTemplate.update("DELETE FROM t_projection_replay_difference");
+            jdbcTemplate.update("DELETE FROM t_funds_transaction_projection");
+            jdbcTemplate.update("DELETE FROM t_projection_replay_task");
+        });
+        switchableSource.use(new FixedProjectionReplaySource());
+        switchableWriter.use(new RecordingProjectionWriter());
+    }
+
+    @Test
+    void testPublicContractShouldExposeOnlyPersistentTenantAwareReplay() throws NoSuchMethodException {
+        Method initializeCheckpoint = FundsTransactionProjectionReplaySource.class.getMethod(
+                "initializeCheckpoint", Long.class, String.class,
+                FundsTransactionProjectionReplayRange.class);
+        Method loadFactBatch = FundsTransactionProjectionReplaySource.class.getMethod(
+                "loadFactBatch", Long.class, String.class,
+                FundsTransactionProjectionReplayRange.class,
+                FundsTransactionProjectionCheckpoint.class, int.class);
+        Method compare = FundsTransactionProjectionWriter.class.getMethod(
+                "compare", Long.class, String.class, List.class);
+        Method upsertShadow = FundsTransactionProjectionWriter.class.getMethod(
+                "upsertShadow", Long.class, String.class, List.class);
+        Method upsertOfficial = FundsTransactionProjectionWriter.class.getMethod(
+                "upsertOfficial", Long.class, String.class, List.class);
+        boolean hasLegacyConstructor = Arrays.stream(FundsProjectionReplayService.class.getConstructors())
+                .anyMatch(constructor -> constructor.getParameterCount() == 2
+                        && constructor.getParameterTypes()[0] == FundsTransactionProjectionReplaySource.class
+                        && constructor.getParameterTypes()[1] == FundsTransactionProjectionWriter.class);
+        boolean hasLegacyReplay = Arrays.stream(FundsProjectionReplayService.class.getMethods())
+                .anyMatch(method -> method.getName().equals("replay"));
+
+        assertSoftly(softly -> {
+            softly.assertThat(isClassPresent(
+                            "com.wind.funds.governance.projection.FundsTransactionProjectionReplayRequest"))
+                    .as("legacy direct replay request must not remain public")
+                    .isFalse();
+            softly.assertThat(hasLegacyConstructor)
+                    .as("legacy two-argument replay service constructor must be removed")
+                    .isFalse();
+            softly.assertThat(hasLegacyReplay)
+                    .as("legacy direct replay method must be removed")
+                    .isFalse();
+            softly.assertThat(hasPublicMethod(FundsTransactionProjectionReplaySource.class,
+                            "loadFacts", FundsTransactionProjectionReplayRange.class))
+                    .as("tenantless replay source method must be removed")
+                    .isFalse();
+            softly.assertThat(hasPublicMethod(FundsTransactionProjectionWriter.class,
+                            "compare", String.class, List.class))
+                    .as("tenantless projection compare method must be removed")
+                    .isFalse();
+            softly.assertThat(hasPublicMethod(FundsTransactionProjectionWriter.class,
+                            "upsertShadow", String.class, List.class))
+                    .as("tenantless shadow write method must be removed")
+                    .isFalse();
+            softly.assertThat(hasPublicMethod(FundsTransactionProjectionWriter.class,
+                            "upsertOfficial", String.class, List.class))
+                    .as("tenantless official write method must be removed")
+                    .isFalse();
+            softly.assertThat(List.of(initializeCheckpoint, loadFactBatch, compare, upsertShadow, upsertOfficial))
+                    .allSatisfy(method -> {
+                        softly.assertThat(Modifier.isAbstract(method.getModifiers()))
+                                .as("%s must be abstract", method)
+                                .isTrue();
+                        softly.assertThat(method.isDefault())
+                                .as("%s must not provide a default fallback", method)
+                                .isFalse();
+                    });
+        });
+    }
+
+    @Test
+    void testProjectionReplaySpiShouldBelongToGovernanceImplementation() {
+        List<String> publicTypeNames = List.of(
+                "com.wind.funds.governance.projection.FundsTransactionProjectionReplaySource",
+                "com.wind.funds.governance.projection.FundsTransactionProjectionWriter",
+                "com.wind.funds.governance.projection.FundsTransactionProjectionFact",
+                "com.wind.funds.governance.projection.FundsTransactionProjectionFactBatch",
+                "com.wind.funds.governance.projection.FundsTransactionProjectionRow");
+        List<String> internalTypeNames = List.of(
+                "com.wind.funds.governance.projection.internal.FundsTransactionProjectionReplaySource",
+                "com.wind.funds.governance.projection.internal.FundsTransactionProjectionWriter",
+                "com.wind.funds.governance.projection.internal.FundsTransactionProjectionFact",
+                "com.wind.funds.governance.projection.internal.FundsTransactionProjectionFactBatch",
+                "com.wind.funds.governance.projection.internal.FundsTransactionProjectionRow");
+
+        assertSoftly(softly -> {
+            publicTypeNames.forEach(typeName -> softly.assertThat(isClassPresent(typeName))
+                    .as("governance face must not publish internal replay type %s", typeName)
+                    .isFalse());
+            internalTypeNames.forEach(typeName -> softly.assertThat(isClassPresent(typeName))
+                    .as("governance implementation must own replay type %s", typeName)
+                    .isTrue());
+            Arrays.stream(FundsProjectionReplayApplicationService.class.getMethods())
+                    .filter(method -> method.getDeclaringClass() == FundsProjectionReplayApplicationService.class)
+                    .forEach(method -> softly.assertThat(method.toGenericString())
+                            .as("public replay application service must not expose internal types")
+                            .doesNotContain(".projection.internal."));
+        });
+    }
 
     /**
      * 场景：运营人员发起交易投影重放，但没有指定单笔、主体、时间窗口或批次范围。
@@ -27,12 +178,11 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithoutBoundedRangeShouldFail() {
-        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
-        FundsTransactionProjectionReplayRequest request = replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .build());
-
-        assertThatThrownBy(() -> service.replay(request))
-                .hasMessageContaining("交易投影重放必须指定单笔、主体、时间窗口或批次范围");
+        FundsProjectionReplayApplicationService service = newService(new RecordingProjectionWriter());
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.VERIFY_ONLY,
+                FundsTransactionProjectionReplayRange.builder().build()))
+                .hasMessageContaining("投影重放任务必须指定有界范围");
+        assertThat(taskCount()).isZero();
     }
 
     /**
@@ -44,13 +194,11 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithIncompleteOwnerRangeShouldFail() {
-        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
-        FundsTransactionProjectionReplayRequest request = replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .ownerType("USER")
-                .build());
-
-        assertThatThrownBy(() -> service.replay(request))
-                .hasMessageContaining("交易投影重放必须指定单笔、主体、时间窗口或批次范围");
+        FundsProjectionReplayApplicationService service = newService(new RecordingProjectionWriter());
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.VERIFY_ONLY,
+                FundsTransactionProjectionReplayRange.builder().ownerType("USER").build()))
+                .hasMessageContaining("投影重放任务必须指定有界范围");
+        assertThat(taskCount()).isZero();
     }
 
     /**
@@ -62,67 +210,53 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithInvalidTimeRangeShouldFail() {
-        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
-        FundsTransactionProjectionReplayRequest request = replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .startTime(LocalDateTime.of(2026, 5, 20, 0, 0))
-                .endTime(LocalDateTime.of(2026, 5, 19, 0, 0))
-                .build());
-
-        assertThatThrownBy(() -> service.replay(request))
-                .hasMessageContaining("交易投影重放必须指定单笔、主体、时间窗口或批次范围");
+        FundsProjectionReplayApplicationService service = newService(new RecordingProjectionWriter());
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.VERIFY_ONLY,
+                FundsTransactionProjectionReplayRange.builder()
+                        .startTime(LocalDateTime.of(2026, 5, 20, 0, 0))
+                        .endTime(LocalDateTime.of(2026, 5, 19, 0, 0))
+                        .build()))
+                .hasMessageContaining("投影重放任务必须指定有界范围");
+        assertThat(taskCount()).isZero();
     }
 
     /**
-     * 场景：调用方发起交易投影重放，但没有提供 checkpoint 流水号。
-     * 输入：单笔重放范围、缺少 checkpointSn 的交易投影 checkpoint。
+     * 场景：重放来源初始化时返回了缺少流水号的 checkpoint。
+     * 输入：单笔重放范围、缺少 checkpointSn 的来源 checkpoint。
      * 输出：服务拒绝执行。
      * 预期：交易投影重放必须明确处理边界流水号。
      * 红线：交易投影重放不得接收不可追踪的 checkpoint。
      */
     @Test
     void testReplayWithoutCheckpointSnShouldFail() {
-        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
-        FundsTransactionProjectionReplayRequest request = FundsTransactionProjectionReplayRequest.builder()
-                .taskSn("TPR-202605190002")
-                .mode(ProjectionReplayMode.VERIFY_ONLY)
-                .viewDomain("USER_BILL")
-                .replayRange(FundsTransactionProjectionReplayRange.builder()
-                        .sourceSn("FT202605190001")
-                        .build())
-                .checkpoint(FundsTransactionProjectionCheckpoint.builder()
+        FundsProjectionReplayApplicationService service = newService(new CheckpointProjectionReplaySource(
+                FundsTransactionProjectionCheckpoint.builder()
                         .type(ProjectionCheckpointType.TRANSACTION_PROJECTION)
                         .checkpointSn("")
-                        .build())
-                .build();
+                        .build()), new RecordingProjectionWriter());
 
-        assertThatThrownBy(() -> service.replay(request))
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.VERIFY_ONLY, sourceRange()))
                 .hasMessageContaining("交易投影重放 checkpoint 流水号不能为空");
+        assertThat(taskCount()).isZero();
     }
 
     /**
-     * 场景：调用方发起交易投影重放，但 checkpoint 没有声明所属水位域。
-     * 输入：单笔重放范围、缺少类型的 checkpoint。
+     * 场景：重放来源初始化时返回了未声明水位域的 checkpoint。
+     * 输入：单笔重放范围、缺少类型的来源 checkpoint。
      * 输出：服务拒绝执行。
      * 预期：交易投影重放必须显式使用交易投影自己的 checkpoint。
      * 红线：不得让无类型 checkpoint 在交易投影、余额、归档或指标域之间被复用。
      */
     @Test
     void testReplayWithoutCheckpointTypeShouldFail() {
-        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
-        FundsTransactionProjectionReplayRequest request = FundsTransactionProjectionReplayRequest.builder()
-                .taskSn("TPR-202605190003")
-                .mode(ProjectionReplayMode.VERIFY_ONLY)
-                .viewDomain("USER_BILL")
-                .replayRange(FundsTransactionProjectionReplayRange.builder()
-                        .sourceSn("FT202605190001")
-                        .build())
-                .checkpoint(FundsTransactionProjectionCheckpoint.builder()
+        FundsProjectionReplayApplicationService service = newService(new CheckpointProjectionReplaySource(
+                FundsTransactionProjectionCheckpoint.builder()
                         .checkpointSn("TPC-202605190003")
-                        .build())
-                .build();
+                        .build()), new RecordingProjectionWriter());
 
-        assertThatThrownBy(() -> service.replay(request))
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.VERIFY_ONLY, sourceRange()))
                 .hasMessageContaining("交易投影重放 checkpoint 类型不能为空");
+        assertThat(taskCount()).isZero();
     }
 
     /**
@@ -143,27 +277,24 @@ class FundsProjectionReplayServiceTests {
      * 预期：tenant-aware 来源和写入入口全部失败关闭，不能静默降级为无租户实现。
      */
     @Test
-    void testPersistentReplayPortsShouldRejectLegacyTenantlessFallback() {
-        FixedProjectionReplaySource source = new FixedProjectionReplaySource();
-        RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsTransactionProjectionReplayRange range = FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build();
-        FundsTransactionProjectionCheckpoint checkpoint = FundsTransactionProjectionCheckpoint.builder()
-                .type(ProjectionCheckpointType.TRANSACTION_PROJECTION)
-                .checkpointSn("0:0:0:0")
-                .build();
+    void testPersistentReplayPortsShouldRejectLegacyTenantlessFallback() throws NoSuchMethodException {
+        Method initializeCheckpoint = FundsTransactionProjectionReplaySource.class.getMethod(
+                "initializeCheckpoint", Long.class, String.class, FundsTransactionProjectionReplayRange.class);
+        Method loadFactBatch = FundsTransactionProjectionReplaySource.class.getMethod(
+                "loadFactBatch", Long.class, String.class, FundsTransactionProjectionReplayRange.class,
+                FundsTransactionProjectionCheckpoint.class, int.class);
+        Method compare = FundsTransactionProjectionWriter.class.getMethod(
+                "compare", Long.class, String.class, List.class);
+        Method upsertShadow = FundsTransactionProjectionWriter.class.getMethod(
+                "upsertShadow", Long.class, String.class, List.class);
+        Method upsertOfficial = FundsTransactionProjectionWriter.class.getMethod(
+                "upsertOfficial", Long.class, String.class, List.class);
 
-        assertThatThrownBy(() -> source.initializeCheckpoint(1L, "USER_BILL", range))
-                .hasMessageContaining("必须显式实现 tenant 有界");
-        assertThatThrownBy(() -> source.loadFactBatch(1L, "USER_BILL", range, checkpoint, 100))
-                .hasMessageContaining("必须显式实现 tenant 有界");
-        assertThatThrownBy(() -> writer.compare(1L, "USER_BILL", List.of()))
-                .hasMessageContaining("必须显式实现 tenant 有界");
-        assertThatThrownBy(() -> writer.upsertShadow(1L, "TASK-1", List.of()))
-                .hasMessageContaining("必须显式实现 tenant 有界");
-        assertThatThrownBy(() -> writer.upsertOfficial(1L, "TASK-1", List.of()))
-                .hasMessageContaining("必须显式实现 tenant 有界");
+        assertThat(List.of(initializeCheckpoint, loadFactBatch, compare, upsertShadow, upsertOfficial))
+                .allSatisfy(method -> {
+                    assertThat(Modifier.isAbstract(method.getModifiers())).isTrue();
+                    assertThat(method.isDefault()).isFalse();
+                });
     }
 
     /**
@@ -176,12 +307,9 @@ class FundsProjectionReplayServiceTests {
     @Test
     void testVerifyOnlyReplayShouldCompareButNotWriteProjection() {
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsProjectionReplayService service = newService(writer);
-
-        FundsTransactionProjectionReplayRange replayRange = FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build();
-        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(replayRange));
+        FundsProjectionReplayApplicationService service = newService(writer);
+        FundsTransactionProjectionReplayResult result = replay(service, ProjectionReplayMode.VERIFY_ONLY,
+                sourceRange());
 
         assertThat(result.loadedFactCount()).isEqualTo(1);
         assertThat(result.rebuiltRowCount()).isEqualTo(1);
@@ -198,53 +326,43 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
-     * 场景：控制面、审批与审计证据尚未落地时请求影子重放。
-     * 预期：服务在读取来源事实和调用 Writer 前拒绝请求。
-     * 红线：不能把有界范围和 checkpoint 当成影子写入授权。
+     * 场景：通过持久控制面执行影子重放。
+     * 预期：任务读取来源事实并只写影子投影，不写正式投影。
+     * 红线：影子重放不得绕过 tenant、任务审计或写入正式投影。
      */
     @Test
-    void testShadowReplayWithoutControlPlaneShouldFailClosed() {
+    void testPersistentShadowReplayShouldWriteShadowOnly() {
         RecordingProjectionReplaySource source = new RecordingProjectionReplaySource();
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsProjectionReplayService service = new FundsProjectionReplayService(source, writer);
+        FundsProjectionReplayApplicationService service = newService(source, writer);
 
-        assertThatThrownBy(() -> service.replay(replayRequest(
-                ProjectionReplayMode.REBUILD_SHADOW,
-                FundsTransactionProjectionReplayRange.builder()
-                        .sourceSn("FT202605190001")
-                        .build())))
-                .hasMessageContaining("交易投影重放控制面未开放")
-                .hasMessageContaining("VERIFY_ONLY");
+        replay(service, ProjectionReplayMode.REBUILD_SHADOW, sourceRange());
 
-        assertThat(source.loadCalls()).isZero();
-        assertThat(writer.comparedRows()).isEmpty();
-        assertThat(writer.shadowWrites()).isEmpty();
+        assertThat(source.loadCalls()).isEqualTo(1);
+        assertThat(writer.comparedRows()).hasSize(1);
+        assertThat(writer.shadowWrites()).hasSize(1);
         assertThat(writer.officialWrites()).isEmpty();
     }
 
     /**
-     * 场景：控制面、审批与审计证据尚未落地时请求正式重放。
-     * 预期：服务在读取来源事实和调用 Writer 前拒绝请求。
-     * 红线：不能在缺少控制面时覆盖正式投影。
+     * 场景：持久控制面缺少审批证据时请求正式重放。
+     * 预期：服务在初始化来源和创建任务前拒绝请求。
+     * 红线：不能在缺少审批和已验证影子任务时覆盖正式投影。
      */
     @Test
-    void testApplyReplayWithoutControlPlaneShouldFailClosed() {
+    void testPersistentApplyWithoutApprovalShouldFailClosed() {
         RecordingProjectionReplaySource source = new RecordingProjectionReplaySource();
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
-        FundsProjectionReplayService service = new FundsProjectionReplayService(source, writer);
+        FundsProjectionReplayApplicationService service = newService(source, writer);
 
-        assertThatThrownBy(() -> service.replay(replayRequest(
-                ProjectionReplayMode.REBUILD_APPLY,
-                FundsTransactionProjectionReplayRange.builder()
-                        .sourceSn("FT202605190001")
-                        .build())))
-                .hasMessageContaining("交易投影重放控制面未开放")
-                .hasMessageContaining("VERIFY_ONLY");
+        assertThatThrownBy(() -> createTask(service, ProjectionReplayMode.REBUILD_APPLY, sourceRange()))
+                .hasMessageContaining("正式投影重放必须提供审批引用");
 
         assertThat(source.loadCalls()).isZero();
         assertThat(writer.comparedRows()).isEmpty();
         assertThat(writer.shadowWrites()).isEmpty();
         assertThat(writer.officialWrites()).isEmpty();
+        assertThat(taskCount()).isZero();
     }
 
     /**
@@ -256,13 +374,9 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithNullDifferencesShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new FixedProjectionReplaySource(),
                 new StaticDifferencesProjectionWriter(null));
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放差异列表不能为空");
+        assertReplayFails(service, sourceRange(), "交易投影重放差异列表不能为空");
     }
 
     /**
@@ -276,13 +390,9 @@ class FundsProjectionReplayServiceTests {
     void testReplayWithNullDifferenceItemShouldFail() {
         List<FundsTransactionProjectionDifference> differences = new ArrayList<>();
         differences.add(null);
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new FixedProjectionReplaySource(),
                 new StaticDifferencesProjectionWriter(differences));
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放差异项不能为空");
+        assertReplayFails(service, sourceRange(), "交易投影重放差异项不能为空");
     }
 
     /**
@@ -294,19 +404,14 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithBlankDifferenceFieldNameShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new FixedProjectionReplaySource(),
                 new StaticDifferencesProjectionWriter(List.of(FundsTransactionProjectionDifference.builder()
                         .sourceSn("FT202605190001")
                         .fieldName("")
                         .expectedValue("SUCCEEDED")
                         .actualValue("FAILED")
                         .build())));
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放差异项字段不能为空")
-                .hasMessageContaining("fieldName");
+        assertReplayFails(service, sourceRange(), "交易投影重放差异项字段不能为空", "fieldName");
     }
 
     /**
@@ -318,19 +423,14 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayWithBlankDifferenceSourceSnShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new FixedProjectionReplaySource(),
                 new StaticDifferencesProjectionWriter(List.of(FundsTransactionProjectionDifference.builder()
                         .sourceSn("")
                         .fieldName("displayStatus")
                         .expectedValue("SUCCEEDED")
                         .actualValue("FAILED")
                         .build())));
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放差异项字段不能为空")
-                .hasMessageContaining("sourceSn");
+        assertReplayFails(service, sourceRange(), "交易投影重放差异项字段不能为空", "sourceSn");
     }
 
     /**
@@ -342,15 +442,10 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactWithMismatchedViewDomainShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new MismatchedViewDomainReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new MismatchedViewDomainReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放来源事实不属于请求视图域")
-                .hasMessageContaining("MERCHANT_BILL")
-                .hasMessageContaining("USER_BILL");
+        assertReplayFails(service, sourceRange(), "交易投影重放来源事实不属于请求视图域",
+                "MERCHANT_BILL", "USER_BILL");
     }
 
     /**
@@ -362,15 +457,10 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactOutsideSourceRangeShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new OutsideSourceRangeReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new OutsideSourceRangeReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放来源事实不属于请求范围")
-                .hasMessageContaining("sourceSn")
-                .hasMessageContaining("FT202605190999");
+        assertReplayFails(service, sourceRange(), "交易投影重放来源事实不属于请求范围",
+                "sourceSn", "FT202605190999");
     }
 
     /**
@@ -382,15 +472,9 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactWithoutSourceSnShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new BlankSourceSnReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new BlankSourceSnReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .ownerType("USER")
-                .ownerId("U1001")
-                .build())))
-                .hasMessageContaining("交易投影重放来源事实字段不能为空")
-                .hasMessageContaining("sourceSn");
+        assertReplayFails(service, ownerRange(), "交易投影重放来源事实字段不能为空", "sourceSn");
     }
 
     /**
@@ -402,14 +486,9 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactWithoutPayloadShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new NullPayloadReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new NullPayloadReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放来源事实字段不能为空")
-                .hasMessageContaining("payload");
+        assertReplayFails(service, sourceRange(), "交易投影重放来源事实字段不能为空", "payload");
     }
 
     /**
@@ -421,14 +500,10 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactWithoutExplainabilityPayloadShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new IncompleteProjectionReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new IncompleteProjectionReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放缺少使用者解释视图字段")
-                .hasMessageContaining("operationStatus");
+        assertReplayFails(service, sourceRange(), "交易投影重放缺少使用者解释视图字段",
+                "operationStatus");
     }
 
     /**
@@ -440,44 +515,199 @@ class FundsProjectionReplayServiceTests {
      */
     @Test
     void testReplayFactWithoutAmountSourceShouldFail() {
-        FundsProjectionReplayService service = new FundsProjectionReplayService(new MissingAmountSourceReplaySource(),
+        FundsProjectionReplayApplicationService service = newService(new MissingAmountSourceReplaySource(),
                 new RecordingProjectionWriter());
-
-        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
-                .sourceSn("FT202605190001")
-                .build())))
-                .hasMessageContaining("交易投影重放缺少使用者解释视图字段")
-                .hasMessageContaining("amountSource");
+        assertReplayFails(service, sourceRange(), "交易投影重放缺少使用者解释视图字段", "amountSource");
     }
 
-    private static FundsProjectionReplayService newService(RecordingProjectionWriter writer) {
-        return new FundsProjectionReplayService(new FixedProjectionReplaySource(), writer);
+    private FundsProjectionReplayApplicationService newService(RecordingProjectionWriter writer) {
+        return newService(new FixedProjectionReplaySource(), writer);
     }
 
-    private static FundsTransactionProjectionReplayRequest replayRequest(
-            FundsTransactionProjectionReplayRange replayRange) {
-        return replayRequest(ProjectionReplayMode.VERIFY_ONLY, replayRange);
+    private FundsProjectionReplayApplicationService newService(FundsTransactionProjectionReplaySource source,
+                                                                FundsTransactionProjectionWriter writer) {
+        switchableSource.use(source);
+        switchableWriter.use(writer);
+        return projectionReplayApplicationService;
     }
 
-    private static FundsTransactionProjectionReplayRequest replayRequest(
-            ProjectionReplayMode mode,
-            FundsTransactionProjectionReplayRange replayRange) {
-        return FundsTransactionProjectionReplayRequest.builder()
-                .taskSn("TPR-202605190001")
+    private static boolean isClassPresent(String className) {
+        try {
+            Class.forName(className);
+            return true;
+        } catch (ClassNotFoundException exception) {
+            return false;
+        }
+    }
+
+    private static boolean hasPublicMethod(Class<?> type, String methodName, Class<?>... parameterTypes) {
+        try {
+            type.getMethod(methodName, parameterTypes);
+            return true;
+        } catch (NoSuchMethodException exception) {
+            return false;
+        }
+    }
+
+    private FundsProjectionReplayTaskDTO createTask(FundsProjectionReplayApplicationService service,
+                                                    ProjectionReplayMode mode,
+                                                    FundsTransactionProjectionReplayRange range) {
+        int sequence = ++requestSequence;
+        return service.createTask(CreateFundsProjectionReplayTaskRequest.builder()
+                .requestSn("REPLAY-TEST-" + sequence)
+                .requestDigest("digest-" + sequence)
+                .tenantId(TENANT_ID)
+                .viewDomain(VIEW_DOMAIN)
                 .mode(mode)
-                .viewDomain("USER_BILL")
-                .replayRange(replayRange)
-                .checkpoint(FundsTransactionProjectionCheckpoint.builder()
-                        .type(ProjectionCheckpointType.TRANSACTION_PROJECTION)
-                        .checkpointSn("TPC-202605190001")
-                        .build())
+                .replayRange(range)
+                .reason("verify projection replay contract")
+                .auditRef("AUDIT-REPLAY-TEST")
+                .build(), WindOperatorFactory.system());
+    }
+
+    private FundsTransactionProjectionReplayResult replay(FundsProjectionReplayApplicationService service,
+                                                           ProjectionReplayMode mode,
+                                                           FundsTransactionProjectionReplayRange range) {
+        FundsProjectionReplayTaskDTO task = createTask(service, mode, range);
+        return runTask(service, task.taskSn());
+    }
+
+    private FundsTransactionProjectionReplayResult runTask(FundsProjectionReplayApplicationService service, String taskSn) {
+        return service.runTask(RunFundsProjectionReplayTaskRequest.builder()
+                .tenantId(TENANT_ID)
+                .taskSn(taskSn)
+                .maxBatchSize(100)
+                .build(), WindOperatorFactory.system());
+    }
+
+    private void assertReplayFails(FundsProjectionReplayApplicationService service,
+                                   FundsTransactionProjectionReplayRange range,
+                                   String... messageParts) {
+        FundsProjectionReplayTaskDTO created = createTask(service, ProjectionReplayMode.VERIFY_ONLY, range);
+        Throwable failure = catchThrowable(() -> runTask(service, created.taskSn()));
+        assertThat(failure).isNotNull();
+        for (String messagePart : messageParts) {
+            assertThat(failure).hasMessageContaining(messagePart);
+        }
+        FundsProjectionReplayTaskDTO unchanged = service.getTask(
+                TENANT_ID, created.taskSn(), WindOperatorFactory.system());
+        assertThat(unchanged.state()).isEqualTo(ProjectionReplayTaskState.CREATED);
+        assertThat(unchanged.checkpoint()).isEqualTo(created.checkpoint());
+        assertThat(unchanged.successCount()).isZero();
+        assertThat(unchanged.differenceCount()).isZero();
+    }
+
+    private long taskCount() {
+        return projectionReplayApplicationService.queryBacklog(
+                TENANT_ID, 500, WindOperatorFactory.system()).size();
+    }
+
+    private static FundsTransactionProjectionReplayRange sourceRange() {
+        return FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
                 .build();
     }
 
-    private static final class FixedProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+    private static FundsTransactionProjectionReplayRange ownerRange() {
+        return FundsTransactionProjectionReplayRange.builder()
+                .ownerType("USER")
+                .ownerId("U1001")
+                .build();
+    }
+
+    private static FundsTransactionProjectionCheckpoint checkpoint(String checkpointSn) {
+        return FundsTransactionProjectionCheckpoint.builder()
+                .type(ProjectionCheckpointType.TRANSACTION_PROJECTION)
+                .checkpointSn(checkpointSn)
+                .build();
+    }
+
+    private static final class SwitchableProjectionReplaySource
+            implements FundsTransactionProjectionReplaySource {
+
+        private FundsTransactionProjectionReplaySource delegate;
+
+        private void use(FundsTransactionProjectionReplaySource delegate) {
+            this.delegate = delegate;
+        }
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        public FundsTransactionProjectionCheckpoint initializeCheckpoint(Long tenantId,
+                                                                         String viewDomain,
+                                                                         FundsTransactionProjectionReplayRange range) {
+            return delegate.initializeCheckpoint(tenantId, viewDomain, range);
+        }
+
+        @Override
+        public FundsTransactionProjectionFactBatch loadFactBatch(Long tenantId,
+                                                                 String viewDomain,
+                                                                 FundsTransactionProjectionReplayRange range,
+                                                                 FundsTransactionProjectionCheckpoint checkpoint,
+                                                                 int maxBatchSize) {
+            return delegate.loadFactBatch(tenantId, viewDomain, range, checkpoint, maxBatchSize);
+        }
+    }
+
+    private static final class SwitchableProjectionWriter implements FundsTransactionProjectionWriter {
+
+        private FundsTransactionProjectionWriter delegate;
+
+        private void use(FundsTransactionProjectionWriter delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public List<FundsTransactionProjectionDifference> compare(Long tenantId,
+                                                                  String viewDomain,
+                                                                  List<FundsTransactionProjectionRow> rebuiltRows) {
+            return delegate.compare(tenantId, viewDomain, rebuiltRows);
+        }
+
+        @Override
+        public void upsertShadow(Long tenantId,
+                                 String taskSn,
+                                 List<FundsTransactionProjectionRow> rebuiltRows) {
+            delegate.upsertShadow(tenantId, taskSn, rebuiltRows);
+        }
+
+        @Override
+        public void upsertOfficial(Long tenantId,
+                                   String taskSn,
+                                   List<FundsTransactionProjectionRow> rebuiltRows) {
+            delegate.upsertOfficial(tenantId, taskSn, rebuiltRows);
+        }
+    }
+
+    private abstract static class TestProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+
+        @Override
+        public FundsTransactionProjectionCheckpoint initializeCheckpoint(Long tenantId,
+                                                                         String viewDomain,
+                                                                         FundsTransactionProjectionReplayRange range) {
+            return checkpoint("0");
+        }
+
+        @Override
+        public FundsTransactionProjectionFactBatch loadFactBatch(Long tenantId,
+                                                                 String viewDomain,
+                                                                 FundsTransactionProjectionReplayRange range,
+                                                                 FundsTransactionProjectionCheckpoint checkpoint,
+                                                                 int maxBatchSize) {
+            return FundsTransactionProjectionFactBatch.builder()
+                    .facts(loadFacts(range))
+                    .nextCheckpoint(checkpoint("1"))
+                    .hasMore(false)
+                    .build();
+        }
+
+        protected abstract List<FundsTransactionProjectionFact> loadFacts(
+                FundsTransactionProjectionReplayRange range);
+    }
+
+    private static class FixedProjectionReplaySource extends TestProjectionReplaySource {
+
+        @Override
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -493,12 +723,28 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class RecordingProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class CheckpointProjectionReplaySource extends FixedProjectionReplaySource {
+
+        private final FundsTransactionProjectionCheckpoint checkpoint;
+
+        private CheckpointProjectionReplaySource(FundsTransactionProjectionCheckpoint checkpoint) {
+            this.checkpoint = checkpoint;
+        }
+
+        @Override
+        public FundsTransactionProjectionCheckpoint initializeCheckpoint(Long tenantId,
+                                                                         String viewDomain,
+                                                                         FundsTransactionProjectionReplayRange range) {
+            return checkpoint;
+        }
+    }
+
+    private static final class RecordingProjectionReplaySource extends TestProjectionReplaySource {
 
         private int loadCalls;
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             loadCalls++;
             return new FixedProjectionReplaySource().loadFacts(range);
         }
@@ -508,10 +754,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class IncompleteProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class IncompleteProjectionReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -527,10 +773,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class MismatchedViewDomainReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class MismatchedViewDomainReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("MERCHANT_BILL")
                     .ownerType("USER")
@@ -546,10 +792,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class OutsideSourceRangeReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class OutsideSourceRangeReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -565,10 +811,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class BlankSourceSnReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class BlankSourceSnReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -584,10 +830,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class NullPayloadReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class NullPayloadReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -602,10 +848,10 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
-    private static final class MissingAmountSourceReplaySource implements FundsTransactionProjectionReplaySource {
+    private static final class MissingAmountSourceReplaySource extends TestProjectionReplaySource {
 
         @Override
-        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+        protected List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
             return List.of(FundsTransactionProjectionFact.builder()
                     .viewDomain("USER_BILL")
                     .ownerType("USER")
@@ -651,18 +897,23 @@ class FundsProjectionReplayServiceTests {
         }
 
         @Override
-        public List<FundsTransactionProjectionDifference> compare(String viewDomain,
+        public List<FundsTransactionProjectionDifference> compare(Long tenantId,
+                                                                  String viewDomain,
                                                                   List<FundsTransactionProjectionRow> rebuiltRows) {
             return differences;
         }
 
         @Override
-        public void upsertShadow(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+        public void upsertShadow(Long tenantId,
+                                 String taskSn,
+                                 List<FundsTransactionProjectionRow> rebuiltRows) {
             // 无操作：本测试只验证比较契约加固。
         }
 
         @Override
-        public void upsertOfficial(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+        public void upsertOfficial(Long tenantId,
+                                   String taskSn,
+                                   List<FundsTransactionProjectionRow> rebuiltRows) {
             // 无操作：本测试只验证比较契约加固。
         }
     }
@@ -676,7 +927,8 @@ class FundsProjectionReplayServiceTests {
         private final List<FundsTransactionProjectionRow> officialWrites = new ArrayList<>();
 
         @Override
-        public List<FundsTransactionProjectionDifference> compare(String viewDomain,
+        public List<FundsTransactionProjectionDifference> compare(Long tenantId,
+                                                                  String viewDomain,
                                                                   List<FundsTransactionProjectionRow> rebuiltRows) {
             comparedRows.addAll(rebuiltRows);
             return List.of(FundsTransactionProjectionDifference.builder()
@@ -688,12 +940,16 @@ class FundsProjectionReplayServiceTests {
         }
 
         @Override
-        public void upsertShadow(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+        public void upsertShadow(Long tenantId,
+                                 String taskSn,
+                                 List<FundsTransactionProjectionRow> rebuiltRows) {
             shadowWrites.addAll(rebuiltRows);
         }
 
         @Override
-        public void upsertOfficial(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+        public void upsertOfficial(Long tenantId,
+                                   String taskSn,
+                                   List<FundsTransactionProjectionRow> rebuiltRows) {
             officialWrites.addAll(rebuiltRows);
         }
 
@@ -707,6 +963,21 @@ class FundsProjectionReplayServiceTests {
 
         private List<FundsTransactionProjectionRow> officialWrites() {
             return officialWrites;
+        }
+    }
+
+    @Configuration
+    @Import(FundsProjectionReplayService.class)
+    static class Config {
+
+        @Bean
+        SwitchableProjectionReplaySource projectionReplaySource() {
+            return new SwitchableProjectionReplaySource();
+        }
+
+        @Bean
+        SwitchableProjectionWriter projectionWriter() {
+            return new SwitchableProjectionWriter();
         }
     }
 }

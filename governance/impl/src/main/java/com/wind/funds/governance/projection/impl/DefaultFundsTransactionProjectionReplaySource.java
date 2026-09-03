@@ -2,10 +2,10 @@ package com.wind.funds.governance.projection.impl;
 
 import com.wind.funds.governance.enums.ProjectionCheckpointType;
 import com.wind.funds.governance.projection.FundsTransactionProjectionCheckpoint;
-import com.wind.funds.governance.projection.FundsTransactionProjectionFact;
-import com.wind.funds.governance.projection.FundsTransactionProjectionFactBatch;
 import com.wind.funds.governance.projection.FundsTransactionProjectionReplayRange;
-import com.wind.funds.governance.projection.FundsTransactionProjectionReplaySource;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFact;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionFactBatch;
+import com.wind.funds.governance.projection.internal.FundsTransactionProjectionReplaySource;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionScanBatch;
@@ -15,7 +15,6 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -28,12 +27,6 @@ public class DefaultFundsTransactionProjectionReplaySource implements FundsTrans
     private static final int INITIAL_BATCH_SIZE = 1;
 
     private final FundsTransactionProjectionExplainApplicationService projectionExplainApplicationService;
-
-    @Override
-    public @NonNull List<FundsTransactionProjectionFact> loadFacts(
-            @NonNull FundsTransactionProjectionReplayRange range) {
-        throw new IllegalStateException("生产投影重放来源必须使用 tenant 和 checkpoint 有界读取");
-    }
 
     @Override
     public @NonNull FundsTransactionProjectionCheckpoint initializeCheckpoint(
