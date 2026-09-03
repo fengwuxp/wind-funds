@@ -65,8 +65,9 @@ public interface PayoutOrderMapper extends BaseMapper<PayoutOrder> {
     @Update("""
             UPDATE t_payout_order
             SET external_reference = #{externalReference}
-            WHERE id = #{id} AND external_reference IS NULL
+            WHERE tenant_id = #{tenantId} AND id = #{id} AND external_reference IS NULL
             """)
-    int claimExternalReference(@Param("id") Long id,
+    int claimExternalReference(@Param("tenantId") Long tenantId,
+                               @Param("id") Long id,
                                @Param("externalReference") String externalReference);
 }

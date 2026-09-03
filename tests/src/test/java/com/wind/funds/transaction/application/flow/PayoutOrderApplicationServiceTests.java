@@ -11,6 +11,7 @@ import com.wind.funds.reconciliation.application.run.ReconciliationRunResultAppl
 import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.settlement.SettlementOrderApplicationService;
 import com.wind.funds.reconciliation.application.settlement.impl.SettlementOrderApplicationServiceImpl;
+import com.wind.funds.reconciliation.dal.mapper.PayoutOrderMapper;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationResult;
 import com.wind.funds.reconciliation.enums.PayoutDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutNextAction;
@@ -55,6 +56,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -80,6 +83,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport {
 
+    private static final Long FOREIGN_TENANT_ID = 2L;
+
     @Autowired
     private PayoutOrderApplicationService payoutOrderApplicationService;
 
@@ -94,6 +99,9 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
 
     @Autowired
     private TestPayoutSubmissionAuthority payoutSubmissionAuthority;
+
+    @Autowired
+    private PayoutOrderMapper payoutOrderMapper;
 
     @BeforeEach
     void clearPayoutFacts() {
@@ -190,6 +198,30 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
                 "currency", request.getCurrency().name(),
                 "sourceReceiptDigest", request.getSourceReceiptDigest()));
         assertThat(actualDigest).isEqualTo(expectedDigest).isNotEqualTo(legacyDigest);
+    }
+
+    @Test
+    void testClaimExternalReferenceShouldRejectForeignTenant() {
+        FundsAccountId accountId = fundingAccount("payout_claim_tenant");
+        PayoutOrderDTO payout = newSubmittedPayout(accountId, 180L, "claim-tenant");
+        Long payoutOrderId = jdbcTemplate.queryForObject("""
+                        SELECT id FROM t_payout_order
+                        WHERE tenant_id = ? AND sn = ?
+                        """,
+                Long.class, TENANT_ID, payout.getSn());
+        var before = ledgerFactSnapshot();
+
+        int updated = invokeClaimExternalReference(
+                FOREIGN_TENANT_ID, payoutOrderId, "foreign-tenant-reference");
+
+        assertThat(updated).isZero();
+        assertThat(jdbcTemplate.queryForObject("""
+                                SELECT external_reference FROM t_payout_order
+                                WHERE tenant_id = ? AND sn = ?
+                                """,
+                        String.class, TENANT_ID, payout.getSn()))
+                .isNull();
+        assertThat(ledgerFactSnapshot()).isEqualTo(before);
     }
 
     @Test
@@ -446,6 +478,31 @@ class PayoutOrderApplicationServiceTests extends FundsTransactionFlowTestSupport
         assertThat(submitted.getAdmissionEvidenceRefs()).containsExactly("authority:payout-admission");
         assertNoFundsOrLedgerFactsForBusinessSn(payout.getSn());
         return submitted;
+    }
+
+    private int invokeClaimExternalReference(Long tenantId, Long payoutOrderId, String externalReference) {
+        try {
+            Method method;
+            Object[] arguments;
+            try {
+                method = PayoutOrderMapper.class.getMethod(
+                        "claimExternalReference", Long.class, Long.class, String.class);
+                arguments = new Object[]{tenantId, payoutOrderId, externalReference};
+            } catch (NoSuchMethodException ignored) {
+                method = PayoutOrderMapper.class.getMethod(
+                        "claimExternalReference", Long.class, String.class);
+                arguments = new Object[]{payoutOrderId, externalReference};
+            }
+            return (Integer) method.invoke(payoutOrderMapper, arguments);
+        } catch (InvocationTargetException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException("调用出款单 external reference 认领方法失败", cause);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("出款单 external reference 认领契约不存在", exception);
+        }
     }
 
     private PayoutOrderDTO newCreatedPayout(FundsAccountId accountId, long amount, String suffix) {

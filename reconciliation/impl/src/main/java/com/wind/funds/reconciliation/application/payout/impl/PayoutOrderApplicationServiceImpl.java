@@ -306,7 +306,8 @@ public class PayoutOrderApplicationServiceImpl implements PayoutOrderApplication
             return true;
         }
         try {
-            AssertUtils.isTrue(payoutOrderMapper.claimExternalReference(order.getId(), externalReference) == 1,
+            AssertUtils.isTrue(payoutOrderMapper.claimExternalReference(
+                            order.getTenantId(), order.getId(), externalReference) == 1,
                     "认领外部出款 reference 失败");
             order.setExternalReference(externalReference);
             return true;
