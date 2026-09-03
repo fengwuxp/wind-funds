@@ -33,6 +33,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -87,6 +88,18 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     private String spendRuleBindingSn;
 
     /**
+     * 场景：公共调用方按决策事实读取记录。
+     * 预期：服务不暴露无租户 raw-id 查询，业务身份由 tenantId + decisionSn 承载。
+     * 红线：数据库代理主键不能替代租户对象授权。
+     */
+    @Test
+    void testPublicContractShouldNotExposeRawIdGetter() {
+        assertThat(SpendRuleDecisionRecordService.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain("getDecisionRecordById");
+    }
+
+    /**
      * 场景：准入链直接通过决策记录标准基础服务固化规则决策。
      * 输入：已发布版本、当前有效挂载和一条拒绝决策。
      * 输出：决策记录可被标准基础服务按业务流水查询并解释。
@@ -104,10 +117,11 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                         .setTenantId(TENANT_ID)
                         .setBusinessScene(BUSINESS_SCENE)
                         .setBusinessSn(BUSINESS_SN));
-        List<SpendRuleDecisionRecordDTO> decisionsWithoutTenantId = spendRuleDecisionRecordService.queryDecisions(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.queryDecisions(
                 new SpendRuleDecisionRecordQuery()
                         .setBusinessScene(BUSINESS_SCENE)
-                        .setBusinessSn(BUSINESS_SN));
+                        .setBusinessSn(BUSINESS_SN)))
+                .hasMessageContaining("租户 ID 不能为空");
         SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionRecordService.explainDecision(
                 new SpendRuleDecisionExplainQuery()
                         .setTenantId(TENANT_ID)
@@ -117,8 +131,6 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decisions).hasSize(1);
         assertThat(decisions.getFirst().getId()).isEqualTo(decision.getId());
-        assertThat(decisionsWithoutTenantId).hasSize(1);
-        assertThat(decisionsWithoutTenantId.getFirst().getId()).isEqualTo(decision.getId());
         assertThat(explanation.getDecision().getId()).isEqualTo(decision.getId());
         assertThat(explanation.getDecision().getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(explanation.getDecisionSummary()).contains("拒绝", "超过单卡日限额");
@@ -234,7 +246,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
      * 红线：目标账户证据缺失不得扩大 PASSED 决策的适用范围。
      */
     @Test
-    void testGetDecisionRecordShouldRejectPartialPersistedTargetEvidence() {
+    void testFindDecisionRecordShouldRejectPartialPersistedTargetEvidence() {
         prepareRuleVersionAndBinding();
         SpendRuleDecisionRecordDTO recorded =
                 spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
@@ -244,7 +256,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 WHERE id = ?
                 """, FundsSubjectType.CREDIT_ACCOUNT.name(), recorded.getId());
 
-        assertThatThrownBy(() -> spendRuleDecisionRecordService.getDecisionRecordById(recorded.getId()))
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.findDecisionRecord(TENANT_ID, DECISION_SN))
                 .hasMessageContaining("目标账户证据不完整");
     }
 
@@ -307,15 +319,15 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：决策记录查询依赖 MyBatis-Flex 租户隔离，不要求调用方显式传 tenantId。
+     * 场景：决策记录查询必须由调用方显式提供租户授权。
      * 输入：公共 Query 模型。
-     * 输出：tenantId 作为可选过滤条件，不带必填校验注解。
-     * 红线：查询模型不得和服务层已支持的无 tenantId 查询契约冲突。
+     * 输出：tenantId 具有必填校验注解。
+     * 红线：查询模型不得允许缺少租户授权的宽查询。
      */
     @Test
-    void testDecisionRecordQueryShouldNotRequireTenantId() throws NoSuchFieldException {
+    void testDecisionRecordQueryShouldRequireTenantId() throws NoSuchFieldException {
         assertThat(SpendRuleDecisionRecordQuery.class.getDeclaredField("tenantId")
-                .isAnnotationPresent(NotNull.class)).isFalse();
+                .isAnnotationPresent(NotNull.class)).isTrue();
     }
 
     @BeforeEach

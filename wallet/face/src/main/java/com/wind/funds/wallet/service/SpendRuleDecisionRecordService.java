@@ -38,14 +38,6 @@ public interface SpendRuleDecisionRecordService {
     @NonNull SpendRuleDecisionRecordDTO recordDecision(@NonNull RecordSpendRuleDecisionRecordRequest request);
 
     /**
-     * 根据主键查询 Spend Rule 决策记录。
-     *
-     * @param id 主键
-     * @return 决策记录
-     */
-    @NonNull SpendRuleDecisionRecordDTO getDecisionRecordById(@NonNull Long id);
-
-    /**
      * 按租户和决策流水查找决策记录。
      *
      * @param tenantId 租户 ID

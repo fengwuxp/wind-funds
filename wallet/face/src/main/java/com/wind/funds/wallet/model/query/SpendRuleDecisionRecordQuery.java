@@ -5,6 +5,7 @@ import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -31,6 +32,7 @@ public class SpendRuleDecisionRecordQuery implements Serializable {
     private static final long serialVersionUID = -1343117785267888144L;
 
     @Schema(description = "租户 ID")
+    @NotNull
     private Long tenantId;
 
     @Schema(description = "规则决策流水号")

@@ -56,13 +56,12 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
 
     private final SpendRuleBindingService spendRuleBindingService;
 
-    private @NonNull Long insertDecisionRecord(
+    private void insertDecisionRecord(
             @NonNull RecordSpendRuleDecisionRecordRequest request) {
         SpendRuleDecisionRecord entity = toDecisionRecordEntity(request);
         spendRuleDecisionRecordMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "记录 Spend Rule 决策记录失败，decisionSn = {}",
                 request.getDecisionSn());
-        return entity.getId();
     }
 
     @Override
@@ -80,18 +79,14 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
             return existing;
         }
         try {
-            Long decisionRecordId = insertDecisionRecord(request);
-            return getDecisionRecordById(decisionRecordId);
+            insertDecisionRecord(request);
+            SpendRuleDecisionRecordDTO result = findDecisionRecord(request.getTenantId(), request.getDecisionSn());
+            AssertUtils.notNull(result, "记录 Spend Rule 决策记录失败，decisionSn = {}",
+                    request.getDecisionSn());
+            return result;
         } catch (DataIntegrityViolationException exception) {
             return readIdempotentDecisionRecordAfterInsertConflict(request, exception);
         }
-    }
-
-    @Override
-    public @NonNull SpendRuleDecisionRecordDTO getDecisionRecordById(@NonNull Long id) {
-        SpendRuleDecisionRecord entity = spendRuleDecisionRecordMapper.selectOneById(id);
-        AssertUtils.notNull(entity, "Spend Rule 决策记录不存在，id = {}", id);
-        return toDTO(entity);
     }
 
     @Override
@@ -247,6 +242,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
     }
 
     private void validateDecisionRecordQuery(SpendRuleDecisionRecordQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.isTrue(hasDecisionRecordNarrowCondition(query),
                 "至少提供一个 Spend Rule 决策查询条件");
     }
