@@ -309,6 +309,54 @@ class ReconciliationMysqlDdlContractTests {
                         + "(`tenant_id`, `idempotency_key`)");
     }
 
+    @Test
+    void testStateNamingForwardAndRollbackShouldBeExactInverses() throws IOException {
+        String forward = readMigrationFile("20260826_state_naming_forward.sql");
+        String rollback = readMigrationFile("20260826_state_naming_rollback.sql");
+        String canonicalDdl = Files.readString(
+                workspaceRoot().resolve("database/mysql/core/001_create_core_tables.sql"))
+                + Files.readString(workspaceRoot().resolve(
+                "database/mysql/reconciliation/001_create_reconciliation_tables.sql"))
+                + Files.readString(workspaceRoot().resolve(
+                "database/mysql/governance/001_create_governance_tables.sql"));
+        List<RenameOperation> forwardOperations = renameOperations(forward);
+        List<RenameOperation> rollbackOperations = renameOperations(rollback);
+        List<IndexRenameMapping> forwardIndexes = declaredIndexMappings(forward);
+        List<IndexRenameMapping> rollbackIndexes = declaredIndexMappings(rollback);
+
+        assertThat(forwardOperations).hasSize(47).doesNotHaveDuplicates();
+        assertThat(rollbackOperations).hasSize(47).doesNotHaveDuplicates();
+        assertThat(forwardOperations.stream().filter(operation -> operation.objectType().equals("COLUMN")))
+                .hasSize(27);
+        assertThat(forwardOperations.stream().filter(operation -> operation.objectType().equals("INDEX")))
+                .hasSize(20);
+        assertThat(forwardOperations)
+                .containsExactlyInAnyOrderElementsOf(declaredRenameOperations(forward));
+        assertThat(rollbackOperations)
+                .containsExactlyInAnyOrderElementsOf(declaredRenameOperations(rollback));
+        assertThat(rollbackOperations)
+                .containsExactlyInAnyOrderElementsOf(forwardOperations.stream()
+                        .map(RenameOperation::inverse)
+                        .toList());
+        assertThat(rollbackIndexes)
+                .containsExactlyInAnyOrderElementsOf(forwardIndexes.stream()
+                        .map(IndexRenameMapping::inverse)
+                        .toList());
+        for (RenameOperation operation : forwardOperations) {
+            if (operation.objectType().equals("COLUMN")) {
+                assertThat(extractCreateTable(canonicalDdl, operation.tableName()))
+                        .as("canonical column %s.%s", operation.tableName(), operation.targetName())
+                        .contains("`" + operation.targetName() + "`");
+            }
+        }
+        for (IndexRenameMapping mapping : forwardIndexes) {
+            assertThat(indexColumns(
+                    extractCreateTable(canonicalDdl, mapping.tableName()), mapping.targetName()))
+                    .as("canonical index %s.%s", mapping.tableName(), mapping.targetName())
+                    .isEqualTo(mapping.targetColumns());
+        }
+    }
+
     private void assertUsesStateColumn(String mysqlDdl, String testSchema, String tableName) {
         assertThat(extractCreateTable(mysqlDdl, tableName))
                 .contains("`state`")
@@ -322,6 +370,76 @@ class ReconciliationMysqlDdlContractTests {
         Path path = workspaceRoot().resolve("database/mysql/reconciliation").resolve(fileName);
         assertThat(path).exists().isRegularFile();
         return Files.readString(path);
+    }
+
+    private String readMigrationFile(String fileName) throws IOException {
+        Path path = workspaceRoot().resolve("database/mysql/migration").resolve(fileName);
+        assertThat(path).exists().isRegularFile();
+        return Files.readString(path);
+    }
+
+    private List<RenameOperation> renameOperations(String sql) {
+        Matcher matcher = Pattern.compile(
+                        "(?m)^ALTER TABLE `([^`]+)` RENAME (COLUMN|INDEX) `([^`]+)` TO `([^`]+)`;$")
+                .matcher(sql);
+        List<RenameOperation> operations = new ArrayList<>();
+        while (matcher.find()) {
+            operations.add(new RenameOperation(
+                    matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4)));
+        }
+        return operations;
+    }
+
+    private List<RenameOperation> declaredRenameOperations(String sql) {
+        List<RenameOperation> operations = new ArrayList<>();
+        operations.addAll(declaredRenameOperations(sql, "state_naming_columns", "COLUMN"));
+        operations.addAll(declaredRenameOperations(sql, "state_naming_indexes", "INDEX"));
+        return operations;
+    }
+
+    private List<RenameOperation> declaredRenameOperations(String sql,
+                                                           String variableName,
+                                                           String objectType) {
+        String prefix = "SET @" + variableName + " = JSON_ARRAY(";
+        int start = sql.indexOf(prefix);
+        assertThat(start).as("missing migration mapping %s", variableName).isGreaterThanOrEqualTo(0);
+        int end = sql.indexOf(");", start);
+        assertThat(end).as("missing migration mapping terminator %s", variableName).isGreaterThan(start);
+        Matcher matcher = Pattern.compile(
+                        "JSON_OBJECT\\('table', '([^']+)', 'source', '([^']+)', 'target', '([^']+)'(?:,|\\))")
+                .matcher(sql.substring(start, end));
+        List<RenameOperation> operations = new ArrayList<>();
+        while (matcher.find()) {
+            operations.add(new RenameOperation(
+                    matcher.group(1), objectType, matcher.group(2), matcher.group(3)));
+        }
+        return operations;
+    }
+
+    private List<IndexRenameMapping> declaredIndexMappings(String sql) {
+        String prefix = "SET @state_naming_indexes = JSON_ARRAY(";
+        int start = sql.indexOf(prefix);
+        assertThat(start).as("missing migration index mappings").isGreaterThanOrEqualTo(0);
+        int end = sql.indexOf(");", start);
+        assertThat(end).as("missing migration index mapping terminator").isGreaterThan(start);
+        Matcher matcher = Pattern.compile(
+                        "JSON_OBJECT\\('table', '([^']+)', 'source', '([^']+)', 'target', '([^']+)', "
+                                + "'sourceColumns', '([^']+)', 'targetColumns', '([^']+)'\\)")
+                .matcher(sql.substring(start, end));
+        List<IndexRenameMapping> mappings = new ArrayList<>();
+        while (matcher.find()) {
+            mappings.add(new IndexRenameMapping(
+                    matcher.group(1), matcher.group(2), matcher.group(3), matcher.group(4), matcher.group(5)));
+        }
+        return mappings;
+    }
+
+    private String indexColumns(String tableDdl, String indexName) {
+        Matcher matcher = Pattern.compile(
+                        "(?m)^\\s*(?:UNIQUE KEY|KEY) `" + Pattern.quote(indexName) + "` \\(([^)]+)\\)")
+                .matcher(tableDdl);
+        assertThat(matcher.find()).as("missing canonical index %s", indexName).isTrue();
+        return matcher.group(1).replace("`", "").replaceAll("\\s+", "");
     }
 
     private String extractCreateTable(String sql, String tableName) {
@@ -394,5 +512,27 @@ class ReconciliationMysqlDdlContractTests {
         }
         Path current = Path.of("").toAbsolutePath();
         return "tests".equals(current.getFileName().toString()) ? current.getParent() : current;
+    }
+
+    private record RenameOperation(String tableName,
+                                   String objectType,
+                                   String sourceName,
+                                   String targetName) {
+
+        private RenameOperation inverse() {
+            return new RenameOperation(tableName, objectType, targetName, sourceName);
+        }
+    }
+
+    private record IndexRenameMapping(String tableName,
+                                      String sourceName,
+                                      String targetName,
+                                      String sourceColumns,
+                                      String targetColumns) {
+
+        private IndexRenameMapping inverse() {
+            return new IndexRenameMapping(
+                    tableName, targetName, sourceName, targetColumns, sourceColumns);
+        }
     }
 }
