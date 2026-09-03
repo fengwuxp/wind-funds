@@ -8,6 +8,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -27,8 +28,17 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class CreateFundingAccountRequest {
 
+    private static final int MAX_SN_LENGTH = 64;
+
+    private static final int MAX_OWNER_ID_LENGTH = 30;
+
+    private static final int MAX_ACCOUNT_TYPE_LENGTH = 50;
+
+    private static final int MAX_DESCRIPTION_LENGTH = 512;
+
     @Schema(description = "资金账户号")
     @NotBlank
+    @Size(max = MAX_SN_LENGTH)
     private String sn;
 
     @Schema(description = "租户 ID")
@@ -37,6 +47,7 @@ public class CreateFundingAccountRequest {
 
     @Schema(description = "账户归属主体 ID")
     @NotBlank
+    @Size(max = MAX_OWNER_ID_LENGTH)
     private String ownerId;
 
     @Schema(description = "账户归属主体类型")
@@ -45,6 +56,7 @@ public class CreateFundingAccountRequest {
 
     @Schema(description = "资金账户类型")
     @NotBlank
+    @Size(max = MAX_ACCOUNT_TYPE_LENGTH)
     private String accountType;
 
     @Schema(description = "是否平台账户")
@@ -64,6 +76,7 @@ public class CreateFundingAccountRequest {
     private FundsAccountState state;
 
     @Schema(description = "描述")
+    @Size(max = MAX_DESCRIPTION_LENGTH)
     private String description;
 
     @Schema(description = "扩展上下文")
