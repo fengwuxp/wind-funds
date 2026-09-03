@@ -35,9 +35,13 @@ import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.assertj.core.api.SoftAssertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -53,6 +57,8 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -161,6 +167,33 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
         assertThatThrownBy(() -> fundingAccountService.createFundingAccount(nonPlatformAccountWithRoleRequest()))
                 .hasMessageContaining("非平台资金账户不得指定平台账户角色");
+
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testCreateFundingAccountRequestShouldMatchPersistentFieldLengths() throws NoSuchFieldException {
+        assertSizeConstraint(CreateFundingAccountRequest.class, "sn", 64);
+        assertSizeConstraint(CreateFundingAccountRequest.class, "ownerId", 30);
+        assertSizeConstraint(CreateFundingAccountRequest.class, "accountType", 50);
+        assertSizeConstraint(CreateFundingAccountRequest.class, "description", 512);
+    }
+
+    @ParameterizedTest(name = "{index}: {0}")
+    @MethodSource("overlongFundingFieldCases")
+    void testCreateFundingAccountShouldRejectOverlongPersistentFieldBeforeWrite(
+            String fieldName,
+            Consumer<CreateFundingAccountRequest> mutation) {
+        CreateFundingAccountRequest request = createFundingAccountRequest();
+        mutation.accept(request);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(request))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining(fieldName)
+                .hasMessageContaining("长度不能超过");
 
         assertThat(countFundingAccounts()).isZero();
         assertThat(countLedgers()).isZero();
@@ -401,6 +434,26 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .setPlatform(Boolean.FALSE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
+    }
+
+    private static Stream<Arguments> overlongFundingFieldCases() {
+        return Stream.of(
+                Arguments.of("sn", (Consumer<CreateFundingAccountRequest>) request -> request.setSn("S".repeat(65))),
+                Arguments.of("ownerId",
+                        (Consumer<CreateFundingAccountRequest>) request -> request.setOwnerId("O".repeat(31))),
+                Arguments.of("accountType",
+                        (Consumer<CreateFundingAccountRequest>) request -> request.setAccountType("T".repeat(51))),
+                Arguments.of("description",
+                        (Consumer<CreateFundingAccountRequest>) request -> request.setDescription("D".repeat(513)))
+        );
+    }
+
+    private static void assertSizeConstraint(Class<?> requestType,
+                                             String fieldName,
+                                             int expectedMax) throws NoSuchFieldException {
+        Size constraint = requestType.getDeclaredField(fieldName).getAnnotation(Size.class);
+        assertThat(constraint).as("%s @Size", fieldName).isNotNull();
+        assertThat(constraint.max()).as("%s @Size.max", fieldName).isEqualTo(expectedMax);
     }
 
     private CreateFundingAccountRequest platformAccountWithoutRoleRequest() {

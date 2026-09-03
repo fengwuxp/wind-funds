@@ -20,6 +20,7 @@ import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class FundingAccountServiceImpl implements FundingAccountService {
 
+    private static final int MAX_SN_LENGTH = 64;
+
+    private static final int MAX_OWNER_ID_LENGTH = 30;
+
+    private static final int MAX_ACCOUNT_TYPE_LENGTH = 50;
+
+    private static final int MAX_DESCRIPTION_LENGTH = 512;
+
     private final FundingAccountMapper fundingAccountMapper;
 
     private final LedgerService ledgerService;
@@ -39,6 +48,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createFundingAccount(@NonNull CreateFundingAccountRequest request) {
+        validatePersistentFieldLengths(request);
         WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         validatePlatformRole(request);
         FundingAccount entity = FundingAccountConverter.INSTANCE.convertToFundingAccount(request);
@@ -100,5 +110,17 @@ public class FundingAccountServiceImpl implements FundingAccountService {
             return;
         }
         AssertUtils.isNull(request.getAccountRoleCode(), "非平台资金账户不得指定平台账户角色");
+    }
+
+    private static void validatePersistentFieldLengths(CreateFundingAccountRequest request) {
+        assertMaxLength(request.getSn(), MAX_SN_LENGTH, "sn");
+        assertMaxLength(request.getOwnerId(), MAX_OWNER_ID_LENGTH, "ownerId");
+        assertMaxLength(request.getAccountType(), MAX_ACCOUNT_TYPE_LENGTH, "accountType");
+        assertMaxLength(request.getDescription(), MAX_DESCRIPTION_LENGTH, "description");
+    }
+
+    private static void assertMaxLength(@Nullable String value, int maxLength, String fieldName) {
+        AssertUtils.isTrue(value == null || value.length() <= maxLength,
+                "{} 长度不能超过 {}", fieldName, maxLength);
     }
 }
