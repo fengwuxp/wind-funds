@@ -7,23 +7,23 @@
 | Change ID | `funds-public-capability-redesign` |
 | Origin runtime Goal | `019ff383-2af1-7e82-ad2c-19913a6bb1d2 / PAUSED / provenance_only`；不是计划恢复或切片准入前置 |
 | Plan state | `ACTIVE / REFACTORING_PLAN_V2 / W5_DOCUMENTATION_COMPLETION_REVIEW` |
-| State revision | `plan-r2.323 / 2026-08-27` |
-| Current task / next entry | `W5-MIG09-CREDIT-ACCOUNT-QUERY-SURFACE-NARROWING-RED-EXECUTION-001 / RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`；下一门只允许冻结五文件 Provider Green |
+| State revision | `plan-r2.479 / 2026-09-03` |
+| Current task / next entry | `GIT_DELIVERY_VALIDATION_BLOCKED_CONCURRENT_IDEMPOTENCY / E2_DIAGNOSTIC_NOT_PASS / OBSERVER_HEISENBERG / ROOT_CAUSE_RESIDUAL_RISK_NEXT_EVIDENCE_A_ACCEPTED / ROOT_CAUSE_RESIDUAL_RISK_NEXT_EVIDENCE_A_ACCEPTANCE_INDEPENDENT_CHECKER_PASS / DISCOVERY_SET_DIFFERENTIAL_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_GRANT_CONSUMED / DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_COMPLETE / DISCOVERY_SET_BASELINE_NOT_REPRODUCED / EXPECTED_DECISION_GUARD_STOP / DISCOVERY_SET_BASELINE_NOT_REPRODUCED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE / plan-r2.479`；下一 Human Gate 仅为 documentation-only root-cause residual-risk/next-evidence Inquiry |
 | Closed documentation gate history | `MIG-02C_REFUND_DOCUMENT_CARD_CHECKER_PASS / D-MIG-001-R_DECISION_PACKAGE_CHECKER_PASS / D-MIG-001-R-A_ACCEPTANCE_CHECKER_PASS / MIG-04_DOCUMENT_CARD_CHECKER_PASS / MIG-05_DOCUMENT_CARD_CHECKER_PASS / MIG05_TRANSACTION_LEDGER_REFERENCE_A_ACCEPTANCE_CHECKER_PASS / MIG05_TRANSACTION_LEDGER_REFERENCE_ENTRY_CARD_CHECKER_PASS / MIG05B_LEDGER_PROFILE_OWNERSHIP_ENTRY_CARD_CHECKER_PASS / MIG-07_DOCUMENT_CARD_REWORK_CHECKER_PASS / MIG-06_08_EVIDENCE_INVENTORY_CHECKER_PASS / MIG-06_08_CONSUMER_ROLE_CALIBRATION_DOCUMENT_CARD_CHECKER_PASS / MIG07_RECONCILIATION_CONTRACT_DECISION_PACKAGE_REWORK_CHECKER_PASS / MIG07_RECONCILIATION_CONTRACT_A_ACCEPTED / MIG07_RECONCILIATION_CONTRACT_A_ACCEPTANCE_CHECKER_PASS / SOURCE_RUN_ENTRY_CARD_CHECKER_PASS / SOURCE_RUN_CONTRACT_ACCEPTED / SOURCE_RUN_CONTRACT_ACCEPTANCE_CHECKER_PASS / GATE_REQUIREMENT_ENTRY_CARD_CHECKER_PASS / GATE_REQUIREMENT_CONTRACT_ACCEPTED / GATE_REQUIREMENT_CONTRACT_ACCEPTANCE_CHECKER_PASS / BREAKING_RELEASE_RED_ENTRY_CARD_FROZEN / RED_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / BASELINE_STATUS_MAPPING_REPAIR_CHECKER_PASS / BREAKING_RELEASE_RED_ENTRY_CARD_REFREEZE_CHECKER_PASS / BREAKING_RELEASE_RED_EXECUTION_GRANT_YES / BREAKING_RELEASE_RED_EXECUTION_COMPLETE / BREAKING_RELEASE_RED_INDEPENDENT_CHECKER_PASS / GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_NOT_PASS / BEHAVIORAL_RED_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / CONTRACT_SURFACE_GREEN_EXECUTION_GRANT_YES / CONTRACT_SURFACE_GREEN_EXECUTION_COMPLETE / CONTRACT_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / BEHAVIORAL_RED_EXECUTION_GRANT_YES / BEHAVIORAL_RED_EXECUTION_COMPLETE / BEHAVIORAL_RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / GREEN_EXECUTION_COMPLETE / GREEN_INDEPENDENT_CHECKER_PASS`；均为已关闭历史事实，不构成当前授权 |
 | Closed design gate history | `W4-02_CAPTE_BENEFIT_L3_CHECKER_PASS / CAPTE_BENEFIT_E4_PASS / CAPTE_DOMAIN_LIBRARY_INTEGRATION_CHECKER_PASS / P-SIM03_HOST_DEFERRED / W5-01_GREEN_CHECKER_PASS / W5-01_DIRECT_PRIMARY_RECOVERY_ENTRY_CARD_CHECKER_PASS / CONTRACT_INQUIRY_ACCEPTED / RED_EXECUTION_GRANT_YES / RED_REWORK_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / W5-01_DIRECT_PRIMARY_RECOVERY_GREEN_CHECKER_PASS / W5-01_AUTHORIZATION_ROOT_ACTIONFACT_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / AUTHORIZATION_ROOT_CONTRACT_INQUIRY_ACCEPTED / AUTHORIZATION_ROOT_RED_EXECUTION_GRANT_YES / RED_EXECUTION_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / GREEN_IMPLEMENTATION_COMPLETE / W5-01_AUTHORIZATION_ROOT_GREEN_CHECKER_PASS / W5-01_AUTHORIZATION_COMPLETE_ACTIONFACT_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / AUTHORIZATION_COMPLETE_CONTRACT_INQUIRY_ACCEPTED / AUTHORIZATION_COMPLETE_RED_EXECUTION_GRANT_YES / AUTHORIZATION_COMPLETE_RED_EXECUTION_COMPLETE / AUTHORIZATION_COMPLETE_RED_REWORK_INDEPENDENT_CHECKER_PASS / AUTHORIZATION_COMPLETE_GREEN_EXECUTION_GRANT_YES / AUTHORIZATION_COMPLETE_GREEN_IMPLEMENTATION_COMPLETE / W5-01_AUTHORIZATION_COMPLETE_GREEN_CHECKER_PASS / MIG07_BEHAVIORAL_GREEN_CHECKER_PASS / L4_EXECUTION_GRANT_NO`；均为成熟度或已关闭历史事实 |
-| Closed current-slice execution history | `W5-MIG05_RED_EXECUTION_GRANT_YES / W5-MIG05_RED_EXECUTION_COMPLETE / W5-MIG05_RED_INDEPENDENT_CHECKER_PASS / W5-MIG05_GREEN_EXECUTION_GRANT_YES / W5-MIG05_TEST_REWORK_EXECUTION_GRANT_YES / W5-MIG05_TEST_REWORK_EXECUTION_COMPLETE / W5-MIG05_TEST_CONTRACT_REWORK_INDEPENDENT_CHECKER_PASS / W5-MIG05_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG05B_RED_EXECUTION_GRANT_YES / W5-MIG05B_RED_INDEPENDENT_CHECKER_NOT_PASS / MIG05B_CONTRACT_SURFACE_EXECUTION_GRANT_YES / MIG05B_CONTRACT_SURFACE_EXECUTION_COMPLETE / MIG05B_CONTRACT_SURFACE_INDEPENDENT_CHECKER_PASS / MIG05B_BEHAVIORAL_RED_EXECUTION_GRANT_YES / MIG05B_BEHAVIORAL_RED_EXECUTION_COMPLETE / MIG05B_BEHAVIORAL_RED_INDEPENDENT_CHECKER_PASS / MIG05B_BEHAVIORAL_GREEN_EXECUTION_GRANT_YES / MIG05B_BEHAVIORAL_GREEN_EXECUTION_PARTIAL / MIG05B_BEHAVIORAL_GREEN_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_PARTIAL / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_INDEPENDENT_CHECKER_PASS / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_EXECUTION_GRANT_YES / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_EXECUTION_COMPLETE / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_INDEPENDENT_CHECKER_PASS / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_EXECUTION_GRANT_YES / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_EXECUTION_COMPLETE / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG03_RED_EXECUTION_GRANT_YES / W5-MIG03_RED_EXECUTION_COMPLETE / W5-MIG03_RED_INDEPENDENT_CHECKER_PASS / MIG04_RED_EXECUTION_GRANT_YES / MIG04_RED_EXECUTION_COMPLETE / MIG04_RED_INDEPENDENT_CHECKER_PASS / MIG04_GREEN_EXECUTION_GRANT_YES / MIG04_GREEN_IMPLEMENTATION_COMPLETE / MIG04_GREEN_INDEPENDENT_CHECKER_PASS / MIG05C_RED_EXECUTION_GRANT_YES / MIG05C_RED_EXECUTION_COMPLETE / MIG05C_RED_INDEPENDENT_CHECKER_PASS / MIG05C_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS`；均为已消耗历史事实，不构成当前授权 |
-| Current execution authorization | `MIG09_CREDIT_ACCOUNT_QUERY_SURFACE_NARROWING_RED_EXECUTION_GRANT_CONSUMED / RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_NO / CAPTE_CONSUMER_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE` |
+| Closed current-slice execution history | `W5-MIG05_RED_EXECUTION_GRANT_YES / W5-MIG05_RED_EXECUTION_COMPLETE / W5-MIG05_RED_INDEPENDENT_CHECKER_PASS / W5-MIG05_GREEN_EXECUTION_GRANT_YES / W5-MIG05_TEST_REWORK_EXECUTION_GRANT_YES / W5-MIG05_TEST_REWORK_EXECUTION_COMPLETE / W5-MIG05_TEST_CONTRACT_REWORK_INDEPENDENT_CHECKER_PASS / W5-MIG05_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG05B_RED_EXECUTION_GRANT_YES / W5-MIG05B_RED_INDEPENDENT_CHECKER_NOT_PASS / MIG05B_CONTRACT_SURFACE_EXECUTION_GRANT_YES / MIG05B_CONTRACT_SURFACE_EXECUTION_COMPLETE / MIG05B_CONTRACT_SURFACE_INDEPENDENT_CHECKER_PASS / MIG05B_BEHAVIORAL_RED_EXECUTION_GRANT_YES / MIG05B_BEHAVIORAL_RED_EXECUTION_COMPLETE / MIG05B_BEHAVIORAL_RED_INDEPENDENT_CHECKER_PASS / MIG05B_BEHAVIORAL_GREEN_EXECUTION_GRANT_YES / MIG05B_BEHAVIORAL_GREEN_EXECUTION_PARTIAL / MIG05B_BEHAVIORAL_GREEN_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_RED_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_PARTIAL / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_INDEPENDENT_CHECKER_NOT_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_EXECUTION_GRANT_YES / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_TEST_REWORK_INDEPENDENT_CHECKER_PASS / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_EXECUTION_GRANT_YES / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_EXECUTION_COMPLETE / W5-MIG05B_FUNDING_BALANCE_ADJUST_RED_INDEPENDENT_CHECKER_PASS / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_EXECUTION_GRANT_YES / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_EXECUTION_COMPLETE / W5-MIG05B_FUNDING_BALANCE_ADJUST_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_EXECUTION_COMPLETE / W5-MIG05B_EXTERNAL_FUNDS_LEG_GREEN_INDEPENDENT_CHECKER_PASS / W5-MIG03_RED_EXECUTION_GRANT_YES / W5-MIG03_RED_EXECUTION_COMPLETE / W5-MIG03_RED_INDEPENDENT_CHECKER_PASS / MIG04_RED_EXECUTION_GRANT_YES / MIG04_RED_EXECUTION_COMPLETE / MIG04_RED_INDEPENDENT_CHECKER_PASS / MIG04_GREEN_EXECUTION_GRANT_YES / MIG04_GREEN_IMPLEMENTATION_COMPLETE / MIG04_GREEN_INDEPENDENT_CHECKER_PASS / MIG05C_RED_EXECUTION_GRANT_YES / MIG05C_RED_EXECUTION_COMPLETE / MIG05C_RED_INDEPENDENT_CHECKER_PASS / MIG05C_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / PLATFORM_HIERARCHY_RED_EXECUTION_GRANT_YES / PLATFORM_HIERARCHY_RED_EXECUTION_COMPLETE / PLATFORM_HIERARCHY_RED_INDEPENDENT_CHECKER_PASS / PLATFORM_HIERARCHY_RED_REWORK_INDEPENDENT_CHECKER_PASS / PLATFORM_HIERARCHY_GREEN_EXECUTION_GRANT_YES / PLATFORM_HIERARCHY_GREEN_EXECUTION_COMPLETE / PLATFORM_HIERARCHY_GREEN_INDEPENDENT_CHECKER_PASS / C4_ENTRY_SIDE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / C4_CONTEXT_RED_EXECUTION_GRANT_YES / C4_CONTEXT_RED_EXECUTION_COMPLETE / C4_CONTEXT_RED_INDEPENDENT_CHECKER_PASS`；均为已消耗历史事实，不构成当前授权 |
+| Current execution authorization | `DISCOVERY_SET_DIFFERENTIAL_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_GRANT_CONSUMED / DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_COMPLETE / DISCOVERY_SET_BASELINE_NOT_REPRODUCED / EXPECTED_DECISION_GUARD_STOP / DISCOVERY_SET_BASELINE_NOT_REPRODUCED_CLOSEOUT_GRANT_CONSUMED / DISCOVERY_SET_BASELINE_NOT_REPRODUCED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / REPOSITORY_SOURCE_WRITE_NO / JAVA_NO / TEST_NO / MAVEN_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / NETWORK_NO / INSTALL_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`；下一 Inquiry、Maven、Java/Test、Green、Git 与生产均需新的 Human Owner Grant |
 | Execution basis | 本 Change 的 `state_revision + accepted decisions + authority refs/fingerprints + slice eligibility`；runtime Goal 仅为历史 provenance，不参与运行绑定 |
 | Design maturity | `DRAFT / ROUND_1 / G1_PASS / W2-01_CHECKER_PASS / W2-02_CHECKER_PASS / W3-01~04_CHECKER_PASS / W4-01_CHECKER_PASS / W4-02_VALIDATION_PLAN_CHECKER_PASS / W4-02_CAPTE_BENEFIT_L3_CHECKER_PASS / CAPTE_BENEFIT_E4_PASS / CAPTE_DOMAIN_LIBRARY_INTEGRATION_CHECKER_PASS / W5-01_GREEN_CHECKER_PASS / W5-01_DIRECT_PRIMARY_RECOVERY_ENTRY_CARD_CHECKER_PASS / CONTRACT_INQUIRY_ACCEPTED / RED_REWORK_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / W5-01_DIRECT_PRIMARY_RECOVERY_GREEN_CHECKER_PASS / W5-01_AUTHORIZATION_ROOT_ACTIONFACT_ENTRY_CARD_CHECKER_PASS / AUTHORIZATION_ROOT_CONTRACT_INQUIRY_ACCEPTED / AUTHORIZATION_ROOT_RED_EXECUTION_GRANT_YES / RED_EXECUTION_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / GREEN_IMPLEMENTATION_COMPLETE / W5-01_AUTHORIZATION_ROOT_GREEN_CHECKER_PASS / W5-01_AUTHORIZATION_COMPLETE_ACTIONFACT_ENTRY_CARD_CHECKER_PASS / AUTHORIZATION_COMPLETE_CONTRACT_INQUIRY_ACCEPTED / AUTHORIZATION_COMPLETE_RED_EXECUTION_GRANT_YES / AUTHORIZATION_COMPLETE_RED_EXECUTION_COMPLETE / AUTHORIZATION_COMPLETE_RED_REWORK_INDEPENDENT_CHECKER_PASS / AUTHORIZATION_COMPLETE_GREEN_EXECUTION_GRANT_YES / AUTHORIZATION_COMPLETE_GREEN_IMPLEMENTATION_COMPLETE / W5-01_AUTHORIZATION_COMPLETE_GREEN_CHECKER_PASS / P-SIM03_HOST_DEFERRED / VC-001_BLOCKED / VC-002_BLOCKED / L4_EXECUTION_GRANT_NO`；完整决策历史见正文与 Decision Register |
 | Date | `2026-08-23` |
 | Baseline HEAD | `eb12091819152fcec529f9453b48755f3aa2c999` |
 | E4 assessment source baseline | `0ed7bbdb4664431ab630c46ef9f76e5899484cc7`；该值只记录本次谱系评估采用的 Provider source，不表示后续 live HEAD；任何 E4 执行前仍须重新冻结两仓 HEAD 与完整 dirty fingerprint |
-| Evidence workspace | `Credit RED source=8c2fe2e6... / fresh XML=74ea8ddb... / 3 tests / 2 failures / 0 errors / 0 skipped / pre-post compile=21/21 / independent Checker PASS`；未修改 production、既有测试、Capte、POM 或 schema，未执行 Git/联网/发布 |
+| Evidence workspace | `Wave A+B1+B2+B3+B4 PASS / Ledger Green production manifest=1f371a986aaf636a0a8d32142a0c904314494e2f84844d8ca62e425074979194 / Ledger existing-test manifest=1d980037bfcc6ee34cf4662600dc5716b7cbed0ec419c09ff9f27e79e0f5af6f / PaymentInstrument binding internalization test source=8f9d694902f0412e574e6fd7083a2f8db220ef0dd572e6513b23a809f426cdee / class=c890f1c483ecf9c13c1701f4d2291f5b4f210a1ec7c0f30e584af45d181eb251 / Green XML=2f7290a531a9dfa331d838bcb187394326a36a52d8cf4d92cf13c539c85d845c / Green=5/0F/0E/0S / Platform-Hierarchy fresh=125 XML,1222/0F/0E/1S / Platform-Hierarchy input production manifest=4bb0910cac75fa29cf6f907c0618f7ec88512abee68735e05e7e418533c50054 / input existing-test manifest=447d30a5122d1203b8ad76b9b78cdba6ff844b30bf421447747562a2314fc579 / immutable RED source=e6b1d2b5ff20c8e87b7b2156ac28e8f70889c7854daae0939bf9af59a85971c1 / Green XML=bf1d0c460c26ac8f07138e1328975cca32bad0446069819e6bc736ded268d086 / Green=3/0F/0E/0S / Projection immutable RED=c98246dd7cede16f4d30e3e86d7e5d6fb1decab7b33855cc6021eaa0426c6ef0 / Projection fresh=125 XML,1226/0F/0E/1S / Projection ownership=33/0F/0E/0S / Projection orchestrator=6/0F/0E/0S / AccountHierarchy immutable RED=36a738e6b75499aa98c00e97d9cb728a2ef0d5bcf07e76b6e7b0be65b6702db5 / AccountHierarchy Green=14/0F/0E/0S / fresh=125 XML,1235/0F/0E/1S / Public Contract=293/172/42 / Core API=94/4/4 / PMD=13 XML,0 violation,0 error / Green Checker=PASS/P0=0/P1=0/P2=0`；PaymentInstrument binding internalization、Projection ownership 与 AccountHierarchy stable creation identity 均已完成 current checkout D4，未修改 schema、build、Core、Consumer 或 Git |
 | Human Owner | 用户：目标、产品边界、公共契约和风险取舍的最终确认方 |
 | Plan steward | `wise-agent`：维护本 Change 的单一持久状态、逐切片综合和交接；不替代 Human Owner，也不自行产生执行授权 |
 | Current Maker | 产品、支付资金、DSL 与系统设计能力共同主笔；不形成多个事实源 |
 | Independent Checker | `funds_core_evidence`：`G0 PASS`；`w1_product_checker`：`W1-01 PASS`；`w1_completion_checker`：`W1-02 COMPLETION EVIDENCE PASS`；`q002_decision_checker`：`Q-002 / Q-003 / Q-004 / P-SIM01-01 / P-SIM01-03 DECISION PACKAGE PASS`、`Q-004 ACCEPTANCE_AND_BREAKING_REDESIGN PASS`、`P-SIM01-01-D / P-SIM01-02-A / P-SIM01-03 / P-SIM02-01-A / P-SIM02-02-A / P-SIM03-01-D / P-SIM03-02-R-A / P-SIM04-01-A / P-SIM04-02-D / P-SIM05-01-A ACCEPTANCE PASS`、`P-SIM02-01 / P-SIM02-02 / P-SIM03-01 / P-SIM03-02 / P-SIM04-01 / P-SIM04-02 / P-SIM05-01 DECISION PACKAGE PASS`、`SIM-01~07 CONDITIONAL CONTRACTS PASS`、`RS-001 PASS`、`CI-RS001-CAPTE-WALLET-001 PASS / VC-001 BLOCKED`；`capte_domain_evidence`：`P-SIM06-01 DECISION PACKAGE PASS / 0 P0-P2`、`P-SIM06-01-A ACCEPTANCE PASS / 0 P0-P2`、`P-SIM06-02 DECISION PACKAGE PASS / 0 P0-P2`；`fincone_consumer_evidence`：`P-SIM06-02-B ACCEPTANCE PASS / 0 P0-P2`、`P-SIM06-03 DECISION PACKAGE PASS / 0 P0-P2`、`P-SIM06-03-B ACCEPTANCE PASS / 0 P0-P2`、`P-SIM07-01-A ACCEPTANCE PASS / 0 P0-P2`、`W1-02 / G1 PRODUCT READINESS PASS / 0 P0-P2`、`W3-01 SYSTEM DESIGN PASS / 0 P0-P2`、`W3-02 SYSTEM DESIGN PASS / 0 P0-P2`、`W3-03 SYSTEM DESIGN PASS / 0 P0-P2`、`W3-04 SYSTEM DESIGN PASS / 0 P0-P2`、`W4-01 TDD DESIGN PASS / 0 P0-P2`、`W4-02 VALIDATION PLAN PASS / 0 P0-P2` |
-| Latest independent checker | `plan-r2.323 / CREDIT ACCOUNT QUERY SURFACE RED INDEPENDENT CHECKER PASS / P0=0 / P1=0 / P2=0`；失败映射、真实 Credit/Ledger/Profile/H2、四 bucket、零副作用、不泄露与 immutable RED 一致 |
+| Latest independent checker | `plan-r2.479 / DISCOVERY_SET_BASELINE_NOT_REPRODUCED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / P0=0 / P1=0 / P2=0`；确认 E3-0 full Green、control guard stop、E3-1~E3-5 未执行、证据无漂移及负结果边界准确 |
 | Git strategy | `summary_only`；未授权 stage、commit、push 或 PR |
 
 ## 1. 当前结论
@@ -1330,9 +1330,9 @@ stale: accepted source/POM/JAR/CodeSource/38-path or core+transaction fingerprin
 | `MIG-06` | normalized external fact。 | `DESIGN_ACCEPTED / RUNTIME_ADAPTER_PENDING` | Fincone 可提供设计/模拟输入；真实 authority adapter 与运行恢复仍待 Host。 |
 | `MIG-07` | reconciliation/stage。 | `DOCUMENT_CARD_REWORK_CHECKER_PASS / CONTRACT_DECISION_PACKAGE_REWORK_CHECKER_PASS / A_ACCEPTED / ACCEPTANCE_CHECKER_PASS / SOURCE_RUN_ENTRY_CARD_CHECKER_PASS / SOURCE_RUN_CONTRACT_ACCEPTED / SOURCE_RUN_CONTRACT_ACCEPTANCE_CHECKER_PASS / GATE_REQUIREMENT_ENTRY_CARD_CHECKER_PASS / GATE_REQUIREMENT_CONTRACT_ACCEPTED / GATE_REQUIREMENT_CONTRACT_ACCEPTANCE_CHECKER_PASS / BREAKING_RELEASE_RED_ENTRY_CARD_FROZEN / RED_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / BASELINE_STATUS_MAPPING_REPAIR_CHECKER_PASS / BREAKING_RELEASE_RED_ENTRY_CARD_REFREEZE_CHECKER_PASS / RED_EXECUTION_GRANT_YES / RED_EXECUTION_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_NOT_PASS / BEHAVIORAL_RED_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / CONTRACT_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / BEHAVIORAL_RED_INDEPENDENT_CHECKER_PASS / GREEN_INDEPENDENT_CHECKER_PASS / CODE_FREEZE` | 当前范围已完成；下一 W5 切片必须重新形成 Entry Card，Consumer E4/L4 仍独立阻断。 |
 | `MIG-08` | 真实 Consumer 切换。 | `CAPTE_BENEFIT_ACTIONFACT_CONSUMER_E4_PASS_LIBRARY_TEST_HOST_ONLY / RECONCILIATION_E4_PENDING / L4_DEFERRED` | `capte-domain` Benefit ActionFact Consumer 已在 Provider r9 与不可变 library test host source card 上关闭 E4；当前仍无 Reconciliation 生产调用或独立部署数据库，其他 Consumer 与部署宿主 L4 继续等待。 |
-| `MIG-09` | 删除旧 facade、重复 read adapter、raw rail entry、宽 CRUD 和无 Consumer 扩展壳。 | `IN_PROGRESS / FUNDING_ACCOUNT_QUERY_SURFACE_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CREDIT_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO` | Funding Provider/Capte 已关闭；Credit RED 精准为 `3/2F/0E/0S`，下一步只允许冻结五文件 Provider Green，未授权 Consumer。 |
+| `MIG-09` | 删除旧 facade、重复 read adapter、raw rail entry、宽 CRUD 和无 Consumer 扩展壳。 | `CURRENT_SCOPE_COMPLETE / FUNDING_ACCOUNT_QUERY_SURFACE_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CREDIT_CAPTE_CONSUMER_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / C4_CURRENT_SCOPE_COMPLETE / SPEND_REL_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / SPEND_DECISION_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / SPEND_VERSION_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / SPEND_DEFINITION_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / SPEND_BINDING_STABLE_CREATION_GREEN_INDEPENDENT_CHECKER_PASS / PAYMENT_INSTRUMENT_BINDING_INTERNAL_SERVICE_GREEN_INDEPENDENT_CHECKER_PASS / SPEND_CONTROL_TENANT_READ_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_GREEN_INDEPENDENT_CHECKER_PASS / GOVERNANCE_PROJECTION_LEGACY_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / GOVERNANCE_PROJECTION_SPI_OWNERSHIP_GREEN_INDEPENDENT_CHECKER_PASS / MIG09_EXECUTION_GRANT_NO` | Governance SPI ownership 已完成 D4；连续 surface cleanup 暂停，只有新的 caller、tenant、安全或 Consumer 证据才能重开。 |
 
-本表历史结论已由 plan-r2.323 Credit RED supersede：MIG-02C 仍只在权威逐 complete allocation 出现后重开；MIG-06 与其他 Adapter/Consumer 继续等待各自 E4。MIG-09 Funding Provider 与 Capte Consumer Green 已通过独立技术 Checker；Credit immutable RED 也已独立准出，下一 Gate 只能是冻结五文件 Provider Green，不能进入 Consumer、其他 raw-id 或推测性 MIG-05E。
+本表历史结论已由后续 C4 与 Wallet raw-id 切片机械校准：MIG-02C 仍只在权威逐 complete allocation 出现后重开；MIG-06 与其他 Adapter/Consumer 继续等待各自 E4。MIG-09 的 entrySide、Projection ownership、Context ownership，以及 SpendSubjectFundingRelation、DecisionRecord、Version、Definition raw-id、Binding 稳定创建/raw-id、PaymentInstrument binding/history 内部服务面、Spend Control tenant read surface、AccountHierarchy tenant read 和 stable create 当前范围均已完成；SpendSubjectFundingRelation provisioning、AccountHierarchy 换绑/多父/graph/delete/admin、其他 create/DTO id、真实 MySQL 与仓外二进制 Consumer 仍须独立成卡或验证；新代码切片或推测性 MIG-05E 均未授权。
 
 #### 8.31.2 `D-MIG-001` Owner 决策包
 
@@ -3801,6 +3801,777 @@ Public contract 失败只证明两个旧 getter 尚在且 query tenant 缺 Jakar
 
 独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，该测试自此 immutable。价值是把风险精准收敛为“删除两个无 tenant Public 旁路 + query 首次 read 前 guard”，同时证明既有 tenant+sn/query 无需重做。当前=`RED_EXECUTION_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CAPTE_CONSUMER_EXECUTION_GRANT_NO / CODE_FREEZE`；下一 Human Gate=`MIG09_CREDIT_ACCOUNT_QUERY_SURFACE_NARROWING_GREEN_EXECUTION_GRANT`，只允许 plan-r2.322 冻结的 `3 production + 2 existing test MODIFY / ADD=0 / DELETE=0`，不授权 Capte Consumer、Git、联网、发布或生产。
 
+`W5-MIG09-CREDIT-ACCOUNT-QUERY-SURFACE-NARROWING-PROVIDER-GREEN-CLOSEOUT-001 / plan-r2.324` Green 记录（2026-08-27）：Human Owner 消费五文件 Green Grant。Maker 只修改 `CreditAccountService.java`、`CreditAccountQuery.java`、`CreditAccountServiceImpl.java`、`ControlAccountLedgerInitializationTests.java`、`FundsTransactionFlowTestSupport.java`，post SHA=`59c29af8... / cc3ce49b... / 5f4b87fa... / a9222697... / 4282c411...`；immutable RED=`8c2fe2e6...` 未漂移。两个无 tenant getter 及其实现/调用已归零，query tenant 同时由 Jakarta `@NotNull`、首次 read 前 guard 与 `CreditAccountNameRefs.tenantId` 谓词承重；未新增兼容、fallback、抽象、Entity/Mapper/schema 或资金行为。
+
+Fresh 证据为 compile=`21/21`，Credit=`3/0F/0E/0S`，Control=`14/0F/0E/0S`，transaction/balance-control/business-flow/reconciliation/boundary=`186/44/200/247/211`且全部零失败零错误，Public Contract=`299/175/42`，Core API=`94/4/4/1025`，13 份 PMD XML 无 finding，122 份 Surefire XML=`1209/0F/0E/1S`；唯一 skip 是无真实 MySQL host 的 migration integration。冻结卡中 Control=`15` 是既有计数笔误，本 closeout 按源码与 fresh XML 机械校准为 `14`，没有删除测试。独立 Green Checker 与独立代码 Review 均=`PASS / P0=0 / P1=0 / P2=0`。
+
+当前=`CREDIT_PROVIDER_GREEN_INDEPENDENT_CHECKER_PASS / PROVIDER_CURRENT_SCOPE_COMPLETE / CAPTE_CONSUMER_EXECUTION_GRANT_NO / CODE_FREEZE`。下一 Human Gate=`MIG09_CREDIT_ACCOUNT_QUERY_SURFACE_NARROWING_CAPTE_CONSUMER_EXECUTION_GRANT`，只允许 `CouponActivityServiceImplTests.java` 删除两个旧 Credit override，并验证唯一 Provider artifact 的 built/resolved/loaded lineage；不授权 Provider、其他 Capte 文件、其他 MIG-09、Git、联网、发布、部署或生产。
+
+`W5-MIG09-CREDIT-ACCOUNT-QUERY-SURFACE-NARROWING-CAPTE-CONSUMER-GREEN-CLOSEOUT-001 / plan-r2.325` Consumer Green 记录（2026-08-27）：Human Owner 消费单文件 Consumer Grant。唯一修改为 Capte `CouponActivityServiceImplTests.java`，SHA=`abee939024f4439bb8e4d49a015091e38a8bf7ce37fb0b9e15d0541e0ed8af48 -> f9e87ba8b5f63129bf9dc1c62df27c2e3a4e32e20c37f6d34fbd8c98a3e737e2`，只删除两个旧 Credit override 和孤立 `FundsAccountId` import。Funding hard cut、Credit tenant+sn/query、37 个 `@Test` / 37 个 `testXxx` / 138 处断言均保持；Capte 生产 Consumer 继续在 `CouponActivityServiceImpl` 以既有 `tenantId + subjectId` 查询 Credit。
+
+Provider source manifest=`674 files / 0386100d56d3ae4303a575bfef8b2bd63bb2dd48b4c994a748628beee311fa4c`，唯一验证版本=`1.0.1-mig09-credit-20260827-0386100d56d3`，只写入已有隔离 Maven repository。首次 Provider install 因 raw parent `${revision}` 在 Consumer 解析前阻断，按已冻结 Harness 规则重做 `flatten:flatten + install`；未 clean 的 test compilation 只编译 1 个源的假绿也未计入。最终 clean RED 真实编译 169 个测试源，只命中目标文件两个旧 override error；Green test compilation=`42/42`。
+
+Fresh XML 为 Activity=`37/0F/0E/0S`、Redemption=`49/0F/0E/0S`、Integration main=`25/0F/0E/3S`，lineage/seed/recover 各=`1/0F/0E/0S`；seed/recover 使用同一 file-H2 且 `schema-init=always/never`，证明恢复时零新增 transaction/detail/Ledger transaction/posting plan/entry/refund facts。7 个 Provider JAR 的 built/resolved SHA 逐项相等，lineage 以 `CodeSource` 证明 runtime loaded artifact 一致。独立 Consumer Checker 与代码 Review 均=`PASS / P0=0 / P1=0 / P2=0`；该证据只准出隔离仓与 Spring/H2 library test host D4，不外推真实 MySQL、HOST/L4、发布、部署或生产 D5。
+
+本 closeout 独立文档 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认三文档 SHA、Consumer/artifact/XML 证据、Harness 分层、D4 上限与单一恢复入口一致。本纵向切片当前=`CREDIT_CAPTE_CONSUMER_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / W5_DOCUMENTATION_AUTHORITY_COMPACTION_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。下一 Human Gate=`W5_DOCUMENTATION_AUTHORITY_COMPACTION_ENTRY_CARD_GRANT`，不授权 Java、测试、Git、联网、发布或生产。
+
+### 12.2 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-ENTRY-CARD-001`
+
+#### 12.2.1 问题、实际价值与本卡边界
+
+本轮只建立 documentation-only Entry Card，不执行压缩。现场确认 `docs/产品设计/README.md` 与 `docs/产品设计/01-PRD总览.md` 把编号产品文档描述为正式或 `01-05` 权威主线，但 `docs/产品设计/支付资金公共能力层-产品设计.md` 又声明自己是逐轮确认后的目标态产品语义权威，形成一个真实的产品层双权威入口。DSL、系分和 TDD README 已分别把目标 DSL、主系分和主 TDD 指为本层权威，不需要为了形式对称而修改。
+
+四份目标设计文档虽然在顶部声明执行状态统一进入本 OpenSpec，正文仍累计出现下列高信号执行词。计数是本卡写入前文本中的 token occurrence，不是独立缺陷数；`RED/Green` 可能是稳定 TDD 语义，未计入，也不得按关键词盲删。
+
+| 目标文档 | `Entry Card` | `plan-r` | `Checker` | `SHA=` | 合计 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 产品目标文档 | 44 | 33 | 99 | 1 | 177 |
+| DSL 目标文档 | 17 | 21 | 48 | 0 | 86 |
+| 主系分 | 86 | 49 | 176 | 66 | 377 |
+| 主 TDD | 110 | 67 | 234 | 68 | 479 |
+| 合计 | 257 | 170 | 557 | 135 | 1119 |
+
+实际价值不是减少 Markdown 行数本身，而是让不同读者在同一问题上只得到一个答案：稳定产品/DSL/系分/TDD 结论留在对应正式文档，任务状态、Grant、Checker、SHA、命令与失败诊断只由本 OpenSpec 承载。这样可防止旧 Entry Card 被误当成当前授权、旧 API 被历史段落重新引入，也降低后续评审在一万余行目标文档中辨别“现行设计”和“执行过程”的成本。
+
+本卡不修改产品或 DSL 正文，不删除任何历史，不裁定 payout/finality、Reconciliation 旧 API、Spend Rule 范围或其他业务/架构语义；不授权 Java、测试、schema、POM/build、Consumer、Git、联网、发布、部署或生产。
+
+#### 12.2.2 Wave A：唯一产品权威入口
+
+Wave A 本波实际写入范围严格为 `MODIFY=3 / ADD=0 / DELETE=0`：
+
+| 文件 | 操作 | 精确责任 | 当前输入 SHA |
+| --- | --- | --- | --- |
+| `docs/产品设计/README.md` | MODIFY | 在文档清单与权威边界中明确 `支付资金公共能力层-产品设计.md` 是目标态产品语义唯一入口；编号文档只承载当前基线、专题/场景证据和验收输入，不能覆盖目标文档。 | `59b5266af75b06bca0fe2b95fbd825c3356089d84e8b6835c07ab18db8db44a2` |
+| `docs/产品设计/01-PRD总览.md` | MODIFY | 仅改 1.3 的分册定性：把 `01-05 权威产品主线` 收窄为当前基线与公共问题输入，并显式回链目标产品权威；不改任何产品对象、流程、规则或验收。 | `1f3955ae19ea4ff34cbd1a459453294b3337e695bb19eb04ecf64f3743ce922b` |
+| `openspec/changes/funds-public-capability-redesign/spec.md` | MODIFY | Wave A 独立 Checker PASS 后只机械回写状态、结果与下一 Entry Card，不复制产品语义。 | self-authority；执行前复核 live SHA，不在正文冻结递归 self-SHA |
+
+两份产品输入的有序 manifest 为 `73dbd88a29c461dfb5d741e84c071d169656b9b83c4cb396cdc6f1f33b46d136`，算法为 `repository-relative-path<TAB>sha256<LF>` 按上表顺序拼接后再取 SHA-256。未来执行前必须复算两个文件和 manifest；任一漂移即停止重冻，不按本卡写入。
+
+Wave A 的 immutable verification-only 输入为：
+
+| 文件 | 当前 SHA | 理由 |
+| --- | --- | --- |
+| `docs/产品设计/支付资金公共能力层-产品设计.md` | `40a8301830f7fca66cf4434e7c5223f5336cd917e031add9fd3ff8c429266711` | 已声明目标态产品语义与 OpenSpec 执行史边界；本波不改业务正文。 |
+| `docs/DSL设计/README.md` | `12beb6845ced1f653159d561eff095ff10afabaf9de1694853caaefe2e73be14` | DSL 权威入口已正确。 |
+| `docs/DSL设计/支付资金公共能力层-DSL设计.md` | `665963dba06af37075a90bf332e2fb4041b3f80dcccd23f5743b739cf610f06f` | 本波不压缩执行史或改 DSL。 |
+| `docs/系分设计/README.md` | `76f702be3a763d6b22e41a2272bf7e4d9908a81ed7c48f023f4ab72fb26ba237` | 系分权威入口已正确。 |
+| `docs/系分设计/支付资金公共能力层-系分设计.md` | `da1aa9fffce041a0049a894959191fa850247bca331404111c22ff8399982b57` | 未来 Wave A 不再把当前任务状态镜像写回主系分。 |
+| `docs/TDD设计/README.md` | `cf57ccbc2e062f6415914e9d7a4bf4474ffc4772d59d9f3867d8c6c61fb85ad8` | TDD 权威入口已正确。 |
+| `docs/TDD设计/支付资金底座测试驱动设计.md` | `ac79b3f6d22f563bf3ed3a70ac3ad65fd2ce2a907ca62be2d0e97fe59ee3b2f5` | 未来 Wave A 不再把当前任务状态镜像写回主 TDD。 |
+
+Wave A 验收只证明入口一致：产品 README、01 PRD 和目标产品文档对“唯一目标态权威、编号文档角色、OpenSpec 执行史归属”的表述无冲突；DSL/系分/TDD 入口不倒退；本 OpenSpec 仍是唯一 live state/recovery source。它不宣称四份目标文档已经压缩。
+
+#### 12.2.3 后续波次与语义隔离
+
+后续候选必须逐波重开独立 documentation-only Entry Card，不从本卡继承写入授权：
+
+1. `Wave B1~B4` 分别处理产品、DSL、系分、TDD 目标文档的执行史压缩。每一波先对段落做 `KEEP_STABLE_DESIGN / REMOVE_DUPLICATE_PROCESS / MOVE_MISSING_PROVENANCE / DECISION_REQUIRED` 分类；只有 OpenSpec 或 Git 已保存完整 provenance、稳定结论已有权威落点时才能删除。四份文档不得一次大删，也不得只按 `Entry Card/plan-r/Checker/SHA` 关键词删除。
+2. `Wave C1` 单独裁定 payout/finality 权威冲突：目标产品已接受 executor success、beneficiary arrival、rail finality、post-action reconciliation 正交，但编号产品/TDD 仍存在 accepted/processing 创建 `IN_TRANSIT`、paid/到账/对账合并表达。该波是业务语义重写，不能混入历史压缩。
+3. `Wave C2` 单独清零 Reconciliation 旧合同：编号系分仍保留 `recordRunResult` 与 caller 提交的 `ReconciliationMatchResultItem`，而目标合同已是 Provider `executeStrictExact`。需先确认编号文档角色和全部引用，再做无兼容文档切换。
+4. `Wave C3` 单独复核 Spend Rule 是否只保留跨场景稳定的准入/控制事实。没有真实跨场景 production Consumer 的规则平台、配置路由和扩展壳不得因文档已写而进入公共能力。
+5. `Wave C4` 把 `entryType/entrySide`、transaction projection rule Source 归位、跨模块 context validator 命名等工程候选分别进入 Inquiry；本卡不把评审候选升级为已接受设计。
+
+停止条件：发现待删除段落是某项已接受决策的唯一落点；修改会改变业务对象、资金效果、状态/finality、Owner、Public API 或测试验收；链接/锚点/引用无法机械修复；需要新增兼容层或并行权威；文件不在当前波次白名单；输入 SHA/manifest 漂移。任一命中即停止并返回 Human Owner，不以“整理文档”为理由继续。
+
+#### 12.2.4 Wave A 执行结果、验证与下一门
+
+本 Maker 写入范围严格为 `docs/产品设计/README.md`、`docs/产品设计/01-PRD总览.md` 和本 OpenSpec。README 与 01-PRD 只修正目标产品文档的唯一权威定位、编号文档的基线/证据角色和 OpenSpec 执行状态归属；没有删除历史、改写产品对象/流程/规则、修改目标产品正文/DSL/系分/TDD、Java、测试、schema、POM/build 或 Consumer。两份产品输入最终 post SHA 分别为 `f0188c55e408c68a4069ef73aa46edf10aa0f14a020a5ac2eef221b1eaaf3c36` 与 `c9e93b6edf435392773ba90caff8188a50dab1e66813bf5df91473b7eb25a754`，post manifest 为 `2ed7855ea036ebde2f27046f977f688d99d5ebd8bc23a3e9b2417d4af444b5a7`；首轮独立 Checker 发现 README:7 将执行状态列为多个位置的 P1，最小返工已收窄为 OpenSpec 唯一承载；最终 Checker=`PASS / P0=0 / P1=0 / P2=0`，并确认系分/TDD 旧恢复入口属于本波 verification-only 残余，留待 B3/B4 处理；文档围栏、尾随空白、冻结路径和 `git diff --check` 均通过；未运行 Maven，也未把既有 Java/Test dirty 项归入本波。
+
+Wave A 独立 Checker 已确认：产品 README 与 01-PRD 不再声明自身覆盖目标态产品语义；目标产品正文、DSL、系分和 TDD 未被语义改写；两份产品输入 post SHA 与 manifest 精确匹配；OpenSpec 是唯一执行状态源；Wave B/C 未被提前执行。系分/TDD 当前仍有旧恢复文字，但二者是本波 verification-only 输入，已登记为 B3/B4 残余，不在本波越权修复。下一 Human Gate 为 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B1_PRODUCT_HISTORY_EXECUTION_GRANT`。
+
+#### 12.2.5 Wave B1 目标产品执行史压缩
+
+Human Owner 已授权 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B1_PRODUCT_HISTORY_EXECUTION_GRANT`。本波写入严格为 `MODIFY=2 / ADD=0 / DELETE=0`：`docs/产品设计/支付资金公共能力层-产品设计.md` 负责移除重复执行史并保留稳定产品合同；本 OpenSpec 负责保存 provenance、验证和当前状态。README、01-PRD、DSL、系分、TDD、Java、测试、schema、POM/build、Consumer 与 Git 均不可写。
+
+分类结果：
+
+| 分类 | 本波处置 | 产品语义保护 |
+| --- | --- | --- |
+| `KEEP_STABLE_DESIGN` | 保留 1-8 章及 9.1-9.9 的稳定合同；保留 authorization release/refund、refund allocation、Transaction/Wallet Owner、ActionFact/Ledger projection、Ledger profile、外部资金腿方向、`FUNDING_BALANCE_ADJUST`、非负余额与 Reconciliation/Gate 产品边界。 | 金额、责任、原事实、累计、route、UNKNOWN、finality、对账和 fail-closed 语义不变。 |
+| `REMOVE_DUPLICATE_PROCESS` | 删除 9.10-9.31 及 9.4/9.8 中的文件卡、RED/Green、Checker、测试计数、SHA、Grant 与历史恢复文字；将保留标题改为稳定产品合同名称。 | 完整执行 provenance 已在本 OpenSpec 与 Git；产品正文不再承载运行态。 |
+| `MOVE_MISSING_PROVENANCE` | `0`。 | 删除前确认相关 MIG/Task/Decision 历史已在本 OpenSpec 留痕，不新增第二历史文档。 |
+| `DECISION_REQUIRED` | `0`。 | payout/finality、Reconciliation 旧合同和 Spend Rule 范围继续属于 C1-C3，未借 B1 重裁。 |
+
+实际价值：目标产品文档从 `1576` 行收敛为 `1094` 行，净减少 `482` 行；高信号过程词 `Entry Card / plan-r / Checker / SHA= / Grant` 从 `177` 次归零。删除的不是产品能力，而是已经被 OpenSpec/Git 承接的执行流水；保留的 9.4-9.9 继续回答 release、退款来源、模块 Owner、账本/投影、调账和对账“应该是什么”。这降低了旧门禁被误读为当前产品规则的风险，也让后续产品评审不再依赖理解历史测试轮次。
+
+输入 SHA=`40a8301830f7fca66cf4434e7c5223f5336cd917e031add9fd3ff8c429266711`。首轮 Maker post SHA=`1940c6743ef73711a2a363222c4ec25bb3253986beee0b520b1945e82669878d`；独立 Checker 反向语义审计通过，但发现大小写敏感扫描遗漏 `ACCEPTANCE_CHECKER_PASS` 等执行态，判定 `NOT PASS / P1=1`。最小返工只删除 10 个状态后缀并把两处阶段词改为稳定边界，最终 post SHA=`91a498a9aee470637a0c4b2a41f2cd2fcc12fac63e6fcb7e352b43dd6e2b8842`，case-insensitive 过程词为 0；最终 Checker=`PASS / P0=0 / P1=0 / P2=0`。当前=`DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B1_INDEPENDENT_CHECKER_PASS / WAVE_B2_EXECUTION_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B2_DSL_HISTORY_EXECUTION_GRANT`。
+
+#### 12.2.6 Wave B2 目标 DSL 执行史压缩
+
+Human Owner 已授权 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B2_DSL_HISTORY_EXECUTION_GRANT`。本波写入严格为 `MODIFY=2 / ADD=0 / DELETE=0`：`docs/DSL设计/支付资金公共能力层-DSL设计.md` 负责移除重复执行史并保留稳定 DSL；本 OpenSpec 保存 provenance、验证和当前状态。产品、README/01-PRD、系分、TDD、Java、测试、schema、POM/build、Consumer 与 Git 均不可写。
+
+分类结果：
+
+| 分类 | 本波处置 | DSL 语义保护 |
+| --- | --- | --- |
+| `KEEP_STABLE_DESIGN` | 保留最小稳定词汇、事实/证据层级、正交完成维度、序列化样例、release/refund、Ledger profile、外部资金腿、`FUNDING_BALANCE_ADJUST`、Reconciliation/Requirement、Action-Ledger-Balance closure、persisted digest 和高阶 Ledger posting contract。 | identity、Money、Owner、原事实、累计、route、digest、UNKNOWN、finality、Gate 与 fail-closed 不变量不变。 |
+| `REMOVE_DUPLICATE_PROCESS` | 删除测试形状、RED/Green、文件卡、Checker、计数、Grant、候选重基线、Consumer 收口和重复无新增 DSL 章节；保留标题改为稳定 DSL 名称并连续重编号。 | 完整过程 provenance 已由本 OpenSpec 与 Git 承载；DSL 不再描述验证轮次。 |
+| `MOVE_MISSING_PROVENANCE` | `0`。 | 被删任务/决策均可在本 OpenSpec 回查，不新增第二历史文档。 |
+| `DECISION_REQUIRED` | `0`。 | entrySide、projection/context、raw-id 和 C1-C4 语义候选均未借 B2 重裁。 |
+
+实际价值：目标 DSL 从 `1160` 行收敛为 `939` 行，净减少 `221` 行；大小写不敏感过程词 `checker / entry card / plan-r / sha= / grant` 从 `108` 次归零，阶段词 `RED / Green / Behavioral / Surface Green` 也归零。稳定章节 10.8-10.23 连续保留，调用者现在可以直接判断什么能进入 `core`、什么只属于 face/impl/adapter，而不需要理解历史测试与授权轮次。
+
+输入 SHA=`665963dba06af37075a90bf332e2fb4041b3f80dcccd23f5743b739cf610f06f`，post SHA=`0b3f2ddfc3d1485d1d13c20a6f0daf78d3d2b684d6862cbca92b3402df2f5f28`。本波结构、链接、稳定词汇/决策锚点、过程词归零、OpenSpec provenance、状态一致性和 `git diff --check` 均通过；独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认净删 `221` 行没有损失资金 DSL 合同。当前=`DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B2_INDEPENDENT_CHECKER_PASS / WAVE_B3_EXECUTION_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B3_SYSTEM_HISTORY_EXECUTION_GRANT`。
+
+#### 12.2.7 Wave B3 主系分执行史压缩
+
+Human Owner 已授权 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B3_SYSTEM_HISTORY_EXECUTION_GRANT`。本波写入严格为 `MODIFY=2 / ADD=0 / DELETE=0`：`docs/系分设计/支付资金公共能力层-系分设计.md` 负责移除重复迁移流水并保留稳定系统合同；本 OpenSpec 保存 provenance、验证和当前状态。产品、README/01-PRD、DSL、TDD、Java、测试、schema、POM/build、Consumer 与 Git 均不可写。
+
+分类结果：
+
+| 分类 | 本波处置 | 系统契约保护 |
+| --- | --- | --- |
+| `KEEP_STABLE_DESIGN` | 保留一至十章的 Core/Ledger、Wallet、Transaction、Reconciliation 目标设计；将原第十一章的 accounting direction、persisted digest、tenant/query authorization、raw-id/Public surface、Consumer artifact/host 与 pending inquiry 收敛为六节当前系统边界。 | 模块 Owner、依赖方向、Money、route、posting、事务、幂等、tenant、fail-closed、Gate 和失败零副作用不变。 |
+| `REMOVE_DUPLICATE_PROCESS` | 删除原 11.1-11.46 的文件卡、白名单、RED/Green、Checker、计数、SHA、Grant、恢复入口和测试/制品流水；清理前十章残余 milestone。 | 完整执行 provenance 已由本 OpenSpec 与 Git 承载；主系分不再维护第二状态源。 |
+| `MOVE_MISSING_PROVENANCE` | `0`。 | 被删 MIG/Task/Consumer/tenant hard-cut 历史均可在本 OpenSpec 回查。 |
+| `DECISION_REQUIRED` | `0`。 | payout/finality、Reconciliation 编号文档旧合同、Spend Rule、entrySide、projection/context 与剩余 raw-id 明确列为后续评审，不在 B3 重裁。 |
+
+实际价值：主系分从 `3170` 行收敛为 `725` 行，净减少 `2445` 行，约 `77.1%`；高信号过程词 `Entry Card / plan-r / Checker / SHA=` 从 `377` 次归零，`Grant / RED / Green` 阶段词也归零。调用方现在可在前十章读取目标结构，并在第十一章直接得到 accounting、tenant 查询授权、Public surface、宿主和残余决策，而不需要解析 46 轮迁移记录。
+
+输入 SHA=`da1aa9fffce041a0049a894959191fa850247bca331404111c22ff8399982b57`，首轮 Maker post SHA=`829c3a8fd248a4f1ac25e2b6221b83d9f3dcf00f0f3a6f7b4c39968b93e02c9f`。独立 Checker 确认压缩价值与 provenance 成立，但发现 Ledger/Reconciliation/Capte 三组过期当前事实及 Ledger raw-id 歧义，判定 `NOT PASS / P1=3 / P2=1`。首轮返工校准高阶 Ledger command 与 core accounting specs、`executeStrictExact + GateRequirement`、Capte generic direct/ActionFact/tenant query，以及 `LedgerTransactionService` 已收窄而 `LedgerService` raw-id 仍待内收，post SHA=`dd186363cd6dbfef0f4f15c71ab6cf48a37203d793fc4158528a1c7c9d668629`。复核又发现目标章节遗漏 stable accounting specs 且风险表仍保留宽 assembler 当前态，判定 `NOT PASS / P1=1`；二次最小返工后最终 post SHA=`e2db517a1080d80df34908cd7c87bb865281ef5a10887a53f2c8ccf34395e05d`，最终 Checker=`PASS / P0=0 / P1=0 / P2=0`。当前=`DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B3_INDEPENDENT_CHECKER_PASS / WAVE_B4_EXECUTION_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B4_TDD_HISTORY_EXECUTION_GRANT`。
+
+#### 12.2.8 Wave B4 主 TDD 执行史压缩
+
+Human Owner 已授权 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B4_TDD_HISTORY_EXECUTION_GRANT`。本波写入严格为 `MODIFY=2 / ADD=0 / DELETE=0`：`docs/TDD设计/支付资金底座测试驱动设计.md` 负责移除重复执行流水并保留测试合同；本 OpenSpec 保存 provenance、验证和当前状态。产品、README/01-PRD、DSL、系分、Java、测试、schema、POM/build、Consumer 与 Git 均不可写。
+
+分类结果：
+
+| 分类 | 本波处置 | TDD 合同保护 |
+| --- | --- | --- |
+| `KEEP_STABLE_DESIGN` | 保留前十九章的能力矩阵、测试分层、资产入口、红线与验证命令；将原第二十章压缩为 ActionFact、Ledger、Reconciliation、tenant、Consumer lineage、架构/敏感上下文和验证顺序九节当前合同。 | RED/Green 作为可证伪测试语义保留；Money、route、posting、entry、balance、幂等、原事实、tenant 和失败零副作用断言不变。 |
+| `REMOVE_DUPLICATE_PROCESS` | 删除原 20.1-20.53 的文件卡、Maker/Checker、SHA、Grant、fresh 计数、白名单、失败排障和制品流水；前十九章只清理一个运行角色词。 | 精确执行结果与恢复状态由本 OpenSpec 承载；TDD 不再维护第二状态源。 |
+| `MOVE_MISSING_PROVENANCE` | `0`。 | 被删测试切片、Consumer、tenant hard-cut 与 artifact lineage 历史均可在本 OpenSpec 回查。 |
+| `DECISION_REQUIRED` | `0`。 | payout/finality 与 Reconciliation 编号文档等 C1-C4 语义问题仍独立处理，不借 B4 改测试预期。 |
+
+实际价值：主 TDD 从 `4420` 行收敛为 `1524` 行，净减少 `2896` 行，约 `65.5%`；live 大小写不敏感过程词 `entry card / plan-r / checker / sha= / grant` 从 `642` 次归零。RED/Green 仍保留为测试设计语言，真实测试类、资金断言、tenant 隔离、artifact lineage 和验证命令可以直接检索，不再埋在逐轮执行记录中。
+
+输入 SHA=`ac79b3f6d22f563bf3ed3a70ac3ad65fd2ce2a907ca62be2d0e97fe59ee3b2f5`，Maker post SHA=`63ea56df753aabef44c7b225f7998da981c916f4c77166c6d7f5dc8754cd86ad`。本波只执行文档结构、链接、测试资产存在性、稳定断言锚点、过程词归零、OpenSpec provenance、状态一致性和 `git diff --check`；不运行 Maven。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认前十九章、25 个真实测试入口与稳定资金测试合同无缺失，也未借压缩改变 payout/finality、Reconciliation 或 Spend Rule 决策。当前=`DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_B4_INDEPENDENT_CHECKER_PASS / WAVE_C1_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。下一 Human Gate 才是 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_C1_PAYOUT_FINALITY_ENTRY_CARD_GRANT`，仅允许建立 documentation-only 语义校准卡，不直接改业务合同。
+
+#### 12.2.9 Ledger 对象 tenant 授权 Entry Card
+
+Human Owner 在规范 CR 后明确接受推荐方案并要求推进、确认价值。本卡只冻结 `W5-MIG09-LEDGER-OBJECT-TENANT-AUTHORIZATION-ENTRY-CARD-001`，暂停原 C1 顺序但不取消其候选；本轮只修改主 TDD 的稳定测试合同与本 OpenSpec，不修改主系分、Java、测试、Capte、schema、POM/build，也不执行 Maven/Git/联网/发布/生产。
+
+**价值与根因**：Ledger 是余额、状态、profile、subject、period、posting 与 entry 的资金权威事实。数据库 ledger ID 只定位对象，不能授权读取或更新。当前 `LedgerService#getLedgerById/getLedgerByIds` 直接按裸 ID 读取，`LedgerQuery.tenantId` 可空且分页首次 read 无 guard；`LedgerEntryQuery` 同形。caller closure 又证明同一 `findLedger(id)` 被 `updateLedgerState` 复用，而 `UpdateLedgerStateRequest` 没有 tenant，状态更新 where 也没有 tenant。若只修查询，会留下更危险的跨租户写旁路，因此最小正确边界必须同时覆盖 raw-id read、query、entry query、state update 和 balance projection。
+
+**目标 hard cut**：
+
+```java
+LedgerDTO getLedgerById(Long tenantId, Long id);
+List<LedgerDTO> getLedgerByIds(Long tenantId, Collection<Long> ids);
+void updateLedgerState(UpdateLedgerStateRequest request); // request.tenantId 必填
+WindPagination<LedgerDTO> queryLedgers(LedgerQuery query, WindQuery<? extends QueryOrderField> options);
+WindPagination<LedgerEntryDTO> queryLedgerEntries(LedgerEntryQuery query,
+                                                   WindQuery<? extends QueryOrderField> options);
+void project(Long tenantId, List<LedgerEntrySpec> entries, LedgerPostingAccessType postingAccessType);
+```
+
+旧 `getLedgerById(Long)`、`getLedgerByIds(Collection)` 与旧两参数 `project` 全部删除，不保留 default/deprecated/V2/bridge、双读或 `TenantContextHolder` fallback。`LedgerQuery.tenantId`、`LedgerEntryQuery.tenantId`、`UpdateLedgerStateRequest.tenantId` 使用 Jakarta `@NotNull`；Service/Projection 在首次持久化访问前显式校验 tenant。单条 foreign ledger 表现为当前 tenant 对象不存在；批量 ID 任一缺失/foreign 必须整体 fail-closed，不返回部分集合；foreign query/entry query 返回空页；更新和投影 where 同时包含调用方 tenant + id/version/state。异常不得泄露 foreign subject、state、currency、profile、period、balance 或 owner 关系。
+
+**可信 tenant 来源**：posting 的 raw-id 批量读取和 projection 只取 `LedgerTransactionSpec#getTenantId`；`LedgerBalanceProjectionServiceImpl` 不从返回 Ledger、entry context 或线程上下文反推。`DefaultLedgerPostingAssembler` 的 `LedgerQuery` 已使用 `LedgerKey.tenantId`，Wallet account query 使用 resolved subject tenant，Clearing entry query 使用 application request tenant，三者保持只读无需修改。`updateLedgerState` 当前生产 caller 为 0，未来 caller 必须显式提供 request tenant。
+
+**Provider RED** 只允许新增：
+
+```text
+tests/src/test/java/com/wind/funds/ledger/LedgerObjectTenantIsolationTests.java
+```
+
+测试使用真实 Spring/H2、`LedgerServiceImpl`、`LedgerTransactionServiceImpl`、`LedgerBalanceProjectionServiceImpl` 与 ledger DAL，不 Mock Service/Mapper，不检查私有 helper/Mapper interaction。固定 6 个 `@Test`，旧实现 fresh 目标=`6/6F/0E/0S`：
+
+1. public reflection 聚合新旧 raw-id/project signature 与三个 tenant field Jakarta `@NotNull`，形成 1F；
+2. adaptive public invocation 验证同租户 raw-id 正向、foreign 单条不存在、混合 ID 批量整体拒绝，旧实现泄露 foreign ledger，形成 1F；
+3. 无 tenant `queryLedgers` 必须在首次 read 前拒绝，foreign tenant 空页，旧实现未拒绝，形成 1F；
+4. 无 tenant `queryLedgerEntries` 必须拒绝，foreign tenant 空页，旧实现未拒绝，形成 1F；
+5. adaptive `UpdateLedgerStateRequest` 以 foreign tenant 尝试 `ACTIVE -> SUSPENDED`，必须拒绝且 Ledger/Transaction/Posting/Entry/Balance 全事实不变；旧实现按裸 id 更新，形成 1F。
+6. adaptive 调用旧两参数/新三参数 `project`，由 tenant A 投影指向 tenant B ledger；必须在首次 read/update 前拒绝，且 B ledger debit/credit/version/state 与 Transaction/Posting/Entry/Balance 全快照不变；旧实现读取并更新 foreign ledger，形成 1F。
+
+RED 文件在未来 Checker PASS 后 immutable；任何 compile/Spring/H2/schema/fixture/reflection error 或 failure 数不等于 6 都是 Harness 失败。
+
+**Green production `MODIFY=8 / ADD=0 / DELETE=0`**：
+
+| 文件 | 最小修改 | 当前 SHA |
+| --- | --- | --- |
+| `ledger/face/src/main/java/com/wind/funds/ledger/service/LedgerService.java` | raw-id getter 增加 tenant 首参 | `ba9824bd...` |
+| `ledger/face/src/main/java/com/wind/funds/ledger/query/LedgerQuery.java` | tenantId 增加 Jakarta `@NotNull` | `a8c1e529...` |
+| `ledger/face/src/main/java/com/wind/funds/ledger/query/LedgerEntryQuery.java` | tenantId 增加 Jakarta `@NotNull` | `391a197c...` |
+| `ledger/face/src/main/java/com/wind/funds/ledger/request/UpdateLedgerStateRequest.java` | 新增必填 tenantId | `a5f1d60a...` |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerServiceImpl.java` | tenant+id read/update、query guard、批量完整性 | `6903b674...` |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerTransactionServiceImpl.java` | entry query 首次 tenant guard | `93933bb4...` |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImpl.java` | 以 transaction tenant 调 raw-id batch 与 projection | `7fa2a581...` |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImpl.java` | project 显式 tenant，tenant-scoped read/update | `e7a5fead...` |
+
+production 有序 manifest=`337515bb4057271429ae4eea0bb9135e34353955beaa39dd95ee68a84be372b5`。不得修改 `LedgerTransactionService` interface、`DefaultLedgerPostingAssembler`、Wallet/Reconciliation caller、Entity/Mapper/schema/Core、entryType/entrySide、digest、posting 金额或状态迁移规则。
+
+**既有 test 机械迁移 `MODIFY=11`**：
+
+```text
+tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java
+tests/src/test/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImplTests.java
+tests/src/test/java/com/wind/funds/ledger/impl/LedgerServiceImplTests.java
+tests/src/test/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssemblerTests.java
+tests/src/test/java/com/wind/funds/ledger/service/LedgerTransactionServiceFactQueryTests.java
+tests/src/test/java/com/wind/funds/transaction/application/external/ExternalFundsEventApplicationServiceTests.java
+tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java
+tests/src/test/java/com/wind/funds/transaction/application/flow/FundsDirectTransactionFlowTests.java
+tests/src/test/java/com/wind/funds/transaction/application/flow/FundsTransactionFlowTestSupport.java
+tests/src/test/java/com/wind/funds/transaction/application/flow/FundsWithdrawalRejectionFlowTests.java
+tests/src/test/java/com/wind/funds/wallet/application/instrument/PaymentInstrumentTransactionApplicationServiceTests.java
+```
+
+只允许增加既有 `TENANT_ID`/事实 tenant 实参、为 update request 设置 tenant、适配 projection 新签名，并把 `LedgerTransactionServiceFactQueryTests` 的无 tenant characterization 改为目标 tenant contract；不得削弱 persisted digest、余额、posting、state 或失败零副作用断言。11 文件有序 manifest=`02ce250650bcffef3874951152180a53e00900ff2240f934d08f44366bac1352`。四个仓外项目无直接 Java caller，Capte/Fincone 不需写入。
+
+**验证与停止线**：Entry Card 编制时 target 目录没有可复算 Surefire XML；最近一次 current-source 技术基线为 Credit closeout 的 `122 XML / 1209/0F/0E/1S`，只作预期起点。新增 6 tests 后 old 目标=`1215/6F/0E/1S`、Green=`1215/0F/0E/1S`，唯一允许 skip 仍是无真实 MySQL host migration integration。验证顺序为 `mvn-version -> compile -> RED/Green 单类 -> Ledger focused -> transaction/balance-control/business-flow/reconciliation/boundary -> Public Contract -> Core API -> PMD/CAD -> fresh XML`；Public Contract=`299/175/42` 与 Core=`94/4/4/1025` 预计不变。
+
+发现第 9 个 production、第 12 个 existing test、仓外 caller、缺可信 tenant、需要新抽象/兼容层/DDL/Mapper/Core、需改 entryType/entrySide/digest/金额/状态规则，或 RED 非精准 `6/6F/0E/0S` 时立即停止并返回 Human Owner。独立 Entry Card Checker 以 TDD/OpenSpec SHA=`9715c0ef... / f8af5492...` 复核 projection 行为 RED、8+11 manifests、1215 计数、结构与唯一恢复入口，结论=`PASS / P0=0 / P1=0 / P2=0`。本 Entry Card 冻结结论=`ENTRY_CARD_INDEPENDENT_CHECKER_PASS`。
+
+**RED 执行收口（plan-r2.342）**：Human Owner 精确授权只新增 `LedgerObjectTenantIsolationTests.java`。Maker 首轮 Harness 只在该文件内补齐 `LedgerProfileCatalog`、容错 public reflection、真实 foreign entry 与非文案绑定的拒绝断言；最终又补同租户 Ledger/Entry 查询正向和异常不泄露 subject/state/currency/profile/period/balance 的断言。最终 test SHA=`25432b44cfd4fb9f3b99c57de96f12217fea87af81196e2991db05dbfea8e84b`，fresh XML SHA=`acfddb030f187d4e9c50f9f3db9cdaf186ff4b66bf27b3b59ab56beca9e3d6b7`，source `<` class `<` XML，单类=`6/6F/0E/0S`。六个 testcase 分别精准证明 contract/三个 `@NotNull` 缺口、raw-id 与 mixed batch 泄露、两类 query 缺 tenant 未拒绝、foreign state update 将 `ACTIVE -> SUSPENDED/version+1`、foreign projection 将 `debit 0 -> 10/version+1`；无 compile、Spring、H2、schema、SQL 或 reflection Harness error。
+
+执行 `just mvn-version` 与 Java 21 offline `just compile`，compile=`21/21 SUCCESS`；RED 只运行单类，不运行 Ledger/Transaction 等 Green 扩大矩阵、Public Contract、Core API、PMD、CAD 或真实 MySQL。8 production 与 11 existing test 的排序 manifest 复算仍为 `337515bb4057271429ae4eea0bb9135e34353955beaa39dd95ee68a84be372b5 / 02ce250650bcffef3874951152180a53e00900ff2240f934d08f44366bac1352`。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`；测试自此 immutable。RED 收口时状态=`RED_EXECUTION_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，该 PASS 本身不授权 Green、Git、恢复 C1 或其他 MIG-09。
+
+**Green 执行收口（plan-r2.343）**：Human Owner 在 RED Checker PASS 后授权冻结 Green，并确认显式 `tenantId` 是 Public contract 与对象授权来源，所有持久化读写使用既有 `XxxRefs` 增加 tenant 谓词；MyBatis-Flex 全局 `TenantFactory` / tenant plugin 本轮不引入，只保留为未来宿主可选纵深防御。Maker 只修改冻结的 8 production + 11 existing test：`LedgerService` 删除无 tenant raw-id signature；三个 face model tenant 字段使用 Jakarta `@NotNull`；`LedgerServiceImpl` 的 single/batch/query/state read/update、`LedgerTransactionServiceImpl` entry query 与 `LedgerBalanceProjectionServiceImpl` read/update 均在首次持久化访问前显式 tenant-scoped。批量读取对 distinct ID 结果做完整性校验，任一 missing/foreign 整体 fail-closed；posting 的 tenant 只取 `LedgerTransactionSpec#getTenantId`。未新增兼容重载、V2/default、`TenantContextHolder` fallback、新抽象、Entity/Mapper/schema/Core 或全局 tenant 插件。
+
+production/test 排序 manifest=`1f371a986aaf636a0a8d32142a0c904314494e2f84844d8ca62e425074979194 / 1d980037bfcc6ee34cf4662600dc5716b7cbed0ec419c09ff9f27e79e0f5af6f`；immutable RED SHA 保持 `25432b44cfd4fb9f3b99c57de96f12217fea87af81196e2991db05dbfea8e84b`。Java 21 classfile 只保留双参 `getLedgerById/getLedgerByIds` 与三参 `project`，旧 signature=0。Green RED XML SHA=`2e1759b2005582362f60917eac3cf63ce88d257ef7cb9894300ad450e4c3d24a`，单类=`6/0F/0E/0S`；source `<` full CAD XML。Human Owner 中途要求暂停时，Maker 立即以 SIGINT 终止首次 Core clean-compile；恢复授权后从头重跑完整 Core API/CAD，不采用中断制品作为通过证据。
+
+验证结果：compile=`21/21`；Ledger=`77/0F/0E/0S`、Transaction=`186/0F/0E/0S`、Balance Control=`44/0F/0E/0S`、Business Flow=`200/0F/0E/0S`、Reconciliation=`247/0F/0E/0S`、Boundary=`211/0F/0E/0S`；Public Contract=`299/175/42`；Core API=`94 stable / 4 experimental / 4 internal`；13 份 PMD XML=`0 violation / 0 error`；完整 offline CAD=`PASS`，fresh 123 份 Surefire XML=`1215/0F/0E/1S`，唯一 skip 为无真实 MySQL host 的 `ReconciliationMysqlMigrationIntegrationTests`。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+本切片只达到 current checkout `RUNTIME_D4 / ENGINEERING_READY`，不冒充真实 MySQL 或生产 D5。残余风险为真实 MySQL migration 仍未运行，以及 breaking ABI 的仓外二进制 Consumer 仍需在各自构建中重新编译确认。当前=`GREEN_EXECUTION_COMPLETE / GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；不得自动恢复 C1、推进其他 MIG-09、Git、发布或生产。
+
+#### 12.2.10 Wave C1 payout/finality 语义校准 Entry Card
+
+Human Owner 已授权恢复此前暂停的 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C1-PAYOUT-FINALITY-ENTRY-CARD-001`。本轮是 documentation-only Entry Card：只修改本 OpenSpec，冻结未来语义执行的文档范围；不修改产品、DSL、系分、TDD 正文、Java、测试、schema、POM/build、Consumer、Git、联网、发布或生产。
+
+**实际价值与问题机制**：当前文档和 Provider 源码把多个不同完成层级都写成 `SUCCEEDED/成功/PAID`，调用方容易把 executor 已受理或内部资金闭合误当成受益人银行到账，进而提前履约、错误客服告知或对迟到 RETURNED 自动反向动账。C1 只解决名实和证据边界，不新增 payout 引擎或 rail 规则。它让公共能力提供者回答“内部资金事实是否闭合”，让上游 adapter/merchant settlement/finance/reconciliation Owner 分别回答到账、rail finality 和财务对账。
+
+**已接受的稳定合同**：
+
+1. payout admission、external delivery、executor result、FundsTransaction、Ledger、Balance、beneficiary arrival、rail finality 和 post-action reconciliation 是正交证据；任一层不能替代另一层。
+2. normalized executor `SUCCEEDED` 只关闭执行结果；若内部 Funds/Ledger/Balance 合同满足，可形成一次内部 payout effect，但不得单独声明 beneficiary/bank arrival 或 rail finality。
+3. beneficiary arrival 必须引用已签收的 bank/beneficiary query、report 或 statement，并与 payout identity、amount、currency、scope、source、version、effective period 和 Owner 对平；该证据不得创建第二次 FundsTransaction、Ledger 或 Balance 变化。
+4. rail finality 仍由外部 rail/bank/executor Owner 按版本化规则独立声明。无命中、多命中、陈旧、冲突或 PENDING 时保持待确认、差异或人工处理，禁止猜测或从 Gate/BALANCED/余额倒推。
+5. 迟到 FAILED、RETURNED、reversal 或金额冲突追加 Difference/recovery 证据，不能覆盖历史内部事实、自动返还、换 identity 重发或重复关闭责任。
+6. `SUBMITTED/ACCEPTED/PROCESSING/IN_TRANSIT` 不得展示为受益人已到账；公共资金层不拥有 raw rail 状态、展示文案或外部 finality 策略。
+
+**未来语义执行的精确文档白名单（`MODIFY=7 / ADD=0 / DELETE=0`）**：每个文件只做同一已接受合同的机械语义校准，保留金额、责任、原事实、累计、对账和失败边界。
+
+| 文件 | 未来操作 | 具体责任与锚点 |
+| --- | --- | --- |
+| `docs/产品设计/03-清结算与对账.md` | `MODIFY` | 校准 7.1、7.5、10.1、11.1 的 paid/出款成功/关闭 `SETTLEMENT` 表达，明确内部 payout effect、beneficiary arrival、rail finality 和 reconciliation 分层。 |
+| `docs/产品设计/05-产品验收与TDD用例矩阵.md` | `MODIFY` | 校准 `AC-SET-003`、`AC-SET-007`、`ACQ-AC-004`，把“成功回单/PAID/到账”拆成 executor、内部资金、受益人到账和对账验收。 |
+| `docs/产品设计/07-全球账户收付款资金底座PRD.md` | `MODIFY` | 校准出款 `PROCESSING/PAID` 和成功回单矩阵，明确银行到账证据、外部 Owner 和 UNKNOWN/manual 出口。 |
+| `docs/产品设计/08-收单业务资金底座PRD.md` | `MODIFY` | 校准 `PAYOUT_SUBMITTED`、`ACQ-AC-004` 等“回单成功即 PAID/到账”表达，保持收单、清分、结算、出款与银行到账分层。 |
+| `docs/DSL设计/支付资金底座DSL承载层设计.md` | `MODIFY` | 校准 `DSL-SETTLEMENT-PAYOUT-RESULT-001`、出款成功和 `IN_TRANSIT` 语义；不把外部 finality 或展示状态提升为 core DSL。 |
+| `docs/系分设计/03-清结算与对账系分设计.md` | `MODIFY` | 校准 `PAYOUT_RESULT`、出款状态图、`TDD-SETTLE-002/005` 和 W2 当前边界；区分内部资金关闭与 beneficiary arrival，不启用新在途或 rail 状态机。 |
+| `docs/TDD设计/支付资金底座测试驱动设计.md` | `MODIFY` | 校准 `TDD-SETTLE-002`、`TDD-P2-GA-002/003`、`TDD-P2-ACQ-002`、`TDD-RACE-006` 等验收，新增“executor success 不等于 arrival/finality、独立到账不产生第二资金动作”的可观察合同。 |
+
+未来执行输入逐文件 SHA-256（有序）如下；执行前必须重新计算并与本表及有序 manifest 完全一致：
+
+```text
+docs/产品设计/03-清结算与对账.md<TAB>0948ec062be405c12a2cda5b898a4e4ef0c9245c71b134934d137fce9cd841cc
+docs/产品设计/05-产品验收与TDD用例矩阵.md<TAB>0135a8fab92b8e423c63f1112af420081e4299dea7444dfc49e9456c84d731e0
+docs/产品设计/07-全球账户收付款资金底座PRD.md<TAB>965a1aa4717dd026c3ac79bd34a24117892ee22a4485b58c815d10c0503d0f85
+docs/产品设计/08-收单业务资金底座PRD.md<TAB>a34ebec022f76d5b1b77de258bb55b42f1afad20d11d19095fac264bc50e5271
+docs/DSL设计/支付资金底座DSL承载层设计.md<TAB>6029f489348b183d574eee0c7ed3a64e84d2a243fd5dd5361e8b15ccdf9f3f71
+docs/系分设计/03-清结算与对账系分设计.md<TAB>578e65ed7e78048acfb38e9395c3bd48d616e08f4b2f1756c3c0cfc5d0c0daf6
+docs/TDD设计/支付资金底座测试驱动设计.md<TAB>9715c0ef10009a0e68f41b1cef37fd0d6f6b8452d27678d13294e951b3257d0a
+```
+
+有序 `path<TAB>sha256<LF>` manifest=`8901cb299be115a1e43f62f2ad1cff665c0a9384eaf0499f58041c3f5054fa3b`。
+
+本 OpenSpec 只承担本卡状态、输入指纹、Checker 和恢复入口的机械回写，不属于上述 7 个语义文件的内容改写。
+
+**当前源码与测试仅作只读证据**：`reconciliation/face/.../PayoutOrderState.java:29-36` 将 `SUCCEEDED` 定义为外部通道成功；`PayoutDisplayStatus.java:21-30` 直接提供 `SUCCEEDED` 展示；`PayoutOrderDTO.java:51-88` 没有独立 arrival/finality evidence；`PayoutOrderApplicationServiceImpl.java:234-265,566-583` 在回执 `SUCCEEDED` 时形成内部资金交易并映射成功展示；`PayoutPublicContractTests` 与 `PayoutOrderApplicationServiceTests` 只证明当前 payout lifecycle、幂等和内部账务，不证明 beneficiary arrival 或 rail finality。这些文件本卡均为 `verification-only / non-write`，后续如需改变 Public API、枚举、DTO、测试或 source adapter，必须另开工程 Entry Card。
+
+**明确排除**：不修改 `PayoutOrderState`、`PayoutDisplayStatus`、`PayoutOrderDTO`、`HandlePayoutReceiptRequest`、Payout/Settlement Java 实现或测试；不新增 `Arrival`/`Finality` core 类型、rail matrix、通道策略引擎、统一 `PAID` 状态、兼容 alias、V2、双读/双写、schema、Consumer、外部规则默认值或真实银行/通道能力。`IN_TRANSIT` 是否启用、具体 rail source、法域、会计确认、责任归属和生产展示继续由对应 Owner 待确认。
+
+**未来语义执行验收与停止线**：
+
+- 执行前逐文件确认上述 7 个路径存在，输入 SHA/文档角色未漂移；每个旧“成功/PAID/到账”表达必须映射到上述六层之一，不能留下同义歧义。
+- 保留目标产品、目标 DSL、主系分的已接受正交边界；不能因校准而改金额、责任、原事实、累计、Gate、recovery、Spend Rule 或 Ledger/Balance 合同。
+- 文档结构、链接、围栏和尾空白通过；OpenSpec/refactoring-design 与 lightweight Harness 通过；不运行 Maven。
+- 发现第八个语义文件、Java/API/DTO/枚举/测试/DDL 需要修改，或外部 finality/会计/法域 Owner 未确认时立即停止，回 Human Owner，不把候选自动升级为实现授权。
+
+当前 C1 状态=`C1_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C2_RECONCILIATION_CONTRACT_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。下一 Human Gate 为 `W5_DOCUMENTATION_AUTHORITY_COMPACTION_WAVE_C2_RECONCILIATION_CONTRACT_ENTRY_CARD_GRANT`，仍需先建立独立 documentation-only Entry Card，不授权 Java、测试、Consumer、Git、联网、发布或生产。
+
+#### 12.2.11 `plan-r2.348` Wave C1 语义执行收口
+
+Human Owner 已授权 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C1-PAYOUT-FINALITY-SEMANTIC-EXECUTION-001`。本轮严格按 12.2.10 的 `MODIFY=7 / ADD=0 / DELETE=0` 文档白名单完成语义校准：`executor result`、内部 Funds/Ledger/Balance payout effect、`beneficiary arrival`、`rail finality` 和 post-action reconciliation 现在分别表达，executor `SUCCEEDED` 或成功回单不再单独代表到账、`PAID` 或 finality；独立到账证据不创建第二次资金动作，迟到 RETURNED/FAILED/reversal/金额冲突只追加差异或追偿证据。
+
+七个文件的 post SHA（按 Entry Card 顺序）为：
+
+```text
+docs/产品设计/03-清结算与对账.md<TAB>e476c19521b9a3963e35c1f5179e36a942b35c633081953b2b57423a2cda7a18
+docs/产品设计/05-产品验收与TDD用例矩阵.md<TAB>fff1da1dd5f4965d5f99d14c97adf864e1bdec1f3ec72b6bf8e82d25d561ffb7
+docs/产品设计/07-全球账户收付款资金底座PRD.md<TAB>2f99717a3cf5505760fe025cfecb00dc58674f6499827d1c19be985097642822
+docs/产品设计/08-收单业务资金底座PRD.md<TAB>210adef9cf15a689951ec5f89a77d1c102ee2cc397c0e58efbbf39140c794ca6
+docs/DSL设计/支付资金底座DSL承载层设计.md<TAB>98a18fab8f6ea246104357f1b3aa83da95f39ee984eb0a14f5ab5a4cc1b471db
+docs/系分设计/03-清结算与对账系分设计.md<TAB>e0b79194173d85787d5e79184019d3ff64f73906dd007bdc7a1b6d08934eba53
+docs/TDD设计/支付资金底座测试驱动设计.md<TAB>28d0dbf32887b889056517dd5f307ec9702e1922d89cc6a98f486cf25346791
+```
+
+有序 `path<TAB>sha256<LF>` post manifest=`6f77046a515ad1c19f4936e8ddf3d79af7cf5be11a3cc51939df8f5f186284f8`。结构、链接、围栏和尾空白检查通过；本地 `refactoring-design` 与 `lightweight Harness` 通过；未运行 Maven，未修改 Java、测试、schema、POM/build、Consumer，也未引入兼容层或 MyBatis-Flex 全局租户插件。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+本轮价值是把公共资金层的可观察完成证据从单一“成功”拆成可归责的层级，降低提前标记到账、错误履约/客服展示、以及迟到退回触发重复动账的风险。当前仍仅达到文档设计与工程边界校准，不证明真实银行/rail finality、会计或法域结论，也不授权修改现有 payout Java/API/DTO/测试；这些若要落地必须另开工程 Entry Card。
+
+当前=`C1_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C2_RECONCILIATION_CONTRACT_ENTRY_CARD_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C2-RECONCILIATION-CONTRACT-ENTRY-CARD-GRANT`。
+
+#### 12.2.12 `plan-r2.349` Wave C2 Reconciliation 合同 Entry Card
+
+Human Owner 已授权 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C2-RECONCILIATION-CONTRACT-ENTRY-CARD-001`。本轮仅建立 documentation-only Entry Card，不修改编号系分正文、产品正文、DSL、TDD、Java、测试、schema、POM/build、Consumer、Git 或外部环境。
+
+**实际价值与根因**：运行时代码已经由 `recordRunResult(matchResults)` 切换为 Provider 从冻结来源事实执行 `executeStrictExact(request, operator)`，但编号系分仍把 caller assertion、`matchResults` 和 `ReconciliationMatchResultItem` 写成当前公共合同；目标产品总览还把 Provider 描述成只固化 `VERIFIED` assertion。这会让设计、实现和 Consumer 对“谁计算对账结论”产生相反理解。C2 只清除陈旧权威文本，使 Provider 的唯一计算权、来源适配器职责、不可变结果与 Gate 消费边界可被正确检索；不新增匹配引擎、容差策略或兼容层。
+
+**已接受且不可重裁的合同**：
+
+1. Source Owner/adapter 先完成原始来源授权、验签、解析、去重、聚合和归一化；`RecordReconciliationSourceSnapshotRequest` 只承载 `sourceNamespace`、`snapshotIdentity`、`snapshotVersion`、`coverage`、`facts` 和 `evidenceRefs` 等 carrier-neutral normalized facts。
+2. `ReconciliationRunResultApplicationService` 的唯一执行入口是 `executeStrictExact(RecordReconciliationRunResultRequest, WindOperator)`；request 只包含必填 `tenantId` 与 `reconciliationBatchSn`，不接收 caller 的 `matchResults`。
+3. Provider 从同一批次冻结的两侧 facts 计算 Money、comparison status、claim semantics、rule、identity 和 coverage，原子持久化不可变 run/match/result；`ReconciliationMatchResultDTO` 仍是只读分页证据，不代表独立写入模型。
+4. strict-exact 的 `BALANCED/DIFFERENCE_FOUND`、Difference/action、current-lineage 和 Gate requirement 保持正交；不把 caller `sourceQuality/matchStrength`、总额、行数或 Gate/BALANCE 结果当作匹配结论。
+5. 目标为破坏式文档对齐，不保留旧名、兼容 alias、deprecated/V2、双读、双写或第二事实源。
+
+**未来语义执行精确白名单（`MODIFY=2 / ADD=0 / DELETE=0`）**：
+
+| 文件 | 操作 | 精确责任、旧表达与新表达 |
+| --- | --- | --- |
+| `docs/系分设计/03-清结算与对账系分设计.md` | `MODIFY` | 校准 4.11.4、4.11.5、4.11.14 及相关 API/TDD 矩阵：`recordRunResult` -> `executeStrictExact`；删除 request 的 `matchResults` 输入描述；仅将 `RecordReconciliationSourceSnapshotRequest` 的 `sourceType/sourceItems` -> carrier-neutral `sourceNamespace/snapshotIdentity/snapshotVersion/coverage/facts`；`ReconciliationMatchResultItem` 从 caller 写入模型降为 Provider 计算并通过 `ReconciliationMatchResultDTO` 只读输出；保留 tenant、scope、rule、coverage、lineage、Difference、Gate 和失败零副作用语义。`RecoveryOrder` 的 `sourceType/sourceSn`、`SourceObjectRefDTO`、`CreateRecoveryOrderRequest`、`ReadInternalSourceRequest`/`ReadExternalSourceRequest`、`ReconciliationRawRecord` 与 `ReconciliationNormalizedRecord` 的 `sourceType` 分别属于 W3/端口/来源类型语义，本卡不得全局替换。 |
+| `docs/产品设计/支付资金公共能力层-产品设计.md` | `MODIFY` | 校准 `SIM-07` 汇总（约 189）、5.11 主流程与停止线（约 271、275）、5.25 `P-SIM07-01`（约 691、697、724）、`P-SIM07-01-HOST`（约 299）和 9.9.5（约 1092）的事实基线：从“Provider 仅固化 caller match assertion、A 尚未实现”改为“Provider 已按冻结 normalized facts 执行 strict-exact；真实 source authority/adapter、Consumer、E4/L4 仍待宿主闭合”；不改 A/B/C 决策、金额、责任、Difference 或 Gate 规则。 |
+
+**当前输入指纹**：
+
+```text
+docs/系分设计/03-清结算与对账系分设计.md<TAB>e0b79194173d85787d5e79184019d3ff64f73906dd007bdc7a1b6d08934eba53
+docs/产品设计/支付资金公共能力层-产品设计.md<TAB>91a498a9aee470637a0c4b2a41f2cd2fcc12fac63e6fcb7e352b43dd6e2b8842
+```
+
+有序输入 manifest=`5d1b4857f7ae15d21e6dc5782ae141e2cd05bf7a20ddbff2e2ca3b75276679bb`（`path<TAB>sha256<LF>`）。以上两个文件是未来唯一可写文档；以下均为 verification-only/non-write：`docs/产品设计/03-清结算与对账.md`、`docs/产品设计/05-产品验收与TDD用例矩阵.md`、`docs/产品设计/07-全球账户收付款资金底座PRD.md`、`docs/产品设计/08-收单业务资金底座PRD.md`、`docs/DSL设计/支付资金底座DSL承载层设计.md`、`docs/系分设计/支付资金公共能力层-系分设计.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`。源码和测试只作证据，不在 C2 文档执行中修改：`ReconciliationRunResultApplicationService.java`、`RecordReconciliationRunResultRequest.java`、`ReconciliationRunResultApplicationServiceImpl.java`、`ReconciliationStrictExactPublicContractTests.java` 的当前 SHA 分别为 `d32adec935654c327227e726b70cb993140e30c21c86f89118d9746e6d6c7dc8`、`d50fea3dc7b49d127690cab2d84debef2c290fbbe10dc0ee24c10954afe6d8cd`、`300b8b21cd199dc12f0f3b8f43aeea7aad0e15d1208aa8511de42171a3f39f35`、`864b443811ffd42313645944fc3f36a2e1410b4906354ea0f0e0818ed38eb9b6`。
+
+**验收与停止线**：
+
+- 文档执行前重新确认两份输入 SHA、路径和当前状态；逐一替换全部旧 API/模型引用，编号系分中旧 `recordRunResult`、caller `matchResults` 和 `ReconciliationMatchResultItem` 写入语义归零，但保留只读 `ReconciliationMatchResultDTO` 与历史 OpenSpec provenance。
+- 验证 source/target 文档、产品/DSL/目标系分/TDD 的合同一致；路径存在、相对链接目标存在、Markdown 围栏成对、无尾随空白；不得把历史 OpenSpec 中的旧合同描述误当成当前 API。
+- 不运行 Maven，不修改 Java、测试或 schema；不创建 RED/Green。若发现第三份陈旧权威文档、源码/测试需要变更、现有 accepted contract 需重裁、需要兼容层，或出现真实 Consumer 未能按同一目标语义迁移，立即退回 Human Owner。
+
+独立 Checker=`PASS / P0=0 / P1=0 / P2=0`：确认两份文档覆盖全部陈旧 Provider assertion 事实，`sourceType` 替换被限定在来源快照请求，W3/端口/Raw/NormalizedRecord 语义保留，输入 SHA/manifest、不可写清单、状态链与恢复入口一致；本卡未把 Java 已完成事实外推为新的代码授权。
+
+当前=`C2_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C3_SPEND_RULE_ENTRY_CARD_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。C2 语义执行已收口；下一 Human Gate 才是 `WAVE_C3_SPEND_RULE_ENTRY_CARD_GRANT`，仍需先建立独立 documentation-only Entry Card。
+
+#### 12.2.13 `plan-r2.352` Wave C2 语义执行收口
+
+本轮在 C2 Entry Card 授权内只修改两份文档：
+
+- [清结算与对账系分设计](../../../docs/系分设计/03-清结算与对账系分设计.md)：将基础对账请求、服务 API、匹配模型、API 约束和 TDD 矩阵从 caller 提交 `recordRunResult/matchResults` 对齐为 Provider `executeStrictExact`；来源快照只表达 carrier-neutral normalized facts；保留 W3 Recovery、端口、Raw/NormalizedRecord 的 `sourceType`。
+- [公共能力层产品设计](../../../docs/产品设计/支付资金公共能力层-产品设计.md)：校准 `SIM-07`、5.11、5.25 和 9.9.5 的当前 Provider 事实，明确 strict-exact 已由 Provider 执行，真实 source authority、Consumer、恢复和 E4/L4 仍属于宿主阻断；历史决策记录不改写。
+
+post SHA 与有序 manifest：
+
+```text
+docs/系分设计/03-清结算与对账系分设计.md<TAB>a07ec9b2a5a5356216c6057e16b4334968eafe928243af1e308d9b2032f4627f
+docs/产品设计/支付资金公共能力层-产品设计.md<TAB>ef3016c209abf323b55205a062200f7325e5f092b873c3ba3a1667e9ee19ea80
+```
+
+有序 `path<TAB>sha256<LF>` post manifest=`322e557782cc0f86c0513cd31408f1da378654d2ed5965715f439cd9796fdfce`。旧 `recordRunResult`、caller `matchResults` 和 `ReconciliationMatchResultItem` 写入语义已清零；只读 `ReconciliationMatchResultDTO` 保留。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认未改金额、责任、A/B/C、Gate、C1、Wallet/raw-id、entrySide、schema、Java 或测试。
+
+本轮实际价值：Provider 成为跨场景对账结论的唯一计算权威，来源适配器负责验真和归一，Gate 只消费 current lineage；后续 Consumer 不会再把 caller 自报的匹配结果当作账实证明，也不会因同一 `sourceType` 名称在 W3/端口语义中的复用而发生误删。当前仍是 `DESIGN_D1 / RUNTIME_D4` 边界，不证明真实来源、生产恢复、E4/L4 或会计/法域结论。
+
+当前=`C2_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C3_SPEND_RULE_ENTRY_CARD_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C3-SPEND-RULE-ENTRY-CARD-GRANT`。
+
+#### 12.2.14 `plan-r2.353` Wave C3 Spend Rule 公共边界 Entry Card
+
+Human Owner 已授权 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C3-SPEND-RULE-BOUNDARY-ENTRY-CARD-001`。本轮只建立 documentation-only Entry Card，不修改 Spend Rule 产品/系分正文、Java、测试、schema、POM/build、Consumer、Git 或外部环境。
+
+**问题与实际价值**：Spend Rule 同时出现在 VCC/卡授权、企业预算、钱包付款、交易后控制和投影解释等场景。若把这些场景字段直接提升为 `core`、`wallet-face` 或统一规则引擎，卡组织协议、外部风控、预算策略和资金事实会被混成一个公共模型；若只保留业务层布尔结果，又无法证明版本、租户、控制窗口、拒绝原因、控制流水和历史解释。C3 只复核能力提供者边界：把跨场景稳定的“版本化控制事实、可信准入证据、append-only 控制流水、可重建控制投影”保留为公共能力候选，把场景策略和外部规则留在上游/适配器。
+
+**源码与 Consumer 事实**：当前 `wallet-face` 暴露规则定义/版本/挂载、决策记录、准入、控制流水和预算投影契约；`wallet-impl` 提供轻量单规则 evaluator、binding 回读验真和 movement/projection；真实生产调用只见 `transaction-impl` 的 `PaymentInstrumentAuthorizationProcessor`、`PaymentInstrumentTransactionApplicationServiceImpl` 和 `SpendControlTransactionConsumptionApplicationServiceImpl`，没有 Capte 或 Fincone 的 Spend Rule 生产 Consumer。当前 evaluator 虽列有 MCC、商户、国家、时间、金额/次数及 PAN/CVV/POS/AVS 等规则类型，但后者属于卡协议输入，`COMPOSITE`、完整多规则裁决、外部风控/法务/合规和强一致 rolling velocity 均没有跨场景生产证据。
+
+**稳定公共能力候选（可保留但不自动扩大）**：
+
+1. `SpendRuleDefinition`、不可变 `SpendRuleVersion` 和 `SpendRuleBinding`：只表达规则身份、版本、作用域、有效窗口和摘要，不表达资金主体或外部协议。
+2. `SpendRuleDecisionRecord`：由受信任规则/业务决策方写入，记录租户、版本、scope、请求摘要、结果和拒绝原因；普通调用方不能用裸 `PASSED` 或摘要放行。
+3. `SpendControlMovement` 与 `BudgetControlProjection`：只承载 `LIMIT_INCREASED/DECREASED`、`RESERVED`、`CONSUMED`、可信 `RELEASED` 和经业务授权的 `REFUND_COMPENSATED`，可按 `controlScopeId + periodId` 重建；不进入 Ledger、FundsTransaction 或余额桶。
+4. `SpendControlAdmissionApplicationService`：只做当前 binding 解析、decision 引用回读和上下文验真；`SpendRuleEvaluationApplicationService` 只允许轻量、单条、只读评估，不承担完整规则引擎或强一致频控。
+
+**明确不进入 core/Public API 的候选**：
+
+- PAN entry、CVV、card processing、POS/AVS、issuer/rail 字段及其原文；由支付工具/rail adapter 先归一为受控决策证据。
+- `COMPOSITE`、`evaluatedRules`、`decisionPolicy`、`finalDecision`、复杂容差/优先级合成、完整规则脚本和 `wind-script` 执行器；除非未来有至少两个独立生产 Consumer、明确 Owner 和可验证安全边界。
+- 外部风控模型、名单、KYC/KYB、法务/合规、银行/ACH/卡组织规则、运营后台、审批流程、事件消费、outbox、灰度和生产 DDL。
+- Spend Rule、`SpendControlScope`、预算控制投影或规则结果作为 `FundsSubject`、`LedgerEntry`、资金账户、信用额度或交易生命周期状态。
+
+**未来语义执行精确白名单（`MODIFY=2 / ADD=0 / DELETE=0`）**：
+
+| 文件 | 操作 | 精确责任 |
+| --- | --- | --- |
+| `docs/产品设计/09-SpendRule支出规则产品设计.md` | `MODIFY` | 把产品场景能力与公共能力候选分层；保留规则版本、binding、decision、movement、projection 和拒绝零资金副作用；将完整规则引擎、多规则裁决、卡协议字段、外部风控及运营平台明确为场景/宿主或后续独立工程，不把场景清单写成公共 API 承诺。 |
+| `docs/系分设计/06-SpendRule支出规则系分设计.md` | `MODIFY` | 按 wallet-owned fact、internal admission、transaction internal orchestration、ledger prohibition 重整服务分层和接口可见性；明确当前真实 Consumer 闭包、可信 decision writer、单规则 evaluator、控制流水/投影边界和无 Consumer 时不扩 Public facade。 |
+
+**当前输入指纹**：
+
+```text
+docs/产品设计/09-SpendRule支出规则产品设计.md<TAB>462111d0fa0f50d28c51434c3c7def5c17bf62ea7910fd2e03ef56ea86480a0e
+docs/系分设计/06-SpendRule支出规则系分设计.md<TAB>2753bb0f84e0501ce4edcb88b7678baee7c98214eb0f250726c3f4827f65985f
+```
+
+有序输入 manifest=`468a3e26ca91e1e8697c8b0cb54a33fd2fa29a5a4fe69a8185cd94b6e7265c32`（`path<TAB>sha256<LF>`）。其他产品、DSL、总系分、TDD 和源码/测试均为 verification-only/non-write；关键源码 evidence 为 `SpendRuleEvaluationApplicationService.java=6843fc53d3499c119581000f599676ee88cd2f56e7f0a648218cd67f76567b57`、`SpendControlAdmissionApplicationService.java=dff2123454f04015653518423026a4aa1925860197f5f2da5462f95dfa7721ed`、`SpendControlMovementService.java=43eb50fbd5872704ae561a61464d29afb5479c81c729577f87fd19a9c94f10a8`、`SpendRuleEvaluationApplicationServiceImpl.java=3004cb1dafd03cd61485bb517012370489444c884d86f1eed7c519912aca52c4`、`SpendControlAdmissionApplicationServiceImpl.java=e087575c0f6e0d3f8c8eaba64f3e03b1de7413e710b188c2ebfd3eaffdfce020`、`SpendControlMovementServiceImpl.java=a27d9062067ca90cd15eb8b5cc207b8e2e76e88ee562b4570937ac02df545e6f`、`PaymentInstrumentAuthorizationProcessor.java=705bd6d41039bcab1832f5dd266b8d2c199135417faf36ce845cd85ce85e5860`、`SpendControlTransactionConsumptionApplicationServiceImpl.java=1b2882a12566ac7eb125eacf1397ba7be37c8bd1985cb407b0a90f001677a6d9`。这些指纹只证明现场证据，不授权源码变更。
+
+**验收与停止线**：
+
+- 产品09/系分06 的当前文本必须能区分“跨场景稳定控制事实”与“VCC/issuer/风控/预算场景策略”，且与公共产品、总系分、DSL、TDD 已接受的非账务、非主体、拒绝零副作用边界一致。
+- 必须列出所有被保留的公共服务、被内收的管理/资源服务、唯一真实 Consumer、决策写入者和控制流水写入者；不能因为已有 `wallet-face` 类型就推断 Public API 合同成立。
+- 只执行文档结构、链接、围栏、尾空白和现状证据核对；不创建 RED/Green，不改 Core/face/impl/DTO/Entity/Mapper/schema/测试或 Consumer。
+- 若出现第二个真实 Consumer、需要选择多规则合成/容差/频控方案、需要删除现有公共类型、需要新 Core 词汇或需要生产 DDL/IAM/审计/外部规则 Owner，立即退回 Human Owner，另开工程 Entry Card。
+
+独立 Checker=`PASS / P0=0 / P1=0 / P2=0`：确认稳定控制事实与场景/宿主策略边界、唯一 transaction-impl 内部 Consumer、Capte/Fincone 无 Spend Rule 生产 Consumer、两份文档指纹和 `MODIFY=2` 范围一致；未把既有 wallet-face 类型外推为 Public API，也未授权代码或测试执行。
+
+当前=`C3_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C4_ENTRY_SIDE_PROJECTION_CONTEXT_ENTRY_CARD_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。C3 语义执行已收口；下一 Human Gate 才是 `WAVE_C4_ENTRY_SIDE_PROJECTION_CONTEXT_ENTRY_CARD_GRANT`，仍需先建立独立 documentation-only Entry Card。
+
+#### 12.2.15 `plan-r2.356` Wave C3 语义执行收口
+
+本轮在 C3 Entry Card 授权内只修改两份 Spend Rule 专项文档：
+
+- [Spend Rule 产品设计](../../../docs/产品设计/09-SpendRule支出规则产品设计.md)：明确场景规则清单不自动成为 `core` 或外部 Public API，区分稳定控制事实、已归一请求事实和 VCC/issuer/风控/运营策略；当前 Consumer 只有 transaction-impl 内部授权、交易后控制消费和退款补偿路径。
+- [Spend Rule 系分设计](../../../docs/系分设计/06-SpendRule支出规则系分设计.md)：收窄 `core`、`wallet-face`、基础服务和 application service 的可见性；规则资源/管理服务没有外部 Consumer 时只作内部/管理面候选，交易后控制编排不向外部暴露。
+
+post SHA 与有序 manifest：
+
+```text
+docs/产品设计/09-SpendRule支出规则产品设计.md<TAB>7ec05224bb055e01a531f2f9920804ee73607551fbfdca47e960fae491a1fcd9
+docs/系分设计/06-SpendRule支出规则系分设计.md<TAB>2388a8089f89c00a0dc07526c93f36cb6b10b57bf61057a121e8377c2dcd3c0e
+```
+
+有序 `path<TAB>sha256<LF>` post manifest=`80a91db0f1d714aff5ed59fad2100e6e6e4b969a8f34c13fbf73090848d8027e`。产品/系分结构、链接、围栏和尾空白检查通过；独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。未修改 Core、face、impl、DTO、Entity、Mapper、schema、测试或 Consumer，未引入规则引擎、兼容层、生产 DDL、强一致 velocity 或外部策略。
+
+实际价值成立：Spend Rule 现在保留跨场景可复用的控制事实和拒绝证据，同时阻止卡协议、外部风控、复杂规则平台和预算视图进入资金事实内核；规则拒绝继续保持零 Funds/Ledger/Balance 副作用，历史解释继续只读。当前仅达到 `DESIGN_D1 / RUNTIME_D4`，真实 Consumer、IAM、生产迁移、观测和宿主 E4/L4 仍未证明。
+
+当前=`C3_SEMANTIC_EXECUTION_INDEPENDENT_CHECKER_PASS / WAVE_C4_ENTRY_SIDE_PROJECTION_CONTEXT_ENTRY_CARD_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C4-ENTRY-SIDE-PROJECTION-CONTEXT-ENTRY-CARD-GRANT`。
+
+#### 12.2.16 `plan-r2.357` Wave C4 工程 Inquiry Entry Card
+
+Human Owner 已授权 `W5-DOCUMENTATION-AUTHORITY-COMPACTION-WAVE-C4-ENTRY-SIDE-PROJECTION-CONTEXT-INQUIRY-ENTRY-CARD-001`。本轮是 Inquiry-only：`MODIFY=0 / ADD=0 / DELETE=0`，只冻结源码证据、决策分叉和后续门禁，不修改任何产品/DSL/系分/TDD 正文、Java、测试、schema、Consumer、Git 或外部环境。
+
+**共同价值**：三项问题都触及公共资金能力的语义稳定性，但变化轴不同。Ledger 字段名决定借贷事实能否被跨模块一致解释；交易投影规则归位决定 face 是否继续承载业务策略；context validator 归位决定核心资金字段能否通过 `contextVariables` 旁路进入 Ledger、Wallet 和 Route。先分别决策，才能避免一次改动同时破坏账务契约、投影解释和上下文安全边界。
+
+**当前源码事实**：
+
+| Inquiry | 已核实事实 | 当前不做 |
+| --- | --- | --- |
+| `C4-ENTRY-SIDE-001` | `core/.../LedgerEntrySpec.java:77-82` 仍以 `getEntryType()` 为抽象方法并提供 `getEntrySide()` alias；`ledger-face/.../LedgerEntryDTO.java:91-93`、`LedgerEntryQuery.java:59-60` 仍叫 `entryType`；Ledger Entity、数据库列、`EntrySide` 枚举和部分 impl 已是 `entrySide`，`LedgerConverter` 与 `LedgerTransactionServiceImpl` 保留显式桥接。直接 caller 还包括 `LedgerPostingPlanSpec:101,110`、`DefaultLedgerPostingAssembler:221,231,791,830,853`、`DefaultLedgerTransactionPostingServiceImpl:403` 和 `LedgerBalanceProjectionServiceImpl:301,315`。 | 不在本卡删除 alias、改 DTO/Query/JSON、改 converter、Mapper、schema 或迁移 Consumer。候选 breaking 方向是统一 `entrySide` 并删除 `getEntryType` alias，但尚未接受。 |
+| `C4-PROJECTION-001` | `transaction/face/.../FundsTransactionProjectionExplanationSource.java` 约 724 行，包含状态归纳、展示/下一动作、owner、金额、工具/外部账户和 Spend Rule 解释规则；`FundsTransactionProjectionPublishContext:32`、`DefaultFundsTransactionProjectionExplainApplicationService:75,162` 直接构造或调用它。`FundsTransactionProjectionExplanation` 仍携带 `externalRuleVerificationStatus`，Source 固定写 `NOT_APPLICABLE`；`governance/.../FundsProjectionReplayService:54` 及 `FundsProjectionReplayServiceTests`、`DefaultRoutedFundsInstructionOrchestratorProjectionTests` 还消费该字段/Source，和已统一的 `verificationResult` 语义存在候选冲突。 | 不在本卡把规则搬到 transaction-impl，不删字段，不改 publisher、DTO、schema 或投影行为。候选方向是 face 只保留 port/context/DTO，规则实现下沉 impl；`externalRuleVerificationStatus` 是否删除必须覆盖上述 caller，且无真实 Consumer 证据前不新增策略引擎。 |
+| `C4-CONTEXT-001` | `core/.../transaction/support/FundsInstructionContextValidator.java` 位于 transaction.support，Javadoc 仍称“权益资金上下文”，但被 `LedgerBalanceChangedEvent`、Ledger DTO、`FundsTransactionParticipant`、Ledger impl、transaction-impl 两个 instruction spec 与三个 converter、Wallet `PaymentInstrumentServiceImpl/WalletContextVariablesValidator` 及 `FundsDslJsonContractVerifier` 等跨域使用；transaction-impl 另有同名 validator，Route 还有独立 `RouteContextVariablesValidator`。当前核心键/敏感键阻断行为已有测试和多入口调用。 | 不在本卡移动类、改包名、拆策略、放宽 reserved-key 拒绝或把所有 context 字段实体化。候选方向是保留行为、统一为跨模块 core context policy，或拆分通用安全策略与 transaction-specific keys；均待 Owner 决策。 |
+
+**候选决策与责任边界**：
+
+1. `C4-ENTRY-SIDE-001` 的推荐方向是公共字段、core accessor、face DTO/Query、JSON 与 impl 映射一次性统一为 `entrySide`，删除 `getEntryType` alias；`EntrySide` 只表达借贷方向，不改变金额、normal balance、posting 或 Balance 规则。若 Owner 不接受该 breaking 方向，必须保留为未决，不引入兼容双名。
+2. `C4-PROJECTION-001` 的推荐方向是 `transaction-face` 只保留稳定 publisher/context/DTO/value contract，状态归纳、解释 allow-list 和规则分支归 `transaction-impl`；`externalRuleVerificationStatus` 是否删除取决于是否确认它没有独立生产语义，不能仅凭 rename 解决冲突。
+3. `C4-CONTEXT-001` 的推荐方向是把“禁止通过 contextVariables 偷运核心字段”的不变量保留在跨模块 core policy，同时把 transaction-specific reserved keys 留在 transaction/adapter 边界；命名、包归属和测试分层必须由 Owner 逐项接受，不用新 facade 或全局策略引擎兜底。
+
+**验证范围与下一门**：本卡只做源码 caller closure、Public API/JSON/持久化字段清册、模块依赖、敏感上下文测试资产和文档结构核对。任何一项若需要改变 Public API、JSON/DB 列、Core 类型、DTO、枚举、规则行为、测试、Consumer 或 schema，必须另开对应 Entry Card；没有 Owner 接受的决策不得写正文，更不得写代码。三项 Inquiry 互不构成 fallback，也不把现有桥接、alias 或 724 行 face 规则视为目标设计。
+
+关键 evidence SHA：`LedgerEntrySpec=3cd41e0048bc9ad79bae3f8f619e1b05a1482c161ad389a53fbdef7be87008ca`、`LedgerPostingPlanSpec=5f600ef3b73dd995de5e98907dc1bf499d18b0bf9f45b11e51d9f5958471a36f`、`DefaultLedgerPostingAssembler=31738b7e5159a1ca0559bbe2f4aefc1801f045354f195b76f658845f301990fd`、`DefaultLedgerTransactionPostingServiceImpl=bf7adb091546be8d9761b11c3e3ba7fb92fe8c2c46f233b29a33737aea614799`、`LedgerBalanceProjectionServiceImpl=bff862619df0ae733e089ac08337246b0723865d86c8b878cc62e179db03af5f`、`LedgerEntryDTO=870632ee917e9a60ca8ec41a41913980d5c5d2fc0628ecfce112218e9e0560ce`、`LedgerEntryQuery=a1778c278c674ee47a476b47e05dacc65342a19671907630fb599ca1b4603d7b`、`LedgerConverter=e9a74d81e79c7de71d0db2befd4a53a274b60563f825198f2d6ab53ae02efad4`、`ProjectionSource=e16fb68c05dbe8bd8e672485f6c4ee61930967f13beef906d5aa7b99fb1516b2`、`ProjectionPublishContext=f2df2ef8da00f5be694a1ab35e42b02f53519aad7a78ee0dc18cf6eb87039544`、`ProjectionExplainService=0182f05fe339e9875038e37cf7c5a17bb3a91b1672463b573df9c933bae20e5d`、`ProjectionExplanation=b2a8b4066892fbec3e7c356b5e89285a385eab238082410423018627fd3e6625`、`FundsProjectionReplayService=80316adf021ffddabd59ba4bd4301d9f4587542ca25d0e89cbb0aab06c08a02f`、`ContextValidator=bcd7b3740df6a83d1a9f5ebacfd11615bd6e55eb8326fd1e90ac96f2a44f8cb4`、`FundsTransactionParticipant=632ac226b496ed74272b32c1d4c50f5a21f2eb50363e3497d1b9c7330fa5dc99`、`FundsDslJsonContractVerifier=3d966db2e6c3639f9515771ff34ab66006e2c28fb78dc9778bf39244ca4bc78a`。这些指纹只作证据，不是写入授权。
+
+独立 Checker=`PASS / P0=0 / P1=0 / P2=0`：确认三项 Inquiry 的完整 caller closure、关键源码 SHA、未决 Owner 决策和 `MODIFY=0` 边界一致；没有把 entrySide hard cut、Projection 下沉/字段删除或 Context policy 拆分误写成 accepted contract。
+
+当前=`C4_INQUIRY_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / C4_OWNER_DECISION_REQUIRED / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate 是逐项 Human Owner 决策；决策接受后，必须分别建立对应文档/工程 Entry Card，不能自动进入 C4 语义执行。
+
+#### 12.2.17 `plan-r2.359` Platform/Hierarchy tenant surface Entry Card
+
+Human Owner 已授权 `W5-MIG09-PLATFORM-HIERARCHY-TENANT-SURFACE-ENTRY-CARD-001` documentation-only Entry Card。本轮只修改主系分、主 TDD 与本 OpenSpec；不创建 RED，不修改 Java、测试、schema、build、Consumer，不执行 Git/Maven/联网/发布或生产。C4 三项 Inquiry 继续保持 `C4_OWNER_DECISION_REQUIRED`，本卡不替它们选择方案。
+
+**问题与价值**：平台账户角色解析当前同时存在显式 tenant 和从 `TenantContextHolder` 隐式取 tenant 的 Public overload；`PlatformAccountRouteSupport` 又用线程 tenant 构造 `SubjectRef` 与平台账户快照。直接 route caller 明明已经持有 `FundsInstructionSpec#getTenantId`，继续依赖线程上下文会让“对象定位”和“数据授权”分离，并使直接 resolver/support 调用在上下文错配时选择错误租户平台账户。账户层级的生产路径只使用 `findAccountHierarchyRelation(tenantId, FundsAccountId)`，宽分页及其 Query 类型只有测试 Consumer；保留它们没有跨场景业务价值，却扩大可空 tenant 查询面。
+
+**目标 breaking contract**：
+
+1. `PlatformFundingAccountService` 只保留 `requireAccountId(Long tenantId, CurrencyIsoCode, PlatformFundingAccountRole)`；旧两参数 overload 源码/classfile 必须为零，不保留 default、deprecated、V2、bridge 或 Service 内 `TenantContextHolder` fallback。
+2. `PlatformAccountRouteSupport` 的 `requireAccount`、`createSubjectRef`、`createExternalFundMovementSnapshot`、`createSettlementSnapshot`、`createFeeSnapshot`、`createPrepaymentSnapshot` 和 `createAdjustmentSnapshot` 均显式接收 tenant。Authorization、BalanceControl、Payout、Transfer 和 Fee caller 只传 `FundsInstructionSpec#getTenantId`；`FundsDirectTransactionInstructionConverter` 沿用现有应用边界的 `TenantContextHolder.requireTenantId()`，在 converter 内只解析一次后显式传给 Platform Service，不从返回账户、RouteSnapshot 或 contextVariables 反推。
+3. `AccountHierarchyRelationService` 删除 `queryAccountHierarchyRelations`；删除 `AccountHierarchyRelationQuery`。保留创建和 `findAccountHierarchyRelation(tenantId, FundsAccountId)`，不新增列表替代 API、删除 API、root 查询、递归图接口或 admin facade。
+4. 不考虑兼容。已知仓内 production caller 必须同片迁移；未知仓外二进制 Consumer 只能通过下游重新编译暴露，不以恢复旧签名解决。
+
+**精确 production 白名单（`MODIFY=11 / DELETE=1`）**：
+
+| 文件 | 操作 | tenant 来源或责任 |
+| --- | --- | --- |
+| `wallet/face/src/main/java/com/wind/funds/wallet/service/PlatformFundingAccountService.java` | MODIFY | 删除 implicit tenant overload，只保留显式 tenant contract。 |
+| `wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImpl.java` | MODIFY | 删除 `TenantContextHolder` 与旧 overload，查询仍使用 tenant-required Funding query。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/support/PlatformAccountRouteSupport.java` | MODIFY | 全部平台账户、SubjectRef 和 snapshot helper 首参 tenantId。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolver.java` | MODIFY | `instruction.getTenantId()`。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/BalanceControlFundsInstructionRouteResolver.java` | MODIFY | `instruction.getTenantId()`。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/PayoutFundsInstructionRouteResolver.java` | MODIFY | `instruction.getTenantId()`。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/RouteFeeChargeAppender.java` | MODIFY | `instruction.getTenantId()`。 |
+| `transaction/impl/src/main/java/com/wind/funds/route/TransferFundsInstructionRouteResolver.java` | MODIFY | `instruction.getTenantId()`。 |
+| `transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java` | MODIFY | 既有 `TenantContextHolder.requireTenantId()` 应用边界，解析一次后显式传参。 |
+| `wallet/face/src/main/java/com/wind/funds/wallet/service/AccountHierarchyRelationService.java` | MODIFY | 删除零 production Consumer 的分页 contract。 |
+| `wallet/face/src/main/java/com/wind/funds/wallet/model/query/AccountHierarchyRelationQuery.java` | DELETE | 删除无 production Consumer、tenant 可空的宽 Query 类型。 |
+| `wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImpl.java` | MODIFY | 删除宽分页实现与无用 Query/helper/import，保留 tenant-scoped find。 |
+
+production 输入指纹按表序为：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/PlatformFundingAccountService.java<TAB>992868c47ea4c81cfd4fefd118607fee238bd53501884c8dc97539cbdeb8fc8d
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImpl.java<TAB>fce66fc6d4899cce3ef6b4c16cf68ff629388dc3f9135871e3c9aa2307ea383d
+transaction/impl/src/main/java/com/wind/funds/route/support/PlatformAccountRouteSupport.java<TAB>e74994b674f25bb35aa6fea0b250f0cae463e4ec50b90eb74572622e59433ecc
+transaction/impl/src/main/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolver.java<TAB>96776e3f65bdfe7453948426cf22dc609ef3b49098b7834e6d7e7c0147f42abb
+transaction/impl/src/main/java/com/wind/funds/route/BalanceControlFundsInstructionRouteResolver.java<TAB>20d6f7f28ab84c01eda89b2a038cd20788984dddd701c41dc81308d471605658
+transaction/impl/src/main/java/com/wind/funds/route/PayoutFundsInstructionRouteResolver.java<TAB>d593ed7b108d8bd4b3517fe9dc7553ef1eb4933abe67c6d7c293fc3c0a6a805e
+transaction/impl/src/main/java/com/wind/funds/route/RouteFeeChargeAppender.java<TAB>1855ef3ed23e23618008f59cfd427d44b40ce48edce55c21d306c671780d2f64
+transaction/impl/src/main/java/com/wind/funds/route/TransferFundsInstructionRouteResolver.java<TAB>f9ec8f84b1659a3e927dba2af72eac18756bbdbe35725c3ab5d18a6b7728d9e2
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java<TAB>1f90c74f01e8e3a98ef96af478f1a3346e8366c8b745dee8b8a57070e696462a
+wallet/face/src/main/java/com/wind/funds/wallet/service/AccountHierarchyRelationService.java<TAB>5b41d519303668580953a501b858b186fd75c64f55556aa4ed09d33df1b0618d
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/AccountHierarchyRelationQuery.java<TAB>cd898f981f021f6c0b28ad282647092c0a4efad84f444c693c084e29c5aeabac
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImpl.java<TAB>279702ff8a99b6f94aa4c60e2671c5da1abfb12bcdea18e8681bd49c8e18702c
+```
+
+有序 production manifest=`4bb0910cac75fa29cf6f907c0618f7ec88512abee68735e05e7e418533c50054`。
+
+**精确 existing-test 白名单（`MODIFY=4`）**：
+
+| 文件 | 机械迁移 |
+| --- | --- |
+| `tests/src/test/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolverTests.java` | 固定 Platform Service 只实现显式 tenant contract。 |
+| `tests/src/test/java/com/wind/funds/route/CompositeRouteResolverTests.java` | unexpected Platform Service 只实现显式 tenant contract。 |
+| `tests/src/test/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImplTests.java` | 正向调用补 `TENANT_ID`，既有断言不变。 |
+| `tests/src/test/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImplTests.java` | 原分页测试改为 retained `findAccountHierarchyRelation` 的正向/foreign tenant 行为，测试数不减少。 |
+
+```text
+tests/src/test/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolverTests.java<TAB>eb9adb47ce5612c5e2b21c55dcc890185fd895eb8e2016070f0f75bfee1bd34c
+tests/src/test/java/com/wind/funds/route/CompositeRouteResolverTests.java<TAB>34414c824871e686368fe87cb5ff1be3503d30ddca5209543939b6c683d7b096
+tests/src/test/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImplTests.java<TAB>f6257423e43b7b07a0e6543c05c16666356c34bbf3ea14b78f100ac8483f1c68
+tests/src/test/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImplTests.java<TAB>3c6d881252bc0bb7023cbdd71b64ebb77a8d5670ee31ceb9c1727357d26b024e
+```
+
+有序 existing-test manifest=`447d30a5122d1203b8ad76b9b78cdba6ff844b30bf421447747562a2314fc579`。其他 route、transaction、business、boundary 测试只做 verification-only/non-write。
+
+**RED 与验证**：Entry Card 编写时只允许未来 ADD `tests/src/test/java/com/wind/funds/wallet/services/impl/PlatformHierarchyTenantSurfaceTests.java`，当时目标不存在。固定 3 个公开行为测试：contract、线程 tenant 与调用 tenant 冲突时的平台账户/SubjectRef/snapshot 授权、旧 hierarchy 缺 tenant 宽查询泄露；旧实现目标 `3/3F/0E/0S`。测试只使用真实 Spring/H2 与公开反射/adaptive invocation，Green 后源码 immutable。当时基线机械校准为 `124 XML / 1219/0F/0E/1S`；RED 预计 `125 XML / 1222/3F/0E/1S`，Green 目标 `125 XML / 1222/0F/0E/1S`。Public Contract 预计 `299/175/42 -> 298/174/42`；Core stable baseline 名义目标保持 `94/4/4`，stable baseline 不改。后续实际 RED 与 CR 返工由 `plan-r2.363` 接替。
+
+Core API 前置诊断确认 `api-policy.tsv` 已覆盖 `ResolvedRouteSpec#getExpiresAt` 与 `RouteSnapshotSpec#getExpiresAt`。未设置 `WIND_FUNDS_JAVA_HOME` 的直接调用使用本机旧 JDK `javap`，会省略 interface `default` 标记并误报两条 stale exclusion；以 Corretto 21.0.11 fresh 运行同一脚本为 `94/4/4 PASS`。该问题以 `no_change` 关闭，不修改 policy、Core、route contract、脚本或 stable baseline，也不使用 `--update`。
+
+完整验证顺序为 mvn-version、compile、RED/Green 单类、Platform/Hierarchy/Authorization/Composite focused、route/ledger、balance-control、transaction、business-flow、reconciliation、boundary、Public Contract、Core API、PMD、classfile/codegen、CAD 和 fresh XML。任何第 13 个 production、第 5 个 existing test、仓外生产 caller、缺可信 tenant 来源、新类型、Entity/Mapper/DDL、兼容层、全局 tenant plugin、金额/状态/route 行为或 C4 决策变化立即停止。
+
+本 Entry Card 独立 Checker 首轮因未使用项目 Java 21 环境观察到动态 Core API failure，判定 `NOT PASS / P2=1`；Maker 当时先将其登记为 RED 前置阻塞并收窄 PaymentInstrument 历史证据口径，返工后 Entry Card Checker=`PASS / P0=0 / P1=0 / P2=0`。后续独立前置诊断回读 policy、脚本和两份 route spec，确认两条 exclusion 原本存在，根因是旧 `javap` 输出缺少 `default`，不是 policy drift。Platform/Hierarchy 白名单和 Entry Card PASS 不变；RED 仍需新的 Human Grant。
+
+#### 12.2.18 `plan-r2.361` Core API expiresAt policy drift 诊断
+
+Human Owner 授权关闭 Platform/Hierarchy RED 前置的 Core API verifier 问题。Maker 先直接运行 `scripts/verify-core-api-baseline.sh`，稳定失败并输出两条 stale exclusion：`ResolvedRouteSpec#getExpiresAt`、`RouteSnapshotSpec#getExpiresAt`。回读发现 `core/api-baseline/api-policy.tsv` 已精确包含两条 `public default` exclusion；`ResolvedRouteSpec` 与 `RouteSnapshotSpec` 源码也仍是 default method。历史 `plan-r2.289` 已记录本机旧 JDK `javap` 会省略 interface `default` 并产生相同误报。
+
+根因假设以单变量复验成立：不修改任何文件，只设置 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home` 后运行同一脚本，fresh 输出 `Core API baseline verified: 94 stable, 4 experimental, 4 internal public top-level types; public nested signatures included`，exit 0。因此正确结果是 `no_change`，不是向 `api-policy.tsv` 重复添加 exclusion，也不是刷新 baseline。
+
+关键不变指纹：`api-policy.tsv=fcc2203125df966192d36da45661daac1ea54d1067496586fa11cb74b0af8dd5`、`verify-core-api-baseline.sh=3ad2aab43a898270bd58add64b9b3c4927bdca05abb0f15332cfdab063abefcb`、`ResolvedRouteSpec=d7917f9b340f582e6af48c3d93ad75ca0bff14b299b83bb33f9af84126695573`、`RouteSnapshotSpec=465ad760942ab93d3588612c4285ccff05835f42ba648b2490ade70fa998b710`。本轮只修正文档中的错误根因定性，不修改 policy、脚本、Core、baseline、Java、测试或 Platform/Hierarchy 候选。
+
+独立 Checker=`PASS / P0=0 / P1=0 / P2=0`：默认 JDK=`1.8.0_412` 时同一脚本 exit 1 且只误报两条 stale exclusion；Corretto 21.0.11 时 exit 0、fresh=`94/4/4 PASS`。policy/script/两份 route source SHA 精确匹配，未使用 `--update`，无文件、Git 或网络修改。`no_change` 成立，唯一残余是所有 Core API 验证必须显式设置项目 Java 21 环境。
+
+本诊断完成时=`CORE_API_DIAGNOSIS_INDEPENDENT_CHECKER_PASS / PLATFORM_HIERARCHY_RED_EXECUTION_GRANT_NO / CODE_FREEZE`。后续 RED 执行与 CR 返工由 `plan-r2.363` 接替，本历史状态不构成当前授权。
+
+#### 12.2.19 `plan-r2.363` Platform/Hierarchy RED 执行与独立 Checker 收口
+
+Human Owner 明确授权 `W5-MIG09-PLATFORM-HIERARCHY-TENANT-SURFACE-RED-EXECUTION-GRANT`，并确认唯一 ADD 为 `tests/src/test/java/com/wind/funds/wallet/services/impl/PlatformHierarchyTenantSurfaceTests.java`。执行前重新读取 AGENTS.md 与 Entry Card；HEAD=`80da93982a740ec3a835da68b389979252202204`，默认/`-uall` manifest 均为 51 行、SHA=`617dc7c5dee3f243f6aef71058e05ae6eee841e018f7f5f03b4677cfaed39320`，暂存区为空。Human Owner 另行授权清理 `LedgerBalanceProjectionServiceImplTests.java:246,270` 两处尾随空白；该机械清理不改变行为，整体 `git diff --check` 已恢复 PASS。
+
+修改前 `just mvn-version` 已执行，使用项目 Corretto 21.0.11 的 `just compile` 为 `21/21 SUCCESS`。随后仅运行 Platform/Hierarchy RED 单类，测试源码 SHA=`e6b1d2b5ff20c8e87b7b2156ac28e8f70889c7854daae0939bf9af59a85971c1`。规范 CR 发现初版 contract 只保护三个 route 入口后，Human Owner 授权在同一测试方法内补齐 `PlatformAccountRouteSupport` 全部七入口的新旧签名矩阵；测试方法数、fixture、两项行为断言与零 delta 均未改变。最终真实 Spring/H2 fresh XML=`7999eb29b0aa3879662a173551fc122307d3c18dfa2ae9bd423f5223ef114634`，mtime 顺序为 source 15:48:50、class 15:49:41、XML 15:53:10；结果为 `3 tests / 3 failures / 0 errors / 0 skipped`。失败严格命中冻结契约：17 个 contract 差异、5 个线程 tenant 污染断言和 1 个 hierarchy foreign relation 泄露断言；未出现编译、Spring、H2、schema、reflection 或 Harness error。
+
+独立 Checker 首轮只因 XML 在 Maker 冻结后被后写、SHA 与输入证据不一致而判定 `NOT PASS / P0=0 / P1=1 / P2=0`，未否定测试语义。Maker 重新 fresh 执行并冻结最终 XML 后，独立 recheck=`PASS / P0=0 / P1=0 / P2=0`：确认三项测试走公开 reflection/adaptive invocation 与真实数据库前后事实快照，未窥探私有实现；`PlatformAccountRouteSupport` 全部七入口的旧/新签名断言属于已冻结 production closure，RED 失败类别与源码一致。全体 Surefire=`125 XML / 1222/3F/0E/1S`，唯一 skip 仍为无真实 MySQL host 的 migration test。除已授权两行尾随空白外，本轮未修改生产 Java、其他测试、schema、build、Consumer、Git 或发布材料。
+
+本轮只关闭 RED，不授权 Green。当前=`PLATFORM_HIERARCHY_RED_EXECUTION_COMPLETE / PLATFORM_HIERARCHY_RED_REWORK_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / JAVA_NO / TEST_NO / GIT_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`；下一 Human Gate 为 `W5-MIG09-PLATFORM-HIERARCHY-TENANT-SURFACE-GREEN-EXECUTION-GRANT`，仅可覆盖既有 Entry Card 的 12 个 production 迁移目标与 4 个 existing-test 迁移目标。
+
+#### 12.2.20 `plan-r2.364` Platform/Hierarchy tenant surface Green 与独立 Checker 收口
+
+Human Owner 授权执行 `plan-r2.363` 冻结 Green。Maker 只修改 11 个 production、删除 `AccountHierarchyRelationQuery.java`，并机械迁移 4 个 existing test；immutable RED 源码保持 `e6b1d2b5ff20c8e87b7b2156ac28e8f70889c7854daae0939bf9af59a85971c1`。`PlatformFundingAccountService` 源码/classfile 只剩显式 tenant 三参合同；`PlatformAccountRouteSupport` 七个入口统一以 `Long tenantId` 为首参，`SubjectRef` 与 snapshot 不再读取线程 tenant。Authorization、BalanceControl、Payout、Transfer 和 Fee caller 只传 `FundsInstructionSpec#getTenantId`；直接交易 TOPUP/WITHDRAW 各在既有 converter 边界读取一次 `TenantContextHolder.requireTenantId()` 后显式传给 Provider。没有 default/deprecated/V2/bridge、兼容重载、全局 tenant plugin 或从返回账户、route、snapshot、contextVariables 反推 tenant。
+
+`AccountHierarchyRelationService` 只保留 create 与 `findAccountHierarchyRelation(tenantId, FundsAccountId)`；宽分页 contract、impl 和 `AccountHierarchyRelationQuery` 的源码/classfile 均已删除，没有 replacement list/admin/root/delete API。四个 existing test 只补显式 tenant、删除两个匿名旧 overload，并把原分页测试迁为 retained find 的同租户正向与 foreign tenant 空结果；测试数量和原业务断言意图未弱化。
+
+最终源码指纹为：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/PlatformFundingAccountService.java<TAB>da18ea2dd5b3d8c283ab9cc268ebcd392c59787fbdd8d38baf7aaeb504df068f
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImpl.java<TAB>827cd29952f126a0d199a853cf1c3eaa822300594a76cbe931cd38c9104d50ff
+transaction/impl/src/main/java/com/wind/funds/route/support/PlatformAccountRouteSupport.java<TAB>f3436a2fe677038ae4faffc6107ea07d379700713eda244815bdaef842f0f5d1
+transaction/impl/src/main/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolver.java<TAB>a88e71c6e3e32f7639348e78e5c6ce68c69800d28b032f87171a5d88efe42a6d
+transaction/impl/src/main/java/com/wind/funds/route/BalanceControlFundsInstructionRouteResolver.java<TAB>4a3548773373407d85e708db1bfc82b89ee79e7a5607a6ce39402f851c56d8ae
+transaction/impl/src/main/java/com/wind/funds/route/PayoutFundsInstructionRouteResolver.java<TAB>57feb87a15dd3a033f387c53f2ee911b75e81e3f1db77bcb3a8765793373fe4e
+transaction/impl/src/main/java/com/wind/funds/route/RouteFeeChargeAppender.java<TAB>ecd27303d1846a88d59fcbf216288359088eba9d421c00c6ae9730003a77e8e2
+transaction/impl/src/main/java/com/wind/funds/route/TransferFundsInstructionRouteResolver.java<TAB>939b4295ed588f739e55447480aa37bbb67ef50bc44027f64ef348539092c254
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java<TAB>bb27c66d5173daa3c2d7121cbc272e38e19793848a277cbd207b2e8777faa325
+wallet/face/src/main/java/com/wind/funds/wallet/service/AccountHierarchyRelationService.java<TAB>370080a4ec284b060b7fa46b57be1c5b58181f9770d8993a3d2b5b43843b049d
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/AccountHierarchyRelationQuery.java<TAB>DELETE
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImpl.java<TAB>b9f6f67ebe2cfb338493b5ae4d807bb0c4fd942472799f2b2f7848df9a943008
+tests/src/test/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolverTests.java<TAB>e89b777a6f6b89d0a147d501199c20962080fba2c2d67107d66bce22741d6ff6
+tests/src/test/java/com/wind/funds/route/CompositeRouteResolverTests.java<TAB>4d2c719adc9a110d64d26da7c02a3e032f123edc197076e08a1f647515ba5bf4
+tests/src/test/java/com/wind/funds/wallet/services/impl/PlatformFundingAccountServiceImplTests.java<TAB>66aa8ae6e0055ba2ac0c7ed345d22bd6e017d41c7f7d0c5efa49b9e77f43ec85
+tests/src/test/java/com/wind/funds/wallet/services/impl/AccountHierarchyRelationServiceImplTests.java<TAB>59c571b8b22135f556ac4cb65434f46825b8ece8dab3c96dc68004378381361e
+```
+
+验证全部使用项目 Corretto 21.0.11 与离线 Maven：clean compile=`21/21 SUCCESS`，immutable RED Green=`3/0F/0E/0S`，focused=`21/0`，Ledger=`77/0`，balance-control=`44/0`，transaction=`186/0`，business-flow=`200/0`，reconciliation=`247/0`，boundary=`211/0`，Public Contract=`298/174/42`，Core API=`94/4/4`，PMD=`13 XML / 0 finding`，完整 CAD=`125 XML / 1222/0F/0E/1S`。Green XML SHA=`bf1d0c460c26ac8f07138e1328975cca32bad0446069819e6bc736ded268d086`；唯一 skip 仍为无真实 MySQL host 的 migration test。
+
+第一次 Core API clean compile 因并发 target clean 删除刚生成 class 而出现 `NoSuchFileException`；确认无 Java/Maven 进程后未改源码原样重跑 `94/4/4 PASS`，最终 CAD 再次从 clean compile 全绿。该次只记录为环境制品竞争，不作为源码失败。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`，确认没有第 13 个 production、第 5 个 existing test、schema/build/Mapper/Entity/Core、Consumer、其他 MIG-09 或兼容扩面。
+
+本切片只达到 current checkout `RUNTIME_D4 / ENGINEERING_READY`，不证明真实 MySQL、仓外二进制 Consumer、HOST/L4、发布或生产 D5。当前=`PLATFORM_HIERARCHY_GREEN_EXECUTION_COMPLETE / PLATFORM_HIERARCHY_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；C4 三项继续 `C4_OWNER_DECISION_REQUIRED`，下一 MIG-09 必须重新形成 Entry Card 和 Human Grant。
+
+#### 12.2.21 `plan-r2.365` C4 entrySide 统一 hard-cut Entry Card
+
+Human Owner 已接受 `C4-ENTRY-SIDE-001` 的一次性 breaking 方向，并授权本轮只建立文档 Entry Card 与独立 Checker；不授权 Java、测试、schema、Consumer、Git、发布或生产。该决策把跨场景稳定的借贷方向事实统一为 `entrySide`，消除 Core accessor、face JSON/Query、Entity/数据库和 Ledger impl 的双名桥接，不改变金额、借贷方向、normal balance、posting、Balance、phase 或任何资金结果。
+
+**目标 contract**：`LedgerEntrySpec` 只保留抽象 `getEntrySide()`；删除 `getEntryType()` 与 default alias。`LedgerEntryDTO`、`LedgerEntryQuery` 和 JSON 字段统一为 `entrySide`；MapStruct、Ledger query、posting assembler、balance projection 和 posting service 使用同一 accessor。数据库已有 `entry_side`，不新增迁移或并行字段；不保留 alias、deprecated、V2、bridge、双读、双写或兼容 facade。
+
+**production whitelist（MODIFY=10 / ADD=0 / DELETE=0）**：
+
+| path | operation | responsibility |
+| --- | --- | --- |
+| `core/src/main/java/com/wind/funds/ledger/spec/LedgerEntrySpec.java` | MODIFY | accessor `getEntryType()` -> `getEntrySide()`，删除 alias。 |
+| `core/src/main/java/com/wind/funds/ledger/spec/LedgerPostingPlanSpec.java` | MODIFY | 借贷汇总过滤改读 `getEntrySide()`。 |
+| `ledger/face/src/main/java/com/wind/funds/ledger/dto/LedgerEntryDTO.java` | MODIFY | DTO/JavaBean/JSON 字段改为 `entrySide`。 |
+| `ledger/face/src/main/java/com/wind/funds/ledger/query/LedgerEntryQuery.java` | MODIFY | 查询字段改为 `entrySide`。 |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/mapstruct/LedgerConverter.java` | MODIFY | source/target mapping 统一 `entrySide`。 |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerTransactionServiceImpl.java` | MODIFY | 使用 `query.getEntrySide()`，继续命中 `LedgerEntryNameRefs.entrySide`。 |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImpl.java` | MODIFY | 余额计算改读 `getEntrySide()`。 |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImpl.java` | MODIFY | 投影方向改读 `getEntrySide()`。 |
+| `ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java` | MODIFY | 内部字段/Builder 参数改为 `entrySide`，解析结果不变。 |
+| `reconciliation/impl/src/main/java/com/wind/funds/reconciliation/application/clearing/impl/ClearingSplittableDetailApplicationServiceImpl.java` | MODIFY | 清分来源校验改读 `getEntrySide()`；source digest facts key `entryType` 保持既有稳定摘要协议，本卡不改 key。 |
+
+production 输入有序 manifest=`762c38758b3962abbe5418e6c1c0bc5a8182c8007851266b40ee001287116b5c`；当前源码 SHA 及完整 caller closure 与本表一一对应，见主系分 11.8。另有唯一治理文件 MODIFY：`core/api-baseline/stable-api.txt`，只更新 `LedgerEntrySpec` 的两条 before/after ABI 记录并保持 `94/4/4`，不修改 verifier、policy 或其他 baseline。Reconciliation caller 当前 SHA=`f0b3b70c0b02f253186668aa2685081f41fa531ef040b164e9029b9234597015`，baseline 当前 SHA=`fbc2d6c9d1185af7a3ec39004d29ee0e869925543a85d3d0a21ff0f6ea13aefa`；source digest facts key `entryType` 是稳定摘要字段，不随 accessor hard cut 改名。
+
+**existing-test whitelist（MODIFY=7 / ADD=0 / DELETE=0）**：`tests/src/test/java/com/wind/funds/dsl/PostingLedgerDslContractTests.java`、`tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java`、`tests/src/test/java/com/wind/funds/ledger/LedgerObjectTenantIsolationTests.java`、`tests/src/test/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImplTests.java`、`tests/src/test/java/com/wind/funds/ledger/impl/LedgerTransactionServiceImplTests.java`、`tests/src/test/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssemblerTests.java`、`tests/src/test/java/com/wind/funds/support/LedgerProjectionTestFixture.java`。只迁移 accessor、字段和 method reference，保留金额、平衡、租户隔离、零副作用和账务断言。
+
+**RED（未来单独授权）**：只在 `PostingLedgerDslContractTests.java` 增加 `testLedgerEntryPublicContractShouldUseEntrySide`，用 public reflection/SoftAssertions 断言 `getEntrySide` 为 abstract、`getEntryType` 不存在、DTO/Query 只暴露 `entrySide`。旧实现目标为该类 `10 tests / 1F / 0E / 0S`，失败只能来自该公开契约；Green 后该类 `10/0F/0E/0S`，全量基线目标 `1223/0F/0E/1S`。
+
+**RED 执行收口（plan-r2.368）**：Human Owner 已授权并完成本卡 RED。唯一新增内容位于 `PostingLedgerDslContractTests.java`，源码 SHA=`6516bd9269d386ebeabfc85cc321a3ee118d5a5ff78e1479afa892803cc873fd`，fresh XML SHA=`2cb62241b51d1ef170cb0a5960cf878ac9e085c277cf1ba6d508f9c4ce972561`，结果=`10/1F/0E/0S`；唯一失败为旧公开 `entryType` 契约，独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，该 RED 方法已 immutable。A 决策及其实际价值已确认：锁定 Core/face/JSON/query 的统一 `entrySide` 名称，防止半迁移；不改变 EntrySide 业务含义、金额/平衡/投影，也不改 source digest 稳定 key `entryType`。当前=`C4_ENTRY_SIDE_RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_YES / CODE_FREEZE`，Green 仅允许本卡冻结的 10 production、1 baseline、7 existing-test。
+
+**Green 执行收口（plan-r2.369）**：Human Owner 授权并完成本卡 Green。只修改冻结的 10 个 production、`core/api-baseline/stable-api.txt` 两条 ABI 记录和 7 个 existing-test；immutable RED 源码 SHA=`6516bd9269d386ebeabfc85cc321a3ee118d5a5ff78e1479afa892803cc873fd` 保持不变。目标形态已成立：`LedgerEntrySpec` 仅 abstract `getEntrySide()`，旧 `getEntryType`/alias/default/bridge=0；DTO/Query、MapStruct、Ledger query/posting/projection、Reconciliation caller 统一使用 `entrySide`；`facts.put("entryType", entry.getEntrySide())` 稳定 digest key 保留，金额、借贷、平衡、normal balance、projection、phase、schema/Entity/Consumer 均未变。验证：`Posting=10/0F/0E/0S`、`Ledger=77/0F/0E/0S`、`Reconciliation=247/0F/0E/0S`、`Transaction=186/0F/0E/0S`、`BalanceControl=44/0F/0E/0S`、`BusinessFlow=200/0F/0E/0S`、`Boundary=212/0F/0E/0S`、完整 `125 XML / 1223/0F/0E/1S`；`Public Contract=298/174/42`、`Core API=94/4/4`、`PMD=13 XML / 0 finding`、classfile/codegen 与 `git diff --check` 均通过，独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。本卡达到 `CURRENT_SCOPE_COMPLETE`，不证明真实 MySQL、仓外 Consumer、发布或生产 D5。
+
+**停止线与状态**：发现第 11 个 production、第 8 个 existing-test、digest key 改名、schema/Entity 资金语义变化、Projection/Context/tenant/raw-id/PaymentInstrument 混入、兼容层、新类型或新 Consumer，立即停止并重新取得 Owner 决策。当前=`C4_ENTRY_SIDE_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / CODE_FREEZE`；本卡已关闭，Projection/Context 仍独立待决。
+
+#### 12.2.22 `plan-r2.370` C4 Transaction Projection ownership Entry Card
+
+Human Owner 授权 `W5-MIG09-C4-PROJECTION-OWNERSHIP-ENTRY-CARD-001`，仅允许主系分 11.9、主 TDD 20.12 与本 OpenSpec 的文档设计、状态校准和独立 Checker；不授权 Java、测试、Git、联网或发布，并明确不考虑兼容。本卡只把默认交易投影解释规则从 face 归位到 transaction-impl，不删除 `externalRuleVerificationStatus`，不改变 Explanation payload、after-commit 发布、治理重放或资金行为。
+
+**价值与目标 contract**：`transaction-face` 只保留 `FundsTransactionProjectionPublisher`、纯数据 `FundsTransactionProjectionPublishContext` 和 Explanation DTO/value contract；约 724 行状态归纳、展示/下一动作、owner、金额、支付工具、外部账户和 Spend Rule 规则由 transaction-impl package-private Source 持有。删除 `PublishContext#explanation()`，不保留 facade/default/deprecated/V2/bridge，也不新增 policy engine。单笔解释查询和有界扫描仍由 `DefaultFundsTransactionProjectionExplainApplicationService` 输出原结果；Publisher 的 `publish(context)` 和 orchestrator after-commit 链保持原样。
+
+**future production whitelist（ADD=1 / MODIFY=2 / DELETE=1）**：
+
+| path | operation | responsibility |
+| --- | --- | --- |
+| `transaction/face/src/main/java/com/wind/funds/transaction/projection/FundsTransactionProjectionExplanationSource.java` | DELETE | 删除 face 默认规则实现。 |
+| `transaction/face/src/main/java/com/wind/funds/transaction/projection/FundsTransactionProjectionPublishContext.java` | MODIFY | 删除 `explanation()` 与私有 ledger SN helper，保留四个数据组件。 |
+| `transaction/impl/src/main/java/com/wind/funds/transaction/projection/impl/FundsTransactionProjectionExplanationSource.java` | ADD | package-private 同名实现原样承接规则与 builder。 |
+| `transaction/impl/src/main/java/com/wind/funds/transaction/projection/impl/DefaultFundsTransactionProjectionExplainApplicationService.java` | MODIFY | 改用同包内部 Source。 |
+
+输入有序 manifest=`a60cbb17e374af33b5c0bc33c915ccc8a5ad3d0e386261910f76aa5c84b1385b`；ADD target 当前 absent。Capte/Fincone/Fincone-Issuing 本地 1619 个 Java 文件未发现 Source/PublishContext 生产 Consumer。`FundsTransactionProjectionPublisher`、`DefaultRoutedFundsInstructionOrchestrator`、`FundsTransactionProjectionExplanation`、`FundsProjectionReplayService`、schema、Core baseline 与任何 Consumer 均不可写。
+
+**RED 与 Green test contract**：未来 RED 只在 `FundsModuleDependencyBoundaryTests` 增加 `testTransactionFaceShouldNotOwnProjectionExplanationRules`，旧实现目标=`33/1F/0E/0S`，一个 source-boundary failure 同时证明 face Source 仍存在、impl Source 缺失和 PublishContext 仍承载规则；不得产生编译/路径/Harness error，RED 后 immutable。Green 只机械修改 `DefaultRoutedFundsInstructionOrchestratorProjectionTests`，删除 4 处 `context.explanation()` 及对应解释断言，保留 6 个测试中的 after-commit、context、lifecycle、余额和资金/账务事实。输入 test manifest=`02832cf8107d8e18e4f72d08e22c38ee878496431f1e6b7470cb6ae0d4b8630b`。
+
+`FundsTransactionProjectionExplainApplicationServiceTests`、`FundsTransactionProjectionBusinessScenarioTests`、`FundsProjectionReplayServiceTests`、`FundsHostCompositionContractTests`、`PaymentInstrumentTransactionAuthorizationTests` 及四个不可写生产文件继续 verification-only，manifest=`9996038dd4f699d201ea39d9fe7b32e9b86dc9b53fcc3a7092cfa9ab60b4764b`。Green 目标为 RED 类 `33/0F/0E/0S`、orchestrator projection `6/0F/0E/0S`、boundary `213/0F/0E/0S`、完整 `125 XML / 1224/0F/0E/1S`、Public Contract `297/174/42`、Core API `94/4/4`，并通过 transaction/business-flow/governance、PMD、classfile/codegen 与 CAD。
+
+**RED 执行（plan-r2.372）**：Human Owner 消费 RED Grant 后，仅在 `FundsModuleDependencyBoundaryTests` 新增冻结方法；pre/post SHA=`69f9f2c7... / c98246dd7cede16f4d30e3e86d7e5d6fb1decab7b33855cc6021eaa0426c6ef0`。fresh XML SHA=`b2e1f642952b14b66eff4c6068e92c442220af7eee09f31456bc2cb002038c44`，source/class/XML=`15:52:05/15:52:31/15:55:13`，结果=`33/1F/0E/0S`；唯一 testcase 聚合 5 个目标 ownership label，ADD path 先 guard 后读，无编译/路径/Harness error。三生产输入未漂移、ADD target 仍 absent，RED 自此 immutable。
+
+首次 `just compile` 意外触发并下载少量 SNAPSHOT metadata，Maker 发现后立即中断；后续 compile 与测试均使用 `mvn -o`，因此不得声称全程离线。首次 testCompile 又与白名单外 `ControlAccountLedgerInitializationTests` 等三个 Wallet 测试并发写入竞争，出现短暂 missing symbol；双读其最终 SHA 稳定后，未修改本轮代码原样重跑得到上述目标 RED。独立 RED Checker=`PASS（技术准出） / P0=0 / P1=0 / P2=1`，P2 仅为 metadata 联网过程偏差，不影响 RED 失败真实性；权威记录完成后仍需机械 recheck，Green 保持未授权。
+
+**Green 执行收口（plan-r2.374）**：Human Owner 消费 Green Grant 后，只完成冻结的 `ADD=1 / MODIFY=2 / DELETE=1` production 和 1 个 existing-test。最终源码 SHA：PublishContext=`7385d89e...`、impl Source=`9b3ec6ff...`、Default Service=`441f9859...`、existing-test=`fda08eeb...`；immutable RED=`c98246dd...` 未改。独立 Checker 把 impl Source 的 package/import/public 逆变换后精确还原原 face Source=`e16fb68c...`，Default Service 补回旧 import 后精确还原=`0182f05f...`；规则、payload、`externalRuleVerificationStatus` 与全部 verification-only SHA 均未漂移。face Source 源码/classfile=0，impl Source package-private，PublishContext 只保留四组件。
+
+fresh 验证：ownership=`33/0F/0E/0S`、orchestrator=`6/0F/0E/0S`、focused=`100/0F/0E/0S`、Transaction=`186/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、Governance=`24/0F/0E/0S`、Boundary=`215/0F/0E/0S`、完整=`125 XML / 1226/0F/0E/1S`，唯一 skip 为无真实 MySQL host 的 migration test。冻结目标 `213/1224` 到实际 `215/1226` 的增量 2 来自随后暂停的 Wallet tenant 切片在两个既有 boundary 测试类新增的测试，不属于本卡写入或失败。Public Contract=`297/174/42`、Core API 独立重跑=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen 均通过；Core API 首次并行复核的 stale-exclusion 是 target 瞬态，没有文件改动。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+**停止线与状态**：发现第 5 个 production、第二个 Green existing-test、需要修改 publisher/orchestrator/Explanation/replay、任何解释结果或 payload 变化、`externalRuleVerificationStatus` 变化、compatibility、schema、Consumer 或新抽象时立即停止。当前=`C4_PROJECTION_OWNERSHIP_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / CODE_FREEZE`；本卡已关闭，当时的 Context Owner 决策门现由 12.2.23 的 A 决策接替。
+
+#### 12.2.23 `plan-r2.375` C4 Context policy Owner 决策
+
+Human Owner 回复“授权推进，并做价值分析确认”，按 12.2.16 已冻结的推荐方向接受 `C4-CONTEXT-001-A`。本轮只修改主系分 11.10、主 TDD 20.13 与本 OpenSpec，记录决策、价值、边界和下一 Gate；不建立代码文件卡，不修改 Java、测试、Core baseline、产品/DSL 正文、schema、Consumer、Git、联网或发布。
+
+**事实与价值**：当前 Core public `FundsInstructionContextValidator` 位于 `com.wind.funds.transaction.support`，stable API 有类型及两个方法记录；它被 11 个生产 caller 跨 `LedgerBalanceChangedEvent`、Ledger DTO/impl、`FundsTransactionParticipant`、instruction/reference、Route 和 Wallet 使用，transaction-impl 又有 package-private 同名 validator。Capte/Fincone/Fincone-Issuing 没有 Java Consumer，仅 Fincone 历史知识文档引用名称。该结构让跨模块资金不变量依附 transaction/权益命名，并让两个同名 validator 难以区分公共事实守卫与 request adapter 规则。Context shadow 可使账户、金额、资金性质、route、账期或退款处置在 typed contract 外形成第二来源，后果包括误路由、错记账、余额投影或审计解释冲突；因此归位具有跨充值、付款、退款、授权、冻结、清结算和 Ledger 投影的公共安全价值，但不新增业务能力或改变资金计算。
+
+**接受的 A 决策**：
+
+1. `contextVariables` 永远是非权威扩展/证据数据，不能作为 tenant、主体、账户、金额、资金性质、route、账期、生命周期、原事实、退款处置或 finality 的来源。
+2. Core 中性 package 为 `com.wind.funds.context`；目标公共类型为 `FundsContextVariables` 与 `FundsContextVariablesValidator`。旧 `com.wind.funds.transaction.support.FundsInstructionContextValidator` 和旧 package `FundsContextVariables` hard delete，不保留 alias、deprecated、default、bridge、V2 或 facade。
+3. transaction-impl 同名 validator 改为明确的 request/converter 责任名，候选 `FundsTransactionRequestContextValidator`；`feeChargeSpec` 等 transaction reserved key 保留在该边界。PaymentInstrument、ExternalAccount、Route 和 Wallet 敏感校验继续由各自 owner 持有并组合 Core invariant，不建立全局策略引擎。
+4. 首个 ownership slice 保持当前深不可变复制、key 约束、Money value object 例外、递归 Map/Collection/array、malformed JSON 兜底和 reserved-key fail-closed 行为；不在本卡删除 Benefit/营销 deny-list。场景词汇退出 Core 需另有 adapter/Consumer/行为证据，不与 ownership hard break 混合。
+5. Ledger/Wallet/Route/Transaction 不得从 context 反推 canonical 字段；validator 通过不等于权限、业务资格、资金 finality 或生产安全证明。
+
+**下一门与停止线**：独立 Decision Checker=`PASS / P0=0 / P1=0 / P2=0`，确认中性 Core 双类型不是无价值抽象，11 个生产 caller、stable API 六行、transaction/Route/Wallet 责任分层及暂保 deny-list 均与 A 决策一致。该决策后的 Entry Card Grant 已由 12.2.24 消费；未授权范围仍由 12.2.24 的停止线约束，本段不再形成活动入口。
+
+#### 12.2.24 `plan-r2.377` C4 Context policy Entry Card
+
+Human Owner 授权 `W5-MIG09-C4-CONTEXT-POLICY-ENTRY-CARD-GRANT`，只允许主系分 11.11、主 TDD 20.14 与本 OpenSpec 建立 documentation-only 文件卡并取得独立 Checker；不授权 RED、Java、测试、Core baseline、Git、联网或发布。卡片消费 12.2.23 已接受的 A 决策，不重新打开 package、类型职责或兼容方案。
+
+**价值与安全追踪**：`PN-C4-CTX-001` 保护资金指令、Route、Ledger、Balance 和审计证据不被 shadow context 篡改或产生双事实源；`SR-C4-CTX-001` 要求所有进入这些事实的自由上下文先经过中性 Core validator，并继续经过所属 domain 的敏感字段校验；`RISK-C4-CTX-001` 是合法或错误调用方把账户、金额、资金性质、账期或退款处置藏入 Map/JSON，随后下游与 typed contract 读取不同值；`CTRL-C4-CTX-001` 是深不可变快照、recursive reserved-key fail-closed、domain sensitive validator 与旧 ABI absence；未来 `CLAIM-C4-CTX-001` 由 architecture RED/Green、19 个 immutable 行为测试和 classfile/source scan 证明。当前只达到 `DESIGN_D1 / ENGINEERING_READY`，不证明实现、启用、运行或生产安全。
+
+**目标 contract 与 scope**：生产 exact closure 以系分 11.11 为唯一逐路径权威，固定 `ADD=3 / MODIFY=20 / DELETE=3`；不得发现第 27 个 production。新 Core API 为 `com.wind.funds.context.FundsContextVariables#immutableCopy` 与 `FundsContextVariablesValidator#validateAndCopy/#validate`；Core `FundsInstructionFieldKeys.INCREASE` 直接持有 `increase`，transaction-face alias 只引用 Core key，Ledger assembler 也只引用 Core key；新通用类型不再暴露该常量。transaction local validator 改名为 package-private `FundsTransactionRequestContextValidator`。所有现有 reserved-key、regex、Money、malformed JSON、error message、sensitive check 和资金行为保持。
+
+23 个现存 production 输入：
+
+```text
+core/src/main/java/com/wind/funds/transaction/support/FundsContextVariables.java<TAB>fd2821a6df82f00fe80a532363353bfd68f93addbb4871a1a091df6339c73730
+core/src/main/java/com/wind/funds/transaction/support/FundsInstructionContextValidator.java<TAB>bcd7b3740df6a83d1a9f5ebacfd11615bd6e55eb8326fd1e90ac96f2a44f8cb4
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsInstructionContextValidator.java<TAB>7929788fedcea993ce7cf9ae6d8820b295d4f8f05bd76078ff6145344e5eb0bd
+core/src/main/java/com/wind/funds/ledger/LedgerBalanceChangedEvent.java<TAB>eb37850a0ad633fd8bd3683d26d0ee05715e6972f11b651b3cba3c8542fcacd4
+ledger/face/src/main/java/com/wind/funds/ledger/dto/LedgerEntryDTO.java<TAB>2a18736b1a88c5bfa92a4e81e0f1bc441fe933d9276d927e4f384ec29f0726e8
+ledger/face/src/main/java/com/wind/funds/ledger/dto/LedgerTransactionDTO.java<TAB>6c71060d70c2ef54708265c649154ac812f71681ddd692e563f82063afa22ea4
+ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerBalanceProjectionServiceImpl.java<TAB>c7b0ad960b82521627c015aa414012eca8b91fe24221e555cfb4c4e37aa2c685
+ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerTransactionServiceImpl.java<TAB>f93b67bc079e1d7a1a328b5a6302758d8aabd744004e266931d24cdf21fea344
+ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java<TAB>1d8dba4fa8aa673182d2bf06843f3dffadeaddf6c0b71874ca5725a7544a0ddc
+ledger/impl/src/main/java/com/wind/funds/ledger/posting/LedgerTransactionSpecFactory.java<TAB>583ad35c04df9be53d2fea5725c4cccfafa8f977b7fbc959f3d9b7dde11ad810
+core/src/main/java/com/wind/funds/transaction/spec/FundsInstructionFieldKeys.java<TAB>e0ad6c95249ce1ed2b1ae1314e600937282e2b34d17b6e9a1e8d7d3b2a64bdee
+transaction/face/src/main/java/com/wind/funds/transaction/constant/FundsInstructionContextKeys.java<TAB>e5d6b23755804f08571443d544580f9de51b0cd93e41ac2e6226a8c3ad8ca8e1
+transaction/face/src/main/java/com/wind/funds/transaction/model/FundsTransactionParticipant.java<TAB>632ac226b496ed74272b32c1d4c50f5a21f2eb50363e3497d1b9c7330fa5dc99
+transaction/impl/src/main/java/com/wind/funds/route/model/ImmutableExternalAccountRefSpec.java<TAB>9515afdfbb9d8be5187ab5e705bfe851a1d5c4343d05d1f1250cc7860842e2b0
+transaction/impl/src/main/java/com/wind/funds/route/model/ImmutablePaymentInstrumentRefSpec.java<TAB>ef9f94ec1bc67682302df36854f8b6047a90e512fdefcfeb0b061e4fe901ed1f
+transaction/impl/src/main/java/com/wind/funds/route/model/RouteContextVariablesValidator.java<TAB>a37ae521625c7a991c674370b64d432e28e657a3ea20aa744f443bae3165c7ae
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsAuthorizationInstructionConverter.java<TAB>76b7d0aee69c74938182f9c473efebebc9be769b4918221e3bd00b4ef544d74b
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsBalanceControlInstructionConverter.java<TAB>4963a4477f2ba52bcf28a4481b47b5f84fb53894944df8e3394fe720b89f7835
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java<TAB>bb27c66d5173daa3c2d7121cbc272e38e19793848a277cbd207b2e8777faa325
+transaction/impl/src/main/java/com/wind/funds/transaction/instruction/ImmutableFundsInstructionReferenceSpec.java<TAB>e7053d93669305bc1a72345223a7fe8c2d8e8837c2af877d69a2ded1e7413d41
+transaction/impl/src/main/java/com/wind/funds/transaction/instruction/ImmutableFundsInstructionSpec.java<TAB>542d431515a619dc9da27e52418949934556b27129778b828774379f69da236a
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/PaymentInstrumentServiceImpl.java<TAB>6bd5e5002d9b32c3eca9cb41660245455b5e500dabe88030daa8379e9cf4b57e
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/WalletContextVariablesValidator.java<TAB>ceb2848b10ae0cb493f58e50358940339c302298033d60ac30e1b594abbb26c6
+```
+
+有序 input manifest=`a92ebea475c453b2119c9ccb38f41409af2db6bd1c4b7206c079a4d81b37fb98`；三个 ADD target 当前 absent。Core baseline 只允许 `core/api-baseline/stable-api.txt` 一文件 MODIFY，input SHA=`fbc2d6c9d1185af7a3ec39004d29ee0e869925543a85d3d0a21ff0f6ea13aefa`，旧 6 行替换为新 6 行，新增 member 为 `FundsInstructionFieldKeys.INCREASE`，Core 分类保持 `94/4/4`。
+
+**RED/Green 与验证**：RED 唯一修改 `FundsModuleDependencyBoundaryTests.java`，新增一个 guarded 聚合方法，目标=`34/1F/0E/0S`；Green 后该方法 immutable。Green existing-test 仅 `FundsContextVariablesContractTests`、`FundsTransactionRequestContextVariablesContractTests`、`FundsDslJsonContractVerifier` 三文件机械编译迁移，四测试输入 manifest=`5108615d9aca1ad653c352be0374d87674d59983422478e5b4423dde8e150b6e`。19 个行为测试 non-write manifest=`3efcbf8e461b21110ba2f308f77b4d3d366f5f3852a0ecd6ae11df3f3212f351`。TDD 20.14 冻结 17 类=`221/0F/0E/0S`、boundary=`216/0F/0E/0S`、完整=`125 XML / 1227/0F/0E/1S`、Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding` 以及 classfile/codegen/CAD。
+
+**RED 执行收口（plan-r2.379）**：Human Owner 授权后唯一修改 `tests/src/test/java/com/wind/funds/architecture/FundsModuleDependencyBoundaryTests.java`，新增 `testContextVariablesPolicyShouldUseNeutralCoreOwnership`。source/class/XML SHA=`7b9e21f5f902958e19be14c6ebb72575d430c298a55c44783a87e77dd43ea5ea / 37d24658a59e4847d82904e198636193b976167387e26b8ded7ffdb74927645f / 77c101e1a8973608c1f70fa8f19874d800efeadff97430c745e5ed3d61e2d5a0`，mtime=`18:05:43 < 18:06:02 < 18:10:47`；删除新增块后源码精确回到 pre SHA=`c98246dd7cede16f4d30e3e86d7e5d6fb1decab7b33855cc6021eaa0426c6ef0`，已有 33 个测试未改。单类=`34/1F/0E/0S`、boundary=`216/1F/0E/0S`、完整=`125 XML / 1227/1F/0E/1S`，唯一 failure 为 Context ownership/ABI hard break，唯一 skip 为 MySQL migration。首次完整运行额外出现一次未改 Reconciliation Gate 时序失败；独立复跑=`10/0F/0E/0S`，第二次 fresh 完整运行中通过且只剩目标 RED，记录为一次性非目标观察。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED 自此 immutable；三文档、baseline、23-file production manifest 与三个 ADD absent 均未漂移。
+
+**Green 执行收口（plan-r2.380）**：Human Owner 授权后仅执行冻结的 `ADD=3 / MODIFY=20 / DELETE=3` production、Core baseline `6→6` 与 `3` 个 existing-test。最终新类型 SHA：`FundsContextVariables=91c49579...`、`FundsContextVariablesValidator=b016bf09...`、`FundsTransactionRequestContextValidator=c28fbaef...`；baseline=`28f01597...`，immutable RED=`7b9e21f5...`，architecture XML=`c48d5fbd...`。旧 core/local 三类型源码/classfile=0；新 Core 两类型 Public ABI 精确且 `FundsContextVariables` 无 `INCREASE`，新 local validator package-private；20 个 caller 与三 converter 全部完成无兼容硬切。Core `FundsInstructionFieldKeys.INCREASE="increase"` 是唯一 owner，face 只转引，Ledger 只读 Core key且不依赖 transaction-face。逆变换复核确认原 reserved set/regex/Money 例外/malformed JSON/error message/domain sensitive checks 与资金行为未漂移。
+
+fresh 验证：Java 21 offline clean compile=`21/21`，architecture=`34/0F/0E/0S`，冻结 focused=`17 类 / 221/0F/0E/0S`；扩大保护为 `21` 个可执行类=`389/0F/0E/0S`，另 `FundsDslJsonContractVerifier` 为 helper 编译迁移。Ledger=`77/0F/0E/0S`、Transaction=`186/0F/0E/0S`、Boundary=`216/0F/0E/0S`、完整=`125 XML / 1227/0F/0E/1S`，唯一 skip 为无真实 MySQL host 的 migration test。Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen PASS。首次 Core API 直接调用因环境回退到 JDK 8 `javap`，把 default 方法打印成普通 public 而形成假失败；显式 Java 21 原样重跑 PASS，无文件修改。Wind 全仓补充 guard 因正则扫描无反馈中止；目标 context 目录=`0 error/0 warning`，converter 目录仅有本轮未触碰的 11 个既有 JSpecify warning。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+**停止线与状态**：独立 Entry Card Checker 首轮=`NOT PASS / P0=0 / P1=1 / P2=1`，P1 是原卡让 Ledger assembler 依赖 transaction-face，P2 是 MIG-09 汇总仍写未建立 Entry Card；返工将 `INCREASE` owner 归位到 Core `FundsInstructionFieldKeys`，不新增 POM 或裸字符串，并机械校准汇总。最终 recheck=`PASS / P0=0 / P1=0 / P2=0`。Green 未命中第 27 个 production、第 4 个 test、baseline 目标外变化、行为变化、immutable test 写入、compatibility、schema、Consumer 或 build/POM。当前=`C4_CONTEXT_GREEN_EXECUTION_COMPLETE / C4_CONTEXT_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；该切片只达到 current checkout D4，不证明真实 MySQL、仓外 Consumer、HOST/L4、发布或生产 D5。下一 MIG-09 必须重新形成 Entry Card 和 Human Grant。
+
+#### 12.2.25 `plan-r2.381` SpendSubjectFundingRelation raw-id surface Entry Card
+
+Human Owner 回复“授权推进，并做价值分析确认”，消费 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED`，本轮只允许主系分 11.12、主 TDD 20.15 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**选择与价值**：四仓生产搜索确认 `getSpendSubjectFundingRelationById(Long)` caller=0，当前实现直接 `selectOneById`，没有 tenant predicate；数据库 id 只能定位，不能证明对象授权。tenant-required `SpendSubjectFundingRelationQuery` 已有 Jakarta `@NotNull`、Service 首次 read guard 与真实 H2 保护，唯一 production query caller `FundingResponsibilityResolutionApplicationServiceImpl` 显式传入 request tenant。删除 raw-id getter 能关闭 foreign relation owner/subject/currency/target 引用泄露旁路，并把公共读取统一到 tenant query；因未证明正式外部可利用路径，定性为 `DEFENSE_IN_DEPTH_ELIGIBLE`。本卡不改变资金责任本身，不改变关系创建、唯一性、Funding/Credit 目标可扣和币种校验，也不触发 Route、Transaction、Ledger 或 Balance。
+
+PaymentInstrument current source 已无 instrument/binding/history raw-id getter，三组 query tenant `@NotNull` 且 `PaymentInstrumentTenantIsolationTests=4/0F/0E/0S`；因此不是下一代码候选，本卡只把它作为选择排除证据，不补造历史授权或独立 Green 结论。全组 relation resource internalization、create 返回 Long、DTO database id 与 Spend Rule raw-id 继续独立 Inquiry，不与本 getter 删除合并。
+
+**冻结范围**：RED 只 MODIFY `tests/src/test/java/com/wind/funds/wallet/services/impl/SpendSubjectFundingRelationServiceImplTests.java`，input SHA=`73ae8d295711f8693180a6866d3ae309d807a70c78d75e46697465dcbaf60167`，新增一个 public reflection 方法，旧实现目标=`10/1F/0E/0S`。Green 只 MODIFY `wallet/face/src/main/java/com/wind/funds/wallet/service/SpendSubjectFundingRelationService.java` SHA=`4aa62e668c88aa248f3c8b31c79728b978a82d857162637b522962c829391b42` 与 `wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendSubjectFundingRelationServiceImpl.java` SHA=`a4d50e97abef14633d03bd6f8b4145b7301452e9a9bce34e75ffa53cd60dd774`，删除接口和实现中的 raw-id getter；`ADD=0 / DELETE=0`。query、resolution face/impl、DTO/Request、Entity/Mapper/Converter、schema/POM/build、PaymentInstrument、Consumer 和其他测试全部 non-write。
+
+**验证与停止线**：Green target=`10/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、完整=`125 XML / 1228/0F/0E/1S`、Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding`，并执行 Java 21 offline compile/classfile/codegen/CAD 组成门禁。发现 caller、第 3 个 production、第 2 个 test、兼容 overload、整组 internalization、create/DTO id、业务语义或持久化/build 变化时立即停止。独立 Entry Card Checker=`PASS / P0=0 / P1=0 / P2=0`；当前=`SPEND_REL_RAW_ID_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-SUBJECT-FUNDING-RELATION-RAW-ID-SURFACE-RED-EXECUTION-GRANT`。
+
+**RED 执行收口（plan-r2.383）**：Human Owner 授权后唯一修改 `SpendSubjectFundingRelationServiceImplTests.java`，final source/class/XML SHA=`2a6558b808aeb869e33f7d6f5d26d808f0adac1a0c0c9684919e1f07673884d1 / aa706b9124958e1bf8a68b8c13993b4512880efdcf93ed53af6e7be3ef6871c7 / 3d92ba8d9960a9766d19b2b172adc8064235062f36e9b7dd4f7b1bb55e29de87`，mtime=`19:50:19 < 19:50:41 < 19:51:45`。删除新增方法和 4 imports 后精确回到 pre=`73ae8d...`，旧 9 个测试未改。首次运行在 testCompile 因 checked exception 位于 SoftAssertions lambda 阻断；只把 tenant annotation 解析移到 lambda 前后，最终 fresh target=`10/1F/0E/0S`、Boundary=`217/1F/0E/0S`，唯一 failure 为 raw getter 仍存在，tenant `@NotNull` 通过，无 Spring/H2/fixture/reflection error。当前 125 XML report set=`1228/1F/0E/1S` 且唯一 nonzero 为目标 XML，但非 Boundary XML 未在同轮重跑，不作为 fresh full gate。face/impl与三文档输入未漂移。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED immutable。
+
+当前=`SPEND_REL_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_REL_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-MIG09-SPEND-SUBJECT-FUNDING-RELATION-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**Green 执行收口（plan-r2.384）**：Human Owner 授权后只删除 face 声明/Javadoc和 impl `selectOneById` getter，post source SHA=`f21fc22c1e8486964c6009d9e150928c42a73a974671312bf40c24cef2d024db / 30c4dd274ade2a13c68c5fdcf9105ae271db94a8d0dff81ade3e3d9bb3501a57`，class SHA=`ab110448fab92cac8955aa5c833a8b2ea4e645fb527848fdf155972d91d4df2c / 3cb7fb5c495ec223c1c8c9c09767cade9ed4e7084bd1c5b44ed7375d0693e3f3`。回插删除块精确恢复 pre SHA，证明 create/query、tenant guard、Funding/Credit 目标准入、币种和唯一性未改；raw getter source/classfile=0。immutable RED=`2a6558...`，Green XML=`d42a4183...`。
+
+fresh 验证：Java 21 offline compile=`21/21`、target=`10/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、完整=`125 XML / 1228/0F/0E/1S`，唯一 skip 为无真实 MySQL host 的 migration test；Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen PASS。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。当前=`SPEND_REL_RAW_ID_GREEN_EXECUTION_COMPLETE / SPEND_REL_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；只达到 current checkout D4，不证明真实 MySQL、仓外 Consumer、HOST/L4、发布或生产 D5。整组 `INTERNALIZE_RESOURCE`、create/DTO id 与其他 Wallet raw-id 仍须独立成卡。
+
+#### 12.2.26 `plan-r2.385` SpendRuleDecisionRecord raw-id surface Entry Card
+
+Human Owner 回复“授权推进，并做价值分析确认”，消费 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED`。本轮只允许主系分 11.13、主 TDD 20.16 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**选择与价值**：`SpendRuleDecisionRecord` 固化规则版本、挂载、范围、动作、金额币种、业务流水、决策结果、拒绝原因和摘要，是授权准入、幂等重放和运营解释共同消费的稳定资金准入证据。其业务身份是租户内 `decisionSn`，schema 唯一键也是 `(tenant_id, decision_sn)`；raw `Long id` 只定位持久化行，不能证明对象授权。当前 `getDecisionRecordById(Long)` 直接 `selectOneById`，可返回 foreign tenant 的规则与拒绝证据；`wind-funds` 生产只有 `recordDecision` 写后回读这一处 caller，三仓 Consumer caller=0，而 tenant-scoped stable find 已被准入、解释、幂等冲突承重。删除 raw-id getter 可关闭无授权旁路并统一事实身份，安全定性为 `DEFENSE_IN_DEPTH_ELIGIBLE`。本卡不改变规则评估、挂载、决策、幂等、金额、Route、Transaction、Ledger 或 Balance。
+
+Definition/Version/Binding raw-id 不与本卡批量处理：Version 与 Binding 仍耦合 create 返回 Long，批量删除会提前决定 create/DTO id 和 resource internalization。DecisionRecord 已有完整稳定替代键，可用最小垂直切片独立关闭；不增加兼容 overload、alias、deprecated、bridge、V2、facade 或新抽象。
+
+**冻结范围**：RED 与 Green 只允许同一个 existing test `tests/src/test/java/com/wind/funds/wallet/services/impl/SpendRuleDecisionRecordServiceTests.java`，input SHA=`d55d6b2e40c096662a30aa1a34233e242cdaaac18a1216119d78d594830861d2`。RED 只新增 public reflection 方法 `testPublicContractShouldNotExposeRawIdGetter`，旧实现目标=`11/1F/0E/0S`；Green 时 RED 方法 immutable，只把一个部分持久化目标证据测试的 raw-id 调用迁到 `findDecisionRecord(TENANT_ID, DECISION_SN)` 并同步方法名，SQL 篡改和 fail-closed 断言不变。
+
+Green production `MODIFY=2 / ADD=0 / DELETE=0`：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/SpendRuleDecisionRecordService.java<TAB>2a43715cf6ef7bc0682f194da009a385d79a9b6c0274c1343767ddf17300628f
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleDecisionRecordServiceImpl.java<TAB>dc0d6c08ab8e47f627f4fa4e63d004c5acc9fd05950381b009bd22a76c3a2882
+```
+
+face 只删除 raw-id 声明/Javadoc；impl 删除 `selectOneById` getter，让 private insert helper 不再返回 id，并在插入后复用 request 已持有的 `tenantId + decisionSn` stable find，空回读 fail-closed；现有唯一键冲突继续按同键幂等核对。`SpendRuleDecisionRecordQuery`、stable find/query、准入 application service、DTO/Request/Entity/Mapper/schema/build、Definition/Version/Binding 和 Consumer 全部 non-write；DTO id 另行 Inquiry。
+
+**验证与停止线**：Green target=`11/0F/0E/0S`、五类 focused=`78/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、完整=`125 XML / 1229/0F/0E/1S`、Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding`，并执行 Java 21 offline compile、source/classfile、codegen 与 CAD。发现 Consumer caller、第 3 个 production、第 2 个 test、stable find/query 改动、compatibility、DTO/schema/build、规则/幂等/资金行为变化或非目标 failure/error立即停止。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`；当前=`SPEND_DECISION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_DECISION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-RULE-DECISION-RECORD-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**RED 执行收口（plan-r2.387）**：唯一修改 `SpendRuleDecisionRecordServiceTests.java`，source SHA=`9dbd01de3e23b27c5c3ee58da08130311d599a0a9288080d02583c44b1a3bc94`、class SHA=`06524edccb7f65aae69a700c98986d839100c39d83a0260b86c01fed2009554c`、fresh XML SHA=`31d8401401ee4fbedbc0f58c0a3ee0ab7a3d61ac922488aad0ce19b4fb5cad3`，mtime=`10:24:43 < 10:24:59 < 10:25:01`。结果=`11/1F/0E/0S`，唯一 failure 为 raw-id getter 仍存在，10 个既有 Spring/H2/MyBatis 测试通过；删除新增方法和 `Method` import 可恢复 pre SHA=`d55d6b2e40c096662a30aa1a34233e242cdaaac18a1216119d78d594830861d2`。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED 方法与断言 immutable。当前=`SPEND_DECISION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_DECISION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-RULE-DECISION-RECORD-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**Green 执行收口（plan-r2.388）**：Human Owner 授权后严格完成冻结的 2 个 production 文件和同一 existing test，`ADD=0 / DELETE=0`。face 删除 `getDecisionRecordById(Long)`；impl 删除 `selectOneById` getter，private insert helper 不再返回 id，`recordDecision` 插入后以 request 的 `tenantId + decisionSn` 复用 stable find 并 fail-closed；唯一键冲突、幂等、转换、规则、金额和资金事实不变。测试保留 RED 方法 immutable，仅将部分持久化目标证据用例机械迁移到 `findDecisionRecord(TENANT_ID, DECISION_SN)`。最终 source SHA=`d7e14282d0aaf132ef8a53fa51140012cafdad0fcf5d3d694e99732fa0792fb9 / aec8b30ab4f00f9fe5864c12ee90bab1fa898d1a8f5f1daf1cde044f896b2a39 / 1fe0f6f8bd06a3854b51a5b867fdbe122d2e4c32ea12232437257875cbcb821f`；class SHA=`75ab3b7f2a93fb6870bcd37c18cdd00e7656befd756863bdb45864c88234d002`，XML SHA=`dca98b8c5028d35bfd6b52024cd2d6c7a5531b125615bed008ad4facc2cabd91`。target=`11/0F/0E/0S`、focused=`78/0F/0E/0S`、完整=`125 XML / 1229/0F/0E/1S`，Public Contract=`297/174/42`、Core API=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen/compile PASS；唯一 skip 为无真实 MySQL host 的 migration test。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`，当前=`SPEND_DECISION_RAW_ID_GREEN_EXECUTION_COMPLETE / SPEND_DECISION_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；下一 MIG-09 必须重新成卡。
 ## 13. 状态回写与恢复入口
 
 每轮结束只更新本文件的以下 delta：
@@ -3814,4 +4585,776 @@ Public contract 失败只证明两个旧 getter 尚在且 query tenant 缺 Jakar
 
 恢复时只以本文件的 `state_revision + accepted decisions + authority refs/fingerprints + current entry` 为持久执行依据，再读取当前 Task 需要的最新正式文档和一手证据。runtime Goal 的 `paused/blocked/archived/unavailable` 只作历史 provenance，不影响恢复，也不再绑定新的 runtime Goal。只有目标、权限、承重事实、Owner 决策、写入范围、模板版本和验证入口全部 `aligned` 才继续一个原子轮次。
 
-当前恢复入口：`W5-MIG09-CREDIT-ACCOUNT-QUERY-SURFACE-NARROWING-RED-EXECUTION-001 / RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.323`。下一 Human Gate=`MIG09_CREDIT_ACCOUNT_QUERY_SURFACE_NARROWING_GREEN_EXECUTION_GRANT`，只允许 `CreditAccountService.java`、`CreditAccountQuery.java`、`CreditAccountServiceImpl.java`、`ControlAccountLedgerInitializationTests.java`、`FundsTransactionFlowTestSupport.java` 五个 `MODIFY`；immutable RED、Capte Consumer、Core/Platform/Hierarchy、`web-security`、其他 MIG-09、兼容、Git、联网、远端发布、部署和生产均未授权。
+#### 12.2.27 `plan-r2.389` SpendRuleVersion raw-id surface Entry Card
+
+Human Owner 回复“授权推进，并做价值分析确认”，消费 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED`。本轮只允许主系分 11.14、主 TDD 20.17 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**选择与价值**：`SpendRuleVersion` 是不可变规则制品，包含规则规格、摘要、发布操作者、审计引用和版本状态。跨场景能力消费者通过租户内 `tenantId + ruleId + ruleVersion` 识别同一制品，测试 schema 也以该组合建立唯一约束。当前 `getVersionById(Long)` 直接 `selectOneById`，调用方若取得 foreign id，可能读取另一租户的规则规格、摘要和审计证据；生产只有 `SpendRuleDefinitionServiceImpl.publishVersion` 创建后的内部回读，评估、决策和三仓 Consumer 已使用 tenant-scoped `findVersion/getPublishedVersion`。删除 raw-id getter 的实际价值是关闭无对象授权旁路，并让发布回读与后续评估统一稳定业务身份；因没有正式外部利用路径，安全定性保持 `DEFENSE_IN_DEPTH_ELIGIBLE`。
+
+本卡不新增规则引擎或版本治理能力，不改变版本不可变性、摘要校验、发布状态、幂等、挂载、准入、金额、Route、Transaction、Ledger 或 Balance。Definition raw-id 测试调用和 Binding 生命周期 raw-id 继续独立成卡。
+
+**冻结范围**：
+
+RED 唯一写入（`MODIFY=1`）：`tests/src/test/java/com/wind/funds/wallet/services/impl/SpendRuleDefinitionServiceTests.java`，input SHA=`f2a25b3adfcb2e47f7f519b9fab621f2cebb62ee30a085c2cae2671deeeb8a84`。只新增 `testPublicContractShouldNotExposeVersionRawIdGetter`，用 public reflection 断言 `SpendRuleVersionService` 不暴露 `getVersionById(Long)`；已有 6 个规则定义/版本/挂载/零资金副作用测试 immutable。旧实现目标=`7/1F/0E/0S`，唯一 failure 只能是 raw-id getter 存在。
+
+Green production `MODIFY=3 / ADD=0 / DELETE=0`：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/SpendRuleVersionService.java<TAB>9131acd79c372745a7306764181930322cb086407db2ed0b4d2c3f907ffb7135
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleVersionServiceImpl.java<TAB>804da1270dbbf2abb85caf72bb26b707d178e5ca5ab863cc03e2cea1b2f219cc
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleDefinitionServiceImpl.java<TAB>4eaf8a6ce708075921d27f7559a387a379529b5718c61532783c2a924e42549f
+```
+
+Version face 删除 raw-id 声明/Javadoc；Version impl 删除 `selectOneById` getter；Definition impl 的 `publishVersion` 创建后不再使用 Long id，改以 request 的 `tenantId + ruleId + ruleVersion` 调用现有 `findVersion` 并 fail-closed。`SpendRuleVersion` Entity/NameRefs/Mapper、DTO/Request、stable query、Definition/Binding/Decision/Admission/Evaluation service、schema/build、三仓 Consumer 和 create/DTO id 均 non-write。
+
+**验证与停止线**：当前 full=`125 XML / 1229/0F/0E/1S`；RED 后目标类=`7/1F/0E/0S`、full=`125 XML / 1230/1F/0E/1S`；Green 目标类=`7/0F/0E/0S`、六类 focused=`85/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、full=`125 XML / 1230/0F/0E/1S`；Public=`297/174/42`、Core=`94/4/4`、PMD=`13 XML / 0 finding`，并执行 Java 21 offline compile、classfile/codegen 与 CAD。发现第 4 个 production、第 2 个 test、仓外 caller、需修改 `findVersion/getPublishedVersion`、兼容 overload、Definition/Binding/DTO id、schema/build、规则状态/摘要/幂等/资金行为或非目标 failure/error，立即停止。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`；当前=`SPEND_VERSION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_VERSION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-RULE-VERSION-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**RED 执行收口（plan-r2.391）**：唯一修改 `SpendRuleDefinitionServiceTests.java`，source/class/XML SHA=`6b454d60a2234d511fd6f27dfd3a11effe2b9cd6cfd6145590bab42b614c8374 / 873084e764121b9c15fd974f0c080962c1cef34c396f693604369b6072b2abfd / 4912bdce95d31d9662e2f4e03b124762bcb7e76783bf3c27e89d9dab50f03f5b`，mtime=`12:45:19 < 12:45:41 < 12:45:43`。结果=`7/1F/0E/0S`，唯一 failure 为 `getVersionById` 仍存在，6 个既有 Spring/H2 测试通过；移除新增方法和 `Method` import 可恢复 pre SHA=`f2a25b3adfcb2e47f7f519b9fab621f2cebb62ee30a085c2cae2671deeeb8a84`。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED 方法和断言 immutable。当前=`SPEND_VERSION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_VERSION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-RULE-VERSION-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**Green 执行收口（plan-r2.392）**：Human Owner 授权后只修改冻结的 3 个 production 文件，`ADD=0 / DELETE=0`，immutable RED 未改。Version face/impl 删除 `getVersionById`/`selectOneById`；Definition `publishVersion` 在 `createVersion` 后按 request 的 `tenantId + ruleId + ruleVersion` 调用既有 `findVersion` 并 fail-closed；DataIntegrityViolationException 继续进入原三元幂等核对。source SHA=`1161738c1a60dffa787c2f14ac9959d902f3956a7a0b369a790863138c26d8bf / e4f7215c31e05ac19f3a07759e50931449159d9ed2564303b516695f6f1881b7 / 63729ccaab981f5cd1193b50789f915661227ba59831a53cce1c5693dc622ede`，class SHA=`95161187ba283106c803ac0278781c5f8d78702e959c844a73c3551b4688499d / b6ee6bb4e7c89c18287ac53f8ad5c8c13642a8aacc7065e99f0a34ed7da9a9eb / e9a2c804f318d9809b76d538f318828b2a735f24595adaf7755a4d73608d798f`，Green XML=`203732b50798935e86796da7092e02725ea1c9c7f1bd1020a85931d9d2eaaa55`。验证：compile=`21/21`、target=`7/0F/0E/0S`、focused=`85/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、第二次 fresh full=`125 XML / 1230/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen PASS。首次 full 的未改 Reconciliation Gate 并发用例 `1F` 经独立 `10/0` 和第二次 full 通过定性为一次性非目标观察。独立 Green Review=`PASS / P0=0 / P1=0 / P2=0`。当前=`SPEND_VERSION_RAW_ID_GREEN_EXECUTION_COMPLETE / SPEND_VERSION_RAW_ID_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`；下一 MIG-09 必须重新成卡。
+
+#### 12.2.28 `plan-r2.393` SpendRuleDefinition raw-id surface Entry Card
+
+Human Owner 回复“授权推进，并做价值分析确认”，消费 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED`。本轮只允许主系分 11.15、主 TDD 20.18 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**选择与价值**：`SpendRuleDefinition` 是规则稳定身份、名称、类型、业务域、生命周期状态和说明组成的规则目录事实，租户内稳定身份为 `tenantId + ruleId`，测试 schema 也以该二元组建立唯一约束。当前 `getDefinitionById(Long)` 直接 `selectOneById`，可能以 foreign id 读取另一租户的规则目录和状态。四仓生产 caller=0，仅两个既有测试将 create 返回 id 传给 raw getter；生产创建、发布与并发幂等均已使用 `findDefinition(tenantId, ruleId)`。删除 getter 能关闭无对象授权旁路并统一稳定身份，安全定性为 `DEFENSE_IN_DEPTH_ELIGIBLE`。
+
+本卡不改变定义创建、唯一性、状态、版本发布、摘要、挂载、评估、准入或资金事实；`createDefinition` Long 返回、DTO id 与 Binding raw-id 继续独立 Inquiry，不建立兼容入口。
+
+**冻结范围**：RED 只修改 `SpendRuleDefinitionServiceTests.java`，input SHA=`6b454d60a2234d511fd6f27dfd3a11effe2b9cd6cfd6145590bab42b614c8374`，新增 `testPublicContractShouldNotExposeDefinitionRawIdGetter`；既有 Version RED immutable，旧实现目标=`8/1F/0E/0S`。Green production `MODIFY=2`：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/SpendRuleDefinitionService.java<TAB>935de70eb7c5b151fcd1e9ef0c004fe15ef2b87ec0818d09a58b3a242e056ec7
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleDefinitionServiceImpl.java<TAB>63729ccaab981f5cd1193b50789f915661227ba59831a53cce1c5693dc622ede
+```
+
+Green existing-test `MODIFY=2`：`SpendRuleDefinitionServiceTests.java` 与 `SpendRuleDefinitionServiceFlowTests.java`（input SHA=`a8fde9485cf9875795eb1548f0a3d89ac550811bd01dce677dfa355d92b06fae`），只把各一处 `create -> id -> getById` 改为 create 后 `findDefinition(TENANT_ID, RULE_ID)` 并断言非空；两个 public-contract RED 方法 immutable。`ADD=0 / DELETE=0`。Entity/NameRefs/Mapper、DTO/Request、schema/build、Version/Binding/Decision/Evaluation/Consumer 和 create/DTO id 均 non-write。
+
+**验证与停止线**：当前 target=`7/0F/0E/0S`、full=`125 XML / 1230/0F/0E/1S`；RED target=`8/1F/0E/0S`、full=`1231/1F/0E/1S`；Green target=`8/0F/0E/0S`、六类 focused=`86/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、full=`125 XML / 1231/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13 XML / 0 finding`，并执行 Java 21 offline compile、classfile/codegen 与 CAD。发现第 3 个 production、第 3 个 test、仓外 caller、stable find 变化、compatibility、create/DTO id、Binding 生命周期、schema/build 或规则/资金行为变化立即停止。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`；当前=`SPEND_DEFINITION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_DEFINITION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`，下一 Human Gate 仅为 `W5-MIG09-SPEND-RULE-DEFINITION-RAW-ID-SURFACE-GREEN-EXECUTION-GRANT`。
+
+**RED 执行收口（plan-r2.395）**：唯一修改 `SpendRuleDefinitionServiceTests.java`，source/class/XML SHA=`cd6f6a12fbc38a0915013f613386e0847a09bfea26d14da64bedaf90fb8df427 / 488a6e0bcf20cc6cb28b7031e8ad2d05fec84e044088906ae0a37c1c0aaf15ea / bb0e3a2ad117729dfacd3d9ca37ba325f07ec08bbc448ef2d01b9dbb6e091667`，mtime=`14:52:44 < 14:53:06 < 14:53:09`。结果=`8/1F/0E/0S`，唯一 failure 为 `getDefinitionById` 仍存在，Version RED 与 7 个业务测试通过；移除新增方法可恢复 pre=`6b454d60...`。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED immutable。当前=`SPEND_DEFINITION_RAW_ID_RED_EXECUTION_COMPLETE / SPEND_DEFINITION_RAW_ID_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+**Green 执行收口（plan-r2.396）**：Human Owner 授权后严格修改冻结的 2 个 production 与 2 个 existing-test 文件，`ADD=0 / DELETE=0`。face/impl 删除 `getDefinitionById(Long)`/`selectOneById`，无兼容入口；两测试各一处机械迁移到 `findDefinition(TENANT_ID, RULE_ID)`，两个 public-contract RED 方法及业务断言不变。source SHA=`9996e1ef80f3c638091c834d1d6151de097061273581ef74f3f079afde256fb6 / 05e5eaabac889d3c49d42c9da8e0c5f8807c9439a0b3fc6fc12c091177c82a3e / 81bd2dcfa1121a5b1b431ab881c03108dbe3370ee252cf0ff25a2255c4d76757 / 89049cc9ee87fa0e6eb607a11e8cc77b253bd8a74c66cf5eec75d3c99318d626`，production class SHA=`35dcf6388d6885a824cd6470eac0b765075fa139b53fb7c3448c8fa9c6b27069 / 51c764fe1ab9202557ee288367a650b235e278116e3327aee9e3aac8601248d1`，target XML SHA=`62677af72a6653e6cbae9cedd072e5d637e1770f38af37dbdc94135d2b42d4a0`。验证：Java 21 offline compile=`21/21`、target=`8/0F/0E/0S`、focused=`86/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、full=`125 XML / 1231/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13 XML / 0 finding`、classfile/codegen PASS。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。价值结论：该切片只关闭数据库 id 替代对象授权的 Definition 读取旁路，不改变规则或任何资金行为；`createDefinition` Long/DTO id、Binding raw-id、真实 MySQL 与仓外二进制 Consumer 仍为残余边界。
+
+#### 12.2.29 `plan-r2.397` SpendRuleBinding 稳定创建契约 Entry Card
+
+Human Owner 在方案对比后明确授权推进方案 A：`SpendRuleBindingService.createSpendRuleBinding(CreateSpendRuleBindingRequest)` 直接返回现有 `SpendRuleBindingDTO`，同时删除 `getSpendRuleBindingById(Long)`，不考虑兼容。本轮仅允许主系分 11.16、主 TDD 20.19 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**选择与实际价值**：Binding `sn` 由 Provider 内部生成，暂停、恢复、退役、决策引用和查询均以 `tenantId + sn` 工作；测试 schema 也以该二元组建立唯一键。现有 create 返回数据库 id，Definition impl 随即使用无 tenant raw getter 换回 DTO。只删 getter 会让调用方无法获得新 `sn`，因此 Binding raw-id 与稳定创建结果是同一不可分割的纵向合同。A 复用现有 DTO，由 Provider 在创建边界集中完成必要的 tenant+sn 持久化回读并返回完整 `sn/state/gmtCreate/gmtModified`，避免把 String sn 后的重复查询责任推给每个调用方，也不扩展新的类型、facade 或兼容层。raw getter 可能泄露 foreign tenant 的规则版本、scope、优先级、冲突策略、状态、生效窗口和审计引用；但四仓仓外 production caller=0，定性保持 `DEFENSE_IN_DEPTH_ELIGIBLE`。
+
+产品 09 与专项系分 06 已经定义 `sn` 由底座生成、Binding 创建输出 DTO，故产品和 DSL 无需改写。该卡不内收 `SpendRuleBindingService`，不改变暂停/恢复/退役，不清理 `SpendRuleBindingDTO.id` 或其他 create Long，也不改变规则、幂等、金额和任何资金事实。
+
+**冻结范围**：RED/existing-test 仅 `SpendRuleBindingServiceTests.java`，input SHA=`eb4c59917c7cc312c95acd01a9dbd79e860a739d6c5c287204fc3492ce4c717f`；新增一个 public reflection 方法，当前 `3/0` 变为精准 `4/1F/0E/0S`。Green production `MODIFY=3`：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/service/SpendRuleBindingService.java<TAB>6ea2fd84263f78d388e1b9b0ef1eb08ee9378232c3bcf5ef5a621df813e7e4f9
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleBindingServiceImpl.java<TAB>7c08ce4c6f399b71feb6f3b94143535a1483739a90416f5fa8c7c03e8a7b4527
+wallet/impl/src/main/java/com/wind/funds/wallet/services/impl/SpendRuleDefinitionServiceImpl.java<TAB>05e5eaabac889d3c49d42c9da8e0c5f8807c9439a0b3fc6fc12c091177c82a3e
+```
+
+Green existing-test `MODIFY=1`，同一测试文件已迁移三组 lifecycle setup/read并冻结 DTO 完整性；事务 RED 返工仍只在该文件新增一个真实 TransactionTemplate/H2 方法。Binding impl 最终只允许将 create 注解扩为 `noRollbackFor = DataIntegrityViolationException.class`，保留 insert+tenant/sn persisted read。本重冻仍为 `3 production + 1 test / ADD=0 / DELETE=0`；其他生产调用只消费 stable query/explain/active read 或 lifecycle，均 non-write，三仓 Consumer 为 0。
+
+**验证与停止线**：当前 partial Green=`target 4 / focused 90 / full 1232` 全绿但 Green Checker=`NOT PASS / 1 P1`。事务 RED 必须=`target 5/1F/0E/0S`，唯一 failure 为 `UnexpectedRollbackException`；事务 Green 后 target=`5/0`、focused=`91/0`、Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1233/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13/0`、compile/classfile/codegen/CAD PASS。第 4 个 production、第 2 个 test 文件、线程 barrier、Mock、stable query、DTO id、schema/build、REQUIRES_NEW/NESTED、兼容或其他资金行为变化立即停止。
+
+**RED 执行收口（plan-r2.399）**：唯一修改 `SpendRuleBindingServiceTests.java`，source/class/XML SHA=`ce1847bdf33bf13ad74168fc242e65dde3aedb13ada7b19bd3bcae412ea72c87 / cdce9397725b4d8c49d9b1561a3004e22857232f6f01375550f06190a71f7c54 / 76beb1f6b8ea633ef85e69932e9569e899be96e2594a20b7d7131b1051b2244c`，mtime=`15:51:16 < 15:51:41 < 15:51:44`。fresh=`4/1F/0E/0S`，唯一 JUnit failure 的两个聚合断言分别证明 create 仍返回 Long、raw getter 仍存在；原 3 个 Spring/H2 lifecycle 测试全部通过。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，测试自此 immutable。价值是让未来 Green 不能只改返回类型或只删 getter，同时不窥私有实现、不碰生产行为。
+
+**Green partial 与事务卡返工（plan-r2.401）**：原 Green 严格修改冻结四文件，普通验证为 target=`4/0`、focused=`90/0`、compile=`21/21`、Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1232/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13/0`、classfile/codegen PASS。独立 Green Checker=`NOT PASS / P0=0 / P1=1 / P2=0`：Binding 内层 REQUIRED 在 UK 冲突时把 Definition 外层共享事务标 rollback-only，外层 catch 回读 winner 后仍会提交失败。Human Owner 随后只授权 documentation rework。Checker 已接受更小的真实 TransactionTemplate/H2 测试，无需第二测试文件或双线程；它与既有 Definition 同 winner/单行幂等测试共同闭合行为。最终 Entry Card recheck=`PASS / P0=0 / P1=0 / P2=0`。当前=`TRANSACTION_RED_REWORK_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / TRANSACTION_RED_REWORK_EXECUTION_GRANT_NO / GREEN_REWORK_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+**事务 RED 返工收口（plan-r2.402）**：Human Owner 只授权同一测试文件新增第五个方法。首轮 `5/1F` 已精准捕获 UnexpectedRollback，但因失败断言先于单行/资金不变量，Checker=`NOT PASS / 1 P1`；同一方法改用 `catchThrowable` 后，winner 回读、单行、Transaction/Ledger 零副作用均在最终失败前通过。最终 source/class/XML=`2dc23e8478bec4608df11c98a33d3c2f09973d7f19c3a2bc66d605742eec968f / ced0dc57aef3b8d0a706989e53611e168577abd13c5f2e891c52f30660f6e633 / 6a9d9fe4f50dcc45d945364812ac63d4cd82a681bfdea07eea39ef7ef57ae1b5`，fresh=`5/1F/0E/0S`，独立 recheck=`PASS / P0=0 / P1=0 / P2=0`。该事务方法自此 immutable；Green 仍未授权。
+
+**Green 返工执行收口（plan-r2.403）**：Human Owner 授权后唯一修改 Binding impl，新增 DIVE import 并把 create 声明为 `rollbackFor=Exception + noRollbackFor=DIVE`，保持默认 REQUIRED、方法体和其他事务方法不变。source/class=`11a13ed0f0db345bde70f7ec4699670d34a7714423d0c7a7ce3b49f8c8564c4e / 42c8776f8d2a175fb71e7c2f9209a75014d0ea0dd0c6a4f1fed9e16f336ddf1a`，immutable test source/class 未漂移，Green XML=`9e40dda14e9f48d12c6525edc24ff3bb57253e28c0d2f05d8988e38c2091fc27`。验证为 target=`5/0`、focused=`91/0`、compile=`21/21`、Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1233/0F/0E/1S`、Public=`297/174/42`、Core=`94/4/4`、PMD=`13/0`、classfile/codegen PASS；独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。该修复闭合并发业务 UK 冲突后的外层幂等提交，不改变任何资金计算、生命周期或稳定身份语义。
+
+#### 12.2.30 `plan-r2.404` PaymentInstrument binding/history 内部服务面收口 Entry Card
+
+Human Owner 确认推荐方案并授权 `W5-MIG09-PAYMENT-INSTRUMENT-BINDING-INTERNAL-SERVICE-SURFACE-ENTRY-CARD-001`，本轮只允许主系分 11.17、主 TDD 20.20 与本 OpenSpec 建立 documentation-only Entry Card 并取得独立 Checker；不考虑兼容，不授权 RED、Green、Java、测试、Git、联网或发布。
+
+**价值与公共边界**：PaymentInstrument binding 当前态和 append-only history 是跨 VCC、卡、VA 与外部工具场景稳定复用的 Wallet 事实；但两个基础 Service 只封装 Mapper、selective update、重叠判断和 history insert/query。四仓生产搜索确认它们均只有 `PaymentInstrumentServiceImpl` 一个 caller，非 Wallet 和三仓 Consumer 为 0；上位 `PaymentInstrumentService` 已完整承接 create/change/unbind/query/history。退役基础 face 能阻止调用方绕过目标主体/币种/状态/有效期/重叠/版本/审计校验，避免当前态与历史证据分离，同时保留稳定工具能力和既有资金事实。
+
+**文件卡**：RED 只 MODIFY `PaymentInstrumentTenantIsolationTests.java`，input=`fc7901754ce73bef7458b56a771955f261abbde6d53cf0c679659d62f1f33729`，新增一个 string class-absence + public-method reflection testcase，旧实现目标=`5/1F/0E/0S`。Green production=`DELETE 4 + ADD 2 package-private internal Request + MODIFY 3 impl`；existing-test=`MODIFY 2`，另一个是 `FundsModuleDependencyBoundaryTests.java` input=`7b9e21f5f902958e19be14c6ebb72575d430c298a55c44783a87e77dd43ea5ea`。两个 ADD 只机械承接原 selective update/version 与 history snapshot/audit 字段；不新增接口、facade 或行为。精确路径、逐文件 SHA 与职责见系分 11.17，测试迁移和不变量见 TDD 20.20。
+
+**验证与停止线**：Green target=`5/0`、PaymentInstrument focused=`85/0`、Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1234/0F/0E/1S`、Public=`293/172/42`、Core=`94/4/4`、PMD=`13/0`、compile/classfile/codegen/CAD PASS。第 10 个 production、第 3 个 existing-test、任何真实外部 caller、public PaymentInstrumentService/DTO/Query、Entity/Mapper/schema/build、identity/tenant/version/effective-window/overlap/snapshot/transaction/history 或资金行为变化，兼容层、新接口和类重命名均停止。
+
+独立 Entry Card Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 复算确认两个基础 Service 的唯一 production caller 均为 `PaymentInstrumentServiceImpl`，9-path production closure 无遗漏；两个 package-private Request ADD 只承接现有 selective update/version 与 snapshot/audit 字段；concrete Bean、单文件 RED、2 个 existing-test 和 `85/217/1234/293` 计数可执行。当前=`PAYMENT_INSTRUMENT_BINDING_INTERNAL_SERVICE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+**RED 执行收口（plan-r2.406）**：Human Owner 授权后唯一修改 `PaymentInstrumentTenantIsolationTests.java`。source/class/XML=`13d05a9c7ecea0b58d8f47a775a209b08f80e0a3dbbd3dcdf8be1154f12a4bcb / 984a975675cf1205e7ba204fb29d32e50c9823fd5b55954e64a109e9c2d2566d / 537de3336eded0ae48a427f7037a72cddde752ebe0cfac0417dc27b74f6c2814`，mtime=`17:37:58 < 17:39:00 < 17:39:03`，fresh=`5/1F/0E/0S`。唯一 failure 列出四个仍可加载的 internal face 类型，稳定 Public 方法与既有四个 tenant 行为测试通过。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，确认既有测试、9-path production、另一个 existing-test 和三文档输入未漂移；RED 从此 immutable，本记录不授权 Green。
+
+**Green 执行收口（plan-r2.407）**：Human Owner 授权后严格执行 production `DELETE=4 / ADD=2 / MODIFY=3` 与 existing-test `MODIFY=2`。四个 face source/class 均 absent；两个 Request 下沉为 impl package-private 类型；两基础实现不再实现公共 interface，操作方法全部 package-private；`PaymentInstrumentServiceImpl` 是唯一 production caller，`PaymentInstrumentService` 7 个稳定方法保持。最终 ADD source/class=`dc5ed1efd3841a66ee026f95a61561d0fe01b9aeb163f0aa9eddbeaf199329ba / 8bc7fe70844ad75d543f3070e69e1337958d76ccb49a4ee0167897fd845d8ef1`、`93706e818afe90817306bbe23e89d1d4b1cde7c30dfbbbad1bdb0f532e601632 / abc9aa49ef0ed8da048ca2ac1c616dcdd9c6047e85dd1c39e6ade7487deb889a`；三个 impl source=`a7c322ac7d8dbafcdd0c337580b28ded7079fb0b45115dd3bcf9513422ea76f5 / 352c0625df66483a1726ba11ebdd57bbf4f0f452c392ef605c28ea1e67cb9966 / 182e2575b68243c9e3032c995a7ae009a8f41202099f50e0af5353b90720a3e1`；tenant test source/class/XML=`8f9d694902f0412e574e6fd7083a2f8db220ef0dd572e6513b23a809f426cdee / c890f1c483ecf9c13c1701f4d2291f5b4f210a1ec7c0f30e584af45d181eb251 / 2f7290a531a9dfa331d838bcb187394326a36a52d8cf4d92cf13c539c85d845c`。
+
+fresh 验证为 target=`5/0F/0E/0S`、PaymentInstrument focused=`85/0F/0E/0S`、Boundary=`217/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、full=`125 XML / 1234/0F/0E/1S`、Public=`293/172/42`、Core=`94/4/4`、PMD=`13/0`、Java 21 compile/classfile/codegen 与 `verify-cad` PASS；唯一 skip 是无真实 MySQL host migration。增量 compile 的旧 face classfile 残留由 clean compile 消除，未形成源码返工。独立 Green Checker 首轮仅发现测试闭合行缩进 P2；单行恢复与离线 target 后最终=`PASS / P0=0 / P1=0 / P2=0`。`verify-cad` 的非 offline PMD 子步骤曾访问 Maven metadata，按过程 P2 如实记录；它未修改仓库源码，本轮不能表述为全程离线。该切片删除的是可绕过上位事务的内部持久化入口，不删除 binding/history 公共用例，不改变 identity、tenant、版本、有效期、重叠、快照、事务、历史或任何 Route/Transaction/Ledger/Balance 事实。
+
+#### 12.2.31 `plan-r2.408` Spend Control tenant read surface 收窄 Entry Card
+
+Human Owner 从 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED` 授权继续推进。本轮推荐并冻结 `W5-MIG09-SPEND-CONTROL-TENANT-READ-SURFACE-ENTRY-CARD-001`，只允许主系分 11.18、主 TDD 20.21 和本 OpenSpec 建立 documentation-only Entry Card；不考虑兼容，不授权 RED、Green、Java、测试、Git、联网、发布或生产。
+
+**价值与能力提供者边界**：Spend Control movement 与 projection 是 Wallet 对预算增加/调减、占用、消费、释放和退款补偿形成的稳定控制事实，但每次读取都必须由调用方显式提交 tenant 授权。当前两个 `getXxxById(Long)` 直接按数据库主键读取；movement exact find、pagination/list 和 projection 仅依赖可空 QueryWrapper tenant 条件，缺少首次读取前的 Service guard。现有 H2 测试证明缺 tenant 会返回数据；scope sn 当前虽全局唯一，但已知或可猜测的 foreign scope 仍可被缺 tenant 查询直接读取和聚合，并可能污染后续授权判断。显式 tenant 契约是主防线，MyBatis-Flex tenant 插件只作纵深保护。
+
+**消费者与最小范围**：四仓不存在两个 raw-id getter 的外部 production caller；movement getter 只有实现自调用，scope getter只有一个既有测试类三处。wind-funds production 的 12 个 movement query 与 3 个 projection query 全部已从 request 传入 tenant，无需修改 caller。Green 因此严格 `MODIFY production=4 / existing-test=2 / ADD=0 / DELETE=0`：两个 face 删除 raw-id 方法；movement impl 以 tenant + movementSn 回读并在 exact find/direct pagination/projection 读前拒绝 null tenant；scope impl 删除 raw-id；两个测试文件只承接 immutable RED、删除旧 missing-tenant 正向断言和迁移三处 stable-key read。精确路径、职责和 SHA 见系分 11.18，RED 与不变量见 TDD 20.21。
+
+**RED 与验证**：RED 唯一修改 `SpendControlMovementServiceFlowTests.java`，新增一个真实 H2 + public reflection + exact-find/pagination/list/projection missing-tenant + foreign-empty + 零资金副作用方法；旧实现必须从 `13/0` 精准变为 `14/1F/0E/0S`。Green target=`14/0`，focused=`SpendControlMovementServiceFlowTests, BudgetControlLimitAdjustmentApplicationServiceTests, SpendRuleEvaluationApplicationServiceTests, SpendControlTransactionConsumptionApplicationServiceTests, PaymentInstrumentTransactionAuthorizationTests, ControlAccountLedgerInitializationTests=119/0`，Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1235/0F/0E/1S`，Public=`293/172/42`、Core=`94/4/4`、PMD=`13/0`、Java 21 compile/classfile/codegen/CAD PASS。新增文件、额外 caller、缺 tenant 来源、Query/DTO 或 create 返回值变化、Mapper/Entity/schema/build、全局租户插件、Spend Rule/额度算法、摘要/幂等、锁/事务、资金事实或兼容层均停止。
+
+当前 Maker 只修改三份权威文档，写前 SHA=`13a806d9e2e232657f6da184a765c8fc2630b7e682d25f519d809c2f0467a963 / 7fc79c8e74cd35b1453bffe9c345e1bc7432f1eb90161d8ee119a478f5a73754 / 0286e153f27f8c8522f03313973a30272381aecb6a486c39e9c350de4a7fc3b2`，没有修改 Java、测试、Query/DTO、Entity/Mapper/schema/build 或 Consumer，也没有执行 Maven、Git、联网、发布或生产。独立 Checker 首轮=`NOT PASS / P0=0 / P1=1 / P2=1`，最小返工只在既有范围补 exact find tenant guard/RED 与六类 focused 名单；recheck=`PASS / P0=0 / P1=0 / P2=0`。当时恢复入口为 `W5-MIG09-SPEND-CONTROL-TENANT-READ-SURFACE-RED-EXECUTION-GRANT / SPEND_CONTROL_TENANT_READ_SURFACE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.409`，只等待 Human Owner 是否授权 RED；Java、测试、Git、联网、发布和生产仍未授权。
+
+**RED 执行收口（plan-r2.410）**：Human Owner 授权后唯一修改 `SpendControlMovementServiceFlowTests.java`，source/class/XML=`0bd53e0c004e1e8f3e195bb0bd122f2f72c5f84736c0f5cb0f5fa7ef95573235 / 43d9957e6ae92c41b3ba815965b18fad6a0b6e26f4c3f2e59dd3e9837f377f31 / 1c4ae0da123931d3e864d91f357db33157e79ce25cc46a5b549827166c69c655`，mtime=`09:35:45 < 09:36:04 < 09:36:07`，fresh=`14/1F/0E/0S`。唯一 failure testcase 完整执行四条 missing-tenant、两个 raw-id absence、两个 stable method、foreign empty 与零资金副作用断言；只有四条 guard 和两个 raw-id 缺口失败，无 compile/reflection/Spring/H2/fixture error。生产 4 文件、另一个 test、两个 Query 和三文档输入 SHA 未漂移；Java 21 Maven 3.6.3 offline compile=`21/21`、classfile guard PASS。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，新增方法自此 immutable。
+
+当时恢复入口为 `W5-MIG09-SPEND-CONTROL-TENANT-READ-SURFACE-GREEN-EXECUTION-GRANT / SPEND_CONTROL_TENANT_READ_SURFACE_RED_EXECUTION_COMPLETE / SPEND_CONTROL_TENANT_READ_SURFACE_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.410`，只等待 Human Owner 是否授权 Green；其他 Java/测试、Git、联网、发布和生产仍未授权。
+
+**Green 执行收口（plan-r2.411）**：同一 Human Owner 授权被两个 writer 并发消费，先行 writer 严格完成冻结 4 production + 2 test；主 Owner 的重复 `apply_patch` 在首个已变化上下文处整体失败，没有产生第二份源码差异，并立即以 source SHA=`69456466... / 5c24ef8f... / 9c8454ee... / 623a5558... / 40876a7d... / f99301be...` 双读接管。两个 raw-id public/impl 方法源码和 clean classfile 均为 0；exact find、pagination、projection tenant guard 与 list 复用、record stable-key 回读、Scope stable get 均符合卡片，immutable RED 与两个 Query SHA 未漂移。
+
+Java 21 Maven 3.6.3 全部 offline：clean compile=`21/21`、target=`14/0`、focused=`119/0`、Transaction=`186/0`、Boundary=`217/0`、BusinessFlow=`200/0`、full=`125 XML / 1235/0F/0E/1S`，唯一 skip 为无真实 MySQL host；Public=`293/172/42`、Core=`94/4/4`、PMD=`13/0`、classfile/codegen PASS。未运行非 offline `just verify-cad`，其固定组成门禁已逐项 offline 通过。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`，确认无第 7 文件、双写、兼容、Query/DTO/schema/算法或资金事实变化。
+
+当时恢复入口为 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED / SPEND_CONTROL_TENANT_READ_SURFACE_GREEN_EXECUTION_COMPLETE / SPEND_CONTROL_TENANT_READ_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.411`，下一候选必须重新评估、成卡并取得 Human Owner 授权；Java、测试、Git、联网、发布和生产均未授权。
+
+#### 12.2.32 `plan-r2.412` AccountHierarchy 稳定创建身份决策包
+
+Human Owner 从 `W5-MIG09-NEXT-SLICE / ENTRY_CARD_REQUIRED` 授权继续价值分析和目标对齐。当前 9-file Wallet tenant-query 任务已被既有切片吸收并释放 writer；本轮选择完全不重叠的 AccountHierarchy stable creation identity，只允许主系分 11.19、主 TDD 20.22 和本 OpenSpec 建立 Decision Package，不授权 Java、测试、Maven、Git、联网、发布或生产。
+
+**事实与价值**：账户层级是 Wallet 稳定组织/归属事实，上一 Platform/Hierarchy 合同已保留 create 和 tenant-scoped find；Transaction Route appender 真实消费 find，并把 `relationSn + parent SubjectRef` 冻结到 RouteSnapshot。四仓 create production caller=0、DTO id production read=0；create 当前返回数据库 Long，DTO 也暴露 id，而 route/audit 只消费 provider-generated `sn` 与关系事实。数据库 id 不具备跨宿主稳定意义，`sn` 承担审计事实身份，`tenant + child` 承担业务唯一性；修正结果合同可减少数据库形态泄露，但不构成已证实外部漏洞或运行完成。
+
+**方案**：A=`create -> existing AccountHierarchyRelationDTO，DTO 删除 id`，推荐；B=`create -> String relationSn，DTO 删除 id`；C=`internalize create`。A 复用现有类型、一次返回 persisted stable facts、避免二次查询，且不新增抽象；所有 insert/replay/UK winner-readback 分支必须返回 winner 的 `sn/operatorId/gmtCreate/gmtModified`，不能把 retry/loser 请求回显拼入 DTO。B 更窄但把父关系事实回读推给调用方；C 会移除当前唯一受控 provisioning 能力，与已接受的保留创建方向冲突。继续返回 Long 不是候选。A/B 都保留 request、Operator、账户/tenant/type/state/currency/self/cycle/single-parent/concurrency 规则和 RouteSnapshot 行为，不考虑兼容。
+
+**候选工程影响**：A 预计 production `MODIFY=3`（service、DTO、impl）、existing-test `MODIFY=2`（contract、service tests），后者须以不同 Operator 的 retry/loser 证明返回保持 winner 原始 operator/time，并验证首次 persisted time 非空。其他 create 调用均忽略返回值，Route appender/fixture 不读 id，converter/Entity/Mapper/schema/Request/Core/Consumer non-write。该闭包只供选择评估；Owner 选择后必须从 live checkout 重新冻结 Entry Card、RED、SHA、计数和验证命令。若发现真实 create/DTO-id Consumer、Host 需要不同结果、关系可换绑/多父，或需要 graph/delete/admin/schema/Route/Core/资金事实变化，停止并重开 Inquiry。
+
+本轮三文档写前 SHA=`19bf81ee868893bd4e0f11a9ad551205aaf9476cc292a3d9175ef2f5ac2de9b7 / 4a7848b54a0724ae200cd178145dcd261bfb0341b6d8e8a27ef53d5e6c8534ef / f35591e9116c222a062343efd9551cf241a03c1eb7493889b078a3e852d3cdc6`。未修改或运行 Java、测试、schema/build、Consumer；未执行 Git、联网或发布。独立 Checker 首轮=`NOT PASS / P0=0 / P1=1 / P2=0`，最小返工只补不同 Operator retry/loser 与 winner persisted `operatorId + gmtCreate/gmtModified` 验收；recheck=`PASS / P0=0 / P1=0 / P2=0`。当时恢复入口为 `W5-MIG09-ACCOUNT-HIERARCHY-STABLE-CREATION-IDENTITY-DECISION-PACKAGE-001 / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_DECISION_PACKAGE_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / OWNER_DECISION_REQUIRED / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.412`，只等待独立 Checker。
+
+当时恢复入口：`W5-MIG09-ACCOUNT-HIERARCHY-STABLE-CREATION-IDENTITY-OWNER-DECISION / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_DECISION_PACKAGE_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_REQUIRED / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.413`。当时只等待 Human Owner 选择 A/B/C；Java、测试、Git、联网、发布和生产均未授权。
+
+#### 12.2.33 `plan-r2.414` AccountHierarchy 稳定创建身份 A 方案 Entry Card
+
+Human Owner 承接上一轮唯一推荐并授权按 A 推进：create 返回既有 `AccountHierarchyRelationDTO`，DTO 删除数据库 `id`，不考虑兼容。本轮只修改主系分 11.20、主 TDD 20.23 与本 OpenSpec，冻结 production `MODIFY=3`、existing-test `MODIFY=2`、`ADD=0 / DELETE=0`；不授权 RED、Green、Java、测试、Maven、Git、联网、发布或生产。
+
+**公共价值与合同**：Provider 返回的是 insert 后 stable re-read 的持久化关系事实，不是数据库代理主键。首建、同父 replay 和 DuplicateKey winner-readback 均返回 winner 的 `sn/operatorId/gmtCreate/gmtModified`；不同 Operator 的 loser 不得覆盖 winner。Request、账户准入、tenant、type/state/currency、自指/环路、单父、RouteSnapshot 和零资金副作用不变；不新增结果类型、图能力、兼容层、线程、锁或事务传播。
+
+**唯一文件与验证源**：精确路径、input SHA、RED 方法、Green 行为和固定计数只以系分 11.20 与 TDD 20.23 为准。RED 唯一修改既有 contract test，目标=`2/1F/0E/0S`；Green 四类 combined=`14/0`、full 保持=`125 XML / 1235/0F/0E/1S`。真实并发 Host、真实数据库和生产 D5 继续是残余边界，不用不稳定双线程测试或新增 fixture 冒充运行证明。
+
+独立 Entry Card Checker 首轮=`NOT PASS / P0=0 / P1=2 / P2=1`，最小返工只闭合唯一恢复入口、同一 service test 的完整零资金快照责任和 MIG-09 汇总陈旧项；recheck=`PASS / P0=0 / P1=0 / P2=0`。当前=`ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_A_ACCEPTED / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+当时恢复入口：`W5-MIG09-ACCOUNT-HIERARCHY-STABLE-CREATION-IDENTITY-RED-EXECUTION-GRANT / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.415`。
+
+#### 12.2.34 `plan-r2.416` AccountHierarchy 稳定创建身份 RED 执行与过程 P2 对齐
+
+Human Owner 授权 RED 后唯一修改既有 `AccountHierarchyRelationContractTests.java`。最终 source/class/XML SHA=`36a738e6b75499aa98c00e97d9cb728a2ef0d5bcf07e76b6e7b0be65b6702db5 / d63a4f0de7ab8f8845eec12d3f2ba26744afaa578f481d2e20a03d7caace16b9 / 220094ee278a351b1373abe46416dfebfaf239bdd20ba2270655131256da6957`，mtime=`10:53:02 < 10:53:20 < 10:53:21`，fresh=`2/1F/0E/0S`。唯一 failure 方法用 public face reflection + JDK Introspector 聚合证明 create 仍返回 Long、DTO Bean 仍含 `id`；Request 和第二条 schema/context 测试通过，生产 3 文件、service test 和三文档输入 SHA 未漂移。
+
+首次执行因 checked reflection 位于 SoftAssertions lambda 内产生 testCompile Harness error；只把 `Method` 解析移到 lambda 外后，写前/后 Java 21 offline compile=`21/21`，最终 testCompile、classfile 与 fresh XML 均到达目标 RED。独立 Checker 确认技术 RED=`PASS / P0=0 / P1=0` 且可 immutable，但首次直接 `just compile` 曾开始访问并下载 Maven SNAPSHOT metadata，发现后立即中断、仓库未改，按授权边界记 `P2=1`；后续通过 `/private/tmp` 临时 Maven wrapper 强制 `-o`，未修改 Justfile/POM/settings。
+
+上述事实已如实写回 authority；独立 authority recheck=`PASS / P0=0 / P1=0 / P2=0`，首次非离线 metadata 访问继续保留为历史过程 P2。当前=`RED_EXECUTION_COMPLETE / RED_TEST_IMMUTABLE / RED_AUTHORITY_ALIGNMENT_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+当时恢复入口：`W5-MIG09-ACCOUNT-HIERARCHY-STABLE-CREATION-IDENTITY-GREEN-EXECUTION-GRANT / RED_EXECUTION_COMPLETE / RED_TEST_IMMUTABLE / RED_AUTHORITY_ALIGNMENT_COMPLETE / RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.417`。
+
+#### 12.2.35 `plan-r2.418` AccountHierarchy 稳定创建身份 Green 执行收口
+
+Human Owner 授权后严格完成 3 production + 1 existing-test，immutable RED 未改，`ADD=0 / DELETE=0`。create 公共契约只返回 persisted `AccountHierarchyRelationDTO`，DTO 不再暴露数据库 `id`，无 Long overload、alias、deprecated、bridge、V2 或兼容层；首建、同父 replay 与 DuplicateKey loser 均以既有 tenant + child stable find 返回 winner，different-parent、账户准入、环路、tenant、币种、状态和 RouteSnapshot 行为不变。
+
+最终 source SHA=`12830f2917e4a7aef41ac26f105d885b519d0567dd460de9459cacfade8b612c / 5166a443894a2d80e6b55bbe75fb282ee92e104c6daea44f3d9d143b7a3e742d / aa2c2878ccd2fb1dddb150cea4af2957a37beeb0739b89312c3a11ad6eeade12 / 2ad6e3fb8ffa1a69b416612c9c15309e03ba1c58d3920d886373998376e26fcb`，immutable RED SHA=`36a738e6b75499aa98c00e97d9cb728a2ef0d5bcf07e76b6e7b0be65b6702db5`。Java 21/Maven 3.6.3 offline 验证=`compile 21/21 / target 14/0F/0E/0S / Transaction 186/0F/0E/0S / full 125 XML,1235/0F/0E/1S / Public 293/172/42 / Core 94/4/4 / PMD 13/0 / classfile+codegen+CAD PASS`，Boundary 与 BusinessFlow 命令通过；唯一 skip 仍为无真实 MySQL host migration。首次非 clean target 的旧生成类/旧测试类 `8E` 经同一源码 clean compile 完全收敛，只保留 breaking API 发布必须 clean build 的工程门禁。
+
+独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。本切片只证明 current checkout D4，不证明真实数据库竞争、仓外 Host、发布或生产 D5。当前=`ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_GREEN_EXECUTION_COMPLETE / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / MIG09_EXECUTION_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5-MIG09-GOVERNANCE-PROJECTION-LEGACY-SURFACE-INQUIRY-ENTRY-CARD-GRANT`，只允许重新建立 documentation-only Inquiry/Entry Card；不授权 Java、测试、Git、联网、发布或生产。
+
+当时恢复入口：`W5-MIG09-GOVERNANCE-PROJECTION-LEGACY-SURFACE-INQUIRY-ENTRY-CARD-GRANT / ACCOUNT_HIERARCHY_STABLE_CREATION_IDENTITY_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / INQUIRY_ENTRY_CARD_GRANT_NO / CODE_FREEZE / plan-r2.418`。
+
+#### 12.2.36 `plan-r2.419` Governance Projection 旧执行面收口 Entry Card
+
+Human Owner 授权 documentation-only Inquiry/Entry Card 与价值确认。源码证明正式 tenant-aware 持久任务链已由 ApplicationService、真实 Spring/H2 transaction scan、task/difference/projection 表、checkpoint resume、verify/shadow/apply 和 Ledger/Balance 零副作用承重；旧 public impl `replay(request)`、双参构造器及 Source/Writer 无 tenant 方法只被 20 个单元测试消费，仓外 production Consumer=0。face Request 无外部 Consumer，但当前仍是 `runTask` 内部 legacy carrier；Green 必须由同一 Service 先改用 `viewDomain + range` 再删除。
+
+本卡选择无兼容硬切旧 direct/no-tenant surface，保留持久能力。future production=`DELETE 1 Request + MODIFY 5`，existing-test=`MODIFY 1`，`ADD=0`；精确路径、SHA、行为迁移和计数只以系分 11.21、TDD 20.24 为准。RED 只新增一个 public reflection 方法，目标=`21/1F/0E/0S`；Green 不删既有 20 个测试，全部迁到真实 Mapper/H2 + tenant-aware test port 的 create/run task，并把旧 direct input checkpoint 校验归位为 Source 初始化 checkpoint 在 task insert 前的内部端口校验；combined=`25/0`、full=`1236/0F/0E/1S`、Public=`292/172/42`、Core=`94/4/4`。Source/Writer 整体内收和 `externalRuleVerificationStatus` 删除均为后续独立决策，不在本卡偷渡。
+
+本轮只修改主系分 11.21、主 TDD 20.24 与本 OpenSpec，没有修改 Java、测试、schema/build、Consumer，也未执行 Maven、Git、联网、发布或生产。独立 Checker 首轮指出 SHA 顺序歧义 P1 与 ReplayRequest 当前内部 carrier 事实误述 P2；逐路径绑定 SHA、校准 runTask 引用、补清 checkpoint 迁移责任后 recheck=`PASS / P0=0 / P1=0 / P2=0`。当前=`GOVERNANCE_PROJECTION_LEGACY_SURFACE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+当时恢复入口：`W5-MIG09-GOVERNANCE-PROJECTION-LEGACY-SURFACE-RED-EXECUTION-GRANT / GOVERNANCE_PROJECTION_LEGACY_SURFACE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.420`。
+
+#### 12.2.37 `plan-r2.421` Governance Projection 旧执行面 RED 收口
+
+Human Owner 授权 RED 后，唯一修改 `FundsProjectionReplayServiceTests.java`，新增 public reflection 契约方法与必要 imports/helper，既有 20 个测试未改。source/class/final XML SHA=`8d914efca4510f5af63161d6b50a4661ef8a2100a175d9194b4a7999286ff5a5 / 2b0759cd3b79c99c1347cacde1c6c0bb0c3bc7dc27cec49c62c453aebf85fc4b / 3128e25057246c9f6e617e41862a1054e5dda36f0226852acc64857bb68661f0`，fresh=`21/1F/0E/0S`、Host=`4/0`、combined=`25/1F`、full=`125 XML / 1236/1F/0E/1S`。唯一 failure 是新增方法聚合证明旧 Request、双参构造、public replay、四个 tenantless port surface 和 5 个 default tenant-aware 方法仍存在；没有 compile/reflection/环境 error。
+
+Java 21/Maven 3.6.3 offline 写前/写后 compile=`21/21`，testCompile/classfile/XML 新鲜。6 个未来 Green production、Host 和三文档 input SHA 未漂移。独立 Checker 证明可机械恢复 pre SHA=`53c0e3028c545f72c56939a1a91f63dc10b7cbf35df710c327ecf7ca686c7645`，结论=`PASS / P0=0 / P1=0 / P2=0`。RED 方法与断言自此 immutable；本轮未修改生产、schema/build、Host test，未执行 Git、联网、发布或生产。
+
+当时恢复入口：`W5-MIG09-GOVERNANCE-PROJECTION-LEGACY-SURFACE-GREEN-EXECUTION-GRANT / GOVERNANCE_PROJECTION_LEGACY_SURFACE_RED_EXECUTION_COMPLETE / RED_TEST_IMMUTABLE / RED_INDEPENDENT_CHECKER_PASS / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE / plan-r2.421`。
+
+#### 12.2.38 `plan-r2.422` Governance Projection 旧执行面 Green 收口
+
+Human Owner 授权 Green 后严格完成 Entry Card 的 `DELETE 1 + MODIFY 5 production + MODIFY 1 existing-test`，Request source/class 为 0，无新增文件。Source/Writer classfile 只保留 tenant-aware abstract 方法；Service 只保留四参构造与 ApplicationService 四方法，runTask 直接使用 viewDomain+range，createTask 在 insert 前校验 Source checkpoint。默认 scan/writer、payload、`externalRuleVerificationStatus`、schema、Host、SPI ownership 和资金事实未改。
+
+最终 production source SHA：Source=`d738badd91bfdc92dbcec9205ff13edfba8f02a13304fd43def28586bf4bd109`、Writer=`c33ba56a991bec04f319da3564851564ec169513e6bb2c9cff764d59dcd55076`、Service=`b1afd699599dac0b471611cae3a6613345810a90ac61c5893e26401c47aac1e4`、DefaultSource=`740b19f2452f6373a59c031b1e15c4ee83117df2a9898ff45fe6cf3314ab40a1`、DefaultWriter=`21eb0716578f4db226df11acd7b6c8cd607c4d9e09f42fa67ecea210753081ff`；test source/class/fresh XML=`15e2af1b81d69e9ac8661df33d2c56c98980fc23998d1e52761242dee6b43a1e / 654255d69e72f6cd2677875e27ab5745ada4b48f7e45e8b0c97b5e566a714d5e / 15431b05cfdab4cdd619d18fffb8e51a3272396bfc523e9feb815fa255df253c`。最终验证=`clean compile21/21 / Governance25/0 / Transaction186/0 / Business200/0 / Boundary217/0 / full125XML,1236/0F/0E/1S / Public292/172/42 / Core94/4/4 / PMD13/0 / classfile+codegen+CAD PASS`。
+
+首次 test migration 的 `15F/2E` 与第二次 `12F/1E` 由 direct construction 绕过 Spring transaction 和跨测已提交任务污染导致，改为真实 Spring Service 代理并用 `REQUIRES_NEW` 仅做每测清理后闭合；首次 CAD 的 unused import 与 Checker Javadoc P2 也完成最小返工。独立 Green Checker 最终=`PASS / P0=0 / P1=0 / P2=0`。本轮不执行 Git、联网、发布或生产；真实 MySQL、宿主 IAM/调度和生产 D5 仍是 residual boundary。
+
+当时恢复入口：`W5-MIG09-GOVERNANCE-PROJECTION-SPI-OWNERSHIP-INQUIRY-ENTRY-CARD-GRANT / GOVERNANCE_PROJECTION_LEGACY_SURFACE_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / INQUIRY_ENTRY_CARD_GRANT_NO / CODE_FREEZE / plan-r2.422`。
+
+#### 12.2.39 `plan-r2.423` Governance Projection SPI ownership Entry Card
+
+Human Owner 授权 documentation-only Inquiry/Entry Card 与价值确认。四仓源码证明 `FundsTransactionProjectionReplaySource/Writer/Fact/FactBatch/Row` 不在公共 ApplicationService 输入输出中，仓外 production Consumer=0；wind-funds 生产只由 replay Service 与两个默认实现使用，Host 也只装配默认实现。它们是 governance-impl 内部事实扫描、批次重建和投影写入协议，不是跨场景稳定的公共资金契约。
+
+本卡选择无兼容 hard cut：保留五类的字段、方法、tenant、checkpoint 和重建/写入语义，整体从 face 平移到 `com.wind.funds.governance.projection.internal`。Source/Writer 继续作为真实内部隔离缝，以保留 malformed port、difference、shadow/apply 与失败不推进验证；不直接耦合两个默认实现，不新增插件机制、facade、V2 或第二套模型。公共 ApplicationService 及其稳定请求、任务、范围、checkpoint、结果、差异、模式和状态不变。
+
+future closure=`DELETE 5 face + ADD 5 internal same-name types + ADD 1 internal package-info + MODIFY 4 production + MODIFY 2 existing-test`，完整路径、input SHA、逐文件责任和 non-write 以主系分 11.22 为准。RED 只修改既有 `FundsProjectionReplayServiceTests.java`，新增 `testProjectionReplaySpiShouldBelongToGovernanceImplementation`，目标=`22/1F/0E/0S`；Green 时该方法和 ownership 断言 immutable，只允许既有 imports 重绑。`FundsCurrencyContractTests` 只迁 Fact/Row imports并保留 3 个币种断言，Host 4 tests verification-only。
+
+固定门禁为 RED combined=`29/1F`、full=`125 XML / 1237/1F/0E/1S`；Green combined=`29/0`、full=`1237/0F/0E/1S`、Public=`287/172/42`、Core=`94/4/4`、PMD=`13/0`，另需 Java 21 offline clean compile、Governance/Transaction/BusinessFlow/Boundary、source/classfile/codegen/CAD。唯一 skip 仍为无真实 MySQL host migration；真实宿主、数据库、发布和生产 D5 不在本卡。
+
+本轮只修改主系分 11.22、主 TDD 20.25 与本 OpenSpec，没有修改 Java、测试、schema/build、Consumer，也不执行 Maven、Git、联网、发布或生产。独立 Checker 首轮=`NOT PASS / P0=0 / P1=1 / P2=0`，唯一 P1 为旧 plan-r2.422 行仍标“当前恢复入口”；只把该前缀改为“当时恢复入口”后 recheck=`PASS / P0=0 / P1=0 / P2=0`。原 B 方案、文件闭包、RED、固定计数和 stop boundary 均保持成立。当前=`GOVERNANCE_PROJECTION_SPI_OWNERSHIP_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / CODE_FREEZE`。
+
+Human Owner 后续授权 RED，唯一修改 `FundsProjectionReplayServiceTests.java`，新增 public ownership 契约方法；既有 21 tests、fixture 和生产源码未改。source/class/XML=`c187210b8249fd4d7148427dc8227e000832a869ef953b1eed9462c1aa732cb7 / 002a814be8cc1714315e4f1960d5ffbb3edcdc21973c2d0361bc705f97cb737b / e4ba4f3b74f5ea168274ff72efec8c892dfa09d8e15600fc0e8f7cab6374edc8`，fresh target=`22/1F/0E/0S`、combined=`29/1F/0E/0S`、full=`125 XML / 1237/1F/0E/1S`。唯一 testcase 聚合十项 ownership 缺口，无非目标 error；独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`，RED 自此 immutable。同期只机械修复用户指南 strict-exact 旧调用名和主系分 Context 陈旧状态，不改变本卡。
+
+Governance SPI ownership Green 按卡片完成 `DELETE 5 + ADD 6 + MODIFY 4 production + MODIFY 2 existing-test`。旧 face source/class 为 0，internal 五类和 package-info source/class 存在；ApplicationService 不泄漏 internal。字段、ABI、JSpecify、重放/persistence/事务和资金行为未改；immutable RED 只机械重绑 imports。首次增量 `29/1F` 是删除源码后旧 target class 残留，clean build 后=`29/0`。最终=`clean compile21/21 / Governance26/0 / Transaction186/0 / Business200/0 / Boundary217/0 / full125XML,1237/0F/0E/1S / Public287/172/42 / Core94/4/4 / PMD13/0 / CAD PASS`。Green Checker 首轮仅报新增类型 Javadoc P2，最小补齐类型头与 record 参数后 recheck=`PASS / P0=0 / P1=0 / P2=0`。
+
+当时恢复入口：`W5-CORE-FUNDS-INSTRUCTION-SPEC-BOUNDARY-DECISION-PACKAGE-GRANT / GOVERNANCE_PROJECTION_SPI_OWNERSHIP_GREEN_EXECUTION_COMPLETE / GOVERNANCE_PROJECTION_SPI_OWNERSHIP_GREEN_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / CORE_DOCUMENTATION_GRANT_NO / CORE_JAVA_NO / CODE_FREEZE / plan-r2.426`。
+
+#### 12.2.40 `plan-r2.427` `FundsInstructionSpec` Core 边界决策包
+
+Human Owner 授权 `W5-CORE-FUNDS-INSTRUCTION-SPEC-BOUNDARY-DECISION-PACKAGE-001`，本轮只建立 Core documentation-only 决策包和价值评估，不考虑兼容；不修改产品/DSL 正文、Java、测试、Core baseline、schema/build 或 Consumer，不执行 Maven、Git 写入、联网、发布或生产。
+
+**证据与定性**：当前 Core `FundsInstructionSpec` 有 30 getter/14 default-null，唯一 production implementation 为 transaction-impl `ImmutableFundsInstructionSpec`；6 converter 共 18 个 builder 入口且全部显式提供 tenant；直接生产闭包为 Core 4 + Transaction 34 + Ledger 3 = 41 文件，Capte/Fincone/Fincone Issuing Java Consumer=0。它已是 Route/Transaction/Ledger 共用的单一执行脊柱，但 nullable tenant、大量默认空值和 load-bearing `contextVariables` 使许多非法变体只能在下游运行时拒绝。`APPROVED/COMPLETION_MODE/REFUND_MODE/INCREASE/FEE_CHARGE_SPEC` 已被真实 Route、Lifecycle、Replay、Query 或 Posting 代码消费，直接影响拒绝路由、完成/退款回放、借贷方向和费用 leg，不属于可选展示上下文。
+
+**推荐 A**=`SINGLE_ACTION_COMMAND_WITH_TYPED_FACETS`：保留一条 Core 资金动作指令，用稳定 kernel + 少量 typed facet 闭合账户/参与方/工具、归一化外部事实、行为控制条件和原事实证据，`contextVariables` 只保留非权威解释/证据引用。该方案最直接消除 Map 控制与非法部分状态，又不建立多套命令和重复映射。B=`SEALED_SCENARIO_HIERARCHY` 会把当前六类 converter/流程固化为 Core 类型族，缺少外部 Consumer 证据，不推荐；C=`STAGE_SPECIFIC_COMMANDS` 会重复 tenant/Money/business identity/reference 并引入多事实源，暂不采用。
+
+**不合并的后续决策**：目标 DSL 的 `FundsIntent -> FundsAttempt -> FundsActionInstruction -> FundsActionFact` 语义保留，但当前没有 Intent/Attempt Java 类、持久权威输入或仓外 Consumer，不先物化对应 Public API。现有 `instructionType/eventType/transactionType` 三元组已被真实行为承重，本包不同时合并为 `actionKind`。Ledger subject/period 是 action 输入还是 Route/posting 派生事实，须在 A 的后续 Entry Card 逐字段冻结，不允许 Core action 反向持有已可派生的 Ledger 结果。
+
+**价值准出**：后续不得只证明 API/getter 更名；必须同时用真实 Spring/H2 流程锁定授权拒绝零账务、余额调整借贷方向、嵌入费用平衡、退款/强制完成重放幂等、外部事实全有全无和显式 tenant fail-closed。本包不新增资金能力，不改变 Money、借贷、平衡、posting 或事实语义；其价值是将已存在但隐藏在可空字段/Map 中的资金不变量变成可构造、可审查、可测试的 Core 契约。
+
+本轮三文档 input SHA=`117e2f67c4ae1891ccf501c2b034ffabfcedf7383691a79ea52f573a266c01b9 / 62dd256fbff7de39a79f26b6cbdcd167d82e598072456ae2eb1f07e5dfd2b49e / 8f5ec533f039ffe7652643d382a3a9fa0e1d8afb596008517c765ec72ee0d7ea`。本包不冻结生产/测试白名单、RED 方法、预期计数或最终 Java 类名；这些必须在 Owner 选择后从 live checkout 重新枚举并建立 documentation-only Acceptance/Entry Card。独立 Checker 首轮=`NOT PASS / P0=0 / P1=0 / P2=1`，唯一 P2 是顶部 Current execution authorization 使用了泛化状态 token；仅对齐为精确 `CORE_FUNDS_INSTRUCTION_SPEC_BOUNDARY_DECISION_PACKAGE_MAKER_COMPLETE` 后 recheck=`PASS / P0=0 / P1=0 / P2=0`，事实、A/B/C 方案、价值、停止线和授权边界均未改。
+
+当时恢复入口：`W5-CORE-FUNDS-INSTRUCTION-SPEC-BOUNDARY-OWNER-DECISION / CORE_FUNDS_INSTRUCTION_SPEC_BOUNDARY_DECISION_PACKAGE_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / OWNER_DECISION_REQUIRED / CORE_ENTRY_CARD_REQUIRED / CORE_JAVA_NO / TEST_NO / CODE_FREEZE / plan-r2.427`。
+
+#### 12.2.41 `plan-r2.428` `FundsInstructionSpec` Core 边界决策包 Checker 收口
+
+独立 Checker 完成源码与三文档复算：30 getter/14 default-null、6 converter 的 18 builder 与 18 个显式 tenant、Core 4 + Transaction 34 + Ledger 3 = 41 个生产直接闭包、三仓 Java Consumer=0 均成立；五个 context key 真实承重路由、生命周期、重放、借贷方向或费用 leg。A 的单指令脊柱 + typed facets 有实际证据；B 的场景类型族和 C 的分层多命令均缺少 Consumer/独立演进压力。暂不物化 Intent/Attempt、不合并三元分类、Ledger 字段逐项后置均通过边界审查；Checker 不替代 Human Owner 选择 A/B/C。
+
+当前=`CORE_FUNDS_INSTRUCTION_SPEC_BOUNDARY_DECISION_PACKAGE_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_REQUIRED / CORE_ENTRY_CARD_REQUIRED / CORE_JAVA_NO / TEST_NO / CODE_FREEZE`。本轮没有修改或运行 Java、测试、Core baseline、schema/build 或 Consumer；没有执行 Maven、Git 写入、联网、发布或生产。
+
+当时恢复入口：`W5-CORE-FUNDS-INSTRUCTION-SPEC-BOUNDARY-OWNER-DECISION / CORE_FUNDS_INSTRUCTION_SPEC_BOUNDARY_DECISION_PACKAGE_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_REQUIRED / CORE_ENTRY_CARD_REQUIRED / CORE_JAVA_NO / TEST_NO / CODE_FREEZE / plan-r2.428`。
+
+#### 12.2.42 `plan-r2.429` 单一资金动作指令 + typed facets A 方案 Entry Card
+
+Human Owner 明确选择 A：`SINGLE_ACTION_COMMAND_WITH_TYPED_FACETS`。本轮只建立字段所有权、完整 caller/test closure、顺序子卡、Green 准入和首个 tenant RED 候选，不考虑兼容；不修改 Java、测试、Core baseline、产品/DSL 正文、schema/build 或 Consumer，不执行 Maven、Git、联网、发布或生产。
+
+**目标契约**：最终单一 `FundsActionInstructionSpec` 保留 tenant、三元分类、Money/原币/汇率、business identity/time、operator、已有 `FundsInstructionReferenceSpec` 和非权威 evidence context。十二个账户/主体/工具/科目/账期字段分入 `FundsActionPartiesSpec + FundsActionPostingTermsSpec`；外部事实四字段分入 `NormalizedExternalFundsFactSpec`；authorization/completion/refund/balance-adjust 分入四个互斥 typed terms，费用复用 `FeeSpec`。`FundsIntent/FundsAttempt` 不物化，三元分类不合并，不改变 Money、借贷、平衡、posting、幂等、重放或资金事实。
+
+**Context 边界**：action `contextVariables` 只保留 channel/external trace、Spend/Benefit/Budget 等非权威证据。所有 typed/control key 必须在 request/core context validator 递归拒绝；Route/posting/lifecycle 不从 action context 回读。为保留已持久查询、投影和重放协议，saver 可以从 typed facet/reference 单向投影原稳定 key；这是 output protocol，不是兼容输入。`FREEZE_TYPE` context override 删除并改由 `businessScene` 归类。
+
+**宏工程闭包**：主系分 11.24 冻结 `48 existing production Java / manifest=6e7d572c5d2c18374c6706282f5e4d2f9f18bf3823ee88dbf2c87e795466b0b7 / DELETE 4 / MODIFY 44 / ADD 9 / Core API governance MODIFY 2`；主 TDD 20.27 冻结 `20 executable test classes + 1 helper / Java manifest=de835b464c19c8df203bac156ddbc72ff52e19b854ebcfbb79603725be05f4fb / 7 transaction-layer JSON / manifest=06ac74d97768d9718cb38b8b3f9e4d46603e0ba30520ccb87ded5ae4ef0d811c`。这些是 K1~K5 总候选集，不是一次 Green 白名单。五张子卡依次为 `TENANT_KERNEL -> EXTERNAL_FACT -> PARTIES_POSTING -> ACTION_TERMS -> ACTION_NAME_CUTOVER`；K3 只移除已迁 parties/posting 读取，K4 完成 terms 后再删除 FieldKeys/ContextReader；每卡无 alias/default/deprecated/bridge/V2/双读写。Core API 计数依次为 `102/94/4/4 -> 103/95/4/4 -> 105/97/4/4 -> 108/100/4/4 -> 108/100/4/4`，K2~K5 同卡修改 stable baseline 与 verifier 硬编码计数。
+
+**首个候选**=`W5-CORE-FUNDS-ACTION-INSTRUCTION-TENANT-KERNEL-001`；精确范围仅为 `FundsInstructionSpec.java + ImmutableFundsInstructionSpec.java + FundsInstructionDslContractTests.java`，`ADD=0 / DELETE=0 / stable-api/verifier/policy non-write`。测试新增 `testFundsInstructionShouldRequireExplicitTenant`，旧实现目标 RED=`19/1F/0E/0S`，Green=`19/0F/0E/0S`，full 从 `1237/0F/0E/1S` 变为 RED `1238/1F/0E/1S` 再到 Green `1238/0F/0E/1S`。Public Contract 保持 `287/172/42`，Core API 保持 `102/94/4/4`，18 个 production builder 保持显式 tenant 且 non-write。
+
+**Ponytail admission**=`PENDING`：本卡尚需独立 Checker，tenant RED/Green 也尚无 Owner 执行授权，因此不启动 A/B。只有本卡 Checker PASS、Owner 再授权首个子卡与独立 Human `GIT_WORKTREE_GRANT`，且两 arm 使用同一 revision + source-set digest/prompt/model/reasoning/测试、独立 worktree/CODEX_HOME、无 memory/全局 Skill/插件/Hook 污染时，才可以 default-off 作 baseline、显式 `@ponytail` 作 candidate。tenant RED/Green Grant 不隐含 Git 或 worktree 权限。
+
+本轮三文档 input SHA=`f72dd5fdfc5f419b1e0e1d8dcc7a4e2334862dbee5e11d541f49fb3f871beeb1 / e8a09539b22e452ed67d55c529b38bf807162314bc397de9dd415b2acfca3574 / 72930f3a9501b377b206919f3cda517ce65749728cec2449617b072e06c83166`。当前=`CORE_FUNDS_ACTION_INSTRUCTION_A_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / TENANT_RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE`。
+
+当时恢复入口：`W5-CORE-FUNDS-ACTION-INSTRUCTION-A-ENTRY-CARD-001 / CORE_FUNDS_ACTION_INSTRUCTION_A_ACCEPTED / CORE_FUNDS_ACTION_INSTRUCTION_A_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / TENANT_RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE / plan-r2.429`。
+
+#### 12.2.43 `plan-r2.430` A 方案 Entry Card Checker 收口
+
+独立 Checker 首轮发现 K3/K4 删除顺序 P1，修正为 K3 只移除已迁 parties/posting 读取、K4 terms 完成后再删 FieldKeys/ContextReader。后续又发现 Core API baseline/verifier 计数和真实 JSON caller/resource 闭包 P1，以及状态 token 与 Git worktree 独立授权 P2；最小返工后全量 recheck=`PASS / P0=0 / P1=0 / P2=0`。
+
+最终可复算闭包为 `48 production Java / manifest=6e7d572c5d2c18374c6706282f5e4d2f9f18bf3823ee88dbf2c87e795466b0b7`、`20 executable test classes + 1 helper / manifest=de835b464c19c8df203bac156ddbc72ff52e19b854ebcfbb79603725be05f4fb`、`7 transaction-layer JSON / manifest=06ac74d97768d9718cb38b8b3f9e4d46603e0ba30520ccb87ded5ae4ef0d811c`。ADD 9 均有当前字段/行为证据；K1~K5 Core API 依次为 `102/94/4/4 -> 103/95/4/4 -> 105/97/4/4 -> 108/100/4/4 -> 108/100/4/4`。
+
+当前只达到 `ENTRY_CARD_INDEPENDENT_CHECKER_PASS / ENGINEERING_READY / EXECUTION_NOT_AUTHORIZED`。首个候选仍是 tenant kernel 的 2 production + 1 existing test，旧实现预期 `19/1F/0E/0S`；RED 尚需 Human Owner 明确授权。Ponytail A/B 还需 tenant RED/Green 授权与独立 `GIT_WORKTREE_GRANT`，当前不执行。
+
+当前=`CORE_FUNDS_ACTION_INSTRUCTION_A_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / TENANT_RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE`。本轮未修改或运行 Java、测试、Core baseline、schema/build 或 Consumer，未执行 Maven、Git、联网、发布或生产。
+
+当时恢复入口：`W5-CORE-FUNDS-ACTION-INSTRUCTION-TENANT-KERNEL-RED-EXECUTION-GRANT / CORE_FUNDS_ACTION_INSTRUCTION_A_ACCEPTED / CORE_FUNDS_ACTION_INSTRUCTION_A_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / TENANT_RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE / plan-r2.430`。
+
+#### 12.2.44 `plan-r2.431` K1 tenant kernel Green 技术事实与 closeout Maker
+
+Human Owner 依次授权 tenant RED、Green 和唯一 Ledger existing-test caller 迁移。最终 production 仅修改 `FundsInstructionSpec.java` 与 `ImmutableFundsInstructionSpec.java`：Core accessor 和 impl getter 明确 `@NonNull`，compact constructor 以 `fundsInstruction.tenantId must not be null` 统一 fail-fast。record component 不标 `@NonNull`，是为避免 Lombok builder setter 先抛 `tenantId is marked non-null but is null` 的架构 NPE，不表示 tenant 可空。没有新 builder、fallback、alias、V2 或兼容层；6 converter 的 18 builder 与 18 个显式 tenant 未改。
+
+immutable RED source SHA=`1e4c62c01ae2714632b1085fdc9616a35323fa7e8225840ca4daaab0e6647bec`，从旧实现 `19/1F/0E/0S` 变为 Green `19/0F/0E/0S`且 Green 期间未修改。首轮 full CAD 的唯一 `1E` 为 Entry Card 漏掉的 `DefaultLedgerTransactionPostingServiceImplTests.testPostShouldRejectMissingTenantIdBeforeLedgerFacts`：旧 fixture 在进入 Ledger 之前就被新 Core 构造不变量拒绝，不是生产回归。Owner 单文件授权后，测试以合法 instruction delegate + JDK Proxy 只让 public `getTenantId()` 返回 null，继续调用真实 `postingService.post` 并保留 LedgerFactSnapshot 零变化断言；最终该类=`30/0F/0E/0S`，无 Mockito/ByteBuddy。
+
+最终 source SHA：Core=`af8e98729b205d990312ff5afa116f3efbb4584b39fdc0f692d1a7849d429da4`，impl=`beb3c1c7e8b65e168e63f1c69aa5b37363b1af806793bfc89b371a6446dbb8ef`，immutable RED=`1e4c62c01ae2714632b1085fdc9616a35323fa7e8225840ca4daaab0e6647bec`，Ledger test=`aab400cce305f0b3a61976004287be1acac565f2fac519d2329ee5eb7062eb79`。Java 21/Maven 3.6.3 强制 offline 验证=`compile 21/21 / tenant 19/0 / Core 108/0 / Ledger posting 30/0 / full 125 XML,1238/0F/0E/1S / Public 287/172/42 / Core API 102/94/4/4 / PMD 13 XML,0 finding / verify-cad+classfile+codegen PASS`，唯一 skip 是无真实 MySQL host migration。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`；未执行 Git、worktree 或 Ponytail A/B。
+
+三文档 closeout input SHA=`3c7ecc9498da46e5f1632983476cab3600498e15f5b79701cf14b2eeabea09f7 / e4c626687392b9981d583db1a7fdfa001af5cf5feac773df93ad15a87c748fbc / f9323546a378c444a12750219d6f3f4c4f839ea08e3f25b1a3b022bb70fac34f`。当时=`TENANT_KERNEL_GREEN_EXECUTION_COMPLETE / TENANT_KERNEL_GREEN_INDEPENDENT_CHECKER_PASS / GREEN_CLOSEOUT_MAKER_COMPLETE / GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PENDING / K2_ENTRY_CARD_GRANT_NO / K2_EXECUTION_ADMISSION_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE`。
+
+当时恢复入口：`W5-CORE-FUNDS-ACTION-INSTRUCTION-TENANT-KERNEL-GREEN-CLOSEOUT-001 / TENANT_KERNEL_GREEN_EXECUTION_COMPLETE / TENANT_KERNEL_GREEN_INDEPENDENT_CHECKER_PASS / GREEN_CLOSEOUT_MAKER_COMPLETE / GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PENDING / K2_ENTRY_CARD_GRANT_NO / K2_EXECUTION_ADMISSION_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE / plan-r2.431`。
+
+#### 12.2.45 `plan-r2.432` K1 tenant kernel Green closeout 收口
+
+documentation closeout 独立 Checker 首轮唯一 P2 是主系分、主 TDD 与 OpenSpec authorization 的当前 tuple 未全部显式携带 `K2_EXECUTION_ADMISSION_NO`；仅补齐三处 token 后 recheck=`PASS / P0=0 / P1=0 / P2=0`，技术证据、A 方案、字段所有权、宏闭包和授权边界均未改。
+
+本轮只修改主系分 11.24、主 TDD 20.27 与本 OpenSpec，未修改 Java、测试、API baseline、配置或其他文档；三文档 system-design/refactoring/lightweight/gsd-wave、trailing whitespace、围栏、唯一恢复入口和 `git diff --check` 均 PASS。
+
+当时=`TENANT_KERNEL_GREEN_EXECUTION_COMPLETE / TENANT_KERNEL_GREEN_INDEPENDENT_CHECKER_PASS / GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / K2_ENTRY_CARD_GRANT_NO / K2_EXECUTION_ADMISSION_NO / K2_RED_NO / K2_GREEN_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / CODE_FREEZE`。当时 K2 尚未具备执行准入，只能在 Human Owner 授权后先建立 documentation-only Entry Card。
+
+当时恢复入口：`W5-CORE-FUNDS-ACTION-INSTRUCTION-EXTERNAL-FACT-ENTRY-CARD-GRANT / K2_EXTERNAL_FACT_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / K2_ENTRY_CARD_GRANT_YES / K2_EXECUTION_ADMISSION_NO / K2_RED_NO / K2_GREEN_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE / plan-r2.433`。
+
+#### 12.2.46 `plan-r2.433` K2 EXTERNAL_FACT typed facet Entry Card
+
+Human Owner 授权 `W5-CORE-FUNDS-ACTION-INSTRUCTION-EXTERNAL-FACT-ENTRY-CARD-GRANT`。本轮仅建立 documentation-only Entry Card；不修改 Java、测试、Core API baseline、schema/build、JSON 或 Consumer，不执行 Maven、Git、worktree、Ponytail A/B、联网、发布或生产。K1 tenant kernel 已由提交 `098f2414` 完成并作为当前事实保留。
+
+**目标契约**：以一个 `@Nullable FundsInstructionSpec#getNormalizedExternalFact()` 替换四个独立 nullable getter；新增 `core/src/main/java/com/wind/funds/transaction/spec/NormalizedExternalFundsFactSpec.java` 作为最小 typed facet，组件固定为 `externalSourceCode`、`externalFundsFactSn`、`externalFundsEffectType`、`externalFundsFactDigest`。facet 只能为 `null` 或四字段全有效，禁止部分构造、context fallback、alias/default/deprecated/bridge/V2、双读写。它只承载已归一外部事实的身份/效果/摘要，不承载 raw rail、accepted/processing、authority/finality、规则解释或证据包；这些由 Adapter/Consumer 负责。
+
+**生产 Green 白名单**：`ADD=1 / MODIFY=7 / DELETE=0`。ADD 为上述 Core facet；MODIFY 为 `FundsInstructionSpec.java`、`ImmutableFundsInstructionSpec.java`、`FundsDirectTransactionInstructionConverter.java`、`FundsTransactionConverter.java`、`ExternalFundsFactDigestSupport.java`、`FundsTransactionCommandServiceImpl.java`、`DefaultFundsInstructionLifecycleSaver.java`。源码扫描确认四个 instruction getter 的直接生产引用仅落在这 7 个既有实现/转换/摘要/幂等路径；route、ledger、reconciliation、governance 无直接 caller。
+
+**测试 Green 白名单**：`MODIFY=2`。`tests/src/test/java/com/wind/funds/dsl/FundsInstructionDslContractTests.java` 只增加一个 public reflection RED 方法，检查新 type/accessor 存在且旧四 getter 不存在，RED 后 immutable；`tests/src/test/java/com/wind/funds/transaction/support/ExternalFundsFactDigestSupportTests.java` 只把 fixture 的四个 builder setter 机械迁移为 facet 构造，保留 canonical/legacy/unknown digest 断言。无新增测试文件。
+
+**治理与 non-write**：治理只允许 `core/api-baseline/stable-api.txt` 与 `scripts/verify-core-api-baseline.sh`，删除四个旧 default member，加入 facet accessor/type 的真实 public signatures，Core API 固定为 `103/95/4/4`；`api-policy.tsv` non-write。`FundsTransaction`、`FundsTransactionMapper`、`FundsTransactionQueryService`/`DefaultFundsTransactionQueryService`、三个 request/外部事件服务、PaymentInstrument 编排、所有 route/ledger/reconciliation/governance 代码、现有外部事实/重放/查询/边界测试、H2 schema/data、当前 0 个 DSL JSON 和宏 7 个 JSON 候选均 non-write。实体列、联合查询、请求字段和 JSON 形状是已成立协议，不因 facet 迁移重命名。
+
+**输入证据 SHA**：`FundsInstructionSpec=af8e98729b205d990312ff5afa116f3efbb4584b39fdc0f692d1a7849d429da4`、`ImmutableFundsInstructionSpec=beb3c1c7e8b65e168e63f1c69aa5b37363b1af806793bfc89b371a6446dbb8ef`、`FundsDirectTransactionInstructionConverter=60f38ae11f8a388eb4945635134702e682a2c1cf8936b4d958d6523e502e4c0f`、`FundsTransactionConverter=cf9dad8ef088c878ef6093b08c7ca2a5867e87bd80f3538a5057514ad4d25ce6`、`ExternalFundsFactDigestSupport=86c795c711713c051f8a4d36d013b9d074f6708a0d5f919d454fa8e0b51191bd`、`FundsTransactionCommandServiceImpl=c35ca20d3d6899a17abd18bc442f51192b816b09fcce192b6362596a7bd5e0ac`、`DefaultFundsInstructionLifecycleSaver=d252eb32a044fffdf9e5a4e3888ba0af405f76fe55e9a1051e5dcd817ab3654f`；测试 `FundsInstructionDslContractTests=1e4c62c01ae2714632b1085fdc9616a35323fa7e8225840ca4daaab0e6647bec`、`ExternalFundsFactDigestSupportTests=88dfffde3663d23888f9c89b528089ba58ac2d4345ac7baf8e2215ec92e2ae70`；baseline=`28f0159789a91ab33d0ee9c9f8760acc75a63c83cbf107dc46b6edfeb1237663`、verifier=`3ad2aab43a898270bd58add64b9b3c4927bdca05abb0f15332cfdab063abefcb`。
+
+**RED/Green 门禁**：RED 只在 `FundsInstructionDslContractTests` 增加一个反射测试，当前 19 tests -> `20/1F/0E/0S`，唯一 failure 必须来自旧公共契约；Green 目标为 DSL+digest `21/0F/0E/0S`，full 目标 `125 XML / 1239/0F/0E/1S`，Core API `103/95/4/4`。全部测试使用 Java 21/Maven 3.6.3 offline，fresh XML 必须晚于源码；验证还需 compile/Core/transaction/business/reconciliation/boundary/Public Contract/PMD/classfile/codegen/CAD，唯一允许既有 skip 为无真实 MySQL host migration。编译/Harness error、额外 caller/type/file、schema/DTO/JSON 变化、digest 变化、资金行为变化或非目标 failure/error 均停止并回 Owner。
+
+**价值与状态**：该卡把已存在的外部事实全有/全无、稳定事实键幂等和不可变载荷摘要冲突不变量收敛为一个可复用输入单元，降低半迁移风险；不新增资金能力、不改变金额、借贷、posting、余额、账本事实、交易状态、重放或外部 finality。独立只读 Checker=`PASS / P0=0 / P1=0 / P2=0`；当时=`K2_EXTERNAL_FACT_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / ENGINEERING_READY / K2_ENTRY_CARD_GRANT_YES / K2_EXECUTION_ADMISSION_NO / K2_RED_NO / K2_GREEN_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-EXTERNAL-FACT-RED-EXECUTION-GRANT`。
+
+#### 12.2.47 `plan-r2.434` K2 EXTERNAL_FACT Green closeout
+
+K2 `EXTERNAL_FACT` 已完成破坏式 Green 迁移并通过独立 Checker。Core 新增 `NormalizedExternalFundsFactSpec`；`FundsInstructionSpec` 删除四个独立 `getExternal*` default getter，统一为 `@Nullable getNormalizedExternalFact()`；immutable instruction、Direct converter、MapStruct、digest support、transaction command 和 lifecycle saver 均读取同一 facet。facet 只能整体为空或四字段全有效，字段为 `externalSourceCode`、`externalFundsFactSn`、`externalFundsEffectType`、`externalFundsFactDigest`。
+
+已验证的资金事实语义保持不变：`tenantId + source + factSn + effectType` 外部事实幂等键、`businessScene + businessSn` 业务幂等键、digest 覆盖范围、持久化四列、审计/重放、金额、借贷、posting、余额和交易状态均未改变。Entity、Mapper、Request、Query、Route、Ledger、JSON、schema 未修改；未引入 alias、双轨、fallback、`FundsIntent/FundsAttempt` 或外部 authority/finality 逻辑，后者仍由 Adapter/Consumer 负责。
+
+Green 证据固定为：K2 target=`21/0F/0E/0S`；Core=`109/0F/0E/0S`；Transaction=`186/0F/0E/0S`；full=`125 XML / 1239/0F/0E/1S`；Public Contract=`287/172/42`；Core API=`103/95/4/4`；PMD=`13 XML / 0 finding`；`verify-cad`、classfile、codegen 和 MapStruct generated source 检查通过。唯一 skip 是既有无真实 MySQL host migration。默认 `just compile`/`just pmd` 曾因 recipe 未带 offline 参数触发 metadata 访问并中止，正式证据全部来自 Java 21/Maven 3.6.3 offline wrapper。
+
+本轮只修改主系分、主 TDD 和本 OpenSpec 的 closeout 记录；不再修改 Java、测试、API baseline、脚本、schema、配置或 Consumer，不执行 Maven、Git、worktree、Ponytail A/B、联网、安装、发布或生产。当前状态=`K2_EXTERNAL_FACT_GREEN_EXECUTION_COMPLETE / K2_EXTERNAL_FACT_GREEN_INDEPENDENT_CHECKER_PASS / K2_EXTERNAL_FACT_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / K3_ENTRY_CARD_GRANT_NO / K3_EXECUTION_ADMISSION_NO / K3_RED_NO / K3_GREEN_NO / CODE_FREEZE`；独立 closeout Checker=`PASS / P0=0 / P1=0 / P2=0`。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-PARTIES-POSTING-ENTRY-CARD-GRANT`，仅允许 K3 documentation-only Entry Card。
+
+#### 12.2.48 `plan-r2.435` K3 PARTIES_POSTING typed facets Entry Card
+
+Human Owner 授权 `W5-CORE-FUNDS-ACTION-INSTRUCTION-PARTIES-POSTING-ENTRY-CARD-GRANT`。本轮只冻结 K3 `PARTIES_POSTING` 的字段所有权、生产/测试闭包、RED/Green 门禁和停止线；不修改 Java、测试、API baseline、schema/build、JSON、Consumer 或其他文档，不执行 Maven、Git、worktree、Ponytail、联网、安装、发布或生产。
+
+**目标契约**：在 K5 类名 cutover 之前继续使用 `FundsInstructionSpec`。新增且仅新增两个 Core public record：`core/src/main/java/com/wind/funds/transaction/spec/FundsActionPartiesSpec.java`（accountId、payerAccountId、payeeAccountId、payerId、payeeId、linkedFundingAccountId、instrumentRef、externalAccountRef）与 `core/src/main/java/com/wind/funds/transaction/spec/FundsActionPostingTermsSpec.java`（payerLedgerSubjectCode、payeeLedgerSubjectCode、ledgerPeriodType、ledgerPeriodId）。`FundsInstructionSpec` 以 `getParties()`、`getPostingTerms()` 替换 12 个 flat getter；facet 整体可空，事件所需字段组合由既有 converter/route fail-closed 校验，tenantId 只来自 K1 action kernel。
+
+**字段边界**：账户/付款方/收款方/linked funding/工具和外部端点是上游已归一动作输入；posting subject/period 是仅在事件需要时上游明确给出的约束。`RouteParticipant`、`SubjectRef`、最终 `LedgerEntry`、posting plan、余额桶、Profile、状态和 RouteSnapshot 均是 Route/Ledger/Transaction 派生事实，不回填 Core action。引用型退款 parties 必须为空并只回放原 RouteSnapshot；业务确认型退款保留到账账户、出资主体和出资账目组合。`LIFETIME` 周期规范化，非生命周期周期必须有 periodId；不允许 context fallback、alias/default/deprecated/bridge/V2 或双轨。
+
+**生产 Green 白名单**：`ADD=2 / MODIFY=21 / DELETE=0`。ADD 为上述两个 record；MODIFY 为：
+
+```text
+core/src/main/java/com/wind/funds/transaction/spec/FundsInstructionSpec.java
+transaction/impl/src/main/java/com/wind/funds/transaction/instruction/ImmutableFundsInstructionSpec.java
+transaction/impl/src/main/java/com/wind/funds/transaction/support/FundsInstructionContextReader.java
+transaction/impl/src/main/java/com/wind/funds/transaction/support/ExternalFundsFactDigestSupport.java
+transaction/impl/src/main/java/com/wind/funds/transaction/DefaultRoutedFundsInstructionOrchestrator.java
+transaction/impl/src/main/java/com/wind/funds/transaction/services/impl/DefaultFundsInstructionLifecycleSaver.java
+transaction/impl/src/main/java/com/wind/funds/transaction/services/impl/DefaultFundsFrozenOrderLifecycleSaver.java
+transaction/impl/src/main/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/BalanceControlFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/ClearingFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/DefaultRouteReplayService.java
+transaction/impl/src/main/java/com/wind/funds/route/PayoutFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/SettlementFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/TransferFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsAuthorizationInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsBalanceControlInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsClearingInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsPayoutInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsSettlementInstructionConverter.java
+ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java
+```
+
+18 个 builder 调用分布为 Authorization 4、BalanceControl 3、Clearing 1、Direct 7、Payout 1、Settlement 2。Route/Replay/Orchestrator 只切换读取来源；saver/digest 只从 facet 投影原稳定 key；posting 只读取显式 terms，最终账务结果仍由既有 route/profile/posting 规则决定。生产 manifest=`c825d08e55edf2ed43b3b18b539951ba50b28661fafe516581548c66c11ba73d`。
+
+**测试 Green 白名单**：`MODIFY=10`，只允许机械迁移 builder/accessor 和 fixture，保留原行为断言：
+
+```text
+tests/src/test/java/com/wind/funds/dsl/FundsInstructionDslContractTests.java
+tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java
+tests/src/test/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssemblerTests.java
+tests/src/test/java/com/wind/funds/ledger/service/LedgerTransactionServiceFactQueryTests.java
+tests/src/test/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolverTests.java
+tests/src/test/java/com/wind/funds/route/DefaultRouteReplayServiceTests.java
+tests/src/test/java/com/wind/funds/transaction/application/flow/FundsInstructionLifecycleTenantIsolationTests.java
+tests/src/test/java/com/wind/funds/transaction/services/impl/DefaultFundsFrozenOrderLifecycleSaverTests.java
+tests/src/test/java/com/wind/funds/transaction/services/impl/RouteSnapshotJsonSupportTests.java
+tests/src/test/java/com/wind/funds/transaction/support/ExternalFundsFactDigestSupportTests.java
+```
+
+测试 manifest=`ab46c5c67fb0a878ce5875c8e9e192fc74c362cea7cab4f21f1fd11028c697c2`。non-write 测试为 `FundsModuleDependencyBoundaryTests`、`FundsOperatorDependencyBoundaryTests`、`FundsAmountBoundaryContractTests`、`FundsDslJsonContractTests`、`FundsDslJsonContractVerifier`、`CompositeRouteResolverTests`、`RouteAccountHierarchySnapshotAppenderTests`、`AgentCommissionSettlementBusinessFlowTests`、`FundsAuthorizationTransactionFlowTests`、`FundsSettlementTransactionFlowTests`、`FundsTransactionProjectionExplainApplicationServiceTests`；7 个 transaction-layer JSON 与空的 `tests/src/test/resources/dsl-contract-cases` 也 non-write。
+
+**RED/Green 门禁**：RED 只在 `FundsInstructionDslContractTests` 新增 `testFundsInstructionShouldExposePartiesAndPostingFacets`，用 public reflection + SoftAssertions 验证两个 facet 类型、新 accessor 和旧 12 getter/flat builder setter 缺失；旧实现预期 DSL=`21/1F/0E/0S`、DSL+digest=`22/1F/0E/0S`、full=`125 XML / 1240/1F/0E/1S`，唯一 failure 必须来自旧 public contract，RED Checker PASS 后 immutable。Green 预期 DSL=`21/0F/0E/0S`、combined=`22/0F/0E/0S`、full=`125 XML / 1240/0F/0E/1S`；既有 Core=`109/0F/0E/0S`、Transaction=`186/0F/0E/0S`、BalanceControl=`44/0F/0E/0S`、BusinessFlow=`200/0F/0E/0S`、Reconciliation=`247/0F/0E/0S` 不得回归。Public Contract=`287/172/42`（Core record 不在该脚本扫描范围），Core API=`105/97/4/4`；治理只允许 `core/api-baseline/stable-api.txt` 与 `scripts/verify-core-api-baseline.sh`，`api-policy.tsv` non-write。
+
+当前 K3 状态=`K3_PARTIES_POSTING_RED_EXECUTION_COMPLETE / K3_PARTIES_POSTING_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K3_GREEN_EXECUTION_GRANT_NO / K3_GREEN_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`；独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`。生产、测试（除本卡唯一 RED 文件）、请求/DTO、Entity/Mapper、schema/build、Projection、Reconciliation、Governance、Consumer、K4/K5、FundsIntent/FundsAttempt、分类三元组、金额/FX、审计/重放和外部 authority/finality 均不在本卡。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-PARTIES-POSTING-GREEN-EXECUTION-GRANT`；Green、Java（除已完成 RED）、其他测试、Git、worktree、Ponytail、联网、发布和生产仍未授权。
+
+#### 12.2.49 `plan-r2.436` K3 PARTIES_POSTING RED execution closeout
+
+Human Owner 的“授权推进”按 K3 Entry Card 的唯一顺序先执行 RED。本轮唯一写入 `tests/src/test/java/com/wind/funds/dsl/FundsInstructionDslContractTests.java`；23 个 production 候选、其他测试、API baseline、脚本、schema/build、Consumer 和设计正文均未修改。source SHA=`f6aacd80558e3bab4e3f17220742711776605436b13c790d888bb95f49e5f8ad`，fresh Surefire XML SHA=`7747edebaecca9164c5a2988408264df20b8299bbdbfe0a662e34aea094f8257`，mtime=`11:35:54 < 11:36:34`。
+
+显式 Java 21/Maven 3.6.3 offline fresh 结果=`21/1F/0E/0S`；唯一失败为 `testFundsInstructionShouldExposePartiesAndPostingFacets`，18 个 SoftAssertions 全部指向两个 facet/type/accessor/builder 尚不存在且 12 个旧 flat getter/setter 仍存在。没有 compile、Spring、reflection、fixture 或其他 error；首次未设置 `JAVA_HOME` 导致 Java 8 fork 的 `UnsupportedClassVersionError` 已作为 Harness 失败废弃，不计入 RED。
+
+RED 方法及断言已 immutable。独立 RED Checker=`PASS / P0=0 / P1=0 / P2=0`。当前状态=`K3_PARTIES_POSTING_RED_EXECUTION_COMPLETE / K3_PARTIES_POSTING_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K3_GREEN_EXECUTION_GRANT_NO / K3_GREEN_NO / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-PARTIES-POSTING-GREEN-EXECUTION-GRANT`，不授权 Green。
+
+#### 12.2.50 `plan-r2.437` K3 PARTIES_POSTING Green closeout
+
+Human Owner 授权并完成冻结的 K3 Green。实际写入闭包为 `ADD=2 / production MODIFY=21 / existing-test MODIFY=10 / governance MODIFY=2`，没有额外 production、test、facet、schema、Request/DTO、Entity/Mapper、JSON、Consumer、兼容层或 K4/K5 变更。`FundsInstructionSpec` 与 immutable implementation 删除 12 个 flat getter/builder setter，统一暴露 `parties` 与 `postingTerms`；Route、orchestrator、lifecycle saver、converter 与 Ledger assembler 已迁移到 facet，stable digest literal keys 保持不变。
+
+Green 证据：K3 focused=`100/0F/0E/0S`；full=`125 XML / 1240/0F/0E/1S`，唯一 skip 为无真实 MySQL host 的 migration test；Public Contract=`287/172/42`；Core API=`105 public / 97 stable / 4 experimental / 4 internal`；PMD=`13 XML / 0 finding`；classfile/codegen 与 Java 21/Maven 3.6.3 offline reactor compile/package=`21/21` 通过。未显式设置项目 Java 21 时的 `getExpiresAt` stale exclusion 误报已用 Corretto 21 复跑为 PASS，`api-policy.tsv` 保持 immutable。
+
+独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`；documentation closeout Checker=`PASS / P0=0 / P1=0 / P2=0`。该证据只证明当前 checkout D4 工程验证和资金不变量保持，不证明真实 MySQL、仓外 Consumer、发布或生产 D5。当前=`K3_PARTIES_POSTING_GREEN_EXECUTION_COMPLETE / K3_PARTIES_POSTING_GREEN_INDEPENDENT_CHECKER_PASS / K3_PARTIES_POSTING_GREEN_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_SCOPE_COMPLETE / K4_ENTRY_CARD_GRANT_NO / K4_EXECUTION_ADMISSION_NO / RED_TEST_IMMUTABLE / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate 仅为 K4 `ACTION_TERMS` documentation-only Entry Card。
+
+#### 12.2.51 `plan-r2.438` K4 ACTION_TERMS typed facets Entry Card
+
+Human Owner 授权建立 K4 `ACTION_TERMS` documentation-only Entry Card。本卡只冻结四类行为控制 terms、FeeSpec 复用、完整 production/test closure、RED/Green 门禁和停止线；不修改 Java、测试、API baseline、schema/build、JSON、Consumer 或其他文档，不执行 Maven、Git、联网、发布或生产。
+
+**价值与边界**：授权通过/拒绝、完成模式、退款模式、余额/额度调账方向和费用规格都会改变 Route、posting、余额或审计结果，不是普通说明字段。typed terms 让这些跨场景稳定的不变量在 Core/Converter 边界可审查，同时保留 Route/Ledger 的派生责任。`contextVariables` 仅保留非权威证据；saver/projection 可从 terms 单向投影原稳定 key，不能形成第二输入源。`FundsIntent/FundsAttempt`、外部 authority/finality、完整协议证据和新费率引擎均不在本卡。
+
+**目标契约**：新增 `FundsAuthorizationTermsSpec`（approved/declineReason/MerchantInfoSpec/InternationalRegionCode）、`FundsCompletionTermsSpec`（Mode=`REFERENCED|FORCE` 与 force policy/limit/reason/originalFactRef/voucherRef）、`FundsRefundTermsSpec`（Mode=`REFERENCED|BUSINESS_CONFIRMED|NO_AUTH|DISPUTE` 与 refund/dispute evidence）和 `FundsBalanceAdjustmentTermsSpec`（Direction=`INCREASE|DECREASE` 与 adjust/source/external/responsibility/approval/reconciliation evidence）。`FundsInstructionSpec` 增加四个 terms accessor 与 `@Nullable getFeeSpec()`，immutable implementation 负责互斥和空值校验；已有 `FeeSpec`、`MerchantInfoSpec`、`FundsInstructionReferenceSpec`、`Money`、`SourceObjectType` 和 ledger enums 复用，不新建平行类型。若 `MerchantInfoSpec` 的 INTERNAL API 分类与 public facet 发生冲突，必须停止并回到 Owner，不调整 policy 或制造同义模型。
+
+**生产白名单**：`ADD=4 / DELETE=2 / MODIFY=15 / governance MODIFY=2`。ADD 为四个上述 terms record；DELETE 为：
+
+```text
+core/src/main/java/com/wind/funds/transaction/spec/FundsInstructionFieldKeys.java
+transaction/impl/src/main/java/com/wind/funds/transaction/support/FundsInstructionContextReader.java
+```
+
+MODIFY 为：
+
+```text
+core/src/main/java/com/wind/funds/context/FundsContextVariablesValidator.java
+core/src/main/java/com/wind/funds/transaction/spec/FundsInstructionSpec.java
+transaction/face/src/main/java/com/wind/funds/transaction/constant/FundsInstructionContextKeys.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsAuthorizationInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsBalanceControlInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsDirectTransactionInstructionConverter.java
+transaction/impl/src/main/java/com/wind/funds/transaction/converter/FundsTransactionRequestContextValidator.java
+transaction/impl/src/main/java/com/wind/funds/transaction/instruction/ImmutableFundsInstructionSpec.java
+transaction/impl/src/main/java/com/wind/funds/route/AuthorizationFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/BalanceControlFundsInstructionRouteResolver.java
+transaction/impl/src/main/java/com/wind/funds/route/DefaultRouteReplayService.java
+transaction/impl/src/main/java/com/wind/funds/route/RouteFeeChargeAppender.java
+transaction/impl/src/main/java/com/wind/funds/transaction/services/impl/DefaultFundsFrozenOrderLifecycleSaver.java
+transaction/impl/src/main/java/com/wind/funds/transaction/services/impl/DefaultFundsInstructionLifecycleSaver.java
+ledger/impl/src/main/java/com/wind/funds/ledger/posting/DefaultLedgerPostingAssembler.java
+```
+
+治理只改 `core/api-baseline/stable-api.txt` 与 `scripts/verify-core-api-baseline.sh`，目标 Core API=`108/100/4/4`；`api-policy.tsv` immutable。
+
+**测试白名单**：existing-test MODIFY 仅为 `FundsInstructionDslContractTests.java`、`FundsModuleDependencyBoundaryTests.java`、`FundsTransactionRequestContextVariablesContractTests.java`、`DefaultLedgerPostingAssemblerTests.java`、`AuthorizationFundsInstructionRouteResolverTests.java`、`DefaultRouteReplayServiceTests.java`。RED 只在 DSL contract 新增一个 public reflection + SoftAssertions 方法，预计 `22/1F/0E/0S`、full=`125 XML / 1241/1F/0E/1S`；Green 只机械迁移其余 5 个直接 builder/context caller，保留 Route、posting、费用 leg、审计、摘要、幂等和重放断言，目标 `22/0F/0E/0S`、full=`125 XML / 1241/0F/0E/1S`。其余 authorization/direct/balance/fee/projection/frozen/query 流程测试与 7 个 JSON fixture 只作 verification-only，验证稳定 output context，不提供兼容输入。
+
+**停止线与状态**：任何额外 type/file、Request/DTO/Entity/Mapper/schema/JSON/Consumer 修改，MerchantInfoSpec/API policy 决策、Intent/Attempt、authority/finality、alias/default/deprecated/bridge/V2、双读写、context fallback、金额/借贷/平衡/余额/状态/幂等/重放或稳定 key 变化，立即停止并重冻。当前=`K4_ACTION_TERMS_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / K4_EXECUTION_ADMISSION_NO / K4_RED_EXECUTION_GRANT_NO / K4_GREEN_EXECUTION_GRANT_NO / K3_CURRENT_SCOPE_COMPLETE / CODE_FREEZE`；下一 Human Gate 为 K4 Entry Card 独立 Checker，未授权 RED/Green。
+
+#### 12.2.52 `plan-r2.439` K4 ACTION_TERMS Entry Card rework
+
+独立 Checker 对 plan-r2.438 判定 `NOT PASS / P0=0 / P1=2 / P2=0`。P1-1 是 `MerchantInfoSpec` 在 `core/api-baseline/api-policy.tsv:7` 明确为 `INTERNAL`，但未来 public `FundsAuthorizationTermsSpec` 计划直接暴露该类型；P1-2 是四个 terms record 的 Java component 类型、`@Nullable/@NonNull` 与 mode/direction 契约未逐项冻结。本轮只修改三份文档，未修改 Java、测试、API policy、schema、build 或 Consumer。
+
+推荐 Owner 决策为：保留现有 `MerchantInfoSpec`，将其提升为 stable Core value（不新建同义类型）；`FundsCompletionTermsSpec.forceCompletionLimitAmount` 使用 `@Nullable Money`，由 Converter 按 instruction amount 的 `CurrencyIsoCode` 从当前 request `Long` 归一。若 Owner 不接受前者，则 `merchantInfo` 必须从 public facet 移为 output-only evidence；若不接受后者，则必须重新评估 Core 金额契约，二者未确认前均不具备 K4 `ENGINEERING_READY`。
+
+四个 terms 的完整签名为：`FundsAuthorizationTermsSpec(@NonNull Boolean approved, @Nullable String declineReason, @Nullable MerchantInfoSpec merchantInfo, @Nullable InternationalRegionCode transactionCountry)`；`FundsCompletionTermsSpec(@NonNull Mode mode, @Nullable String forceCompletionPolicyCode, @Nullable Money forceCompletionLimitAmount, @Nullable String forceCompletionReason, @Nullable String externalOriginalFactRef, @Nullable String forceCompletionVoucherRef)`；`FundsRefundTermsSpec(@NonNull Mode mode, @Nullable String externalReferenceSn, @Nullable String refundReason, @Nullable String disputeMode, @Nullable String disputeReason, @Nullable String disputeVoucherRef, @Nullable String externalDisputeRef)`；`FundsBalanceAdjustmentTermsSpec(@NonNull Direction direction, @NonNull String adjustReason, @NonNull String adjustEvidenceRef, @Nullable SourceObjectType sourceType, @Nullable String sourceSn, @Nullable String reasonCode, @Nullable String externalInstitutionRef, @Nullable String externalAccountRef, @Nullable String externalFinalEventRef, @Nullable String externalBalanceSnapshotRef, @Nullable String responsibilityRef, @NonNull String approvalRef, @Nullable String reconciliationExceptionRef, @Nullable String reconciliationRerunRef)`。`Mode`/`Direction` 仅为嵌套 enum，固定值分别为 `REFERENCED|FORCE`、`REFERENCED|BUSINESS_CONFIRMED|NO_AUTH|DISPUTE`、`INCREASE|DECREASE`。
+
+当前=`K4_ACTION_TERMS_ENTRY_CARD_REWORK_MAKER_COMPLETE / K4_ACTION_TERMS_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / K4_MERCHANT_INFO_POLICY_DECISION_REQUIRED / K4_COMPONENT_SIGNATURE_DECISION_REQUIRED / K4_EXECUTION_ADMISSION_NO / K4_RED_EXECUTION_GRANT_NO / K4_GREEN_EXECUTION_GRANT_NO / K3_CURRENT_SCOPE_COMPLETE / RED_TEST_IMMUTABLE / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate 先确认 MerchantInfoSpec 分类与 force limit 类型，确认后才可申请 K4 RED；当前不授权 RED/Green。
+
+#### 12.2.53 `plan-r2.440` K4 ACTION_TERMS Owner decision closeout
+
+Human Owner 已确认：`MerchantInfoSpec` 不进入 public `FundsAuthorizationTermsSpec`，继续由 transaction-face request 和 saver output context 承载；`FundsCompletionTermsSpec.forceCompletionLimitAmount` 在 Core terms 中采用 `@Nullable Money`，Converter 按 instruction amount 的 `CurrencyIsoCode` 从请求层 `Long` 归一。这样保持 Core 只承载跨场景稳定的资金动作约束，不把收单/卡授权展示证据提升为公共资金模型；`api-policy.tsv` 维持 immutable。
+
+最终 `FundsAuthorizationTermsSpec` 签名为 `(@NonNull Boolean approved, @Nullable String declineReason, @Nullable InternationalRegionCode transactionCountry)`；`FundsCompletionTermsSpec` force limit 为 `@Nullable Money`，其余三个 terms 的组件、Mode/Direction 和互斥校验沿用 plan-r2.439 的完整冻结。K4 生产/测试白名单不变，Core API 目标保持 `108 public / 100 stable / 4 experimental / 4 internal`。
+
+当前=`K4_ACTION_TERMS_ENTRY_CARD_REWORK_MAKER_COMPLETE / K4_ACTION_TERMS_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / K4_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / K4_ACTION_TERMS_RED_EXECUTION_COMPLETE / K4_ACTION_TERMS_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / K4_MERCHANT_INFO_POLICY_DECISION_ACCEPTED / K4_COMPONENT_SIGNATURE_DECISION_ACCEPTED / K4_ENGINEERING_READY / K3_CURRENT_SCOPE_COMPLETE / CODE_FREEZE`。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-ACTION-TERMS-GREEN-EXECUTION-GRANT`；当前不授权 Green。
+
+#### 12.2.54 `plan-r2.441` K4 ACTION_TERMS RED execution closeout
+
+Human Owner 授权后仅新增 `tests/src/test/java/com/wind/funds/dsl/FundsInstructionDslContractTests.java` 的 `testFundsInstructionShouldExposeActionTermsFacets`。source SHA=`634b7e21503b1643d18066053c2a4159df5e41f06c2167b62105b05d5dbc178c`，fresh XML SHA=`f4cedffbc97fa335ae2a8ff790a6c1b0ef20ef9a64a9ae4237cec9d7d2dacacc`，mtime=`13:52:48 < 13:53:12`，结果=`22/1F/0E/0S`。唯一 failure 为四个 terms 类型、四个 terms accessor、`getFeeSpec()` 及旧 `FundsInstructionFieldKeys`/`FundsInstructionContextReader` 的预期旧契约缺口；既有 21 测试通过，无其他 failure/error。
+
+该 RED 使用 public reflection + SoftAssertions，不调用未来 API、不窥私有实现，已由独立 Checker 判定 `PASS / P0=0 / P1=0 / P2=0` 并冻结 immutable。该证据只锁定 K4 breaking contract，不证明 Green、金额、借贷、余额、状态、posting、审计、幂等或重放行为已经改变。当前=`K4_ACTION_TERMS_RED_EXECUTION_COMPLETE / K4_ACTION_TERMS_RED_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / K4_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / K4_ENGINEERING_READY / K3_CURRENT_SCOPE_COMPLETE / CODE_FREEZE`。下一 Human Gate=`W5-CORE-FUNDS-ACTION-INSTRUCTION-ACTION-TERMS-GREEN-EXECUTION-GRANT`；Green 仍未授权。
+
+#### 12.2.55 `plan-r2.442` K4 ACTION_TERMS Green Entry Card rework
+
+K4 Green fresh 全量验证发现两个原卡漏列的 mandatory terms 直接 caller：`tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java:838-853` 的 `COMPLETE` command builder 缺少 `FundsCompletionTermsSpec`，以及 `tests/src/test/java/com/wind/funds/route/RouteAccountHierarchySnapshotAppenderTests.java:110-133` 的 `REFUND` replay fixture 缺少 `FundsRefundTermsSpec`。两者均在 `ImmutableFundsInstructionSpec` 构造边界形成 error，不是生产逻辑回归；前者必须增加 `REFERENCED completionTerms + authorization reference`，后者必须增加 `REFERENCED refundTerms`，原 posting/replay/route 层级断言全部保留。
+
+existing-test MODIFY 从 6 扩为 8，新增完整路径如上；`RouteAccountHierarchySnapshotAppenderTests` 从原 verification-only/non-write 集合移入本卡，其他 verification-only 测试、7 个 JSON fixture、Request/DTO/Entity/Mapper/schema/build/Consumer 和 RED 方法继续 non-write/immutable。K4 生产与治理白名单不变，仍为 `ADD=4 / DELETE=2 / production MODIFY=15 / governance MODIFY=2`；不新增类型、兼容层、context fallback、Intent/Attempt、外部 authority/finality 或资金事实变更。
+
+当前可复算证据：Java 21/offline compile=`21/21`；K4 聚焦（DSL/Posting Assembler/Route Replay）=`49/0F/0E/0S`；full fresh=`125 XML / 1244/0F/2E/1S`，两 error 唯一来自上述两个旧测试构造器；Public Contract=`287/172/42`，classfile/codegen 通过，`git diff --check` 通过且暂存区为空。Green 后精确验收为 full=`1244/0F/0E/1S`、`DefaultLedgerTransactionPostingServiceImplTests=30/0F/0E/0S`、`RouteAccountHierarchySnapshotAppenderTests=4/0F/0E/0S`，并重跑 Core API、PMD、verify-cad 与 fresh XML。历史 `1241` 计数不再作为当前 manifest 权威；当前 dirty worktree 中三个并发测试已纳入 `1244` 基线。
+
+该 rework 的价值是把每个会改变 Route/posting/replay 的动作事件都绑定到唯一 typed terms，使缺失输入在 Core 构造边界 fail-closed，同时让 Ledger posting 和账户层级 replay 测试能真实到达其业务断言；不通过默认值或兼容 API 掩盖迁移遗漏。金额、借贷、posting、余额、状态、幂等、重放和稳定 key 均不变。
+
+停止线为第 9 个 existing-test、额外 production/type/file、Request/DTO/Entity/Mapper/schema/JSON/Consumer 或任何公共契约/资金事实变化；触发即停止并重新成卡。当前=`K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_MAKER_COMPLETE / K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PENDING / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / K4_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K3_CURRENT_SCOPE_COMPLETE / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate=`K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS` 后，才可申请仅新增两个测试文件的 Green execution grant；Green 与文档 closeout 当前仍未授权。
+
+#### 12.2.56 `plan-r2.443` K4 ACTION_TERMS Green Entry Card rework Checker closeout
+
+plan-r2.442 三文档重工已获独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 确认两个新增 direct caller 的旧/新构造、保持断言、existing-test MODIFY=`8`、生产白名单 `ADD=4 / DELETE=2 / production MODIFY=15 / governance MODIFY=2`、当前 full=`1244/0F/2E/1S` 与 Green 目标=`1244/0F/0E/1S` 均一致；RED 方法保持 immutable，历史 `1241` 不再作为当前 manifest 权威。
+
+本次仅机械收口三份文档，不修改 Java、测试、API baseline、schema、build 或 Consumer。当前=`K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_MAKER_COMPLETE / K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / K4_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_TEST_IMMUTABLE / K3_CURRENT_SCOPE_COMPLETE / PONYTAIL_AB_NO / GIT_WORKTREE_GRANT_NO / JAVA_NO / TEST_NO / GIT_WRITE_NO / NETWORK_NO / REMOTE_PUBLISH_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`。下一 Human Gate 仅为新增两个测试文件的 Green execution grant；Green、K4 其他文件、Git、真实 MySQL、发布仍未授权。
+
+#### 12.2.57 `plan-r2.444` 模块 ApplicationService / Service API 责任矩阵候选
+
+本轮根据源码、现有产品/系分/TDD 和 Consumer 证据，建立后续接口设计的责任矩阵候选；不修改 Java、测试、API baseline、schema/build 或 Consumer，不改变当前 K4 Green Gate。完整矩阵写入主系分 11.35，TDD 20.38 固化接口分类和测试门禁。
+
+矩阵覆盖 `core` 的 FundsAccountQueryService、RouteResolver、RouteSnapshotFactory、LedgerTransactionPostingService、FxAmountConversionService、FxRateProvider 和 FundsInstructionOrchestrator；`transaction` 的 Direct/Authorization/BalanceControl、外部事件、生命周期、Query、ActionFact 和 Projection 端口；`wallet` 的账户、资金责任、支付工具、Spend Rule、层级关系、余额和平台账户服务；`ledger` 的 LedgerService、LedgerTransactionService 与 impl-internal LedgerTransactionCommandService；`reconciliation` 的 batch、clearing、settlement、payout、recovery、difference、run result、Gate 和宿主 authority SPI；`governance` 的 projection replay ApplicationService 及 impl-internal Source/Writer。每个接口均按能力 owner、真实 Consumer、tenant 来源、状态/事务/幂等、副作用、Public、extension/provider 或 internal 定性和成熟度标记为后续评审输入。
+
+当前判断是：`core` 与 transaction canonical command 具备优先设计条件；FundsTransactionQueryService、PaymentInstrumentService、SpendRuleDefinitionService、LedgerService 需先拆责；wallet capability 与 reconciliation/governance 多数仍是跨模块端口或运营控制面，仓外 Consumer 不足时不升格为 Public API；`PayoutSubmissionAuthority`、`SettlementReleaseAuthority` 是尚无生产实现的 `E2` 宿主 SPI，不是 I0；fx provider/换算契约可独立冻结。该矩阵只提供设计顺序，不构成新的实现授权、公共契约批准或 K4 Green 授权。
+
+本候选的实际价值是将“接口存在”与“能力已被证明”分离，减少透传服务、raw-id、隐式 tenant、查询/命令混合、规则执行/决策证据混合和无 Consumer 公共 API。下一设计 Gate 仍先完成 K4 两个测试 caller 的 Green；其后才可授权 `core` API responsibility Entry Card。当前执行状态继续=`K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / CODE_FREEZE`。
+
+#### 12.2.58 `plan-r2.445` 模块 Service API 责任矩阵 Checker closeout
+
+独立 Checker 首轮=`NOT PASS / P0=0 / P1=2 / P2=4`：`PayoutSubmissionAuthority`、`SettlementReleaseAuthority` 应为宿主 `E2` authority SPI；governance internal Source/Writer 漏列；Scope 方法、Capability 直接 Consumer、Evaluation/Budget production caller 和 Credit tenant query 四项需要事实校准。三文档完成最小返工后 recheck=`PASS / P0=0 / P1=0 / P2=0`。
+
+最终矩阵覆盖当前 52 个 face/core Service/ApplicationService，以及 FxRateProvider、RouteSnapshotFactory、FundsInstructionOrchestrator、LedgerTransactionCommandService、FundsTransactionProjectionReplaySource、FundsTransactionProjectionWriter 六个关键 provider/internal port。矩阵明确调用契约 `D1-D3`、extension/provider `E2/E3` 和内部端口 `I0`，并以真实 Consumer、production caller=0、tenant、状态/事务/幂等和零副作用证据校准成熟度。
+
+该 Checker PASS 仅证明责任矩阵可消费；不批准 Public API、批量重构或 Java/Test 写入，也不改变当时 K4 的 full=`1244/0F/2E/1S` 事实。当时=`MODULE_SERVICE_API_RESPONSIBILITY_MATRIX_INDEPENDENT_CHECKER_PASS / K4_ACTION_TERMS_GREEN_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / K4_GREEN_EXECUTION_GRANT_NO / K4_GREEN_NO / CODE_FREEZE`；当时下一执行 Gate 只为 K4 两个测试 caller Green，K4 完成后才可申请 `core` API responsibility documentation-only Entry Card。
+
+#### 12.2.59 `plan-r2.446` K4 ACTION_TERMS Green technical closeout
+
+K4 最后两个直接测试 caller 已完成机械迁移。Ledger COMPLETE fixture 使用 `FundsCompletionTermsSpec.Mode.REFERENCED`，authorization reference 与 `COMMAND_FUNDS_TRANSACTION_SN` 同根；Route replay REFUND fixture 使用 `FundsRefundTermsSpec.Mode.REFERENCED`。没有修改生产代码、RED 方法、金额、借贷、posting、余额、状态、幂等、重放或稳定 key，也没有新增 alias/default/compatibility/context fallback。
+
+不可变本地证据为 source SHA=`9394d764f6aa3ef6f14465064fc81b089cc3510a9b5d6f193ef08a61d6abd778 / 8a21d211edb8c67ca5316974526d3c2684dc325b248d8cba1f03cc872f24bfbe`，class SHA=`f8ab933d97eb03f5a557c7627a1ad557400a01938b95483a8a056d28daf319f1 / 1160b1a4bdab6a284b3790aeb57f1d149936c6edd1aae63c4b14fd8b3f850490`，XML SHA=`17e4d728c8648ca45f4b5132ea5a1c768e9a43becefab714b9e283029e3ac807 / f925a7e89039156cd59e4cda3614aa901a5b0c28b6e031dedc53d237168dc4a5`；target=`30/0 + 4/0`，full=`125 XML / 1253/0F/0E/1S`，唯一 skip 为无真实 MySQL host migration。compile=`21/21`、Public Contract=`287/172/42`、PMD=`13/0`、classfile/codegen PASS。独立 Green Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+证据边界：共享 target 曾被并发 Maven 覆盖并出现一次既有 H2 并发测试波动，已废弃；最终串行 target/full 后复制 125 XML 形成独立复核证据。Core API 未取得 PASS，仅被非 K4 `ResolvedRouteSpec/RouteSnapshotSpec#getExpiresAt` stale exclusions 阻断，故不声明完整 CAD PASS。live HEAD=`098f241412a5748f44edcfdce90435bcc42fe9af`；外部 Git writer 在验证中曾暂存 169 文件，index fingerprint=`9c3f123eb539d1088bbfdfac77584b6411eba1f4a3fbe497c2f8ab5c297904ed`，随后释放。技术证据写入时 `porcelain -z` 指纹=`54e257234fb4074374499077b3642760b59c03ea4f32e304c4bf4538bfb6fd68 / f3f6de76d9f268a9680e00216d88585ac91fea2a0546c8cab28ebcbfa9fbd50c`；documentation Checker 最终双读文本 manifest=`default 186/77de5af35cd73bc1ddf29a64e1157bf507cf7e8421e3045b52a8de0601af3608 / -uall 192/e8361e8c28773c6ff78aba53d6d450f42796e39e220d6a5ef0b302d0aade7bcb`、staged empty。本任务未执行 Git 写入；工作树仍大范围 dirty，不能声明 Git/delivery ready。
+
+当前=`K4_ACTION_TERMS_GREEN_IMPLEMENTATION_VERIFIED / K4_ACTION_TERMS_GREEN_INDEPENDENT_CHECKER_PASS / K4_TECHNICAL_SCOPE_COMPLETE / MODULE_SERVICE_API_RESPONSIBILITY_MATRIX_INDEPENDENT_CHECKER_PASS / K4_DELIVERY_RECONCILIATION_REQUIRED / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Owner 先完成工作树交付对账与 Core API residual；完成仓库级交付对账后，才可单独授权 `core` API responsibility 或 K5 documentation-only Entry Card。
+
+#### 12.2.60 `plan-r2.447` K4 Core API validation attribution and delivery boundary
+
+plan-r2.446 的 Core API residual 已完成一手归因。未显式指定项目 JDK 时，`javap` 来自 Corretto `1.8.0_412`，导致 interface default member 文本与 policy 不一致；显式设置 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home` 后，同一 `scripts/verify-core-api-baseline.sh` fresh 运行通过：`100 stable / 4 experimental / 4 internal public top-level types`，即 Core API=`108/100/4/4`。`api-policy.tsv` 已有 `ResolvedRouteSpec#getExpiresAt` 与 `RouteSnapshotSpec#getExpiresAt` 两条精确 default exclusion；本轮对 Route source、policy、stable baseline 和 verifier 均为 `no_change`。
+
+该校准关闭的是验证环境误判，不改变 K4 设计或资金行为。价值在于避免误删有效 policy、避免把未稳定承诺的 Route 派生时间方法错误纳入稳定 ABI，并证明 K4 typed action terms 后 Core API 分类仍符合冻结目标。K4 behavior=`30/0 + 4/0`、full=`125 XML / 1253/0F/0E/1S`、compile=`21/21`、Public Contract=`287/172/42`、PMD=`13/0`、classfile/codegen 和 Core API 均已分别通过；没有执行完整 `verify-cad` recipe，故不伪造该命令证据。
+
+当前工作树事实仍是 HEAD=`098f241412a5748f44edcfdce90435bcc42fe9af`、写前文本 manifest=`default 186/77de5af35cd73bc1ddf29a64e1157bf507cf7e8421e3045b52a8de0601af3608`、`-uall 192/e8361e8c28773c6ff78aba53d6d450f42796e39e220d6a5ef0b302d0aade7bcb`、staged empty。技术范围完成不等于 Git delivery ready；下一步只允许只读工作树交付分解，逐项建立切片归属和精确提交白名单。当时=`K4_ACTION_TERMS_GREEN_IMPLEMENTATION_VERIFIED / K4_ACTION_TERMS_GREEN_INDEPENDENT_CHECKER_PASS / K4_TECHNICAL_SCOPE_COMPLETE / K4_VALIDATION_RESIDUAL_CLOSED / MODULE_SERVICE_API_RESPONSIBILITY_MATRIX_INDEPENDENT_CHECKER_PASS / WORKTREE_DELIVERY_RECONCILIATION_REQUIRED / PLAN_R2_447_INDEPENDENT_CHECKER_PENDING / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。当时下一 Human Gate 仅为 `W5-WORKTREE-DELIVERY-RECONCILIATION-001` 的只读对账；不授权 K5、Java、测试或 Git 写入。
+
+#### 12.2.61 `plan-r2.448` Core API validation alignment Checker closeout
+
+plan-r2.447 已获独立只读 Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 独立确认默认 `javap=Corretto 1.8.0_412`、显式 Corretto `21.0.11` 后 verifier exit 0 且 Core API=`108/100/4/4`；两条 `public default ... getExpiresAt()` exclusion 与 Route source 一致，Route source、policy、stable baseline、verifier 本轮均无需修改。三文档没有把组成门禁误写为完整 `verify-cad` 已运行。
+
+本次只机械更新 OpenSpec 状态，没有修改系分/TDD 设计、Java、测试、API 治理文件或配置。当前=`K4_ACTION_TERMS_GREEN_IMPLEMENTATION_VERIFIED / K4_ACTION_TERMS_GREEN_INDEPENDENT_CHECKER_PASS / K4_TECHNICAL_SCOPE_COMPLETE / K4_VALIDATION_RESIDUAL_CLOSED / CORE_API_VALIDATION_ALIGNMENT_INDEPENDENT_CHECKER_PASS / MODULE_SERVICE_API_RESPONSIBILITY_MATRIX_INDEPENDENT_CHECKER_PASS / WORKTREE_DELIVERY_RECONCILIATION_REQUIRED / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5-WORKTREE-DELIVERY-RECONCILIATION-001` 只读对账；不授权 K5、Java、测试、Git、联网或发布。
+
+#### 12.2.62 `plan-r2.449` worktree residual attribution Entry Card
+
+Human Owner 授权 `W5-WORKTREE-RESIDUAL-ATTRIBUTION-DOC-ENTRY-CARD-001`，只修改主系分 11.39、主 TDD 20.42 与本 OpenSpec。上一轮只读交付对账稳定复算 HEAD=`098f241412a5748f44edcfdce90435bcc42fe9af`、tracked=`170`、untracked=`22`、`-uall=192`、staged empty、tracked diff SHA=`57b410aded9e2c057d86603cb9a0a01d53fbdd1eac448f547f3ffc384a7ba605`、untracked path+content manifest=`778b9f795f3b0e678ef712c57ab8071f1503347433705b100f48cfe4ecf22527`。独立 Checker 对交付对账判定 `NOT PASS / P0=0 / P1=2 / P2=1`：Payout tenant write 与 Wallet persistent length 缺独立责任，state migration inverse test 缺既有 Change 关联。
+
+本卡接受并冻结三项归位：Payout 的 `tenantId + id + external_reference IS NULL` 是 reconciliation-impl persistence defense-in-depth，tenant 只来自已 tenant-scoped 锁定读取的 PayoutOrder；Funding/Credit 的 DDL 字段上限由 wallet face `@Size` 与 impl fail-fast 共同保护，防止内部直调绕过 Bean Validation 后产生数据库截断或账户已写而 Ledger 未闭合；`ReconciliationMysqlDdlContractTests` 的 `47=27 column+20 index` 精确互逆合同回链 `funds-state-naming-normalization`，不改 migration。精确十文件、SHA、行为不变量和停止线见系分 11.39；测试计数、XML 与未来验证矩阵见 TDD 20.42。
+
+当前实现只作为待交付候选，不因本卡自动获得代码或 Git 授权。已有 full=`125 XML / 1253/0F/0E/1S` 证明十文件与当前组合相容，但不替代 attribution Checker、fresh integrated validation、真实 MySQL 或生产 D5。跨切片改动已在同文件叠加，不逆向重建大量中间 commit；未来只形成一个可构建的 code/test/API-governance/migration 候选和一个权威文档候选，二者均需精确 cached 白名单和独立 CR 后才可申请 Git。
+
+当前=`WORKTREE_RESIDUAL_ATTRIBUTION_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / DELIVERY_VALIDATION_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Human Gate 仅为本卡独立 Checker；Checker PASS 后才可申请 `W5-WORKTREE-INTEGRATED-DELIVERY-VALIDATION-GRANT`，仍不授权 Java、测试、Git、联网、发布或生产。
+
+#### 12.2.63 `plan-r2.450` residual attribution Entry Card test-guard rework
+
+plan-r2.449 独立 Checker=`NOT PASS / P0=0 / P1=1 / P2=0`。唯一 P1 为当前 Credit/Funding 参数化测试只直调 Service，能够证明 impl fail-fast 与零副作用，但没有读取 face Request 的 Jakarta `@Size.max`；因此 plan-r2.449 不得把 face validation boundary 写成已有可执行测试事实。Payout tenant claim、state migration 归属、十文件 SHA、四 XML、full、192 项工作树和授权边界均通过复核。
+
+本轮只返工主系分 11.39、主 TDD 20.42 与本 OpenSpec，不修改 Java、测试、DDL 或配置。未来 coverage closure 精确冻结两个已在十文件清单中的 existing-test：各新增一个 reflection contract test，Credit 断言 `64/30/50/30/512`，Funding 断言 `64/30/50/512`；生产 Request/Service/DDL 全部 immutable。当前实现先于补测存在，故不伪造形式 RED；新增测试 fresh 目标为 `Credit=9/0 / Funding=15/0 / combined=24/0`，full 预期从 `1253` 增为 `1255`。
+
+当前=`WORKTREE_RESIDUAL_ATTRIBUTION_ENTRY_CARD_REWORK_MAKER_COMPLETE / INDEPENDENT_RECHECK_PENDING / WALLET_LENGTH_FACE_CONTRACT_TEST_CLOSURE_GRANT_NO / DELIVERY_VALIDATION_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Human Gate 仅为本卡独立 recheck；recheck PASS 后才可申请 `W5-WORKTREE-WALLET-LENGTH-FACE-CONTRACT-TEST-CLOSURE-GRANT`，仅允许两个 existing-test，不授权 production、Git、联网或发布。
+
+#### 12.2.64 `plan-r2.451` residual attribution Entry Card Checker closeout
+
+plan-r2.450 已获独立 recheck=`PASS / P0=0 / P1=0 / P2=0`。Checker 确认 Payout tenant claim、Wallet face/impl 双边界、state migration 归属和十文件 manifest 未漂移；当前 `8/14` 只证明 Service guard，未来两个 reflection annotation contract test 精确补齐 face `@Size.max`，目标 `Credit=9 / Funding=15 / combined=24 / full=1255` 合理且不需要新增生产路径。
+
+本次只机械更新三份权威文档状态，不修改 Java、测试、DDL 或配置。当前=`WORKTREE_RESIDUAL_ATTRIBUTION_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / WALLET_LENGTH_FACE_CONTRACT_TEST_CLOSURE_GRANT_NO / DELIVERY_VALIDATION_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5-WORKTREE-WALLET-LENGTH-FACE-CONTRACT-TEST-CLOSURE-GRANT`，只允许两个 existing-test；不授权 production、Git、联网、发布或 K5。
+
+#### 12.2.65 `plan-r2.452` Wallet face contract test closure
+
+Human Owner 的“按建议推进”授权已用于本 Entry Card 的两个既有测试文件。`CreditAccountServiceTenantIsolationTests` 新增一个反射注解契约测试，精确断言 `sn=64 / ownerId=30 / accountType=50 / periodId=30 / description=512`；`FundingAccountServiceImplTests` 新增一个反射注解契约测试，精确断言 `sn=64 / ownerId=30 / accountType=50 / description=512`。原 tenant 查询、Service fail-fast、数据库零副作用和 Ledger 事实断言保持不变；Request、Service、DDL、其他测试和生产文件未修改。
+
+最终 source SHA=`4259dfc85b2b3eda201cb09585403f081cb32c82c996df2393ab7868bc8d3fb3 / aaba048f747e27d2182b4c6163ab96de664ebbc6cae9769fc02ed6e1e955fb13`，class SHA=`8e146e4fb061c9394348841bb1299953ceebc3f9681355851e30d6a241684ee6 / 1a533c6be53efdf46f96e4adc12efa1f3eb83be99e4bf682f76ca7cd9cb8f6aa`，XML SHA=`501660d0b1b59422dff64760de11dec3dc393f8b2e463c9679aec8e4e7b1e831 / 2e80c2f31838c6d03fd69238b63e4a3b65fedf7d861cab332395452048a1e6d9`；fresh=`Credit 9/0F/0E/0S + Funding 15/0F/0E/0S + combined 24/0F/0E/0S`，source < test-class < XML。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当前技术证据不宣称完整 `verify-cad`、真实 MySQL、Git、发布或生产 D5。
+
+本次仅写入测试闭包并机械收口 authority，不改变三组残项的生产责任归位。当前=`WORKTREE_RESIDUAL_ATTRIBUTION_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / WALLET_LENGTH_FACE_CONTRACT_TEST_CLOSURE_COMPLETE / WALLET_LENGTH_FACE_CONTRACT_TEST_CLOSURE_INDEPENDENT_CHECKER_PASS / WORKTREE_INTEGRATED_DELIVERY_VALIDATION_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / GIT_DELIVERY_NO / CODE_FREEZE`。下一 Human Gate 仅为 `W5-WORKTREE-INTEGRATED-DELIVERY-VALIDATION-GRANT`；该 Gate 才允许按 TDD 20.42 运行完整离线 integrated validation，仍不授权 Git、联网、发布或生产。
+
+#### 12.2.66 `plan-r2.453` integrated delivery validation closeout
+
+Human Owner 的“按建议推进”已用于当前集成交付验证 Gate。Maker 在 Java 21/Maven 3.6.3 offline reactor 中完成 clean compile=`21/21`、full Surefire=`125 XML / 1255/0F/0E/1S`、Payout=`12/0`、DDL=`9/0`、Credit=`9/0`、Funding=`15/0`、Public Contract=`287/172/42`、Core API=`108/100/4/4`、PMD=`13 target/pmd.xml / 0 violation / 0 error`、classfile/codegen PASS。唯一 skip 为没有真实 MySQL host 的 `ReconciliationMysqlMigrationIntegrationTests`。
+
+本轮正式证据来自离线 Maven 等价门禁：默认 Justfile 的 Surefire report goal 会触发私有 site descriptor 访问，未把该无关步骤当作成功条件；literal `just verify-cad` 未运行。所有 125 XML 均在 clean 后生成，目标 source/class/XML 时间顺序成立。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认无非目标 failure/error、无文件漂移，两个新增 face annotation contract test 与十文件残项责任保持一致。
+
+当前 workspace 仍为 HEAD=`098f241412a5748f44edcfdce90435bcc42fe9af`、default=`186/77de5af35cd73bc1ddf29a64e1157bf507cf7e8421e3045b52a8de0601af3608`、`-uall=192/e8361e8c28773c6ff78aba53d6d450f42796e39e220d6a5ef0b302d0aade7bcb`、staged empty、`git diff --check` PASS。技术验证只证明当前混合工作树可构建和可审计，不等于 Git delivery。当前=`WORKTREE_INTEGRATED_DELIVERY_VALIDATION_COMPLETE / WORKTREE_INTEGRATED_DELIVERY_VALIDATION_INDEPENDENT_CHECKER_PASS / WORKTREE_GIT_DELIVERY_RECONCILIATION_REQUIRED / GIT_DELIVERY_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为只读最终 Git 白名单分解与交付卡，未授权 stage/commit/push、K5、联网、发布或生产。
+
+#### 12.2.67 `plan-r2.454` worktree delivery attribution card
+
+独立 Checker 对 `technical=176`、`docs=16` 的候选拆分提出 `P1`：5 个技术 hunk 具有既有行为证据，但未逐文件绑定 owner、操作、依赖和测试闭包。现补登记以下路径，作为当前工作树既有事实的交付归属，不新增行为或执行授权：
+
+```text
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/PaymentInstrumentBindingHistoryQuery.java  MODIFY  tenantId -> @NotNull tenantId  PaymentInstrument binding/history tenant query
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/PaymentInstrumentBindingQuery.java         MODIFY  tenantId -> @NotNull tenantId  PaymentInstrument binding tenant query
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/PaymentInstrumentQuery.java                 MODIFY  tenantId -> @NotNull tenantId  PaymentInstrument tenant query
+wallet/face/src/main/java/com/wind/funds/wallet/service/PaymentInstrumentService.java                  MODIFY  删除无 tenant 的 getPaymentInstrumentById/getPaymentInstrumentBySn  PaymentInstrument raw-id/unscoped surface hard-cut
+wallet/face/src/main/java/com/wind/funds/wallet/model/query/SpendControlScopeQuery.java                MODIFY  tenantId -> @NotNull tenantId  Spend Control tenant query input
+```
+
+前三项由现有 PaymentInstrument tenant isolation 测试与 impl 查询闭包证明；`PaymentInstrumentService` 必须与对应 impl 的删除保持同一编译闭包；`SpendControlScopeQuery` 由 Scope Service tenant guard 与现有隔离行为证明。该卡不改变金额、posting、余额、状态、幂等、重放或外部协议，也不允许恢复 raw-id、增加兼容重载或把 query annotation 误写成独立执行切片。当前 5 个文件 SHA 依次为 `6d5e2e7999eae2ef211f0ab2b460302c9ecd5b89a1479101cbaa1e9781620f69`、`2be6bbaedc7c6a21704a3a1e4a63dc62446118a567997ac3d6b471639921d043`、`dc6775f055390aa3d34a4664813c623a7f5b0f2ef0ec64088f769f0a7d79156c`、`5573e69f9ce43d2dad6e8d46cd9ef6379872a1c83a48a460be30df124e553a77`、`af928629bc562deee558a7fe5b824e0951c6be7196d8a68fe120c8f157dc568a`。
+
+plan-r2.454 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认 5 个路径均有完整 path、MODIFY 操作、old/new 契约、owner、SHA、测试/依赖闭包，且没有第 6 个未归属路径。当前技术候选仍为 `176` 项、文档候选 `16` 项；任一路径、内容、staged 状态、调用闭包或测试预期漂移即停止并重新取得 Owner 决策。当前状态为 `WORKTREE_GIT_DELIVERY_ATTRIBUTION_ENTRY_CARD_COMPLETE / WORKTREE_GIT_DELIVERY_ATTRIBUTION_INDEPENDENT_CHECKER_PASS / GIT_DELIVERY_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`；下一 Human Gate 仅为只读重新冻结完整 path/SHA manifest，之后仍需单独 Git delivery Grant。
+
+#### 12.2.68 `plan-r2.456` final Git delivery candidate re-freeze
+
+归属卡通过后，以 `git -c core.quotePath=false status --porcelain=v1 -uall` 两次生成 UTF-8 path/SHA manifest，结果完全一致：技术候选 `176` 项（`137 MODIFY / 17 DELETE / 22 ADD`），文档候选 `16 MODIFY`，合计 `192` 项。技术内容 manifest=`fa4e7e3aa599197c86dcd261c43ac5d02ad378f63c1eea8164abd8dd18575b60`，文档 path/status manifest=`03d83358f78e4d7cfff5ebd091dbf9d1beba754f3376ea395dbd726697ab9d9b`，合并 path/status manifest=`5cd16eb3d934a958036d4c667ec22293ddc1779c89cca0af42d5e496b711e1d4`。默认 status 仍为 `186/77de5af35cd73bc1ddf29a64e1157bf507cf7e8421e3045b52a8de0601af3608`；`-uall` 状态为 `192/e8361e8c28773c6ff78aba53d6d450f42796e39e220d6a5ef0b302d0aade7bcb`，UTF-8 `-uall` SHA=`c3ff2e0a0d0578ebe7de320cb2b02c568a2f7eebae7558da534d59fe24411a4c`；`HEAD=098f241412a5748f44edcfdce90435bcc42fe9af`、staged empty、`git diff --check` PASS。
+
+该候选是现有已完成切片责任表与 11.41 五路径归属的并集，不新增生产语义或测试授权。下一步只允许按 manifest 做 Git delivery 预检；发现第 193 个路径、任一内容/SHA 漂移、非目标 failure/error 或 staged 非空即停止。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认 `176 technical + 16 docs = 192`、操作计数、manifest、HEAD、staged empty 与格式证据一致。当前状态=`WORKTREE_GIT_DELIVERY_RECONCILIATION_COMPLETE / WORKTREE_GIT_DELIVERY_RECONCILIATION_INDEPENDENT_CHECKER_PASS / GIT_DELIVERY_GRANT_NO / K5_ENTRY_CARD_GRANT_NO / DEPLOY_PRODUCTION_NO / CODE_FREEZE`；下一 Human Gate 为单独 Git delivery Grant，未授权 K5、联网、发布或生产。
+
+#### 12.2.69 `plan-r2.458` Git delivery validation blocker
+
+Human Owner 授予 Git delivery 后，Maker 在暂存前运行 Java 21/Maven 3.6.3 offline fresh gate。`clean compile=21/21`，但 full=`1255/1F/0E/1S`；唯一失败为 `DefaultLedgerTransactionPostingServiceImplTests#testPostShouldPostOnceForConcurrentSameCommand`。两个相同命令中 winner 成功，loser 返回生产异常“持久化 transaction 摘要不一致”。随后目标方法连续 `5/5`、完整测试类连续 `5/5` 均通过，只能证明竞态窗口低概率，不能覆盖完整套件中已观察的资金幂等合同失败。
+
+只读源码复核确认 outer `DefaultLedgerTransactionPostingServiceImpl#post` 与 inner `LedgerTransactionServiceImpl#postLedgerTransaction` 共用 REQUIRED 事务；transaction insert 命中 `DuplicateKeyException` 后，loser 在原事务立即执行 `resolveExistingLedgerTransaction -> verifiedLedgerAggregate`，读取 root/plan/entry 并校验整体摘要。当前路径不能区分 winner aggregate 尚未稳定可见与真实摘要冲突。独立 Checker=`NOT PASS / P0=0 / P1=1 / P2=0`，要求阻断当前 commit；未执行 stage/commit/push。
+
+下一候选仅为 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-WINNER-VISIBILITY-ENTRY-CARD`，未来文件候选限定 `LedgerTransactionServiceImpl.java` 与 `DefaultLedgerTransactionPostingServiceImplTests.java`。Entry Card 必须先形成可重复 RED，并分别评估当前 loser 事务内的可靠 winner 可见性，以及事务受约束/快照污染时的受控恢复边界；不得预选 `REQUIRES_NEW`、`for update` 或 retry。禁止 sleep、无界重试、吞异常、放宽 digest、跳过 plan/entry 校验、拆散 Ledger/Balance 原子事务或新增 schema/幂等表。当前=`GIT_DELIVERY_VALIDATION_BLOCKED_CONCURRENT_IDEMPOTENCY / LEDGER_CONCURRENT_IDEMPOTENT_WINNER_VISIBILITY_ENTRY_CARD_GRANT_NO / GIT_STAGE_COMMIT_PUSH_NOT_EXECUTED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。
+
+#### 12.2.70 `plan-r2.459` Ledger concurrent idempotent winner visibility Entry Card
+
+Human Owner 授予 documentation-only Entry Card。源码闭包确认问题限定在 DuplicateKey loser 恢复：普通 replay 的初始无锁查询可能建立旧快照，catch 后同一 REQUIRED 事务又立即用普通查询读取 winner root/plan/entry。选择 `A / DUPLICATE_ONLY_LOCKING_CURRENT_READ`：普通 replay 不变；只有 DuplicateKey recovery 对 transaction、posting plan、entry 三层 QueryWrapper 使用本机 MyBatis-Flex `1.11.5` 已存在的 `forUpdate()`，等待同一稳定 SN winner 完整提交后执行原严格 aggregate/digest 校验。该选择不拆 Ledger/Balance 原子事务，不引入新事务、retry、锁服务、schema 或 Public API。
+
+未来精确白名单=`ADD 0 / DELETE 0 / production MODIFY 1 / existing-test MODIFY 1`：
+
+```text
+RED MODIFY tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java
+GREEN MODIFY ledger/impl/src/main/java/com/wind/funds/ledger/impl/LedgerTransactionServiceImpl.java
+```
+
+input SHA=`test 9394d764f6aa3ef6f14465064fc81b089cc3510a9b5d6f193ef08a61d6abd778 / production 970a7af8e2b8ecb687aeee54dc445094e2e5e79f2796f3ad3ab23ad50736f4ea`。RED 用真实 Spring/H2、REPEATABLE_READ loser 和 test-only BEFORE INSERT trigger/latch 强化既有 concurrent same-command 测试，先建立旧快照、让 winner 完整提交、再释放 loser；另加并发异事实 strict-conflict guard。禁止 sleep。当前 class=`30/0`；RED=`31/1F/0E/0S`，唯一 failure 为同事实 loser 未复用 winner；Green class=`31/0`、test-ledger=`78/0`、full=`125 XML / 1256/0F/0E/1S`，Public=`287/172/42`、Core=`108/100/4/4`、PMD=`13/0`。
+
+`DefaultLedgerTransactionPostingServiceImpl`、core/face、Entity/Mapper/schema/build/API baseline/Consumer 与其他测试均 non-write。若 DuplicateKey 后事务 rollback-only、locking current read 无法覆盖三层或需要事务管理器、Mapper/SQL、第 3 个生产/第 2 个测试文件，则停止并重卡；不得转用 `REQUIRES_NEW`、sleep、轮询、无界 retry、进程/分布式锁、幂等表、放宽 digest 或跳过 child 校验。本轮未修改 Java/测试，未运行 Maven/Git/联网。当前=`ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。
+
+plan-r2.459 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 确认 MyBatis-Flex/H2 本地能力存在，三层 locking current read 保持 winner Ledger/Balance 原子性，test-only trigger/latch + REPEATABLE_READ 可形成无 sleep 的确定性 RED，异事实 guard 阻止无条件复用；两文件范围和 `class 31 / test-ledger 78 / full 1256` 计数成立。当前=`ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-WINNER-VISIBILITY-RED-EXECUTION-GRANT`。
+
+#### 12.2.71 `plan-r2.461` Ledger concurrent idempotency RED evidence rework Entry Card
+
+Human Owner 按建议授权 documentation-only rework。实际 RED source/class/XML=`13891fa52ce14fbae0172eb4cb044f0f781afaa1e4179219d467ca971bbbc250 / 8860ec80918e54d98a1f52db76bc8c64b8c93f8742409e9db5579b7612d9b930 / 404efb4b07423588fb562f7868fda92065b2edc779c59b5815b0a1645f09dec9`，fresh=`31/0F/1E/0S`。same-command 在 loser-first BEFORE trigger 下通过，唯一 error 是异事实 guard 在 TransactionTemplate callback 内吞异常后提交 rollback-only 事务产生的 `UnexpectedRollbackException`。独立 Checker=`NOT PASS / P0=0 / P1=2 / P2=0`，原 `A / DUPLICATE_ONLY_LOCKING_CURRENT_READ` 不再是准出方案，测试 `NOT_IMMUTABLE`，Green/Git 继续阻断。
+
+本卡把事实分为 H1 winner root/child visibility、H2 rollback-only/catch boundary、H3 aggregate replay identity/order。下一 evidence execution 唯一可写文件仍为当前测试：先把异事实异常移到事务 callback 外捕获，得到 E1=`31/0F/0E/0S`；再用 winner-first `AFTER INSERT` pause + second `BEFORE INSERT` signal/latch 控制真实 public post 顺序。只有 loser 在 winner release 前返回 persisted aggregate digest failure，释放后仍单 aggregate/单 balance，才接受 E2=`31/1F/0E/0S`；若 loser 等 winner commit 后成功复用，则 H1 在 H2 未复现并停止，不得实现 `forUpdate()`。禁止 sleep、概率循环、READ_UNCOMMITTED、Mock Mapper、生产 hook 或把 timeout/error 当 RED。
+
+只读 production Owner 扩大评估为 outer `DefaultLedgerTransactionPostingServiceImpl`（SHA=`fd47b1366a024ca14794bccf3f11d78635e402f8e5021c00a8a7a6b8df689bf0`）和 inner `LedgerTransactionServiceImpl`（SHA=`970a7af8e2b8ecb687aeee54dc445094e2e5e79f2796f3ad3ab23ad50736f4ea`），但二者均 non-write。若未来 RED 证明只需 inner 则重冻 production=1；若异常恢复必须跨 outer REQUIRED 与 Balance，则重冻 production=2。当前只冻结 evidence rework，不冻结 Green 文件卡、锁或事务策略。
+
+价值结论：公共不变量仍是同事实复用、异事实冲突、单 aggregate/单余额影响；rework 的直接价值是避免合法重试误失败，资金价值是防重复入账与无条件复用，Provider 价值是让机制留在 Ledger impl，工程价值是阻止错误悲观锁或事务拆分进入高频路径。当前=`RED_EXECUTION_NOT_PASS / RED_EVIDENCE_REWORK_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / TEST_NOT_IMMUTABLE / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Gate 仅为本卡独立 Checker。
+
+plan-r2.461 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认方案 A 已撤销准出、H1/H2/H3 假设和 E1/E2 evidence 顺序完整、all-green/timeout/deadlock/error 均停止、当前测试保持 mutable、outer/inner production 只读。当前=`RED_EVIDENCE_REWORK_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / RED_EVIDENCE_REWORK_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-WINNER-VISIBILITY-RED-EVIDENCE-REWORK-EXECUTION-GRANT`。
+
+#### 12.2.72 `plan-r2.463` H1 not reproduced closeout and H3 Inquiry
+
+Human Owner 授予 documentation-only closeout/Inquiry。E1/E2 最终 source/class/XML=`37f4f0c81e2776e310ef607f466f605e9b7d9f5067fa5a6de4a52401b6d28c6c / 6f9acc7d82ce1c8e524ab58f3ea8220ef61e5e295007a803ae0a056c41c46b07 / 7553b6b0fd0d36fd27d9a04b398b88f658088fad0c061ae11463a2c36ad6ed01`，fresh=`31/0F/0E/0S`。E1 消除 Harness UnexpectedRollback；E2 winner-first root pause 下 loser 等待 winner commit 后成功复用。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，仅证明 evidence execution 和 `H1_NOT_REPRODUCED_ON_CURRENT_H2`，不是 RED/Green。
+
+H3 只读结论为 `CURRENT_INCIDENT_UNPROVEN`：persisted replay 按既有 entry SN 顺序重绑定 spec entry，存在理论顺序耦合；但当前加载的 `wind-sequence-core:4.0.0-SNAPSHOT` 默认使用按 scope/type 隔离的 AtomicLong 与定长零填充数字，全仓没有 `TemporalSequenceFactory.setCounter` 调用，单 plan entry 串行取号，因此没有证据把原异常归因于 identity/order。共享 H2 DB 也未发现同 identity 跨类来源：目标常量只在当前类，Surefire 无 parallel/fork 配置，本类 cleanup 覆盖目标 aggregate。plan-r2.458 failure 未设置正式 wrapper 的 `skipSurefireReport=true` 是 harness 差异，但不能证明 report goal 是根因。
+
+当前 test-only trigger harness 定性为 `TEMPORARY_EVIDENCE_ONLY / TEST_NOT_IMMUTABLE / REVERT_REQUIRED_BEFORE_DELIVERY`，因为它排除了曾命中异常的原对称调度。下一候选只允许把当前 test 机械恢复到 SHA=`9394d764f6aa3ef6f14465064fc81b089cc3510a9b5d6f193ef08a61d6abd778`，随后 Java 21/offline target 30 与 clean full 1255 验证；production non-write。全绿只证明当前正式 Harness 未复现，不能自动解除 Git blocker，最终残余风险需 Human Owner 在独立 Checker 后裁决。
+
+价值结论：不变量仍有直接公共价值，但 H1/H3 均无确定根因；当前最有价值的动作不是加锁或改 digest，而是撤回会掩盖原调度的临时探针、恢复正式测试并重新建立可比较证据。当前=`H1_NOT_REPRODUCED_ON_CURRENT_H2 / H3_CURRENT_INCIDENT_UNPROVEN / TEMP_EVIDENCE_TEST_REVERT_REQUIRED / INQUIRY_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Gate 仅为本 Inquiry 独立 Checker。
+
+plan-r2.463 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，确认当前 H1/H3 均无生产改动依据，临时 trigger harness 必须在交付前机械恢复到 test SHA=`9394d764f6aa3ef6f14465064fc81b089cc3510a9b5d6f193ef08a61d6abd778`，再运行 target 30 与 offline clean full 1255。当前=`H1_H3_INQUIRY_INDEPENDENT_CHECKER_PASS / TEST_REVERT_AND_CLEAN_FULL_VALIDATION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-TEMP-EVIDENCE-TEST-REVERT-AND-CLEAN-FULL-VALIDATION-GRANT`。
+
+#### 12.2.73 `plan-r2.465` Ledger clean-full context root-cause evidence Entry Card
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-CLEAN-FULL-CONTEXT-ROOT-CAUSE-EVIDENCE-ENTRY-CARD-GRANT`，仅修改主系分、主 TDD 与本 OpenSpec。official test 已精确恢复为 `9394d764f6aa3ef6f14465064fc81b089cc3510a9b5d6f193ef08a61d6abd778`，production outer/inner 保持 `fd47b1366a024ca14794bccf3f11d78635e402f8e5021c00a8a7a6b8df689bf0 / 970a7af8e2b8ecb687aeee54dc445094e2e5e79f2796f3ad3ab23ad50736f4ea`。target class=`30/0F/0E/0S`，随后 Java21/offline clean full 且 `skipSurefireReport=true` 得 `125 XML / 1255/1F/0E/1S`；唯一 failure 为同事实并发 loser 的 persisted transaction digest mismatch。fresh XML=`eeed51de0ee3b70bebd54dae83bcb5d3f164ebb473d6224e051a0bdb27914c62`，source/class/XML 顺序成立。
+
+该 XML 已由上一 validation 独立 Checker 复核，本卡首次结构检查时仍存在；P1 返工后第二次回读发现 `tests/target` 已缺失。本 Maker 未运行 Maven，test/outer/inner source SHA 未漂移，故记录 `GENERATED_ARTIFACT_REMOVED_AFTER_FREEZE / LIVE_XML_ABSENT / CAUSE_UNPROVEN`。`eeed...` 仍是已核验历史 fresh evidence，但不再冒充当前 live 文件；下一 evidence execution 的 E0 必须先生成并冻结新 XML。
+
+源码定位确认失败发生在 `verifiedLedgerAggregate` 的 persisted transaction 自校验：visible plan/entry 已先通过 parent 与自身 digest，随后以 **DB 回读 root facts + visible child aggregate** 重算的 transaction digest 与 stored root digest 不一致；当前不能把它只收窄为 child 集合问题。卡片按 H4 read-set/visibility、H5 full execution context、H6 entry identity/order、H7 outer assembled input、H8 persisted root round-trip/规范化五个可证伪假设，固定 `E0 baseline -> E1 no-source fixed-prefix minimization -> E2 future test-only diagnostic -> E3 deterministic RED admission`。E2 只允许在同一 existing test nested Config 中注册不改变 SQL/result 的 test-only MyBatis observer，捕获 loser 同一时点原始三层 entities，并把 root/plan/entry canonical facts 与 winner 写前、最终 DB facts 逐字段对照。稳定 RED 必须在固定前置和单次受控调度中精确为 official class=`30/1F/0E/0S`，指出具体 root 或 child 差异，并保持单 aggregate、单余额影响及异事实 strict conflict；偶发 full failure、概率阈值、timeout/error 或只记录异常文本均不准入 Green。
+
+未来首个 evidence execution 候选只有 existing test MODIFY=`tests/src/test/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImplTests.java`，`ADD=0 / DELETE=0`；当前没有该执行授权。outer/inner production、其他测试、Core/face、Entity/Mapper/schema/build/API baseline/Consumer 全部 non-write。若 test-only 无法取得同一时点三层差异，停止并重卡；不得扩为 production seam、锁、retry、`forUpdate()`、`REQUIRES_NEW`、sequence/digest 修改、sleep/循环或弱化资金断言。
+
+该卡的价值是把“交付门禁再次失败”转成可定位的 Ledger Provider 证据问题：既不让合法重试误失败，也不让异事实或重复资金影响被错误复用；同时避免在根因未闭合时把悲观锁、事务拆分或摘要放宽引入高频路径。当前=`CLEAN_FULL_CONTEXT_ROOT_CAUSE_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / ROOT_CAUSE_EVIDENCE_EXECUTION_GRANT_NO / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Gate 仅为本卡独立 Checker。
+
+#### 12.2.74 `plan-r2.466` clean-full context root-cause Entry Card Checker closeout
+
+plan-r2.465 独立 Checker 初审=`NOT PASS / P0=0 / P1=1 / P2=0`：transaction digest 同时覆盖 DB 回读 root facts 与 child aggregate，原卡只收窄 child 无法区分 persisted root round-trip。Maker 仅在三文档加入 H8、winner 写前/loser 同时点/final DB 的三层逐字段 canonical facts，以及 nested Config 内不改变 SQL/result 的 test-only MyBatis observer；production/test 源码未修改。live SHA recheck=`PASS / P0=0 / P1=0 / P2=0`，确认唯一 existing-test 范围可执行，无需 production seam。
+
+Checker 同时确认 `tests/target` 当前缺失；三文档已把 `eeed...` 降格为上一 validation 独立核验的历史 fresh evidence，并要求下一 execution 先重建 E0。artifact 缺失不阻断 documentation Entry Card，但不允许直接进入 E1 结论、E2 diagnostic 或 Green。当前=`CLEAN_FULL_CONTEXT_ROOT_CAUSE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / E0_E1_EVIDENCE_EXECUTION_GRANT_NO / E2_DIAGNOSTIC_GRANT_NO / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-CLEAN-FULL-CONTEXT-ROOT-CAUSE-E0-E1-EVIDENCE-EXECUTION-GRANT`，只允许 E0 fresh XML 重建/冻结与 E1 fixed-prefix 无源码取证，不授权 Java/test 源码、Green、Git、联网、发布或生产。
+
+#### 12.2.75 `plan-r2.467` E0/E1 evidence closeout and E2 Entry Card rework
+
+Human Owner 授予 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-E0-E1-EVIDENCE-CLOSEOUT-AND-E2-ENTRY-CARD-REWORK-GRANT`。E0 Java21/offline clean full=`125 classes / 1255/1F/0E/1S`，唯一为 official concurrent same-command loser persisted transaction digest mismatch，target XML=`cd34c6ab...`，ordered class-name digest=`8d5595d3...`，target index=61。corrected E1：positions1-61=`656/0F/0E/1S`、explicit all125=`1255/1F/0E/1S`、prefix+suffixA=`964/0F/0E/1S`、prefix+suffixB=`947/0F/0E/1S`，target XML 分别=`7c2f86cf... / 5d4f31b... / ed66a563... / f63f63bc...`；错误 82-class run 已按独立 booter 隔离为 invalid evidence。execution Checker=`PASS / P0=0 / P1=0 / P2=0`。
+
+两 suffix half 分别全绿而 all125 为红，只证明 `FULL_DISCOVERY_SET_COMBINATION_OR_SCALE_CONTEXT`；不得归因单类、root/child、entry order、H2 visibility 或 production Owner。当前 live target XML 是最后 suffixB green，不冒充 full RED。E2 因此改用完整 all125 discovery set，不再要求最小 prefix：未来只允许 MODIFY official existing test，在 nested Config 注册不改 SQL/result/transaction 的 test-only MyBatis observer，深拷贝 winner insert、winner verification、loser duplicate/recovery 与 final DB 的 root/plan/entry persisted-v1 canonical facts；不新增测试、dependency、production seam、Mock Mapper 或日志敏感上下文。
+
+未来 E2 必须先 target-only=`30/0`，再 clean full=`125 classes / 1255/1F/0E/1S` 且 ordered class digest=`8d5595d3...`；all125 被 observer 变绿即 `OBSERVER_HEISENBERG`，不是修复。只接受 `ROOT_ROUND_TRIP_DIFF / CHILD_READ_SET_DIFF / ORDER_BINDING_DIFF / NO_OBSERVED_DIFF` 的证据分类。E2 即使有具体差异也不自动成为 immutable RED 或 Green，必须独立 Checker、文档收口、撤回 observer 并重做根因专属 Entry Card。当前=`E0_E1_EVIDENCE_EXECUTION_COMPLETE / E0_E1_INDEPENDENT_CHECKER_PASS / E2_ENTRY_CARD_REWORK_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / E2_DIAGNOSTIC_EXECUTION_GRANT_NO / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Gate 仅为本卡独立 Checker。
+
+#### 12.2.76 `plan-r2.468` E2 Entry Card Checker closeout
+
+plan-r2.467 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 独立复算 E0/E1 五份 target XML、125 类 ordered/unordered digest、target index=61、corrected 四组计数与 invalid 82-class booter 隔离，确认 `FULL_DISCOVERY_SET_COMBINATION_OR_SCALE_CONTEXT` 是当前证据上限，不得归因单类或生产机制。
+
+Checker 同时确认 MyBatis-Flex 1.11.5 auto-config 消费 `List<ConfigurationCustomizer>`，目标 test nested Config 可注册第二 customizer 并添加 test-only interceptor；`Executor.update/query` 可单次 `proceed()` 前后深拷贝 insert/query facts、记录 duplicate 并原样抛出，final DB 继续由同文件 `JdbcTemplate` 取证，不需要修改 `AbstractFundsServiceTest`、第二个 test 或 production seam。当前=`E2_ENTRY_CARD_REWORK_INDEPENDENT_CHECKER_PASS / E2_DIAGNOSTIC_EXECUTION_GRANT_NO / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-E2-DIAGNOSTIC-EXECUTION-GRANT`，只允许唯一 existing test 的 temporary observer，不授权 production、Green、Git、联网、发布或生产。
+
+#### 12.2.77 `plan-r2.469` E2 NOT PASS closeout and observer revert Entry Card
+
+Human Owner 授予 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-E2-NOT-PASS-CLOSEOUT-AND-OBSERVER-REVERT-ENTRY-CARD-GRANT`。E2 temporary test 从 `9394d764...` 变为 `2bb6eeec...`；final class/XML=`34227f43... / c2c671ba...`，mtime 顺序成立。final single observer target=`30/0F/0E/0S`，但相同 ordered digest=`8d5595d3...` 的 clean full 由既有唯一 `1F` 变为 `125 XML / 1255/0F/0E/1S`，精准命中 `OBSERVER_HEISENBERG`。fresh 目录=`/private/tmp/wind-funds-e2-heisenberg-SScBxc`。
+
+首次 Timestamp `1E` 只属 Harness normalization；重复注册 observer 时未冻结且已覆盖的“child hint”统一 `INVALID_DIAGNOSTIC_HINT / NOT_USED`。独立 Checker=`PASS / P0=0 / P1=0 / P2=0` 只准出执行纪律，技术结果必须为 `E2_DIAGNOSTIC_NOT_PASS / ROOT_CAUSE_UNPROVEN`；all-green 不得解释为修复、RED、Green 或 Git 准出。
+
+未来唯一写入仍是 official test，必须把 `2bb6eeec...` byte-exact 恢复到 `9394d764...`，撤回全部 observer imports、field、helper、assertion description、nested types 与 Config Beans，不动其他历史迁移和资金断言。恢复后 target 必须=`30/0`；clean full 只运行一次并保持 `1255/0E/1S + class-order 8d5595...`，原唯一 `1F` 记为重现，`0F` 只记本轮未重现，均不解除 Git blocker。当时=`E2_DIAGNOSTIC_NOT_PASS / OBSERVER_HEISENBERG / ROOT_CAUSE_UNPROVEN / OBSERVER_REVERT_ENTRY_CARD_MAKER_COMPLETE / INDEPENDENT_CHECKER_PENDING / OBSERVER_REVERT_EXECUTION_GRANT_NO / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；当时下一 Gate 仅为本卡独立 Checker。
+
+#### 12.2.78 `plan-r2.470` observer revert Entry Card Checker closeout
+
+plan-r2.469 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。Checker 复算 E2 final source/class/XML、mtime、125 XML/1255/0/0/1、target30/0、class-order digest 和 temporary source 范围；确认 Timestamp 1E 与双 observer child hint 均为 invalid evidence，all-green 只属 `OBSERVER_HEISENBERG`。
+
+Checker 使用独立 pre 快照 SHA=`9394d764...` 与 current `2bb6eeec...` 做全量 diff，差异精确覆盖且只覆盖 E2 imports、observer field/reset/start/finish、final DB helper、assertion description、diagnostic types/interceptor 与两个 Config Beans；inverse 不会删除 K3/K4/entrySide/tenant 历史迁移。当时=`OBSERVER_REVERT_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / OBSERVER_REVERT_EXECUTION_GRANT_NO / E2_DIAGNOSTIC_NOT_PASS / ROOT_CAUSE_UNPROVEN / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`；当时下一 Human Gate=`W5-LEDGER-CONCURRENT-IDEMPOTENT-E2-OBSERVER-MECHANICAL-REVERT-EXECUTION-GRANT`，仅允许唯一 test byte-exact 恢复和 target/full 验证，不授权 production、Green、Git、联网、发布或生产。
+
+#### 12.2.79 `plan-r2.471` observer revert execution closeout
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-E2-OBSERVER-MECHANICAL-REVERT-EXECUTION-GRANT` 后，唯一 existing test 已从 temporary `2bb6eeec...` byte-exact 恢复为 official `9394d764...`，observer token=`0`，K3/K4、explicit tenant、entrySide 与原资金断言均保留；outer/inner production 仍为 `fd47b136... / 970a7af8...`。写前 Java21/Maven3.6.3 offline compile=`21/21`、classfile PASS；focused source/class/XML=`9394d764... / f8ab933d... / 57b2af84...`，结果=`30/0F/0E/0S`。
+
+随后只运行一次 Java21/offline clean full、无 `-Dtest`：live target XML=`d53eeee4...`，full=`125 XML / 1255/0F/0E/1S`，XML manifest=`f3cf6195...`，ordered class digest=`8d5595d3...`，target index=`61`，唯一 skip 为无真实 MySQL host migration。执行独立 Checker=`PASS / P0=0 / P1=0 / P2=0`；当前技术结论严格为 `MECHANICAL_REVERT_PASS / CURRENT_RUN_NOT_REPRODUCED / ROOT_CAUSE_UNPROVEN`。该 0F 不抵消 E0/E1 两次 official all125 failure，不形成 deterministic RED、Green、生产安全或 Git 准出证据。
+
+本轮 closeout 只修改主系分、主 TDD 与本 OpenSpec；价值是撤掉会改变竞态窗口的约 600 行 observer，恢复可维护 official 黑盒合同，并防止把一次未复现误记成修复。closeout 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`OBSERVER_REVERT_EXECUTION_COMPLETE / OBSERVER_REVERT_INDEPENDENT_CHECKER_PASS / OBSERVER_REVERT_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_RUN_NOT_REPRODUCED / ROOT_CAUSE_UNPROVEN / ROOT_CAUSE_NEXT_EVIDENCE_INQUIRY_GRANT_NO / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 只能是 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-NEXT-EVIDENCE-INQUIRY-GRANT`；不授权新 observer、测试、production、Green、Git、联网、发布或生产。
+
+#### 12.2.80 `plan-r2.472` root-cause next-evidence Inquiry and Entry Card
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-NEXT-EVIDENCE-INQUIRY-GRANT`。本轮只读回溯 E0/E1 official XML、outer/inner、assembler/factory、face query、H2 transaction manager/schema 和现有 round-trip/query tests，并修改主系分、主 TDD 与本 OpenSpec；不修改 Java/测试，不运行 Maven/Git/联网。E0/E1 两次 `1F` 均定位到 DuplicateKey recovery 读取 existing aggregate 后的 persisted transaction self-digest 校验，发生在请求 replay aggregate 比较之前；普通顺序 replay 与 time/decimal round-trip 已有 Green，因此只建立 `RECOVERY_TIME_AGGREGATE_VIEW_DIFF_CANDIDATE`，不猜 H2 snapshot、partial child 或生产数据库根因。
+
+选择 A=`POST_JOIN_PUBLIC_ROUND_TRIP`：未来唯一 temporary MODIFY 为 official test `9394d764...`；两个 Future 和现有 after snapshot 完成后、原 `allMatch(succeeded)` 前，helper 必须先用 before/after 与既有 Ledger read 证明 `+1 transaction / +1 plan / +2 entries`、source/target balance=`200/100`，并确认唯一 winner + 唯一预期 transaction digest loser。只有共同资金准入成立，才从 winner SN 调用一次 face `LedgerTransactionService#getLedgerTransactionBySn`，把最终 aggregate 可验证/仍无效分类附到原 allMatch 描述；任一前置不符统一 `POST_JOIN_EVIDENCE_INCONCLUSIVE`。原 predicate 及其后的同 SN/count/balance 断言不变；不使用 raw SQL、private/Mapper/Entity、observer/trace/log、sleep/latch/循环、隔离覆盖或 production hook。focused 必须=`30/0`，full 只运行一次并保持 `125/1255/0E/1S + order 8d5595/index61`；test source/class shape 仍可能轻微改变 JIT/调度，因此 0F 只记未重现且不重跑，1F 才按 post-join token 收窄 hypothesis。
+
+temporary source/class/XML/full reports 冻结后，同一 execution grant 必须 byte-exact 恢复 live source=`9394d764...` 并只再跑 focused=`30/0`，不得第二次 full。任何第 2 个测试、production/face/schema/build 变化或行为断言弱化立即停止。实际价值是用公开读边界区分最终账务损坏与 recovery-time 视图差异，避免错误锁、重试、事务拆分或摘要放宽进入 Ledger；它不新增资金能力，H2 证据不证明真实 MySQL/D5。
+
+独立 Checker 首轮=`NOT PASS / P0=0 / P1=1 / P2=0`，唯一 P1 为 final-valid token 未在原 allMatch 前门禁 `+1/+1/+2` 与 `200/100`；补齐共同资金准入且保留后续原断言后 recheck=`PASS / P0=0 / P1=0 / P2=0`。当时=`ROOT_CAUSE_NEXT_EVIDENCE_INQUIRY_INDEPENDENT_CHECKER_PASS / POST_JOIN_PUBLIC_ROUND_TRIP_EVIDENCE_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / POST_JOIN_PUBLIC_ROUND_TRIP_EVIDENCE_EXECUTION_GRANT_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-PUBLIC-ROUND-TRIP-EVIDENCE-EXECUTION-GRANT`，仍不授权 production、Green、Git、联网、发布或生产。
+
+#### 12.2.81 `plan-r2.473` post-join evidence environment-blocked closeout
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-PUBLIC-ROUND-TRIP-EVIDENCE-EXECUTION-GRANT`。写前双读与 Java21/Maven3.6.3 offline compile=`21/21`、classfile PASS；唯一 temporary source SHA=`f08fd19e...`，diff 只含 frozen face injection、allMatch description 与 post-join helper。focused Maven 随后在 project model resolution 阶段因本地缺 `com.wind.security:wind-security-dependencies:pom:1.0.1-SNAPSHOT` 停止，未进入 testCompile/Surefire；三处既有 local/offline repository 均无该 POM，且未联网、安装、改 settings 或替换版本。
+
+temporary source=`16:49:51`，live target XML 仍为上一轮 `15:31:05`；没有新 class/XML/test count/RED/token，full 未运行。temporary-uncompiled snapshot=`/private/tmp/wind-funds-post-join-evidence-yHBm6T/temporary-uncompiled.java / f08fd19e...` 只作范围证据。live test 已 byte-exact 恢复 official `9394d764...`、cmp=`0`、probe token=`0`；production、face、11 项 non-write 与三文档未漂移。独立 Checker 仅对阻断识别和恢复纪律判 `PASS / P0=0 / P1=0 / P2=0`，技术状态=`EXECUTION_NOT_PASS / ENVIRONMENT_BLOCKED_BEFORE_TEST / NO_NEW_ROOT_CAUSE_EVIDENCE / OFFICIAL_SOURCE_RESTORED`。
+
+本轮价值是阻止环境失败冒充业务 RED、阻止未经授权的联网/安装/版本替换和 stale runner，并保持 official test 可维护；不产生资金根因、Green 或 Git 准出。环境依赖缓存 Owner 必须先以另行授权、可追溯方式恢复 exact POM 和相同 offline model resolution 条件；本卡不授权环境写入。环境 ready 后仍需新的 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-PUBLIC-ROUND-TRIP-EVIDENCE-RETRY-EXECUTION-GRANT`，从 official source 重新执行，不复用旧 XML 或直接复制未编译 probe。
+
+blocked closeout 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`POST_JOIN_PUBLIC_ROUND_TRIP_EVIDENCE_EXECUTION_NOT_PASS / ENVIRONMENT_BLOCKED_BEFORE_TEST / NO_NEW_ROOT_CAUSE_EVIDENCE / OFFICIAL_SOURCE_RESTORED / ENVIRONMENT_BLOCKED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / ENVIRONMENT_READY_NO / EVIDENCE_RETRY_EXECUTION_GRANT_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 owner 是环境依赖缓存 Owner；环境未 ready 前不得授权 retry、测试、production、Green、Git、联网或安装。
+
+#### 12.2.82 `plan-r2.474` current-checkout environment readiness closeout
+
+Human Owner 授予 environment readiness 核验。没有执行 `dependency:get`、curl、non-offline Maven 或 exact `1.0.1-SNAPSHOT` POM 下载；settings=`7c1bd285...`，当前 effective cached integration/security POM=`a8d2125... / 41a9e32e...`。exact `wind-security-dependencies:1.0.1-SNAPSHOT` 仍 absent，但 corrected Java21/Maven3.6.3 offline `test-compile` 已 20/20 PASS；与 focused 相同 test goal/module/`-Dtest` 在 `skipTests=true` 下也 20/20 PASS，Surefire 3.5.6 明确 `Tests are skipped`。首次误写 `testCompile` 的 unknown phase error 不计 readiness 证据。
+
+current scoped security cache=`63 files / 81e2f3dfa83074e5011d63aa54044f1631e840d91a79eda37e1d3697f4693e76`；但全局 `com/wind` 同期 `330` 个文件更新来源未证明，故只定性 `ENVIRONMENT_READINESS_PASS_CURRENT_CHECKOUT / OFFLINE_MODEL_AND_SUREFIRE_READY / TESTS_NOT_EXECUTED / NO_EXACT_POM_FETCH_NEEDED_CURRENT_CHECKOUT / CACHE_PROVENANCE_UNPROVEN`。official source=`9394d764...`，旧 target XML 仍为 `15:31:05`；没有新 testcase/XML/RED/root-cause token。
+
+该 readiness 的价值是避免不必要下载并恢复同 runner 的 retry 准入，不是资金行为证据。未来 retry 必须先双读 settings/active profiles、4.0 POM、scoped cache、三文档、official test 与 11 non-write SHA，确认无并发 cache writer，并原样重复两条 0-test offline readiness；任一漂移或非20/20立即停止。
+
+readiness closeout 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`ENVIRONMENT_READINESS_PASS_CURRENT_CHECKOUT / OFFLINE_MODEL_AND_SUREFIRE_READY / TESTS_NOT_EXECUTED / NO_NEW_ROOT_CAUSE_EVIDENCE / NO_EXACT_POM_FETCH_NEEDED_CURRENT_CHECKOUT / CACHE_PROVENANCE_UNPROVEN / ENVIRONMENT_READINESS_CLOSEOUT_INDEPENDENT_CHECKER_PASS / EVIDENCE_RETRY_EXECUTION_GRANT_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 仅为 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-PUBLIC-ROUND-TRIP-EVIDENCE-RETRY-EXECUTION-GRANT`；不授权 Java/Test、Green、Git、联网或安装。
+
+#### 12.2.83 `plan-r2.475` post-join retry current-run-not-reproduced closeout
+
+Human Owner 已消费 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-PUBLIC-ROUND-TRIP-EVIDENCE-RETRY-EXECUTION-GRANT`，随后授权 `W5-LEDGER-CONCURRENT-IDEMPOTENT-POST-JOIN-RETRY-CURRENT-RUN-NOT-REPRODUCED-CLOSEOUT-GRANT`。本 closeout 只修改主系分、主 TDD 与本 OpenSpec，不再修改 Java、测试、production、face、schema/build/API baseline/Consumer，不运行 Maven、Git、联网、安装或发布。
+
+retry 写前以 plan-r2.474、official test=`9394d764...`、11 项 primary non-write、settings=`7c1bd285...`、effective integration/security 4.0 POM=`a8d2125... / 41a9e32e...` 与 security scoped cache=`63 / 81e2f3df...` 双读稳定为输入；Java21/Maven3.6.3 offline test-compile 与 skipTests focused runner 均 `20/20 PASS`，但 global `com/wind` cache provenance 仍未知。temporary source/class/focused XML=`f08fd19e... / c3f4b0f1... / 40ab422f...`，mtime 闭合且 focused=`30/0F/0E/0S`；diff 仅含 face 注入、原 allMatch description 与 post-join helper，原并发路径、predicate、后续资金断言和 production 未改。
+
+恰好一次 temporary clean full=`125 classes / 1255/0F/0E/1S`，target=`30/0`、target XML=`2436a035...`、full XML manifest=`1ca0120b...`、class order=`8d5595d3...`、target index=`61`；唯一 skip 是无真实 MySQL host 的 migration test。冻结 XML 没有 `POST_JOIN_FINAL_*` 或 `POST_JOIN_EVIDENCE_*` token，因为目标 concurrent loser failure 没有重现；结论严格为 `CURRENT_RUN_NOT_REPRODUCED / NO_NEW_ROOT_CAUSE_EVIDENCE`，不能判断 final aggregate valid/invalid，不能覆盖 E0/E1、形成修复/RED/Green 或解除 Git blocker。
+
+第一次 restore focused 复用 temporary class=`c3f4b0f1...`、XML=`1bc35f88...`，独立 Checker 明确将其排除为 `INVALID_STALE_CLASS_EVIDENCE`。保持 official source 字节 SHA=`9394d764...` 并刷新 mtime 后重新编译，official class/XML=`f8ab933d... / 744b146...`、`30/0F/0E/0S`、source/class/XML mtime 闭合，javap probe token=`0`；live source 与 official-pre `cmp=0`，没有第二次 full。当前 live Surefire 目录混合 temporary full 与后续 official focused target，禁止汇总成单次 fresh official full。
+
+execution 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`，可登记 `POST_JOIN_EVIDENCE_RETRY_EXECUTION_COMPLETE / CURRENT_RUN_NOT_REPRODUCED / NO_NEW_ROOT_CAUSE_EVIDENCE / OFFICIAL_SOURCE_RESTORED / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED`。实际价值是用资金不变量门禁阻止错误加锁、无界 retry、事务传播改造或摘要放宽：同一稳定事实的 webhook/MQ/客户端并发重试仍须复用同一 Ledger SN、只形成一个 aggregate 与一次余额影响，同键不同 posting facts 仍须严格冲突。本轮未命中 final-valid/final-invalid 分叉，重复执行同一 retry 直到失败不再具有合格证据价值。
+
+closeout 独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`POST_JOIN_RETRY_CURRENT_RUN_NOT_REPRODUCED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / CURRENT_RUN_NOT_REPRODUCED / NO_NEW_ROOT_CAUSE_EVIDENCE / OFFICIAL_SOURCE_RESTORED / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 只能是 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-RESIDUAL-RISK-NEXT-EVIDENCE-INQUIRY-GRANT`，评估新的可证伪取证或由 Owner 接受持续 blocker；不授权同一概率 retry、Java/Test、production、Green、Git、联网、发布或生产。
+
+#### 12.2.84 `plan-r2.476` concurrent idempotency residual-risk next-evidence Inquiry
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-RESIDUAL-RISK-NEXT-EVIDENCE-INQUIRY-GRANT`。本轮只读回溯 official E0/E1/H1-H3/E2/post-join 证据、outer/inner、target test、test infrastructure、H2 properties、tests POM 与 frozen class order，并只修改主系分、主 TDD 与本 OpenSpec；不修改 Java/测试，不运行 Maven/Git/联网。
+
+事实链保持：E0/E1-ALL 两次 official all125 均为唯一 concurrent same-command loser persisted transaction digest `1F`；positions 1-61、prefix+suffixA、prefix+suffixB Green，只准出 `FULL_DISCOVERY_SET_COMBINATION_OR_SCALE_CONTEXT`。winner-first trigger/latch Green，H1 当前 H2 未复现；H3 identity/order 无 incident 证据；SQL observer 和 post-join helper均使 full Green；official restore/retry full Green。当前没有 deterministic RED，也没有证据归因 H2、partial child、entry order、request facts、生产数据库或事务传播。
+
+新增静态证据：test foundation 的固定 H2 URL=`jdbc:h2:mem:dbtest;MODE=MySQL` 并追加 `DB_CLOSE_DELAY=-1`，不同 Spring contexts 可以持有不同 DataSource/Hikari pools 但共享同名内存库；target context 默认使用 `DataSourceTransactionManager`。tests POM 未显式配置 Surefire parallel/runOrder/forkCount/reuseForks。测试基座持有 JVM-static Spring context/event publisher/audit/query-ignore function；TemporalSequenceFactory 是 scope/type 隔离的 JVM-static AtomicLong。仓内未发现直接 system property、H2 SET 或 sequence counter override caller；connection isolation setter 仅存在于当前唯一 skip 的 MySQL migration test 三处，不访问 shared H2，其他已执行 H2/class-order 测试未发现显式 setter。这些只形成 discovery/context-scale 与 shared-H2 interaction 候选，不是 root cause。
+
+Inquiry 比较三项：A=`BOUNDED_NO_SOURCE_DISCOVERY_SET_DIFFERENTIAL`，推荐；B=`DETERMINISTIC_H2_UNIQUE_CONFLICT_VISIBILITY_MICROTEST`，只作机制证据且排在 A 后；C=`STOP_DIAGNOSIS_RETAIN_GIT_BLOCKER`。A 直接利用历史 `P=Green / P+A=Green / P+B=Green / P+A+B=Red`，未来从 frozen order 将 A/B 各分半，形成四个唯一 109-class arm；source write=0，固定预算为 exact all125 准入最多一次、四 arm 最多各一次、最小 Red arm confirmation 最多一次，总计不超过 6 次 Maven。E3-0 不精准复现即停止，不允许重复 all125 直到失败。
+
+A 的结果只允许：`DISCOVERY_SET_INTERACTION_CANDIDATE_FOUND / NO_REDUCED_ARM_REPRODUCED_WITHIN_BUDGET / DISCOVERY_SET_BASELINE_NOT_REPRODUCED / INTERACTION_CONFIRMATION_NOT_REPRODUCED / NON_TARGET_FAILURE`。只有同一 reduced arm 两次精准 Red 才形成 interaction candidate；四个 arm 全 Green 不能归因 full-set scale、四块共同作用或排除随机调度。即使找到 candidate，也只进入更小只读审计/Entry Card，不形成 production Green。B 只能回答 H2 机制，不能证明 public flow 或真实 MySQL；C 不产生新证据且持续 blocker。实际业务价值是保护同事实并发复用、单 aggregate/单余额影响和同键异事实冲突，避免 loser 假失败引发重试/补偿噪声，也避免为消除假失败而错误放宽摘要。
+
+本 Inquiry 不建立 A 的执行卡；若 Owner 选择 A，下一步必须另行授权 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-DIFFERENTIAL-ENTRY-CARD-GRANT`，展开 125 个完整类名、每个 arm 的精确命令/count/order/index/SHA/目录与停止条件。选择 B 也需独立 Entry Card；选择 C 只保持 blocker。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`ROOT_CAUSE_RESIDUAL_RISK_NEXT_EVIDENCE_INQUIRY_INDEPENDENT_CHECKER_PASS / OWNER_DECISION_REQUIRED / DISCOVERY_SET_DIFFERENTIAL_ENTRY_CARD_GRANT_NO / NEXT_EVIDENCE_EXECUTION_GRANT_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate=`W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-RESIDUAL-RISK-NEXT-EVIDENCE-OWNER-DECISION`，不自动选择 A。
+
+#### 12.2.85 `plan-r2.477` next-evidence Owner decision A acceptance
+
+Human Owner 回复“授权推进，并做价值分析确认”，承接 plan-r2.476 的明确建议，选择 A=`BOUNDED_NO_SOURCE_DISCOVERY_SET_DIFFERENTIAL`。本轮只修改主系分、主 TDD 与本 OpenSpec，记录 Owner 决策、价值理由、排除项和下一 documentation Gate；不修改或运行 Java、测试、Maven、POM/Justfile、production、Git、联网、发布或生产。
+
+A 被接受是因为它具有当前最高的单位变更信息增益：repository source write=`0`，不会重演 observer/helper/trigger 改变 official source/class shape 的 Heisenberg 问题；它直接验证 `P/P+A/P+B Green、P+A+B Red` 的 discovery-set 差异，不提前把 H2、事务传播、entry order 或数据库写成根因。B 只证明 H2 机制，当前 defer；C 不产生新证据且持续 Git blocker，当前不选。
+
+A 同时接受严格预算和负结果边界：E3-0 all125 只运行一次，未精准复现立即停止；最多四个互异 109-class arm和一次预声明 confirmation，总 Maven 不超过 6 次；无动态追加、随机排序、压力循环或重复 all125 直到失败。只有同一 reduced arm 两次精准 Red 才形成 interaction candidate；全 Green、baseline Green 或 confirmation Green 都不形成 scale、共同作用、root cause、RED、Green 或 Git 准出。
+
+资金价值仍只承接同事实并发复用同一 Ledger SN、单 aggregate/单余额影响和同键异 posting facts 冲突。A 不改变金额、借贷、posting、余额、摘要、事务、schema、Public API 或 Consumer，不宣称历史 `1F` 已造成重复扣款；它只减少 loser 假失败引发的重试、补偿与告警风险，并阻止无根因的锁、retry、事务拆分或 digest 放宽。
+
+本 Owner 决策不是 `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-DIFFERENTIAL-ENTRY-CARD-GRANT`。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`ROOT_CAUSE_RESIDUAL_RISK_NEXT_EVIDENCE_A_ACCEPTED / ROOT_CAUSE_RESIDUAL_RISK_NEXT_EVIDENCE_A_ACCEPTANCE_INDEPENDENT_CHECKER_PASS / DISCOVERY_SET_DIFFERENTIAL_ENTRY_CARD_GRANT_NO / NEXT_EVIDENCE_EXECUTION_GRANT_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 是 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-DIFFERENTIAL-ENTRY-CARD-GRANT`。
+
+#### 12.2.86 `plan-r2.478` discovery-set differential Entry Card
+
+Human Owner 授予 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-DIFFERENTIAL-ENTRY-CARD-GRANT`。本轮只修改主系分、主 TDD 与本 OpenSpec，冻结 E3-0~E3-5 的 class authority、计数、摘要、runner、XML 分类、预算和停止条件；不修改 Java/测试/POM/Justfile/schema/config，不运行 Maven/Git/联网。
+
+DISCOVERY_SET_DIFFERENTIAL_AUTHORITY_FINGERPRINT=dfe731aea80624650093cacf0b21bebbbb311d96abb2797bf49f372974211361
+
+canonical 125-class list 已逐项展开于主 TDD 20.54.2；`125/8d5595d3.../778d06ff...` 与 125 份 frozen XML 对齐，全部 FQCN 均存在对应 test source。arm 复算为：E3-0=`125/1255/8d5595d3...`；E3-1=`109/1104/b2fce45e...`；E3-2=`109/1115/59fe99c0...`；E3-3=`109/1077/6a85d94a...`；E3-4=`109/1125/84360585...`；target 均 index `61`、`30 tests`，唯一 skip 仍是无真实 MySQL host migration。全源输入 manifest=`844 / 3961e509...`，scoped Maven cache=`63 / e6ceff6c...`，future source write=`0`。
+
+future runner 只使用 Java21/Maven3.6.3/offline/`skipSurefireReport=true` 与显式 `-Dtest` array；每次 clean run 先基于 live `ls -1rt` 冻结 actual order，再 `cp -pR` reports，结构化汇总 XML 并核对 input/output source manifest。E3-0 非精准 Red即停；精准 Red 后四个 arm 各一次；编号最小 Red arm最多确认一次。总 evidence Maven<=`6`，readiness 0-test 不计预算；禁止相同 all125 重跑、动态追加、随机/压力循环或 source/build 修改。
+
+只有同一 arm 两次精准 target digest `1F/0E` 才登记 `DISCOVERY_SET_INTERACTION_CANDIDATE_FOUND`；其他分类严格为 `DISCOVERY_SET_BASELINE_NOT_REPRODUCED / NO_REDUCED_ARM_REPRODUCED_WITHIN_BUDGET / INTERACTION_CONFIRMATION_NOT_REPRODUCED / NON_TARGET_FAILURE`。任何分类都不形成 root cause、immutable RED、Green、Git 或生产准出。
+
+本卡价值是使并发不稳定证据具有固定输入、有限成本、结构化验收和可停止性，同时继续保护同事实同 SN、单 aggregate/单余额影响与异 facts 冲突。独立 Checker=`PASS / P0=0 / P1=0 / P2=0`。当时=`DISCOVERY_SET_DIFFERENTIAL_ENTRY_CARD_INDEPENDENT_CHECKER_PASS / DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_GRANT_NO / REPOSITORY_SOURCE_WRITE_NO / MAVEN_NO / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。当时下一 Human Gate 是 `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-DIFFERENTIAL-EVIDENCE-EXECUTION-GRANT`；本卡不授权执行。
+
+#### 12.2.87 `plan-r2.479` E3-0 baseline not reproduced closeout
+
+Human Owner 授予 `W5-LEDGER-CONCURRENT-IDEMPOTENT-DISCOVERY-SET-BASELINE-NOT-REPRODUCED-CLOSEOUT-GRANT`。本轮只修改主系分、主 TDD 与本 OpenSpec，回写 E3-0 evidence 与独立 Checker；不再运行 Maven，不修改 Java、测试、POM、Justfile、schema、配置或 Git。
+
+唯一 evidence 目录=`/private/tmp/wind-funds-discovery-set-differential.IyCUtA/E3-0`。E3-0 Java21/Maven3.6.3 offline clean test=`125 classes / 1255/0F/0E/1S`，Maven status=`0`，final check=`0`；target=`30/0F/0E/0S`，target class SHA=`f8ab933d97eb03f5a557c7627a1ad557400a01938b95483a8a056d28daf319f1`，target XML SHA=`ec5c03420a3724c7635e47fe56936b65f0193b7ad13063b0267f5172770ccecb`；actual/expected class order=`125 lines / 8d5595d3...`，target index=`61`，XML manifest SHA=`17a31fe6...`。唯一 skip 为无真实 MySQL host 的 `ReconciliationMysqlMigrationIntegrationTests`。
+
+source=`844/3961e509...`、cache=`63/e6ceff6c...`、authority/environment/source/cache pre/post 均相等，jps 前后仅 Jps；run-ledger 仅含 E3-0，E3-1~E3-5 未执行。runner outer `rc=1` 是 E3-0 Green 后 E3-1 precise-Red guard 的 `EXPECTED_DECISION_GUARD_STOP`，不是 Maven/test/业务 failure。唯一技术分类=`DISCOVERY_SET_BASELINE_NOT_REPRODUCED`，不形成 RED、root cause、fix、Green、Git 或生产准出，且不抵消 E0/E1 历史 `1F`。
+
+实际业务价值是把一次完整、可审计的未复现结果纳入证据链并及时停止后续无信息增益运行，继续保护同事实同 Ledger SN、单 aggregate/单余额影响和异 posting facts 冲突；不把负结果包装成生产安全，不引入锁、无界 retry、事务传播改造或 digest 放宽。
+
+独立 execution 与 closeout Checker=`PASS / P0=0 / P1=0 / P2=0`。当前=`DISCOVERY_SET_DIFFERENTIAL_EVIDENCE_EXECUTION_COMPLETE / DISCOVERY_SET_BASELINE_NOT_REPRODUCED / EXPECTED_DECISION_GUARD_STOP / DISCOVERY_SET_BASELINE_NOT_REPRODUCED_CLOSEOUT_INDEPENDENT_CHECKER_PASS / ROOT_CAUSE_UNPROVEN / RED_NOT_ESTABLISHED / GREEN_EXECUTION_GRANT_NO / GIT_DELIVERY_BLOCKED / K5_ENTRY_CARD_GRANT_NO / CODE_FREEZE`。下一 Human Gate 仅为 documentation-only `W5-LEDGER-CONCURRENT-IDEMPOTENT-ROOT-CAUSE-RESIDUAL-RISK-NEXT-EVIDENCE-INQUIRY-GRANT`；不授权新的 Maven、Java/Test、Green 或 Git。

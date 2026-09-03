@@ -373,11 +373,11 @@ Fincone `FundsHandoffRecord` 至少保存：`tenantId/handoffRef`、事实/规�
 
 `gateRef` 是上游审批时的快照证据，不是最终授权。当前 Provider 本仓稳定证据覆盖 clearing confirm、settlement lock、锁定后全额 release 和首次 payout submit 在最终事务内 fresh `checkGate`。普通 direct pay、balance adjust 和 Recovery 登记不消费 Gate；初始 pay 是否需要前置 Gate 属于宿主资金政策，不能借清算模块反向调用通用支付服务实现。`ReconciliationGate` 当前只有 `PASSED/BLOCKED`，尚无 `CONDITIONAL`、有效期或条件放行权威语义。上述本仓证据不代表 Fincone adapter、跨仓 L3、目标数据库或生产准出已经完成。
 
-当前通用对账证据链为：宿主先完成来源验签、归一和匹配，再调用 `createBatch` 固化 `reconciliationScopeRef`、可选 Gate 对象、规则版本与 `[windowStart, windowEnd)`；分别记录 `REFERENCE/COMPARISON` 来源成员及内容摘要；`recordRunResult` 校验两侧来源完整覆盖后原子封版运行结果；差异按逐笔结果物化，先回链 `SUPPLEMENT_FACT/REVERSE/ADJUST/SUSPENSE/RECOVER/WRITE_OFF` 等已完成动作，再创建新批次重跑。完成态运行结果不覆盖；重跑或证据替代通过新批次推进当前 lineage，历史批次保留。
+当前通用对账证据链为：宿主先完成来源验签和归一，再调用 `createBatch` 固化 `reconciliationScopeRef`、可选 Gate 对象、规则版本与 `[windowStart, windowEnd)`；分别记录 `REFERENCE/COMPARISON` 来源成员及内容摘要；`executeStrictExact` 由 Provider 读取两侧冻结事实，校验来源完整覆盖，执行严格精确比较并原子封版运行结果；差异按逐笔结果物化，先回链 `SUPPLEMENT_FACT/REVERSE/ADJUST/SUSPENSE/RECOVER/WRITE_OFF` 等已完成动作，再创建新批次重跑。调用方不得提交匹配断言；完成态运行结果不覆盖，重跑或证据替代通过新批次推进当前 lineage，历史批次保留。
 
 当前匹配项只支持 1:1；1:N/N:1、显式 fee/timing/跨日差异、容差策略、watermark/coverage mode、owner 分派、SLA/aging/escalation、条件放行和独立 `closeEvidence` 都未形成公共契约。`responsiblePartyRef`、金额/币种/状态等基础差异类型、动作审批/证据引用、重跑结果和替代批次可复用；来源真实性、业务规则、容差、账期归属、核销政策和工单生命周期由对应业务/Finance/rail Owner 持有。缺失时不得用 `RULE_MATCH` 或自由文本冒充已经对平。
 
-`checkGate` 的 `PASSED` 只证明：指定 tenant 与 `gateObjectType + gateObjectSn` 下，请求的运行结果属于当前 lineage 头、批次已完成且为 `BALANCED`，并且当前 lineage 没有阻断中的对象级差异。冻结成员完整覆盖由 `recordRunResult` 在不可变结果封版时校验；Gate 当次只消费该结果，不重新采集或重算来源。`PASSED` 不证明外部来源真实性、业务窗口应到数据已经收齐、某个业务 scene 或当前对象摘要已被重新读取，也不提供 watermark/cutoff、TTL、容差、SLA、外部 Paid 或单独关闭凭证。当前差错关闭证据是“差错动作证据 + 后继不可变 batch/run/resultDigest + lineage”的组合，不是一个独立 `closeEvidence` 对象；Gate decision 是下游即时准入证据，不参与 `RESOLVED` 关闭。
+`checkGate` 的 `PASSED` 只证明：指定 tenant 与 `gateObjectType + gateObjectSn` 下，请求的运行结果属于当前 lineage 头、批次已完成且为 `BALANCED`，并且当前 lineage 没有阻断中的对象级差异。冻结成员完整覆盖由 `executeStrictExact` 在不可变结果封版时校验；Gate 当次只消费该结果，不重新采集或重算来源。`PASSED` 不证明外部来源真实性、业务窗口应到数据已经收齐、某个业务 scene 或当前对象摘要已被重新读取，也不提供 watermark/cutoff、TTL、容差、SLA、外部 Paid 或单独关闭凭证。当前差错关闭证据是“差错动作证据 + 后继不可变 batch/run/resultDigest + lineage”的组合，不是一个独立 `closeEvidence` 对象；Gate decision 是下游即时准入证据，不参与 `RESOLVED` 关闭。
 
 除 `checkGate` 外，写入口使用本地 Spring `REQUIRED` 事务，查询入口使用 `readOnly` 事务；Fincone handoff、来源采集与 wind-funds 之间没有跨仓事务。`checkGate` 使用 `MANDATORY` 加入 clearing confirm、settlement lock、锁定后全额 release 或首次 payout submit 的最终写事务并锁定当前 lineage/batch，不能脱离调用方事务独立执行；`inspectGate` 仅供解释，不能授权资金动作。
 

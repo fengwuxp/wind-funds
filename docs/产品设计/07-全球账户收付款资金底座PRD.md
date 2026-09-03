@@ -178,7 +178,7 @@ mindmap
 | --- | --- | --- | --- |
 | Global Account | accountRef、customerRef、currency、country、status、providerRef。 | ACTIVE、SUSPENDED、CLOSED。 | 外部账户产品不是内部账本主体。 |
 | Inbound Payment | inboundId、vaRef、payerRef、bankStatementRef、amount、currency、receivedAt。 | EXTERNAL_ACCEPTED、IN_TRANSIT、RECEIVED、MATCHED、POSTED、RETURNED、EXCEPTION。 | 外部受理不等于到账，到账不等于可用。 |
-| Outbound Payment | payoutId、payeeRef、externalAccountRef、amount、currency、fee、purpose、complianceStatus。 | REQUESTED、PRECHECKED、SUBMITTED、PROCESSING、PAID、RETURNED、FAILED、RECONCILED。 | 外部提交不等于付款成功。 |
+| Outbound Payment | payoutId、payeeRef、externalAccountRef、amount、currency、fee、purpose、complianceStatus。 | REQUESTED、PRECHECKED、SUBMITTED、PROCESSING、PAID、RETURNED、FAILED、RECONCILED。 | 外部提交或 executor 成功不等于 beneficiary arrival；`PAID` 只在独立到账证据闭合后作为上层展示，`RECONCILED` 仍独立表达对账完成。 |
 | FX Reference | quoteRef、fromCurrency、toCurrency、rate、validUntil、provider、executionRef。 | QUOTED、LOCKED、EXECUTED、EXPIRED、FAILED。 | 无有效 quote 不得隐式换汇。 |
 | Recon Exception | reconBatch、externalRef、ledgerRef、differenceType、amount、currency、owner。 | OPEN、INVESTIGATING、ADJUSTING、WRITTEN_OFF、CLOSED。 | 差错不能直接改历史分录。 |
 
@@ -191,7 +191,9 @@ mindmap
 | MATCHED | 入账完成 | 合规和账务准入通过。 | ledger entry 增加对应账户。 | POSTED | 未过账不得展示可用。 |
 | REQUESTED | 出款申请 | 权限、余额、合规资料完整。 | 进入前置检查。 | PRECHECKED | 资料缺失阻断。 |
 | PRECHECKED | 外部提交 | 出款前置检查通过。 | 生成出款请求和在途状态。 | SUBMITTED / PROCESSING | 外部提交不等于 PAID。 |
-| PROCESSING | 银行回单成功 | 回单和对账来源确认。 | 确认资金出款成功。 | PAID | 无回单不得终态成功。 |
+| PROCESSING | executor 终态成功 | executor 回执已归一，内部资金准入和守恒通过。 | 形成一次内部 payout effect，展示“执行完成/到账待确认”。 | 内部执行完成（非 beneficiary arrival） | 不得把 executor 成功直接写成 PAID 或 rail finality。 |
+| 内部执行完成 | beneficiary 到账证据确认 | bank/beneficiary query、report 或 statement 与 payout identity、amount、currency、scope、source、version 和 Owner 对平。 | 声明 beneficiary arrival；不创建第二次资金动作。 | beneficiary arrival confirmed | 缺证据、冲突或陈旧时保持待确认/人工。 |
+| 内部执行完成或 beneficiary arrival confirmed | rail finality 证据确认 | 适用 rail/bank/executor Owner 提供版本化、范围匹配且未过期的 finality 证据。 | 独立声明 rail finality。 | rail finality confirmed | 不得由内部资金、余额或对账 Gate 推导。 |
 | PROCESSING | 银行退汇 | 外部返回 return。 | 生成退汇资金动作或回补。 | RETURNED | 退汇不能当普通退款。 |
 
 ## 6. 业务流程
@@ -223,7 +225,9 @@ flowchart LR
     D -- "是" --> F["提交出金资金动作\nAVAILABLE -> IN_TRANSIT"]
     F --> G["外部银行提交"]
     G --> H{"回单结果"}
-    H -- "成功" --> I["确认 PAID\n对账完成"]
+    H -- "executor 终态成功" --> I["形成内部 payout effect\n展示执行完成/到账待确认"]
+    I --> L["独立 bank/beneficiary 到账证据对平\n上层再展示 PAID"]
+    L --> M["post-action reconciliation\n独立确认对账"]
     H -- "失败/退汇" --> J["回补 / 差错 / 人工处理"]
     H -- "处理中" --> K["保持在途\n超时告警"]
 ```
@@ -233,7 +237,7 @@ flowchart LR
 | 场景 | 触发条件 | 处理逻辑 | 人工处理 | 审计和验收 |
 | --- | --- | --- | --- | --- |
 | 银行单边 | 银行流水存在，内部无匹配。 | 进入挂账或待匹配。 | 补 VA、主体、用途或退回。 | 不得自动入 AVAILABLE。 |
-| 平台单边 | 内部出款成功，银行无回单。 | 进入资金在途和对账差错。 | 补拉、人工确认或回滚出款状态。 | 不能无回单展示 PAID。 |
+| 平台单边 | 内部 payout effect 已完成，银行无独立到账证据。 | 进入资金在途和对账差错。 | 补拉、人工确认或按责任处理，不覆盖内部事实。 | 不能无独立到账证据展示 PAID；不得自动重复出款。 |
 | 错币种 | 入金或出金币种与账户不一致。 | 阻断或进入 FX 处理。 | 补 quote 或人工确认。 | 无有效 quote 不隐式换汇。 |
 | 退汇 | 银行或网络返回。 | 回补、费用拆分、状态回退或差错。 | 补资料、通知客户、核销。 | 退汇资金动作和原出金关联。 |
 | 合规拦截 | 名单、资料、用途或规则未通过。 | 阻断出金或冻结在途。 | 补资料、复核、解除或关闭。 | 审批和确认方完整。 |
@@ -246,7 +250,7 @@ flowchart LR
 | GA-R002 | 外部账户不入账 | VA / Bank Account | 生成账本分录。 | externalAccountRef 只做引用。 | 解析内部资金账户。 | P0 | 随全球账户场景规则确认。 | ledger entry 主体不出现银行账号。 |
 | GA-R003 | 错币种阻断 | 多币种资金动作 | 交易币种与账户币种不同。 | 无有效 FX quote。 | 拒绝或进入待处理。 | P0 | 随全球账户场景规则确认。 | USD 账户不能静默入 EUR。 |
 | GA-R004 | 费用拆分 | 入金、出金、退汇 | 存在平台费、银行费、中间行费。 | 金额组件必须结构化。 | 本金、费用、成本分别入账或待确认。 | P1 | 随全球账户场景规则确认。 | 客户账单能解释到账金额差。 |
-| GA-R005 | 出款回单终态确认 | Outbound | 外部提交后。 | 回单成功并对账匹配。 | 标记 PAID。 | P0 | 随全球账户场景规则确认。 | 无回单保持 PROCESSING 或差错。 |
+| GA-R005 | 受益人到账证据确认 | Outbound | executor 结果已形成内部 payout effect。 | 独立 bank/beneficiary query、report 或 statement 与 payout identity、amount、currency、scope、source、version 和 Owner 对平。 | 上层标记 beneficiary arrival/PAID；rail finality 另行声明。 | P0 | 随全球账户场景规则确认。 | 缺证据、冲突或陈旧时保持到账待确认或差错。 |
 
 ## 8. 运营后台、数据、报表和审计
 
@@ -298,14 +302,14 @@ flowchart LR
 | GA-AC-001 | 入金流水匹配并入账 | 银行流水、VA、客户、金额、币种。 | 生成入金资金动作和 ledger entry。 | 多币种、费用。 | VA 不匹配进入挂账。 |
 | GA-AC-002 | 外部受理保持在途 | 外部 accepted 状态。 | 进入 IN_TRANSIT，不增加 AVAILABLE。 | 长时间未达告警。 | 被误标可用即失败。 |
 | GA-AC-003 | 出款前置检查通过后提交 | 出款申请、余额、收款账户、合规状态。 | AVAILABLE -> IN_TRANSIT，生成出款引用。 | 手续费、限额。 | 余额不足或规则未确认阻断。 |
-| GA-AC-004 | 出款成功回单确认 | 银行成功回单。 | 状态 PAID，对账完成。 | 部分费用。 | 无回单不得成功。 |
+| GA-AC-004 | executor 出款成功与受益人到账分层 | executor 成功回单及内部 payout effect 已闭合。 | 先展示执行完成/到账待确认；独立到账证据对平后才标记 PAID，reconciliation 仍独立。 | 部分费用、到账缺失或 rail finality 未确认保持待确认。 | 不得以 executor 回单、Ledger、Balance 或 Gate 单独标记 PAID。 |
 | GA-AC-005 | 银行退汇回补 | 出款处理中收到 return。 | 生成退汇资金动作或回补，关联原出金。 | 退汇费。 | 重复 return 幂等处理。 |
 | GA-RED-001 | 错币种无 quote 阻断 | USD 账户收到 EUR 入账请求。 | 拒绝或进入待 FX，不写 AVAILABLE。 | quote 过期。 | 静默换汇即失败。 |
 | GA-RED-002 | 外部银行账户不得入账 | 资金动作携带 bankAccountRef。 | 仅作为 externalAccountRef。 | VA、Nostro/Vostro 引用。 | ledger entry 主体出现外部账号即失败。 |
 
 ## 11. 与资金底座主线的关系
 
-本分册作为全球账户收付款业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免 VA、外部银行账户、SWIFT、本地清算网络、FX 执行和跨境材料管理反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：外部受理不等于到账、外部账户不入账、错币种阻断、费用拆分、出款回单才可确认终态。
+本分册作为全球账户收付款业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免 VA、外部银行账户、SWIFT、本地清算网络、FX 执行和跨境材料管理反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：外部受理和 executor 成功不等于受益人到账、外部账户不入账、错币种阻断、费用拆分、独立到账证据才可确认 beneficiary arrival，rail finality 与 reconciliation 分开。
 
 | 原文档 | 补充方式 |
 | --- | --- |

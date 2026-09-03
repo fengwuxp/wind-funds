@@ -365,7 +365,7 @@ flowchart TD
 | 收益分润清算确认 | 平台分润成本、员工激励成本、合作方分润成本或收益来源账户；用户代理、平台员工或合作方解析后的资金账户或员工应付账户 `AVAILABLE`。 | 成本账户通常为 EXPENSE/DEBIT；收益参与方 `AVAILABLE` 或员工应付账户通常为负债/CREDIT；合作方账户按 profile 配置。 | 平台额外奖励场景：借平台分润成本或员工激励成本；贷收益参与方 `AVAILABLE` 或员工应付账户 `AVAILABLE`。从佣金池分出场景：必须先形成用户代理净佣金和员工二级分润两个金额项，再分别入账，不静默扣减。 | 清算确认后收益参与方可用或员工应付增加；平台成本或约定收益来源同步变化；清分和候选阶段余额不变。 | 最小交付只支持两级归因验收；缺交易利润或 GMV 口径、归因快照、规则版本、审批、专业确认或收益参与方账户解析时不得入账。`TDD-B7-REVSHARE-*`、`TDD-CLS-*`、`TDD-RECON-*`。 |
 | 结算锁定 | 商户 `AVAILABLE`、商户 `SETTLEMENT`。 | 两个余额桶通常为负债/CREDIT。 | 借：商户 `AVAILABLE`；贷：商户 `SETTLEMENT`。 | 可用减少，结算锁定增加；总责任不变。 | `SETTLEMENT` 是出款中或结算处理中余额桶，不等于授权链路 `COMPLETE` 事件；锁定后不得重复结算。`TDD-SETTLE-*`。 |
 | 外部出款受理或在途 | 商户 `SETTLEMENT`；商户或平台 `IN_TRANSIT` 责任桶；外部银行账户只做引用。 | `SETTLEMENT` 和 `IN_TRANSIT` 默认按负债/CREDIT 承接；若未来改为在途资产，必须单独补 DSL 行和 TDD 断言。 | 采用责任在途桶时，借：`SETTLEMENT`；贷：`IN_TRANSIT`。不采用在途桶时不生成新的资金分录，只记录外部非终态引用。 | 采用在途桶：结算锁定减少，在途责任增加；不采用在途桶：余额不变。 | submitted、accepted、message sent 或 processing 不等于到账成功。`TDD-SETTLE-*`、`TDD-RAIL-*`。 |
-| 出款成功 | 商户 `SETTLEMENT` 或 `IN_TRANSIT`；平台现金/备付镜像 `CASH` 或外部回单现金映射。 | 商户锁定/在途通常为负债/CREDIT；平台现金为资产/DEBIT。 | 借：商户 `SETTLEMENT` 或 `IN_TRANSIT`；贷：平台 `CASH` 或付款资产镜像。 | 商户结算责任减少；平台现金资产减少；外部付款结果可追溯。 | 不得重复关闭；必须能证明商户结算负债减少和外部付款结果一致。`TDD-SETTLE-*`。 |
+| executor 终态成功（内部 payout effect） | 商户 `SETTLEMENT` 或 `IN_TRANSIT`；平台现金/备付镜像 `CASH` 或外部回单现金映射。 | 商户锁定/在途通常为负债/CREDIT；平台现金为资产/DEBIT。 | 借：商户 `SETTLEMENT` 或 `IN_TRANSIT`；贷：平台 `CASH` 或付款资产镜像。 | 商户结算责任减少；平台内部 payout effect 可追溯。该事实不单独证明 beneficiary arrival 或 rail finality。 | 不得重复关闭；到账证据和 rail finality 由上游独立声明，不能从内部账务推导。`TDD-SETTLE-*`。 |
 | 出款失败或退回 | 商户 `IN_TRANSIT` 或 `SETTLEMENT`；商户 `AVAILABLE`；异常退回可进 `ADJUSTMENT`。 | 商户余额桶通常为负债/CREDIT；差错挂账按 profile 配置。 | 借：`IN_TRANSIT` 或 `SETTLEMENT`；贷：商户 `AVAILABLE`，金额不一致时贷/借 `ADJUSTMENT` 并转差错。 | 在途或结算锁定减少；可用恢复；异常差额进入差错余额。 | 只回退一次；金额不一致或状态不确定进入差错，不直接改历史分录。`TDD-SETTLE-*`、`TDD-RECON-*`。 |
 | 对账误报关闭 | 对账差错处理单、审计记录。 | 不涉及账目或账户类型。 | 不生成 posting 或 ledger entry。 | 资金余额、账本分录和投影不变化。 | 差异不能靠日志或人工备注修复余额。`TDD-RECON-*`。 |
 | 对账补事实、冲正、调账或核销 | 责任方账户、挂账方账户、平台 `ADJUSTMENT`、目标资金账户。 | 责任、资产、收入、成本或挂账账户按审批结论配置。 | 上层业务确认后调用既有资金能力，按审批结论生成一组或多组平衡 plan：借方合计等于贷方合计；冲正优先反向原分录。 | 目标余额、差错挂账、成本、收入或责任余额按审批结果变化。 | 对账不判断上层业务准入、不自行生成指令；必须有审批、凭证、原事实引用、幂等键和失败无副作用测试。`TDD-RECON-*`、`TDD-CTRL-*`。 |
@@ -1272,7 +1272,7 @@ VCC 授权接入口径：
 | 结算锁定 | 确认后的结算出款候选，事件语义使用 `SETTLEMENT_LOCK`。 | 从 `AVAILABLE` 锁定到 `SETTLEMENT`。 |
 | 出款提交前门禁 | 不进入资金 DSL，只作为出款单提交前的准入守卫。 | 出款账户、收款端点、外部通道、额度、cutoff、名单筛查、外部规则核验、负余额、准备金、对账差错、幂等和审批任一缺失、失败或未知时，不得生成 `FUND_OUT` 或在途事实。 |
 | 外部出款受理在途 | 外部已受理但未最终成功或失败。 | 需要账本可见在途时从 `SETTLEMENT` 进入 `IN_TRANSIT`；未启用在途桶时必须保持出款单待确认，禁止展示成功。 |
-| 出款成功 | 外部出款结果成立。 | 关闭 `SETTLEMENT` 或 `IN_TRANSIT`，保留外部引用。 |
+| executor 终态成功 | 外部 executor 结果成立且内部资金准入通过。 | 形成一次内部 payout effect，可关闭 `SETTLEMENT` 或 `IN_TRANSIT`，保留外部引用；不声明 beneficiary arrival 或 rail finality。 |
 | 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 或 `IN_TRANSIT` 回退到原口径。 |
 | 对账差错调账 | 差错已审批、凭证已确认。 | 进入 `ADJUSTMENT` 或业务指定口径，必须可审计。 |
 
@@ -1377,7 +1377,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-SETTLEMENT-RECONCILIATION-001` | 清结算与对账差错入账总入口。 | 清结算对象不是 route leg；只有明确资金事实进入 DSL。 | 子 case 分别承接清算确认、结算锁定、出款提交前门禁、出款结果和差错调账。 | 对账通过直接写账、差错直接改历史分录、结算锁定进入人工调账口径。 |
 | `DSL-SETTLEMENT-CLEARING-CONFIRM-001` | 清算批次确认。 | `DIRECT_TRANSACTION / CLEARING_CONFIRM` 资金事实，以清算批次号为业务幂等键。 | 同账户 `CLEARING -> AVAILABLE`；同摘要重放复用原交易，不同摘要冲突拒绝；余额不足在入账前确定拒绝时只保留 `FAILED` 资金事实，不生成账本交易、计划、分录或余额变化。 | 清分批次确认直接入账、候选 `READY` 绕过最终复核、重复确认重复入账、缺前置对账放行，或把技术异常误提交为确定失败。 |
 | `DSL-SETTLEMENT-LOCK-001` | 结算锁定。 | `SETTLEMENT_LOCK` 资金事实，引用结算单和金额项。 | 商户 `AVAILABLE -> SETTLEMENT`；锁定不等于出款成功。 | 锁定复用人工调账口径、出款中金额再次结算、缺审批锁定。 |
-| `DSL-SETTLEMENT-PAYOUT-RESULT-001` | 出款成功、失败、退回和金额不一致结果。 | `FUND_OUT`、失败回退事实或金额不一致差错，引用出款单、外部回单、事实状态、展示状态和操作状态。 | 出款提交前门禁通过后才允许生成出款事实；成功关闭 `SETTLEMENT/IN_TRANSIT`；失败只回退一次；金额不一致进入差错或挂账。 | 门禁失败仍提交、外部受理当成功、失败重复回退、金额不一致静默完成、缺操作状态仍展示可操作。 |
+| `DSL-SETTLEMENT-PAYOUT-RESULT-001` | executor 出款结果、内部资金 effect、退回和金额不一致结果。 | `FUND_OUT`、失败回退事实或金额不一致差错，引用出款单、外部回单、事实状态、展示状态和操作状态。 | 出款提交前门禁通过后才允许生成出款事实；executor 成功且内部闭合才关闭 `SETTLEMENT/IN_TRANSIT`；beneficiary arrival 与 rail finality 由独立证据确认；失败只回退一次；金额不一致进入差错或挂账。 | 门禁失败仍提交、外部受理当成功、executor success 冒充到账/finality、失败重复回退、金额不一致静默完成、缺操作状态仍展示可操作。 |
 | `DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` | 对账差错调账。 | `BALANCE_CONTROL / BALANCE_ADJUST` 或批次授权的 `DIRECT_TRANSACTION / ADJUSTMENT`，引用差错、审批、凭证和重新对账上下文。 | 追加受控调整或平衡调账分录；核销前后可重新对账。 | 无审批调账、差错直接改历史分录、绕过差错闭环直接改余额。 |
 | `DSL-SETTLEMENT-POLICY-001` | 结算策略表达和解析失败边界。 | `SettlementPolicySpec` 固化周期、cutoff、时区、节假日和结算对象。 | 策略解析成功才生成候选或结算计划；策略快照可追溯。 | 空表达式、未知策略或解析失败被静默按实时结算处理。 |
 | `DSL-P2-EXTERNAL-EVIDENCE-PACK-001` | P2 业务能力包外部适配证据包。 | GatewayInstruction、RouteDecisionSnapshot、ChannelRequest、ChannelResponse、WebhookEvent、ChannelReference、ExternalQueryResult、ExternalFileDigest、ExternalRuleVerification 或等价脱敏摘要。 | 外部动作可被去重、验签、回查、审计、对账和关联 route snapshot；证据包只作为归一资金事实、阻断、等待证据或对账输入。 | 外部 accepted/submitted/processing 直接入账，缺验签/幂等/外部引用/文件摘要/规则核验仍自动推进，保存敏感原文。 |

@@ -184,7 +184,8 @@ mindmap
 | SPLIT_CONFIRMED | 清算批次确认 | 风控、退款、争议、差错阻断均通过。 | CLEARING -> AVAILABLE；后续结算锁定才 AVAILABLE -> SETTLEMENT。 | CLEARING_CONFIRMED | 被争议或差错阻断不得清算。 |
 | CLEARING_CONFIRMED | 结算锁定 | 结算单复核通过。 | 锁定可结算金额。 | LOCKED | 结算锁定后普通交易不得直接修改净额。 |
 | LOCKED | 出款提交 | 出款前置检查通过。 | SETTLEMENT -> IN_TRANSIT。 | PAYOUT_SUBMITTED | 外部受理不等于 PAID。 |
-| PAYOUT_SUBMITTED | 银行到账 | 回单和对账确认。 | 确认出款完成。 | PAID | 无回单不得终态成功。 |
+| PAYOUT_SUBMITTED | executor 终态成功 | executor 回执已归一，内部资金准入和守恒通过。 | 形成一次内部 payout effect，展示“执行完成/到账待确认”。 | 内部执行完成（非 beneficiary arrival） | 不得把 executor 成功直接写成 PAID 或 rail finality。 |
+| 内部执行完成 | beneficiary 到账证据确认 | bank/beneficiary query、report 或 statement 与 payout identity、amount、currency、scope、source、version 和 Owner 对平。 | 声明 beneficiary arrival；不创建第二次资金动作。 | beneficiary arrival confirmed | 缺证据、冲突或陈旧时保持待确认/人工。 |
 | CAPTURED / PAID | 拒付 | 外部 chargeback。 | 生成扣回、准备金、追偿或负余额。 | DISPUTED | 不得作为普通退款处理。 |
 
 ## 6. 业务流程
@@ -215,7 +216,7 @@ flowchart LR
 | void / reversal | 授权未完成或未清算前取消。 | 释放占用或关闭支付尝试。 | 通道状态不明时人工查询。 | 不当成已清算退款。 |
 | chargeback | 持卡人或网络发起拒付。 | 独立 dispute case，扣回、准备金、追偿或损失确认。 | 证据提交、期限提醒、商户追偿。 | 不与 refund 混用。 |
 | 结算阻断 | 风险、争议、负余额、资料过期或外部规则未确认。 | 暂停结算或转入准备金。 | 风控和合规复核。 | 阻断原因可解释。 |
-| 出款失败 | 银行退回、账户异常、通道失败。 | 回退 IN_TRANSIT 或进入差错。 | 补资料、重试、关闭、追偿。 | 无回单不标 PAID。 |
+| 出款失败 | 银行退回、账户异常、通道失败。 | 回退 IN_TRANSIT 或进入差错。 | 补资料、重试、关闭、追偿。 | 无独立到账证据不标 PAID。 |
 | 通道文件差异 | PSP/卡组织文件与内部记录不一致。 | 生成对账差错。 | 补单、冲正、挂账、核销。 | 差错不直接改历史分录。 |
 
 ## 7. 业务规则矩阵
@@ -281,7 +282,7 @@ flowchart LR
 | ACQ-AC-001 | 支付成功进入待清算 | capture 成功事件、商户、金额、币种。 | 商户 CLEARING 增加，生成 ledger entry。 | 平台手续费、通道成本。 | 重复通知幂等。 |
 | ACQ-AC-002 | 清分批次确认 | 可清分明细、规则版本、周期。 | 生成清分批次，不释放可结算。 | 多商户、多币种。 | 明细缺账本引用阻断。 |
 | ACQ-AC-003 | 清算确认进入可结算 | 清算批次确认且无阻断。 | CLEARING -> AVAILABLE；后续结算锁定才进入 SETTLEMENT。 | 准备金扣减。 | 争议未闭环阻断。 |
-| ACQ-AC-004 | 结算出款成功 | 结算单锁定、出款回单成功。 | IN_TRANSIT -> PAID，商户账单展示到账。 | 部分失败待确认。 | 无回单不得 PAID。 |
+| ACQ-AC-004 | 结算出款 executor 成功与受益人到账分层 | 结算单锁定、executor 终态成功，后续可取得独立到账证据。 | 先关闭内部 payout effect 并展示“执行完成/到账待确认”；bank/beneficiary 证据与 payout identity、amount、currency 对平后，才由上层展示 beneficiary arrival。 | 部分失败、到账缺失或 rail finality 未确认均保持待确认。 | 不得以 executor 回单、Ledger、Balance 或 Gate 单独写成 `PAID`/银行到账。 |
 | ACQ-AC-005 | 退款沿原路径 | 已 capture 交易退款。 | 基于原 route snapshot 回放，更新清账和结算影响。 | 结算后退款。 | 超额退款失败。 |
 | ACQ-AC-006 | chargeback 独立追偿 | 已结算交易发生拒付。 | 生成 dispute case、扣准备金、负余额或追偿。 | 争议费。 | 与 refund 碰撞防重复损失。 |
 | ACQ-RED-001 | 支付成功不得展示可提现 | capture 后未清算。 | 商户只能看到待清算。 | T+N 账期。 | 直接可出款即失败。 |
@@ -289,7 +290,7 @@ flowchart LR
 
 ## 11. 与资金底座主线的关系
 
-本分册作为收单业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免商户入网、收银台、PSP 协议、通道路由、tokenization、支付方式展示和商户风控策略反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：支付成功不等于可结算、先清账再结算、refund 与 chargeback 分离、出款回单才可确认到账、PCI 敏感数据不入资金底座。
+本分册作为收单业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免商户入网、收银台、PSP 协议、通道路由、tokenization、支付方式展示和商户风控策略反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：支付成功不等于可结算、先清账再结算、refund 与 chargeback 分离、独立到账证据才可确认 beneficiary arrival、PCI 敏感数据不入资金底座。
 
 | 原文档 | 补充方式 |
 | --- | --- |

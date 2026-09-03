@@ -132,8 +132,8 @@
 
 | 模块 | 职责 | 不承担 |
 | --- | --- | --- |
-| core | 定义 Spend Rule 枚举、值对象或 DSL 承载类型，例如规则类型、规则域、scope 类型、状态枚举。 | 依赖 DAL、Mapper、Spring Bean、测试或具体规则实现。 |
-| wallet-face | 暴露 Spend Rule application 契约、Request、Query、DTO。 | 暴露 Entity、Mapper、内部实现类或 HTTP/RPC 控制器。 |
+| core | 仅承载已证明跨场景稳定的 Spend Rule 枚举、值对象或 DSL 承载类型；当前场景/卡协议字段先视为迁移证据，不自动进入核心公共词汇。 | 依赖 DAL、Mapper、Spring Bean、测试或具体规则实现，或把场景协议字段提升为核心规则语言。 |
+| wallet-face | 承载受控的 Spend Rule Request、Query、DTO 和内部协作契约；是否成为外部 Public API 必须另有真实 Consumer 证据。 | 因已有 face 类型就默认对外承诺，或暴露 Entity、Mapper、内部实现类或 HTTP/RPC 控制器。 |
 | wallet-impl | 实现规则定义、版本发布、规则挂载、决策记录、控制额度变动流水和预算控制投影。 | 写资金交易事实、route、posting、LedgerEntry、ledger transaction 或账本余额投影。 |
 | transaction-face / transaction-impl | 在授权、付款、退款和投影解释中读取已固化规则证据。 | 计算 Spend Rule、管理规则定义、更新规则挂载或把规则作为 canonical 入参主体。 |
 | ledger-face / ledger-impl | 只接受资金账户、信用账户或平台角色解析后的资金账户作为账本主体。 | 为 Spend Rule 或支出控制范围建账、过账或投影余额。 |
@@ -142,11 +142,11 @@
 
 ### 4.1 模块归属强约束
 
-Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费已固化证据。该约束不是目录偏好，而是资金事实边界：规则配置和控制额度变动流水可以决定是否继续进入交易，但不能成为交易内核的主体能力。
+Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费已固化证据。该约束不是目录偏好，而是资金事实边界：规则配置和控制额度变动流水可以决定是否继续进入交易，但不能成为交易内核的主体能力。当前没有跨模块 Spend Rule 生产 Consumer，因此 wallet-face 中的规则资源服务和管理能力默认按内部/管理面候选处理，不自动形成外部 Public API。
 
 | 包或模块 | 允许 | 禁止 |
 | --- | --- | --- |
-| `wallet/face` | 暴露 Spend Rule 定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制投影契约。 | 直接写交易事实、账本分录或余额投影。 |
+| `wallet/face` | 承载规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制投影的受控契约；跨模块只保留有真实 Consumer 和稳定不变量证明的部分。 | 直接写交易事实、账本分录或余额投影，或把当前资源型接口整体当作外部 Public API。 |
 | `wallet/impl` | 持久化规则事实和控制事实，提供支付工具、账户能力、资金责任和准入证据。 | 依赖 transaction-face/impl，或直接写交易表、route、posting、LedgerEntry。 |
 | `transaction-face / transaction-impl` | 读取 `spendRuleDecision`、route snapshot、控制额度变动引用等已固化证据用于历史解释；`transaction-impl` 可通过 `wallet-face` 契约实现交易后控制消费或退款补偿适配；支付工具授权 facade 可在进入交易内核前调用 wallet-face 准入契约解析 binding 并验真决策引用。 | 依赖 `wallet-impl`、wallet DAL / Mapper、规则定义 / 挂载 / 决策记录 Entity，查询预算控制投影模型，或在交易内核内执行 Spend Rule。 |
 | `ledger` | 校验可入账主体并过账资金账户、信用账户或平台资金账户。 | 为 Spend Rule、支出控制范围、支付工具或控制 scope 建账、过账或投影余额。 |
@@ -166,8 +166,8 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 
 | 服务类型 | Spend Rule 目标服务 | 职责 |
 | --- | --- | --- |
-| 基础服务 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`、`SpendRuleDecisionRecordService`、`SpendControlMovementService` | 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影的标准服务能力；允许访问 Mapper / Repository，并在服务内保留必要业务守卫。 |
-| 场景应用服务 | `SpendControlAdmissionApplicationService`；transaction-impl 内部支付工具与控制事实编排 | Wallet 对外只提供授权前准入；交易后消费 / 退款补偿、支付工具授权与收款编排属于 Transaction Provider 内部事务边界。 |
+| 基础服务 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`、`SpendRuleDecisionRecordService`、`SpendControlMovementService` | Wallet 内部/管理面承载规则和控制事实；允许访问 Mapper / Repository，并在服务内保留必要业务守卫，但没有外部 Consumer 时不构成公共 API 承诺。 |
+| 场景应用服务 | `SpendControlAdmissionApplicationService`；transaction-impl 内部支付工具与控制事实编排 | 只向受控交易边界提供授权前准入；交易后消费 / 退款补偿、支付工具授权与收款编排属于 Transaction Provider 内部事务边界，不向外部 Consumer 暴露。 |
 
 服务命名规则：
 
