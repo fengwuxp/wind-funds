@@ -99,51 +99,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(transactionSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
-            var explanation = context.explanation();
-            assertThat(explanation.businessScene()).isEqualTo("PAY");
-            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
-            assertThat(explanation.fundsTransactionSn()).isEqualTo(transactionSn);
-            assertThat(explanation.routeSnapshotId()).isEqualTo(context.routeSnapshot().getSnapshotId());
-            assertThat(explanation.routeCode()).isEqualTo(context.routeSnapshot().getRouteCode());
-            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
-            assertThat(explanation.factStatus()).isEqualTo("POSTED");
-            assertThat(explanation.displayStatus()).isEqualTo("SUCCEEDED");
-            assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
-            assertThat(explanation.statusMeaning()).isEqualTo("FUNDS_POSTED");
-            assertThat(explanation.amountSource())
-                    .isEqualTo("instructionAmount=70 USD, routeLegCount=1, routeSnapshot="
-                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
-                            + ledgerTransaction.getSn());
-            assertThat(explanation.failureReason()).isEqualTo("N/A");
-            assertThat(explanation.unavailableReason()).isEqualTo("N/A");
-            assertThat(explanation.nextAction()).isEqualTo("N/A");
-            assertThat(explanation.evidenceRefs())
-                    .contains("fundsTransaction:" + transactionSn,
-                            "routeSnapshot:" + context.routeSnapshot().getSnapshotId(),
-                            "ledgerTransaction:" + ledgerTransaction.getSn());
-            assertThat(explanation.externalRuleVerificationStatus()).isEqualTo("N/A");
-            var payload = explanation.payload();
-            assertThat(payload)
-                    .containsEntry("businessScene", "PAY")
-                    .containsEntry("businessSn", "PROJECTION_SUCCESS_PAY")
-                    .containsEntry("fundsTransactionSn", transactionSn)
-                    .containsEntry("routeSnapshotId", context.routeSnapshot().getSnapshotId())
-                    .containsEntry("routeCode", context.routeSnapshot().getRouteCode())
-                    .containsEntry("ledgerTransactionSn", ledgerTransaction.getSn())
-                    .containsEntry("factStatus", "POSTED")
-                    .containsEntry("displayStatus", "SUCCEEDED")
-                    .containsEntry("operationStatus", "NO_ACTION_REQUIRED")
-                    .containsEntry("statusMeaning", "FUNDS_POSTED")
-                    .containsEntry("amountSource", "instructionAmount=70 USD, routeLegCount=1, routeSnapshot="
-                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
-                            + ledgerTransaction.getSn())
-                    .containsEntry("failureReason", "N/A")
-                    .containsEntry("unavailableReason", "N/A")
-                    .containsEntry("nextAction", "N/A")
-                    .containsEntry("externalRuleVerificationStatus", "N/A");
-            assertThat(payload.get("evidenceRefs"))
-                    .asList()
-                    .contains("routeSnapshot:" + context.routeSnapshot().getSnapshotId());
         });
         assertThat(fundsTransaction.getState()).isEqualTo(FundsTransactionState.CLOSED);
         assertThat(details).isNotEmpty()
@@ -190,26 +145,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(authorizationSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
-            var explanation = context.explanation();
-            assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION");
-            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_AUTH_AUTHORIZE");
-            assertThat(explanation.fundsTransactionSn()).isEqualTo(authorizationSn);
-            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
-            assertThat(explanation.factStatus()).isEqualTo("HELD");
-            assertThat(explanation.displayStatus()).isEqualTo("AUTHORIZED_HOLD");
-            assertThat(explanation.operationStatus()).isEqualTo("WAITING_CAPTURE_OR_RELEASE");
-            assertThat(explanation.statusMeaning()).isEqualTo("AUTHORIZATION_HELD_NOT_CAPTURED");
-            assertThat(explanation.amountSource())
-                    .isEqualTo("instructionAmount=60 USD, routeLegCount=1, routeSnapshot="
-                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
-                            + ledgerTransaction.getSn());
-            assertThat(explanation.unavailableReason())
-                    .isEqualTo("AUTHORIZATION_HOLD_IS_NOT_FINAL_CONSUMPTION");
-            assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_CAPTURE_OR_RELEASE");
-            assertThat(explanation.payload())
-                    .containsEntry("displayStatus", "AUTHORIZED_HOLD")
-                    .containsEntry("operationStatus", "WAITING_CAPTURE_OR_RELEASE")
-                    .containsEntry("nextAction", "WAIT_FOR_CAPTURE_OR_RELEASE");
         });
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_AUTH_TOPUP", 3, 4);
@@ -253,27 +188,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isNull();
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
             assertThat(context.routeSnapshot().getLegs()).isEmpty();
-            var explanation = context.explanation();
-            assertThat(explanation.factStatus()).isEqualTo("REJECTED");
-            assertThat(explanation.displayStatus()).isEqualTo("DECLINED");
-            assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
-            assertThat(explanation.statusMeaning()).isEqualTo("AUTHORIZATION_DECLINED_NO_FUNDS_POSTED");
-            assertThat(explanation.amountSource())
-                    .isEqualTo("instructionAmount=60 USD, routeLegCount=0, routeSnapshot="
-                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction=N/A");
-            assertThat(explanation.failureReason()).isEqualTo("RISK_DECLINED");
-            assertThat(explanation.unavailableReason()).isEqualTo("AUTHORIZATION_DECLINED");
-            assertThat(explanation.nextAction()).isEqualTo("N/A");
-            assertThat(explanation.evidenceRefs())
-                    .contains("fundsTransaction:" + authorizationSn,
-                            "routeSnapshot:" + context.routeSnapshot().getSnapshotId());
-            assertThat(explanation.evidenceRefs())
-                    .noneMatch(ref -> ref.startsWith("ledgerTransaction:"));
-            assertThat(explanation.payload())
-                    .containsEntry("displayStatus", "DECLINED")
-                    .containsEntry("operationStatus", "NO_ACTION_REQUIRED")
-                    .containsEntry("failureReason", "RISK_DECLINED")
-                    .containsEntry("unavailableReason", "AUTHORIZATION_DECLINED");
         });
         assertPostedTransactions(1);
         assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_AUTH_DECLINE_TOPUP", 3, 4);
@@ -327,25 +241,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(freezeSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
-            var explanation = context.explanation();
-            assertThat(explanation.businessScene()).isEqualTo("FREEZE");
-            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_FREEZE_HOLD");
-            assertThat(explanation.fundsTransactionSn()).isEqualTo(freezeSn);
-            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
-            assertThat(explanation.factStatus()).isEqualTo("HELD");
-            assertThat(explanation.displayStatus()).isEqualTo("FROZEN");
-            assertThat(explanation.operationStatus()).isEqualTo("WAITING_UNFREEZE_OR_CONSUME");
-            assertThat(explanation.statusMeaning()).isEqualTo("BALANCE_FROZEN_NOT_CONSUMED");
-            assertThat(explanation.amountSource())
-                    .isEqualTo("instructionAmount=40 USD, routeLegCount=1, routeSnapshot="
-                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
-                            + ledgerTransaction.getSn());
-            assertThat(explanation.unavailableReason()).isEqualTo("BALANCE_FREEZE_IS_NOT_CONSUMPTION");
-            assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_UNFREEZE_OR_CONSUME");
-            assertThat(explanation.payload())
-                    .containsEntry("displayStatus", "FROZEN")
-                    .containsEntry("operationStatus", "WAITING_UNFREEZE_OR_CONSUME")
-                    .containsEntry("nextAction", "WAIT_FOR_UNFREEZE_OR_CONSUME");
         });
         assertPostedTransactions(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FREEZE_TOPUP", 3, 4);

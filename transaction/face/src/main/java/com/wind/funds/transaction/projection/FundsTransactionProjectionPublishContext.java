@@ -6,8 +6,6 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.spec.FundsInstructionSpec;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 /**
  * 交易投影正常发布上下文。
@@ -22,33 +20,4 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                                                        @NonNull ResolvedRouteSpec resolvedRoute,
                                                        @NonNull RouteSnapshotSpec routeSnapshot,
                                                        @NonNull FundsInstructionLifecycleResult lifecycleResult) {
-
-    /**
-     * 生成面向用户账单、商户账单和运营时间线的只读解释摘要。
-     *
-     * @return 投影解释摘要
-     */
-    public @NonNull FundsTransactionProjectionExplanation explanation() {
-        return FundsTransactionProjectionExplanationSource.builder()
-                .businessScene(instruction.getBusinessScene())
-                .businessSn(instruction.getBusinessSn())
-                .fundsTransactionSn(lifecycleResult.getTransactionSn())
-                .routeSnapshot(routeSnapshot)
-                .ledgerTransactionSn(resolveLedgerTransactionSn())
-                .completed(lifecycleResult.isCompleted())
-                .failed(false)
-                .eventType(instruction.getEventType())
-                .amount(instruction.getAmount())
-                .contextVariables(instruction.getContextVariables())
-                .build()
-                .explanation();
-    }
-
-    private @Nullable String resolveLedgerTransactionSn() {
-        String ledgerTransactionSn = lifecycleResult.getLedgerTransactionSn();
-        if (StringUtils.hasText(ledgerTransactionSn)) {
-            return ledgerTransactionSn;
-        }
-        return null;
-    }
 }

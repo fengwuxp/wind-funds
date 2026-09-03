@@ -15,7 +15,6 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
-import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanationSource;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionScanBatch;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionScanCursor;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionScanQuery;

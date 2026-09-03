@@ -1,4 +1,4 @@
-package com.wind.funds.transaction.projection;
+package com.wind.funds.transaction.projection.impl;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -9,6 +9,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionState;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
+import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
@@ -30,7 +31,7 @@ import java.time.LocalDateTime;
  * <p>边界：本对象只做确定性解释转换，不查询数据库、不发布投影、不修改资金、账本或余额事实。</p>
  */
 @Builder
-public record FundsTransactionProjectionExplanationSource(@NonNull String businessScene,
+record FundsTransactionProjectionExplanationSource(@NonNull String businessScene,
                                                           @NonNull String businessSn,
                                                           @NonNull String fundsTransactionSn,
                                                           @NonNull RouteSnapshotSpec routeSnapshot,

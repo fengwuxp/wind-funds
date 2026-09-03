@@ -291,6 +291,54 @@ class FundsModuleDependencyBoundaryTests {
                 .isEmpty();
     }
 
+    @Test
+    void testTransactionFaceShouldNotOwnProjectionExplanationRules() throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path root = workspaceRoot();
+        String faceSourcePath = "transaction/face/src/main/java/com/wind/funds/transaction/projection/"
+                + "FundsTransactionProjectionExplanationSource.java";
+        if (Files.exists(root.resolve(faceSourcePath))) {
+            violations.add(faceSourcePath + " still exposes projection explanation rules");
+        }
+
+        String implSourcePath = "transaction/impl/src/main/java/com/wind/funds/transaction/projection/impl/"
+                + "FundsTransactionProjectionExplanationSource.java";
+        Path implSource = root.resolve(implSourcePath);
+        if (Files.notExists(implSource)) {
+            violations.add(implSourcePath + " is missing");
+        } else if (Files.readString(implSource)
+                .contains("public record FundsTransactionProjectionExplanationSource")) {
+            violations.add(implSourcePath + " must be package-private");
+        }
+
+        String publishContextPath = "transaction/face/src/main/java/com/wind/funds/transaction/projection/"
+                + "FundsTransactionProjectionPublishContext.java";
+        String publishContext = Files.readString(root.resolve(publishContextPath));
+        for (String forbidden : List.of(
+                "FundsTransactionProjectionExplanationSource",
+                "FundsTransactionProjectionExplanation explanation(",
+                "resolveLedgerTransactionSn(")) {
+            if (publishContext.contains(forbidden)) {
+                violations.add(publishContextPath + " still contains " + forbidden);
+            }
+        }
+
+        for (String requiredPath : List.of(
+                "transaction/face/src/main/java/com/wind/funds/transaction/projection/"
+                        + "FundsTransactionProjectionPublisher.java",
+                publishContextPath,
+                "transaction/face/src/main/java/com/wind/funds/transaction/projection/"
+                        + "FundsTransactionProjectionExplanation.java")) {
+            if (Files.notExists(root.resolve(requiredPath))) {
+                violations.add(requiredPath + " must remain in transaction-face");
+            }
+        }
+
+        assertThat(violations)
+                .as("transaction-face must expose projection contracts without default explanation rules")
+                .isEmpty();
+    }
+
     private static final List<String> PRODUCTION_MODULE_POMS = List.of(
             "core/pom.xml",
             "fx/impl/pom.xml",
